@@ -34,50 +34,6 @@
 static void addpkgruleinfo(Solver *solv, Id p, Id p2, Id d, int type, Id dep);
 static void solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded);
 
-/*-------------------------------------------------------------------
- * Check if dependency is possible
- *
- * mirrors solver_dep_fulfilled but uses map m instead of the decisionmap.
- * used in solver_addpkgrulesforweak and solver_createcleandepsmap.
- */
-
-static inline int
-dep_possible(Solver *solv, Id dep, Map *m)
-{
-  Pool *pool = solv->pool;
-  Id p, pp;
-
-  if (ISRELDEP(dep))
-    {
-      Reldep *rd = GETRELDEP(pool, dep);
-      if (rd->flags >= 8)
-	 {
-	  if (rd->flags == REL_COND || rd->flags == REL_UNLESS)
-	    return 1;
-	  if (rd->flags == REL_AND)
-	    {
-	      if (!dep_possible(solv, rd->name, m))
-		return 0;
-	      return dep_possible(solv, rd->evr, m);
-	    }
-	  if (rd->flags == REL_OR)
-	    {
-	      if (dep_possible(solv, rd->name, m))
-		return 1;
-	      return dep_possible(solv, rd->evr, m);
-	    }
-	  if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_SPLITPROVIDES)
-	    return solver_splitprovides(solv, rd->evr, m);
-	}
-    }
-  FOR_PROVIDES(p, pp, dep)
-    {
-      if (MAPTST(m, p))
-	return 1;
-    }
-  return 0;
-}
-
 static inline int
 is_otherproviders_dep(Pool *pool, Id dep)
 {
@@ -1205,7 +1161,7 @@ solver_addpkgrulesforweak(Solver *solv, Map *m)
 	  /* find possible supplements */
 	  supp = s->repo->idarraydata + s->supplements;
 	  while ((sup = *supp++) != 0)
-	    if (dep_possible(solv, sup, m))
+	    if (solver_dep_possible(solv, sup, m))
 	      break;
 	}
 
@@ -1214,7 +1170,7 @@ solver_addpkgrulesforweak(Solver *solv, Map *m)
 	{
 	  supp = s->repo->idarraydata + s->enhances;
 	  while ((sup = *supp++) != 0)
-	    if (dep_possible(solv, sup, m))
+	    if (solver_dep_possible(solv, sup, m))
 	      break;
 	}
       /* if nothing found, goto next solvables */
@@ -2137,120 +2093,6 @@ reenableduprule(Solver *solv, Id name)
 #define DISABLE_INFARCH	2
 #define DISABLE_DUP	3
 
-/*
- * add all installed packages that package p obsoletes to Queue q.
- * Package p is not installed. Also, we know that if
- * solv->keepexplicitobsoletes is not set, p is not in the multiversion map.
- * Entries may get added multiple times.
- */
-static void
-add_obsoletes(Solver *solv, Id p, Queue *q)
-{
-  Pool *pool = solv->pool;
-  Repo *installed = solv->installed;
-  Id p2, pp2;
-  Solvable *s = pool->solvables + p;
-  Id obs, *obsp;
-  Id lastp2 = 0;
-
-  if (!solv->keepexplicitobsoletes || !(solv->multiversion.size && MAPTST(&solv->multiversion, p)))
-    {
-      FOR_PROVIDES(p2, pp2, s->name)
-	{
-	  Solvable *ps = pool->solvables + p2;
-	  if (ps->repo != installed)
-	    continue;
-	  if (!pool->implicitobsoleteusesprovides && ps->name != s->name)
-	    continue;
-	  if (pool->implicitobsoleteusescolors && !pool_colormatch(pool, s, ps))
-	    continue;
-	  queue_push(q, p2);
-	  lastp2 = p2;
-	}
-    }
-  if (!s->obsoletes)
-    return;
-  obsp = s->repo->idarraydata + s->obsoletes;
-  while ((obs = *obsp++) != 0)
-    FOR_PROVIDES(p2, pp2, obs)
-      {
-	Solvable *ps = pool->solvables + p2;
-	if (ps->repo != installed)
-	  continue;
-	if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, ps, obs))
-	  continue;
-	if (pool->obsoleteusescolors && !pool_colormatch(pool, s, ps))
-	  continue;
-	if (p2 == lastp2)
-	  continue;
-	queue_push(q, p2);
-	lastp2 = p2;
-      }
-}
-
-/*
- * Call add_obsoletes and intersect the result with the
- * elements in Queue q starting at qstart.
- * Assumes that it's the first call if qstart == q->count.
- * May use auxillary map m for the intersection process, all
- * elements of q starting at qstart must have their bit cleared.
- * (This is also true after the function returns.)
- */
-static void
-intersect_obsoletes(Solver *solv, Id p, Queue *q, int qstart, Map *m)
-{
-  int i, j;
-  int qcount = q->count;
-
-  add_obsoletes(solv, p, q);
-  if (qcount == qstart)
-    return;	/* first call */
-  if (qcount == q->count)
-    j = qstart;	
-  else if (qcount == qstart + 1)
-    {
-      /* easy if there's just one element */
-      j = qstart;
-      for (i = qcount; i < q->count; i++)
-	if (q->elements[i] == q->elements[qstart])
-	  {
-	    j++;	/* keep the element */
-	    break;
-	  }
-    }
-  else if (!m->size && q->count - qstart <= 8)
-    {
-      /* faster than a map most of the time */
-      int k;
-      for (i = j = qstart; i < qcount; i++)
-	{
-	  Id ip = q->elements[i];
-	  for (k = qcount; k < q->count; k++)
-	    if (q->elements[k] == ip)
-	      {
-		q->elements[j++] = ip;
-		break;
-	      }
-	}
-    }
-  else
-    {
-      /* for the really pathologic cases we use the map */
-      Repo *installed = solv->installed;
-      if (!m->size)
-	map_init(m, installed->end - installed->start);
-      for (i = qcount; i < q->count; i++)
-	MAPSET(m, q->elements[i] - installed->start);
-      for (i = j = qstart; i < qcount; i++)
-	if (MAPTST(m, q->elements[i] - installed->start))
-	  {
-	    MAPCLR(m, q->elements[i] - installed->start);
-	    q->elements[j++] = q->elements[i];
-	  }
-    }
-  queue_truncate(q, j);
-}
-
 static void
 jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
 {
@@ -2366,7 +2208,7 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
       qstart = q->count;
       FOR_JOB_SELECT(p, pp, select, what)
 	{
-	  intersect_obsoletes(solv, p, q, qstart, &omap);
+	  solver_intersect_obsoleted(solv, p, q, qstart, &omap);
 	  if (q->count == qstart)
 	    break;
 	}
@@ -4243,7 +4085,7 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
 			}
 		    }
 		  else
-		    intersect_obsoletes(solv, p, &iq, iqstart, &om);
+		    solver_intersect_obsoleted(solv, p, &iq, iqstart, &om);
 		  if (iq.count == iqstart)
 		    break;
 		}
@@ -4311,13 +4153,13 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
 		continue;
 	      supp = s->repo->idarraydata + s->supplements;
 	      while ((sup = *supp++) != 0)
-		if (dep_possible(solv, sup, &im))
+		if (solver_dep_possible(solv, sup, &im))
 		  break;
 	      if (!sup)
 		{
 		  supp = s->repo->idarraydata + s->supplements;
 		  while ((sup = *supp++) != 0)
-		    if (dep_possible(solv, sup, &installedm) || (xsuppq.count && queue_contains(&xsuppq, sup)))
+		    if (solver_dep_possible(solv, sup, &installedm) || (xsuppq.count && queue_contains(&xsuppq, sup)))
 		      {
 		        /* no longer supplemented, also erase */
 			int iqcount = iq.count;
@@ -4473,7 +4315,7 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
 		continue;
 	      supp = s->repo->idarraydata + s->supplements;
 	      while ((sup = *supp++) != 0)
-		if (dep_possible(solv, sup, &im))
+		if (solver_dep_possible(solv, sup, &im))
 		  break;
 	      if (sup)
 		{
@@ -4832,7 +4674,7 @@ solver_get_unneeded(Solver *solv, Queue *unneededq, int filtered)
 	      Id *dp;
 	      int k;
 	      for (dp = s->repo->idarraydata + s->supplements; *dp; dp++)
-		if (dep_possible(solv, *dp, &installedm))
+		if (solver_dep_possible(solv, *dp, &installedm))
 		  {
 		    Queue iq;
 		    Id iqbuf[16];

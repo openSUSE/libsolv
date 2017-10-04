@@ -17,7 +17,29 @@ extern void solver_run_sat(Solver *solv, int disablerules, int doweak);
 extern void solver_reset(Solver *solv);
 
 extern int solver_splitprovides(Solver *solv, Id dep, Map *m);
+extern int solver_dep_possible_slow(Solver *solv, Id dep, Map *m);
 extern int solver_dep_fulfilled_cplx(Solver *solv, Reldep *rd);
+extern int solver_is_supplementing_alreadyinstalled(Solver *solv, Solvable *s);
+extern void solver_intersect_obsoleted(Solver *solv, Id p, Queue *q, int qstart, Map *m);
+
+
+#define ISSIMPLEDEP(pool, dep) (!ISRELDEP(dep) || GETRELDEP(pool, dep)->flags < 8)
+
+static inline int
+solver_dep_possible(Solver *solv, Id dep, Map *m)
+{
+  Pool *pool = solv->pool;
+  Id p, pp;
+
+  if (!ISSIMPLEDEP(pool, dep))
+    return solver_dep_possible_slow(solv, dep, m);
+  FOR_PROVIDES(p, pp, dep)
+    {  
+      if (MAPTST(m, p))
+        return 1;
+    }
+  return 0;
+}
 
 static inline int
 solver_dep_fulfilled(Solver *solv, Id dep)
