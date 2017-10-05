@@ -374,7 +374,7 @@ solver_intersect_obsoleted(Solver *solv, Id p, Queue *q, int qstart, Map *m)
             break;
           }
     }
-  else if (!m->size && q->count - qstart <= 8)
+  else if (!m || (!m->size && q->count - qstart <= 8))
     {
       /* faster than a map most of the time */
       int k;
