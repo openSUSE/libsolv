@@ -39,3 +39,12 @@ nextjob
 job update name A = 1-2 [cleandeps]
 result transaction,problems,cleandeps <inline>
 #>upgrade A-1-1.noarch@system A-1-2.noarch@test
+
+# check all packages
+nextjob
+job update all packages [cleandeps]
+result transaction,problems,cleandeps <inline>
+#>cleandeps B1-1-1.noarch@system
+#>erase B1-1-1.noarch@system
+#>install B2-1-1.noarch@test
+#>upgrade A-1-1.noarch@system A-2-1.noarch@test
