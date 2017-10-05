@@ -558,6 +558,72 @@ queue_contains(Queue *q, Id id)
   return 0;
 }
 
+static void
+find_update_seeds(Solver *solv, Queue *updatepkgs_filtered, Map *userinstalled)
+{
+  Pool *pool = solv->pool;
+  Repo *installed = solv->installed;
+  Queue *cleandeps_updatepkgs = solv->cleandeps_updatepkgs;
+  int i, j;
+  Id p;
+
+  queue_prealloc(updatepkgs_filtered, cleandeps_updatepkgs->count);
+  for (i = 0; i < cleandeps_updatepkgs->count; i++)
+    {
+      p = cleandeps_updatepkgs->elements[i];
+      if (pool->solvables[p].repo == installed)
+	{
+#ifdef ENABLE_LINKED_PKGS
+	  const char *name = pool_id2str(pool, pool->solvables[p].name);
+	  if (strncmp(name, "pattern:", 8) == 0 || strncmp(name, "application:", 12) == 0)
+	    continue;
+#endif
+	  queue_push(updatepkgs_filtered, p);
+	}
+    }
+#ifdef CLEANDEPSDEBUG
+  printf("SEEDS IN (%d)\n", updatepkgs_filtered->count);
+  for (i = 0; i < updatepkgs_filtered->count; i++)
+    printf("  - %s\n", pool_solvid2str(pool, updatepkgs_filtered->elements[i]));
+#endif
+  filter_unneeded(solv, updatepkgs_filtered, 0, 1);
+#ifdef CLEANDEPSDEBUG
+  printf("SEEDS OUT (%d)\n", updatepkgs_filtered->count);
+  for (i = 0; i < updatepkgs_filtered->count; i++)
+    printf("  - %s\n", pool_solvid2str(pool, updatepkgs_filtered->elements[i]));
+#endif
+  /* make sure userinstalled packages are in the seeds */
+  for (i = j = 0; i < updatepkgs_filtered->count; i++)
+    {
+      p = updatepkgs_filtered->elements[i];
+      if (!MAPTST(userinstalled, p - installed->start))
+	updatepkgs_filtered->elements[j++] = p;
+    }
+  queue_truncate(updatepkgs_filtered, j);
+  for (i = 0; i < cleandeps_updatepkgs->count; i++)
+    {
+      p = cleandeps_updatepkgs->elements[i];
+      if (pool->solvables[p].repo == installed)
+	{
+#ifdef ENABLE_LINKED_PKGS
+	  const char *name = pool_id2str(pool, pool->solvables[p].name);
+	  if (strncmp(name, "pattern:", 8) == 0 || strncmp(name, "application:", 12) == 0)
+	    {
+	      queue_push(updatepkgs_filtered, p);
+	      continue;
+	    }
+#endif
+	  if (MAPTST(userinstalled, p - installed->start))
+	    queue_push(updatepkgs_filtered, p);
+	}
+    }
+#ifdef CLEANDEPSDEBUG
+  printf("SEEDS FINAL\n");
+  for (i = 0; i < updatepkgs_filtered->count; i++)
+    printf("  - %s\n", pool_solvid2str(pool, updatepkgs_filtered->elements[i]));
+#endif
+}
+
 /*
  * Find all installed packages that are no longer
  * needed regarding the current solver job.
@@ -849,59 +915,8 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
   if (!unneeded && solv->cleandeps_updatepkgs)
     {
       /* find update "seeds" */
-      int j;
       queue_init(&updatepkgs_filtered);
-      queue_prealloc(&updatepkgs_filtered, solv->cleandeps_updatepkgs->count);
-      for (i = 0; i < solv->cleandeps_updatepkgs->count; i++)
-	{
-	  p = solv->cleandeps_updatepkgs->elements[i];
-	  if (pool->solvables[p].repo == installed)
-	    {
-#ifdef ENABLE_LINKED_PKGS
-	      const char *name = pool_id2str(pool, pool->solvables[p].name);
-	      if (strncmp(name, "pattern:", 8) == 0 || strncmp(name, "application:", 12) == 0)
-		continue;
-#endif
-	      queue_push(&updatepkgs_filtered, p);
-	    }
-	}
-      printf("SEEDS IN (%d)\n", updatepkgs_filtered.count);
-      for (i = 0; i < updatepkgs_filtered.count; i++)
-        printf("  - %s\n", pool_solvid2str(pool, updatepkgs_filtered.elements[i]));
-      filter_unneeded(solv, &updatepkgs_filtered, 0, 1);
-      printf("SEEDS OUT (%d)\n", updatepkgs_filtered.count);
-      for (i = 0; i < updatepkgs_filtered.count; i++)
-        printf("  - %s\n", pool_solvid2str(pool, updatepkgs_filtered.elements[i]));
-      /* make sure userinstalled packages are in the seeds */
-      for (i = j = 0; i < updatepkgs_filtered.count; i++)
-	{
-	  p = updatepkgs_filtered.elements[i];
-	  if (!MAPTST(&userinstalled, p - installed->start))
-	    updatepkgs_filtered.elements[j++] = p;
-	}
-      queue_truncate(&updatepkgs_filtered, j);
-      for (i = 0; i < solv->cleandeps_updatepkgs->count; i++)
-	{
-	  p = solv->cleandeps_updatepkgs->elements[i];
-	  if (pool->solvables[p].repo == installed)
-	    {
-#ifdef ENABLE_LINKED_PKGS
-	      const char *name = pool_id2str(pool, pool->solvables[p].name);
-	      if (strncmp(name, "pattern:", 8) == 0 || strncmp(name, "application:", 12) == 0)
-		{
-		  queue_push(&updatepkgs_filtered, p);
-		  continue;
-		}
-#endif
-	      if (MAPTST(&userinstalled, p - installed->start))
-		queue_push(&updatepkgs_filtered, p);
-	    }
-	}
-#ifdef CLEANDEPSDEBUG
-      printf("UPDATE SEEDS\n");
-      for (i = 0; i < updatepkgs_filtered.count; i++)
-        printf("  - %s\n", pool_solvid2str(pool, updatepkgs_filtered.elements[i]));
-#endif
+      find_update_seeds(solv, &updatepkgs_filtered, &userinstalled);
     }
 
 #ifdef CLEANDEPSDEBUG
