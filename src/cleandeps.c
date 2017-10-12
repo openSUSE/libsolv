@@ -119,18 +119,14 @@ check_xsupp(Solver *solv, Queue *depq, Id dep)
 	      return check_xsupp(solv, depq, rd->evr);
 	    }
 	  if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_SPLITPROVIDES)
-#if 0
-	    return solver_splitprovides(solv, rd->evr);
-#else
 	    return 0;
-#endif
-	}
-      if (depq && rd->flags == REL_NAMESPACE)
-	{
-	  int i;
-	  for (i = 0; i < depq->count; i++)
-	    if (depq->elements[i] == dep || depq->elements[i] == rd->name)
-	     return 1;
+	  if (depq && rd->flags == REL_NAMESPACE)
+	    {
+	      int i;
+	      for (i = 0; i < depq->count; i++)
+		if (depq->elements[i] == dep || depq->elements[i] == rd->name)
+		 return 1;
+	    }
 	}
     }
   FOR_PROVIDES(p, pp, dep)
