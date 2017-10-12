@@ -170,8 +170,8 @@
 #define MAX_SIG_CNT		0x100000
 #define MAX_SIG_DSIZE		0x100000
 
-#define MAX_HDR_CNT		0x100000
-#define MAX_HDR_DSIZE		0x2000000
+#define MAX_HDR_CNT		0x200000
+#define MAX_HDR_DSIZE		0x4000000
 
 typedef struct rpmhead {
   int cnt;
