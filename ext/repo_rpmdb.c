@@ -167,11 +167,12 @@
 #endif
 
 /* some limits to guard against corrupt rpms */
-#define MAX_SIG_CNT		0x100000
-#define MAX_SIG_DSIZE		0x100000
+/* dsize limits taken from rpm's lib/header.c */
+#define MAX_SIG_CNT		0x10000
+#define MAX_SIG_DSIZE		0x4000000
 
-#define MAX_HDR_CNT		0x200000
-#define MAX_HDR_DSIZE		0x4000000
+#define MAX_HDR_CNT		0x10000
+#define MAX_HDR_DSIZE		0x10000000
 
 typedef struct rpmhead {
   int cnt;
