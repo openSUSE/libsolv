@@ -1249,58 +1249,6 @@ dup_maykeepinstalled(Solver *solv, Solvable *s)
 }
 
 
-static Id
-finddistupgradepackages(Solver *solv, Solvable *s, Queue *qs)
-{
-  Pool *pool = solv->pool;
-  int i, j;
-
-  policy_findupdatepackages(solv, s, qs, 2);
-  if (qs->count)
-    {
-      /* remove installed packages we can't keep */
-      for (i = j = 0; i < qs->count; i++)
-	{
-	  Solvable *ns = pool->solvables + qs->elements[i];
-	  if (ns->repo == pool->installed && !dup_maykeepinstalled(solv, ns))
-	    continue;
-	  qs->elements[j++] = qs->elements[i];
-	}
-      queue_truncate(qs, j);
-    }
-  /* check if it is ok to keep the installed package */
-  if (dup_maykeepinstalled(solv, s))
-    return s - pool->solvables;
-  /* nope, it must be some other package */
-  return -SYSTEMSOLVABLE;
-}
-
-#if 0
-/* add packages from the dup repositories to the update candidates
- * this isn't needed for the global dup mode as all packages are
- * from dup repos in that case */
-static void
-addduppackages(Solver *solv, Solvable *s, Queue *qs)
-{
-  Queue dupqs;
-  Id p, dupqsbuf[64];
-  int i;
-  int oldnoupdateprovide = solv->noupdateprovide;
-
-  queue_init_buffer(&dupqs, dupqsbuf, sizeof(dupqsbuf)/sizeof(*dupqsbuf));
-  solv->noupdateprovide = 1;
-  policy_findupdatepackages(solv, s, &dupqs, 2);
-  solv->noupdateprovide = oldnoupdateprovide;
-  for (i = 0; i < dupqs.count; i++)
-    {
-      p = dupqs.elements[i];
-      if (MAPTST(&solv->dupmap, p))
-        queue_pushunique(qs, p);
-    }
-  queue_free(&dupqs);
-}
-#endif
-
 /* stash away the original updaters for multiversion packages. We do this so that
  * we can update the package later */
 static inline void
@@ -1396,6 +1344,7 @@ solver_addupdaterule(Solver *solv, Solvable *s)
   Queue qs;
   Id qsbuf[64];
   Rule *r;
+  int dupinvolved = 0;
 
   p = s - pool->solvables;
   /* Orphan detection. We cheat by looking at the feature rule, which
@@ -1418,16 +1367,10 @@ solver_addupdaterule(Solver *solv, Solvable *s)
       return;
     }
 
-  queue_init_buffer(&qs, qsbuf, sizeof(qsbuf)/sizeof(*qsbuf));
   /* find update candidates for 's' */
-  if (solv->dupinvolvedmap_all || (solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, p)))
-    {
-      policy_findupdatepackages(solv, s, &qs, 2);
-      if (!dup_maykeepinstalled(solv, s))
-	p = -SYSTEMSOLVABLE;
-    }
-  else
-    policy_findupdatepackages(solv, s, &qs, 0);
+  queue_init_buffer(&qs, qsbuf, sizeof(qsbuf)/sizeof(*qsbuf));
+  dupinvolved = solv->dupinvolvedmap_all || (solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, p));
+  policy_findupdatepackages(solv, s, &qs, dupinvolved ? 2 : 0);
 
   if (qs.count && solv->multiversion.size)
     {
@@ -1458,43 +1401,41 @@ solver_addupdaterule(Solver *solv, Solvable *s)
 		}
 	      qs.elements[j++] = qs.elements[i];
 	    }
+
+	  if (j == 0 && dupinvolved && !dup_maykeepinstalled(solv, s))
+	    {
+	      /* this is a multiversion orphan */
+	      queue_push(&solv->orphaned, p);
+	      set_specialupdaters(solv, s, d);
+	      if (solv->keep_orphans && !(solv->droporphanedmap_all || (solv->droporphanedmap.size && MAPTST(&solv->droporphanedmap, p - solv->installed->start))))
+		{
+		  /* we need to keep the orphan */
+		  queue_free(&qs);
+		  solver_addrule(solv, p, 0, 0);
+		  return;
+		}
+	      /* we can drop it as long as we update */
+	      j = qs.count;
+	    }
+
 	  if (j < qs.count)		/* filtered at least one package? */
 	    {
-	      if (j == 0 && p == -SYSTEMSOLVABLE)
-		{
-		  /* this is a multiversion orphan */
-		  queue_push(&solv->orphaned, s - pool->solvables);
-		  set_specialupdaters(solv, s, d);
-		  if (solv->keep_orphans && !(solv->droporphanedmap_all || (solv->droporphanedmap.size && MAPTST(&solv->droporphanedmap, s - pool->solvables - solv->installed->start))))
-		    {
-		      /* we need to keep the orphan */
-		      queue_free(&qs);
-		      solver_addrule(solv, s - pool->solvables, 0, 0);
-		      return;
-		    }
-		  /* we can drop it as long as we update */
-		  j = qs.count;		/* force the update */
-		}
-	      else if (d && (solv->updatemap_all || (solv->updatemap.size && MAPTST(&solv->updatemap, s - pool->solvables - solv->installed->start))))
+	      if (d && (solv->updatemap_all || (solv->updatemap.size && MAPTST(&solv->updatemap, p - solv->installed->start))))
 		{
 		  /* non-orphan multiversion package, set special updaters if we want an update */
 		  set_specialupdaters(solv, s, d);
 		}
 	      qs.count = j;
 	    }
-	  else if (p != -SYSTEMSOLVABLE)
+	  else
 	    {
 	      /* could fallthrough, but then we would do pool_queuetowhatprovides twice */
 	      queue_free(&qs);
-	      solver_addrule(solv, s - pool->solvables, 0, d);	/* allow update of s */
+	      solver_addrule(solv, p, 0, d);	/* allow update of s */
 	      return;
 	    }
 	}
     }
-  if (p == -SYSTEMSOLVABLE && solv->dupmap.size)
-    p = s - pool->solvables;		/* let the dup rules sort it out */
-  if (qs.count && p == -SYSTEMSOLVABLE)
-    p = queue_shift(&qs);
   if (qs.count > 1)
     {
       d = pool_queuetowhatprovides(pool, &qs);
