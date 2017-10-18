@@ -40,7 +40,7 @@ result transaction,problems <inline>
 # second check forced to untargeted
 nextjob
 solverflags noautotarget
-job distupgrade name A = 2-1
+job update name A = 2-1
 result transaction,problems <inline>
 
 # then targeted to D
