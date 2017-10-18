@@ -167,9 +167,10 @@ struct _Solver {
   int strongrecommends;			/* true: create weak rules for recommends */
   int install_also_updates;		/* true: do not prune install job rules to installed packages */
 
-  Map dupmap;				/* dup these packages*/
-  int dupmap_all;			/* dup all packages */
+  Map dupmap;				/* dup to those packages */
+  int dupmap_all;			/* dup to all repo packages */
   Map dupinvolvedmap;			/* packages involved in dup process */
+  int dupinvolvedmap_all;		/* all packages are involved */
   int dup_allowdowngrade;		/* dup mode: allow to downgrade installed solvable */
   int dup_allownamechange;		/* dup mode: allow to change name of installed solvable */
   int dup_allowarchchange;		/* dup mode: allow to change architecture of installed solvables */

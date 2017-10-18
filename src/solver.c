@@ -259,6 +259,10 @@ makeruledecisions(Solver *solv)
 	      continue;
 	    }
 
+	  POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, "ANALYZE UNSOLVABLE ASSERTION ----------------------\n");
+	  IF_POOLDEBUG (SOLV_DEBUG_UNSOLVABLE)
+	    solver_printruleclass(solv, SOLV_DEBUG_UNSOLVABLE, solv->rules + ri);
+
 	  /*
 	   * find the decision which is the "opposite" of the rule
 	   */
@@ -304,6 +308,8 @@ makeruledecisions(Solver *solv)
 	    }
 
 	  assert(solv->decisionq_why.elements[i] > 0);
+	  IF_POOLDEBUG (SOLV_DEBUG_UNSOLVABLE)
+	    solver_printruleclass(solv, SOLV_DEBUG_UNSOLVABLE, solv->rules + solv->decisionq_why.elements[i]);
 
 	  /*
 	   * conflict with a pkg rule ?
@@ -3647,17 +3653,8 @@ solver_solve(Solver *solv, Queue *job)
 	    }
 	  break;
 	case SOLVER_DISTUPGRADE:
-	  if (select == SOLVER_SOLVABLE_ALL)
-	    {
-	      solv->dupmap_all = 1;
-	      solv->updatemap_all = 1;
-	      if (how & SOLVER_FORCEBEST)
-		solv->bestupdatemap_all = 1;
-	    }
-	  if ((how & SOLVER_TARGETED) != 0)
-	    needduprules = 1;
-	  if (!solv->dupmap_all || solv->allowuninstall || solv->allowuninstall_all || solv->allowuninstallmap.size || solv->keep_orphans)
-	    needduprules = 1;
+	  needduprules = 1;
+	  solv->dupmap_all = 1;
 	  break;
 	default:
 	  break;
@@ -4038,7 +4035,7 @@ solver_solve(Solver *solv, Queue *job)
   else
     solv->infarchrules = solv->infarchrules_end = solv->nrules;
 
-  if (needduprules)
+  if (solv->dupinvolvedmap_all || solv->dupinvolvedmap.size)
     solver_addduprules(solv, &addedmap);
   else
     solv->duprules = solv->duprules_end = solv->nrules;

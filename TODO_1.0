@@ -23,8 +23,6 @@
 
 - write more manpages
 
-- use dup rules all the time
-
 - bindings: selections.flags() should be a attribute and not a method
 
 - rename repodata_lookup_id_uninternalized to repodata_lookup_id_voidid_uninternalized

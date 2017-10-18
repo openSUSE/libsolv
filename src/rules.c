@@ -1347,7 +1347,7 @@ solver_addfeaturerule(Solver *solv, Solvable *s)
   queue_init_buffer(&qs, qsbuf, sizeof(qsbuf)/sizeof(*qsbuf));
   p = s - pool->solvables;
   policy_findupdatepackages(solv, s, &qs, 1);
-  if (solv->dupmap_all || (solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, p)))
+  if (solv->dupinvolvedmap_all || (solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, p)))
     {
       if (!dup_maykeepinstalled(solv, s))
 	{
@@ -1421,8 +1421,12 @@ solver_addupdaterule(Solver *solv, Solvable *s)
 
   queue_init_buffer(&qs, qsbuf, sizeof(qsbuf)/sizeof(*qsbuf));
   /* find update candidates for 's' */
-  if (solv->dupmap_all || (solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, p)))
-    p = finddistupgradepackages(solv, s, &qs);
+  if (solv->dupinvolvedmap_all || (solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, p)))
+    {
+      policy_findupdatepackages(solv, s, &qs, 2);
+      if (!dup_maykeepinstalled(solv, s))
+	p = -SYSTEMSOLVABLE;
+    }
   else
     policy_findupdatepackages(solv, s, &qs, 0);
 
@@ -1489,6 +1493,9 @@ solver_addupdaterule(Solver *solv, Solvable *s)
 	    }
 	}
     }
+  else if (p == -SYSTEMSOLVABLE && solv->dupmap.size)
+    p = s - pool->solvables;		/* let the dup rules sort it out */
+
   if (!isorphaned && p == -SYSTEMSOLVABLE && qs.count && solv->dupmap.size)
     p = s - pool->solvables;		/* let the dup rules sort it out */
   if (qs.count && p == -SYSTEMSOLVABLE)
@@ -1619,9 +1626,10 @@ solver_addinfarchrules(Solver *solv, Map *addedmap)
 	  a = (a <= pool->lastarch) ? pool->id2arch[a] : 0;
 	  if (a != 1 && installed && ps->repo == installed)
 	    {
-	      if (!solv->dupmap_all && !(solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, p)))
-	        queue_pushunique(&allowedarchs, ps->arch);	/* also ok to keep this architecture */
-	      continue;		/* ignore installed solvables when calculating the best arch */
+	      if (solv->dupinvolvedmap_all || (solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, p)))
+		continue;
+	      queue_pushunique(&allowedarchs, ps->arch);	/* also ok to keep this architecture */
+	      continue;		/* but ignore installed solvables when calculating the best arch */
 	    }
 	  if (a && a != 1 && (!bestarch || a < bestarch))
 	    {
@@ -1647,7 +1655,7 @@ solver_addinfarchrules(Solver *solv, Map *addedmap)
 	      ps = pool->solvables + p;
 	      if (ps->name != s->name || ps->repo != installed || !MAPTST(addedmap, p))
 		continue;
-	      if (solv->dupmap_all || (solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, p)))
+	      if (solv->dupinvolvedmap_all || (solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, p)))
 		continue;
 	      a = ps->arch;
 	      a = (a <= pool->lastarch) ? pool->id2arch[a] : 0;
@@ -1807,6 +1815,9 @@ solver_addtodupmaps(Solver *solv, Id p, Id how, int targeted)
   Repo *installed = solv->installed;
   Id pi, pip, obs, *obsp;
 
+  if (!solv->dupinvolvedmap.size)
+    map_grow(&solv->dupinvolvedmap, pool->nsolvables);
+
   MAPSET(&solv->dupinvolvedmap, p);
   if (targeted)
     MAPSET(&solv->dupmap, p);
@@ -1881,6 +1892,10 @@ solver_addtodupmaps(Solver *solv, Id p, Id how, int targeted)
     }
 }
 
+/* create the two dupmaps:
+ * - dupmap: packages in that map are good to install/keep
+ * - dupinvolvedmap: packages are subject to dup mode
+ */
 void
 solver_createdupmaps(Solver *solv)
 {
@@ -1892,7 +1907,8 @@ solver_createdupmaps(Solver *solv)
   int i, targeted;
 
   map_init(&solv->dupmap, pool->nsolvables);
-  map_init(&solv->dupinvolvedmap, pool->nsolvables);
+  solv->dupinvolvedmap_all = 0;
+  map_init(&solv->dupinvolvedmap, 0);
   for (i = 0; i < job->count; i += 2)
     {
       how = job->elements[i];
@@ -1921,12 +1937,15 @@ solver_createdupmaps(Solver *solv)
 	    }
 	  else if (select == SOLVER_SOLVABLE_ALL)
 	    {
+	      solv->dupinvolvedmap_all = 1;
 	      FOR_POOL_SOLVABLES(p)
 		{
-		  MAPSET(&solv->dupinvolvedmap, p);
 		  if (installed && pool->solvables[p].repo != installed)
 		    MAPSET(&solv->dupmap, p);
 		}
+	      solv->updatemap_all = 1;
+	      if (how & SOLVER_FORCEBEST)
+		solv->bestupdatemap_all = 1;
 	    }
 	  else
 	    {
@@ -1957,7 +1976,8 @@ solver_createdupmaps(Solver *solv)
 	  break;
 	}
     }
-  MAPCLR(&solv->dupinvolvedmap, SYSTEMSOLVABLE);
+  if (solv->dupinvolvedmap.size)
+    MAPCLR(&solv->dupinvolvedmap, SYSTEMSOLVABLE);
 }
 
 void
@@ -1994,7 +2014,7 @@ solver_addduprules(Solver *solv, Map *addedmap)
 	    first = 0;
 	  if (first)
 	    break;
-	  if (!MAPTST(&solv->dupinvolvedmap, p))
+	  if (!solv->dupinvolvedmap_all && !MAPTST(&solv->dupinvolvedmap, p))
 	    continue;
 	  if (installed && ps->repo == installed)
 	    {
@@ -2015,24 +2035,35 @@ solver_addduprules(Solver *solv, Map *addedmap)
 		    }
 		  if (ip)
 		    {
-		      /* ok, found a good one. we may keep this package. */
+		      /* ok, identical to a good one. we may keep this package. */
 		      MAPSET(&solv->dupmap, p);		/* for best rules processing */
 		      continue;
 		    }
+		  /* check if it's orphaned. If yes, we may keep it */
 		  r = solv->rules + solv->updaterules + (p - installed->start);
 		  if (!r->p)
-		      r = solv->rules + solv->featurerules + (p - installed->start);
-		  if (r->p && solv->specialupdaters && solv->specialupdaters[p - installed->start])
+		    r = solv->rules + solv->featurerules + (p - installed->start);
+		  if (!r->p)
+		    {
+		      /* no update/feature rule, this is an orphan */
+		      MAPSET(&solv->dupmap, p);		/* for best rules processing */
+		      continue;
+		    }
+		  if (solv->specialupdaters && solv->specialupdaters[p - installed->start])
 		    {
 		      /* this is a multiversion orphan, we're good if an update is installed */
 		      solver_addrule(solv, -p, 0, solv->specialupdaters[p - installed->start]);
 		      continue;
 		    }
-		  if (!r->p || (r->p == p && !r->d && !r->w2))
+		  if (r->p == p && !r->d && !r->w2)
 		    {
-		      /* this is an orphan */
-		      MAPSET(&solv->dupmap, p);		/* for best rules processing */
-		      continue;
+		      r = solv->rules + solv->featurerules + (p - installed->start);
+		      if (!r->p || (!r->d && !r->w2))
+			{
+			  /* this is an orphan */
+			  MAPSET(&solv->dupmap, p);		/* for best rules processing */
+			  continue;
+			}
 		    }
 		  solver_addrule(solv, -p, 0, 0);	/* no match, sorry */
 		}

@@ -145,7 +145,7 @@ solver_prune_installed_dup_packages(Solver *solv, Queue *plist)
       Solvable *s = pool->solvables + p;
       if (s->repo != pool->installed && s->repo->priority < bestprio)
 	continue;
-      if (s->repo == pool->installed && (solv->dupmap_all || (solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, p))))
+      if (s->repo == pool->installed && (solv->dupinvolvedmap_all || (solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, p))))
 	{
 	  Id p2, pp2;
 	  int keepit = 0;
@@ -181,7 +181,7 @@ static inline void
 solver_prune_to_highest_prio(Solver *solv, Queue *plist)
 {
   prune_to_highest_prio(solv->pool, plist);
-  if (plist->count > 1 && solv->pool->installed && (solv->dupmap_all || solv->dupinvolvedmap.size))
+  if (plist->count > 1 && solv->pool->installed && (solv->dupinvolvedmap_all || solv->dupinvolvedmap.size))
     solver_prune_installed_dup_packages(solv, plist);
 }
 
