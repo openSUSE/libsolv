@@ -1395,7 +1395,6 @@ solver_addupdaterule(Solver *solv, Solvable *s)
   Id p, d;
   Queue qs;
   Id qsbuf[64];
-  int isorphaned = 0;
   Rule *r;
 
   p = s - pool->solvables;
@@ -1474,7 +1473,6 @@ solver_addupdaterule(Solver *solv, Solvable *s)
 		      return;
 		    }
 		  /* we can drop it as long as we update */
-		  isorphaned = 1;
 		  j = qs.count;		/* force the update */
 		}
 	      else if (d && (solv->updatemap_all || (solv->updatemap.size && MAPTST(&solv->updatemap, s - pool->solvables - solv->installed->start))))
@@ -1493,10 +1491,7 @@ solver_addupdaterule(Solver *solv, Solvable *s)
 	    }
 	}
     }
-  else if (p == -SYSTEMSOLVABLE && solv->dupmap.size)
-    p = s - pool->solvables;		/* let the dup rules sort it out */
-
-  if (!isorphaned && p == -SYSTEMSOLVABLE && qs.count && solv->dupmap.size)
+  if (p == -SYSTEMSOLVABLE && solv->dupmap.size)
     p = s - pool->solvables;		/* let the dup rules sort it out */
   if (qs.count && p == -SYSTEMSOLVABLE)
     p = queue_shift(&qs);
@@ -2215,25 +2210,14 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
 	return;
       /* now the hard part: disable some update rules */
 
-      /* first check if we have multiversion or installed packages in the job */
-      i = j = 0;
+      /* first check if we have installed or multiversion packages in the job */
       FOR_JOB_SELECT(p, pp, select, what)
 	{
 	  if (pool->solvables[p].repo == installed)
-	    j = p;
-	  else if (solv->multiversion.size && MAPTST(&solv->multiversion, p) && !solv->keepexplicitobsoletes)
 	    return;
-	  i++;
+	  if (solv->multiversion.size && MAPTST(&solv->multiversion, p) && !solv->keepexplicitobsoletes)
+	    return;
 	}
-      if (j)	/* have installed packages */
-	{
-	  /* this is for dupmap_all jobs, it can go away if we create
-	   * duprules for them */
-	  if (i == 1 && (set & SOLVER_SETREPO) != 0)
-	    queue_push2(q, DISABLE_UPDATE, j);
-	  return;
-	}
-
       omap.size = 0;
       qstart = q->count;
       FOR_JOB_SELECT(p, pp, select, what)
