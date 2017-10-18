@@ -12,17 +12,18 @@ system i686 * system
 job multiversion name a
 job distupgrade all packages
 result transaction,problems <inline>
-#>problem 251f1f35 info nothing provides c needed by a-2-1.i686
-#>problem 251f1f35 solution 2f2d254c allow a-1-1.i686@system
+#>problem fc3d647e info nothing provides c needed by a-2-1.i686
+#>problem fc3d647e solution 179b72ed allow a-1-1.i686@system
+#>problem fc3d647e solution e5fc66c9 erase a-1-1.i686@system
 
 nextjob
 
 job multiversion name a
 job distupgrade repo available
 result transaction,problems <inline>
-#>erase a-1-1.i686@system
-#>problem 251f1f35 info nothing provides c needed by a-2-1.i686
-#>problem 251f1f35 solution 2f2d254c allow a-1-1.i686@system
+#>problem fc3d647e info nothing provides c needed by a-2-1.i686
+#>problem fc3d647e solution 179b72ed allow a-1-1.i686@system
+#>problem fc3d647e solution e5fc66c9 erase a-1-1.i686@system
 
 ### same with keeporphans
 

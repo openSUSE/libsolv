@@ -1,6 +1,6 @@
 # test dup with orphaned packages
 #
-# part 3: a is not really an orphan, but cannott be downgraded
+# part 3: a is not really an orphan, but cannot be downgraded
 #
 
 repo system 0 testtags <inline>
@@ -16,8 +16,9 @@ job distupgrade all packages
 result transaction,problems <inline>
 #>downgrade a-1-1.i686@system a-1-0.i686@available
 #>upgrade b-1-1.i686@system b-2-1.i686@available
-#>problem c43b1300 info problem with installed package a-1-1.i686
-#>problem c43b1300 solution c43b1300 replace a-1-1.i686@system a-1-0.i686@available
+#>problem 7724e627 info problem with installed package a-1-1.i686
+#>problem 7724e627 solution 25ae2253 allow a-1-1.i686@system
+#>problem 7724e627 solution 2cf4745c replace a-1-1.i686@system a-1-0.i686@available
 
 nextjob
 
@@ -26,8 +27,9 @@ job distupgrade repo available
 result transaction,problems <inline>
 #>downgrade a-1-1.i686@system a-1-0.i686@available
 #>upgrade b-1-1.i686@system b-2-1.i686@available
-#>problem c43b1300 info problem with installed package a-1-1.i686
-#>problem c43b1300 solution c43b1300 replace a-1-1.i686@system a-1-0.i686@available
+#>problem 7724e627 info problem with installed package a-1-1.i686
+#>problem 7724e627 solution 25ae2253 allow a-1-1.i686@system
+#>problem 7724e627 solution 2cf4745c replace a-1-1.i686@system a-1-0.i686@available
 
 ### keeporphans
 
@@ -38,8 +40,9 @@ job distupgrade all packages
 result transaction,problems <inline>
 #>downgrade a-1-1.i686@system a-1-0.i686@available
 #>upgrade b-1-1.i686@system b-2-1.i686@available
-#>problem c43b1300 info problem with installed package a-1-1.i686
-#>problem c43b1300 solution c43b1300 replace a-1-1.i686@system a-1-0.i686@available
+#>problem 7724e627 info problem with installed package a-1-1.i686
+#>problem 7724e627 solution 25ae2253 allow a-1-1.i686@system
+#>problem 7724e627 solution 2cf4745c replace a-1-1.i686@system a-1-0.i686@available
 
 nextjob
 
@@ -48,9 +51,9 @@ job distupgrade repo available
 result transaction,problems <inline>
 #>downgrade a-1-1.i686@system a-1-0.i686@available
 #>upgrade b-1-1.i686@system b-2-1.i686@available
-#>problem c43b1300 info problem with installed package a-1-1.i686
-#>problem c43b1300 solution c43b1300 replace a-1-1.i686@system a-1-0.i686@available
-
+#>problem 7724e627 info problem with installed package a-1-1.i686
+#>problem 7724e627 solution 25ae2253 allow a-1-1.i686@system
+#>problem 7724e627 solution 2cf4745c replace a-1-1.i686@system a-1-0.i686@available
 
 ### same with allowuninstall
 
