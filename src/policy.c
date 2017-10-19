@@ -1424,7 +1424,7 @@ policy_is_illegal(Solver *solv, Solvable *is, Solvable *s, int ignore)
 {
   Pool *pool = solv->pool;
   int ret = 0;
-  int duppkg = solv->dupmap_all ? 1 : 0;
+  int duppkg = solv->dupinvolvedmap_all || (solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, is - pool->solvables));
   if (!(ignore & POLICY_ILLEGAL_DOWNGRADE) && !(duppkg ? solv->dup_allowdowngrade : solv->allowdowngrade))
     {
       if (is->name == s->name && pool_evrcmp(pool, is->evr, s->evr, EVRCMP_COMPARE) > 0)

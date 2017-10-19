@@ -2118,7 +2118,7 @@ add_complex_recommends(Solver *solv, Id rec, Queue *dq, Map *dqmap)
 	    {
 	      if (solv->decisionmap[p] < 0)
 		continue;
-	      if (solv->dupmap_all && solv->installed && pool->solvables[p].repo == solv->installed && (solv->droporphanedmap_all || (solv->droporphanedmap.size && MAPTST(&solv->droporphanedmap, p - solv->installed->start))))
+	      if (solv->process_orphans && solv->installed && pool->solvables[p].repo == solv->installed && (solv->droporphanedmap_all || (solv->droporphanedmap.size && MAPTST(&solv->droporphanedmap, p - solv->installed->start))))
 		continue;
 	    }
 	  queue_push(dq, p);
@@ -2273,7 +2273,7 @@ resolve_weak(Solver *solv, int level, int disablerules, Queue *dq, Queue *dqs, i
 			}
 		      else if (solv->decisionmap[p] == 0)
 			{
-			  if (solv->dupmap_all && solv->installed && pool->solvables[p].repo == solv->installed && (solv->droporphanedmap_all || (solv->droporphanedmap.size && MAPTST(&solv->droporphanedmap, p - solv->installed->start))))
+			  if (solv->process_orphans && solv->installed && pool->solvables[p].repo == solv->installed && (solv->droporphanedmap_all || (solv->droporphanedmap.size && MAPTST(&solv->droporphanedmap, p - solv->installed->start))))
 			    continue;
 			  queue_pushunique(dq, p);
 			}
@@ -2290,7 +2290,7 @@ resolve_weak(Solver *solv, int level, int disablerules, Queue *dq, Queue *dqs, i
 	    continue;
 	  if (!solver_is_supplementing(solv, s))
 	    continue;
-	  if (solv->dupmap_all && solv->installed && s->repo == solv->installed && (solv->droporphanedmap_all || (solv->droporphanedmap.size && MAPTST(&solv->droporphanedmap, i - solv->installed->start))))
+	  if (solv->process_orphans && solv->installed && s->repo == solv->installed && (solv->droporphanedmap_all || (solv->droporphanedmap.size && MAPTST(&solv->droporphanedmap, i - solv->installed->start))))
 	    continue;
 	  if (solv->isdisfavormap.size && MAPTST(&solv->isdisfavormap, i))
 	    continue;	/* disfavored supplements, do not install */
@@ -3414,7 +3414,7 @@ solver_solve(Solver *solv, Queue *job)
     queue_insertn(&solv->job, 0, pool->pooljobs.count, pool->pooljobs.elements);
   job = &solv->job;
 
-  /* free old stuff in jase we re-run a solver */
+  /* free old stuff in case we re-run a solver */
   queuep_free(&solv->update_targets);
   queuep_free(&solv->cleandeps_updatepkgs);
   queue_empty(&solv->ruleassertions);
@@ -3430,9 +3430,9 @@ solver_solve(Solver *solv, Queue *job)
   map_zerosize(&solv->bestupdatemap);
   solv->fixmap_all = 0;
   map_zerosize(&solv->fixmap);
-  solv->dupmap_all = 0;
   map_zerosize(&solv->dupmap);
   map_zerosize(&solv->dupinvolvedmap);
+  solv->process_orphans = 0;
   solv->droporphanedmap_all = 0;
   map_zerosize(&solv->droporphanedmap);
   solv->allowuninstall_all = 0;
@@ -3654,7 +3654,8 @@ solver_solve(Solver *solv, Queue *job)
 	  break;
 	case SOLVER_DISTUPGRADE:
 	  needduprules = 1;
-	  solv->dupmap_all = 1;
+	  if (select == SOLVER_SOLVABLE_ALL)
+	    solv->process_orphans = 1;
 	  break;
 	default:
 	  break;
@@ -3777,7 +3778,7 @@ solver_solve(Solver *solv, Queue *job)
 	      continue;
 	    }
 	  /* it's also orphaned if the feature rule consists just of the installed package */
-	  if (!solv->dupmap_all && sr->p == i && !sr->d && !sr->w2)
+	  if (!solv->process_orphans && sr->p == i && !sr->d && !sr->w2)
 	    queue_push(&solv->orphaned, i);
 
 	  if (!solver_rulecmp(solv, r, sr))
@@ -4126,7 +4127,7 @@ solver_solve(Solver *solv, Queue *job)
   solver_disablepolicyrules(solv);
 
   /* break orphans if requested */
-  if (solv->dupmap_all && solv->orphaned.count && solv->break_orphans)
+  if (solv->process_orphans && solv->orphaned.count && solv->break_orphans)
     solver_breakorphans(solv);
 
   /*

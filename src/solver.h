@@ -167,8 +167,8 @@ struct _Solver {
   int strongrecommends;			/* true: create weak rules for recommends */
   int install_also_updates;		/* true: do not prune install job rules to installed packages */
 
+  int process_orphans;			/* true: do special orphan processing */
   Map dupmap;				/* dup to those packages */
-  int dupmap_all;			/* dup to all repo packages */
   Map dupinvolvedmap;			/* packages involved in dup process */
   int dupinvolvedmap_all;		/* all packages are involved */
   int dup_allowdowngrade;		/* dup mode: allow to downgrade installed solvable */

@@ -454,13 +454,6 @@ convertsolution(Solver *solv, Id why, Queue *solutionq)
 	  return;	/* false alarm */
 
       p = solv->installed->start + (why - solv->updaterules);
-      if (solv->dupmap_all && solv->rules[why].p != p && solv->decisionmap[p] > 0)
-	{
-	  /* distupgrade case, allow to keep old package */
-	  queue_push(solutionq, SOLVER_SOLUTION_DISTUPGRADE);
-	  queue_push(solutionq, p);
-	  return;
-	}
       if (solv->decisionmap[p] > 0)
 	return;		/* false alarm, turned out we can keep the package */
       rr = solv->rules + solv->featurerules + (why - solv->updaterules);
