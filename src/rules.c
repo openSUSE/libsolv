@@ -1876,12 +1876,16 @@ solver_createdupmaps(Solver *solv)
 	      solv->dupinvolvedmap_all = 1;
 	      FOR_POOL_SOLVABLES(p)
 		{
-		  if (installed && pool->solvables[p].repo != installed)
-		    MAPSET(&solv->dupmap, p);
+		  Solvable *s = pool->solvables + p;
+		  if (!s->repo || s->repo == installed)
+		    continue;
+		  if (!pool_installable(pool, s))
+		    continue;
+		  MAPSET(&solv->dupmap, p);
 		}
-	      if (how & SOLVER_FORCEBEST)
+	      if ((how & SOLVER_FORCEBEST) != 0)
 		solv->bestupdatemap_all = 1;
-	      if (how & SOLVER_CLEANDEPS)
+	      if ((how & SOLVER_CLEANDEPS) != 0 && installed)
 		{
 		  FOR_REPO_SOLVABLES(installed, p, s)
 		    add_cleandeps_updatepkg(solv, p);
