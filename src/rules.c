@@ -3249,11 +3249,6 @@ solver_addbestrules(Solver *solv, int havebestinstalljobs)
   int i, oldcnt;
 
   solv->bestrules = solv->nrules;
-  if (!installed)
-    {
-      solv->bestrules_end = solv->nrules;
-      return;
-    }
   queue_init(&q);
   queue_init(&q2);
   queue_init(&r2pkg);
@@ -3293,7 +3288,7 @@ solver_addbestrules(Solver *solv, int havebestinstalljobs)
 	}
     }
 
-  if (solv->bestupdatemap_all || solv->bestupdatemap.size)
+  if (installed && (solv->bestupdatemap_all || solv->bestupdatemap.size))
     {
       Map m;
 
