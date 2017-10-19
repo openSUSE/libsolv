@@ -1770,7 +1770,7 @@ solver_addtodupmaps(Solver *solv, Id p, Id how, int targeted)
 	    if (pool->solvables[pi2].repo != installed)
 	      MAPSET(&solv->dupinvolvedmap, pi2);
 	}
-      if (ps->repo == installed && (how & SOLVER_FORCEBEST) != 0)
+      if (ps->repo == installed && (how & SOLVER_FORCEBEST) != 0 && !solv->bestupdatemap_all)
 	{
 	  if (!solv->bestupdatemap.size)
 	    map_grow(&solv->bestupdatemap, installed->end - installed->start);
@@ -1815,7 +1815,7 @@ solver_addtodupmaps(Solver *solv, Id p, Id how, int targeted)
 		    if (pool->solvables[pi2].repo != installed)
 		      MAPSET(&solv->dupinvolvedmap, pi2);
 		}
-	      if (ps->repo == installed && (how & SOLVER_FORCEBEST) != 0)
+	      if (ps->repo == installed && (how & SOLVER_FORCEBEST) != 0 && !solv->bestupdatemap_all)
 		{
 		  if (!solv->bestupdatemap.size)
 		    map_grow(&solv->bestupdatemap, installed->end - installed->start);
@@ -1879,9 +1879,13 @@ solver_createdupmaps(Solver *solv)
 		  if (installed && pool->solvables[p].repo != installed)
 		    MAPSET(&solv->dupmap, p);
 		}
-	      solv->updatemap_all = 1;
 	      if (how & SOLVER_FORCEBEST)
 		solv->bestupdatemap_all = 1;
+	      if (how & SOLVER_CLEANDEPS)
+		{
+		  FOR_REPO_SOLVABLES(installed, p, s)
+		    add_cleandeps_updatepkg(solv, p);
+		}
 	    }
 	  else
 	    {
@@ -1935,6 +1939,8 @@ solver_addduprules(Solver *solv, Map *addedmap)
   Rule *r;
 
   solv->duprules = solv->nrules;
+  if (solv->dupinvolvedmap_all)
+    solv->updatemap_all = 1;
   for (i = 1; i < pool->nsolvables; i++)
     {
       if (i == SYSTEMSOLVABLE || !MAPTST(addedmap, i))
@@ -1954,9 +1960,12 @@ solver_addduprules(Solver *solv, Map *addedmap)
 	    continue;
 	  if (installed && ps->repo == installed)
 	    {
-	      if (!solv->updatemap.size)
-		map_grow(&solv->updatemap, installed->end - installed->start);
-	      MAPSET(&solv->updatemap, p - installed->start);
+	      if (!solv->updatemap_all)
+		{
+		  if (!solv->updatemap.size)
+		    map_grow(&solv->updatemap, installed->end - installed->start);
+		  MAPSET(&solv->updatemap, p - installed->start);
+		}
 	      if (!MAPTST(&solv->dupmap, p))
 		{
 		  Id ip, ipp;
