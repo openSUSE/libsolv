@@ -12,6 +12,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <zlib.h>
+#include <lzma.h>
 #include <errno.h>
 
 #include "pool.h"
@@ -22,7 +23,7 @@
 #include "repo_deb.h"
 
 static unsigned char *
-decompress(unsigned char *in, int inl, int *outlp)
+decompress_gz(unsigned char *in, int inl, int *outlp)
 {
   z_stream strm;
   int outl, ret;
@@ -61,6 +62,51 @@ decompress(unsigned char *in, int inl, int *outlp)
     }
   outl += 4096 - strm.avail_out;
   inflateEnd(&strm);
+  *outlp = outl;
+  return out;
+}
+
+static unsigned char *
+decompress_xz(unsigned char *in, int inl, int *outlp)
+{
+  static lzma_stream stream_init = LZMA_STREAM_INIT;
+  lzma_stream strm;
+  int outl, ret;
+  unsigned char *out;
+
+  strm = stream_init;
+  strm.next_in = in;
+  strm.avail_in = inl;
+  out = solv_malloc(4096);
+  strm.next_out = out;
+  strm.avail_out = 4096;
+  outl = 0;
+  ret = lzma_auto_decoder(&strm, 100 << 20, 0);
+  if (ret != LZMA_OK)
+    {
+      free(out);
+      return 0;
+    }
+  for (;;)
+    {
+      if (strm.avail_out == 0)
+	{
+	  outl += 4096;
+	  out = solv_realloc(out, outl + 4096);
+	  strm.next_out = out + outl;
+	  strm.avail_out = 4096;
+	}
+      ret = lzma_code(&strm, LZMA_RUN);
+      if (ret == LZMA_STREAM_END)
+	break;
+      if (ret != LZMA_OK)
+	{
+	  free(out);
+	  return 0;
+	}
+    }
+  outl += 4096 - strm.avail_out;
+  lzma_end(&strm);
   *outlp = outl;
   return out;
 }
@@ -447,6 +493,10 @@ repo_add_debdb(Repo *repo, int flags)
   return 0;
 }
 
+#define CONTROL_COMP_NONE	0
+#define CONTROL_COMP_GZIP	1
+#define CONTROL_COMP_XZ		2
+
 Id
 repo_add_deb(Repo *repo, const char *deb, int flags)
 {
@@ -454,6 +504,7 @@ repo_add_deb(Repo *repo, const char *deb, int flags)
   Repodata *data;
   unsigned char buf[4096], *bp;
   int l, l2, vlen, clen, ctarlen;
+  int control_comp;
   unsigned char *ctgz;
   unsigned char pkgid[16];
   unsigned char *ctar;
@@ -495,16 +546,23 @@ repo_add_deb(Repo *repo, const char *deb, int flags)
       fclose(fp);
       return 0;
     }
-  if (strncmp((char *)buf + 8 + 60 + vlen, "control.tar.gz  ", 16) != 0 && strncmp((char *)buf + 8 + 60 + vlen, "control.tar.gz/ ", 16) != 0)
+  control_comp = 0;
+  if (!strncmp((char *)buf + 8 + 60 + vlen, "control.tar.gz  ", 16) || !strncmp((char *)buf + 8 + 60 + vlen, "control.tar.gz/ ", 16))
+    control_comp = CONTROL_COMP_GZIP;
+  else if (!strncmp((char *)buf + 8 + 60 + vlen, "control.tar.xz  ", 16) || !strncmp((char *)buf + 8 + 60 + vlen, "control.tar.xz/ ", 16))
+    control_comp = CONTROL_COMP_XZ;
+  else if (!strncmp((char *)buf + 8 + 60 + vlen, "control.tar     ", 16) || !strncmp((char *)buf + 8 + 60 + vlen, "control.tar/    ", 16))
+    control_comp = CONTROL_COMP_NONE;
+  else
     {
-      pool_error(pool, -1, "%s: control.tar.gz is not second entry", deb);
+      pool_error(pool, -1, "%s: control.tar is not second entry", deb);
       fclose(fp);
       return 0;
     }
   clen = atoi((char *)buf + 8 + 60 + vlen + 48);
   if (clen <= 0 || clen >= 0x100000)
     {
-      pool_error(pool, -1, "%s: control.tar.gz has illegal size", deb);
+      pool_error(pool, -1, "%s: control.tar has illegal size", deb);
       fclose(fp);
       return 0;
     }
@@ -534,51 +592,64 @@ repo_add_deb(Repo *repo, const char *deb, int flags)
       solv_chksum_free(chk, pkgid);
       gotpkgid = 1;
     }
-  if (ctgz[0] != 0x1f || ctgz[1] != 0x8b)
+  ctar = 0;
+  if (control_comp == CONTROL_COMP_GZIP)
     {
-      pool_error(pool, -1, "%s: control.tar.gz is not gzipped", deb);
-      solv_free(ctgz);
-      return 0;
-    }
-  if (ctgz[2] != 8 || (ctgz[3] & 0xe0) != 0)
-    {
-      pool_error(pool, -1, "%s: control.tar.gz is compressed in a strange way", deb);
-      solv_free(ctgz);
-      return 0;
-    }
-  bp = ctgz + 4;
-  bp += 6;	/* skip time, xflags and OS code */
-  if (ctgz[3] & 0x04)
-    {
-      /* skip extra field */
-      l = bp[0] | bp[1] << 8;
-      bp += l + 2;
-      if (bp >= ctgz + clen)
+      if (ctgz[0] != 0x1f || ctgz[1] != 0x8b)
 	{
-          pool_error(pool, -1, "%s: control.tar.gz is corrupt", deb);
+	  pool_error(pool, -1, "%s: control.tar.gz is not gzipped", deb);
 	  solv_free(ctgz);
 	  return 0;
 	}
+      if (ctgz[2] != 8 || (ctgz[3] & 0xe0) != 0)
+	{
+	  pool_error(pool, -1, "%s: control.tar.gz is compressed in a strange way", deb);
+	  solv_free(ctgz);
+	  return 0;
+	}
+      bp = ctgz + 4;
+      bp += 6;	/* skip time, xflags and OS code */
+      if (ctgz[3] & 0x04)
+	{
+	  /* skip extra field */
+	  l = bp[0] | bp[1] << 8;
+	  bp += l + 2;
+	  if (bp >= ctgz + clen)
+	    {
+	      pool_error(pool, -1, "%s: control.tar.gz is corrupt", deb);
+	      solv_free(ctgz);
+	      return 0;
+	    }
+	}
+      if (ctgz[3] & 0x08)	/* orig filename */
+	while (*bp)
+	  bp++;
+      if (ctgz[3] & 0x10)	/* file comment */
+	while (*bp)
+	  bp++;
+      if (ctgz[3] & 0x02)	/* header crc */
+	bp += 2;
+      if (bp >= ctgz + clen)
+	{
+	  pool_error(pool, -1, "%s: control.tar.gz is corrupt", deb);
+	  solv_free(ctgz);
+	  return 0;
+	}
+      ctar = decompress_gz(bp, ctgz + clen - bp, &ctarlen);
     }
-  if (ctgz[3] & 0x08)	/* orig filename */
-    while (*bp)
-      bp++;
-  if (ctgz[3] & 0x10)	/* file comment */
-    while (*bp)
-      bp++;
-  if (ctgz[3] & 0x02)	/* header crc */
-    bp += 2;
-  if (bp >= ctgz + clen)
+  else if (control_comp == CONTROL_COMP_XZ)
     {
-      pool_error(pool, -1, "%s: control.tar.gz is corrupt", deb);
-      solv_free(ctgz);
-      return 0;
+      ctar = decompress_xz(ctgz, clen, &ctarlen);
     }
-  ctar = decompress(bp, ctgz + clen - bp, &ctarlen);
+  else
+    {
+      ctarlen = clen;
+      ctar = solv_memdup(ctgz, clen);
+    }
   solv_free(ctgz);
   if (!ctar)
     {
-      pool_error(pool, -1, "%s: control.tar.gz is corrupt", deb);
+      pool_error(pool, -1, "%s: control.tar is corrupt", deb);
       return 0;
     }
   bp = ctar;
@@ -598,7 +669,7 @@ repo_add_deb(Repo *repo, const char *deb, int flags)
     }
   if (l <= 512 || l - 512 - l2 <= 0 || l2 <= 0)
     {
-      pool_error(pool, -1, "%s: control.tar.gz contains no control file", deb);
+      pool_error(pool, -1, "%s: control.tar contains no control file", deb);
       free(ctar);
       return 0;
     }
