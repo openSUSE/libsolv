@@ -595,7 +595,7 @@ repo_add_deb(Repo *repo, const char *deb, int flags)
   ctar = 0;
   if (control_comp == CONTROL_COMP_GZIP)
     {
-      if (ctgz[0] != 0x1f || ctgz[1] != 0x8b)
+      if (clen <= 10 || ctgz[0] != 0x1f || ctgz[1] != 0x8b)
 	{
 	  pool_error(pool, -1, "%s: control.tar.gz is not gzipped", deb);
 	  solv_free(ctgz);
@@ -612,21 +612,15 @@ repo_add_deb(Repo *repo, const char *deb, int flags)
       if (ctgz[3] & 0x04)
 	{
 	  /* skip extra field */
-	  l = bp[0] | bp[1] << 8;
+	  l = bp + 2 >= ctgz + clen ? 0 : (bp[0] | bp[1] << 8);
 	  bp += l + 2;
-	  if (bp >= ctgz + clen)
-	    {
-	      pool_error(pool, -1, "%s: control.tar.gz is corrupt", deb);
-	      solv_free(ctgz);
-	      return 0;
-	    }
 	}
       if (ctgz[3] & 0x08)	/* orig filename */
-	while (*bp)
-	  bp++;
+	while (bp < ctgz + clen && *bp++)
+	  ;
       if (ctgz[3] & 0x10)	/* file comment */
-	while (*bp)
-	  bp++;
+	while (bp < ctgz + clen && *bp++)
+	  ;
       if (ctgz[3] & 0x02)	/* header crc */
 	bp += 2;
       if (bp >= ctgz + clen)
