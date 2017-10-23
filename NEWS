@@ -2,6 +2,14 @@
 This file contains the major changes between
 libsolv versions:
 
+Version 0.6.30
+- new features:
+  * many fixes and extenstions for cleandeps, e.g.
+    cleandeps now works for "update all packages"
+  * support debian packages with xz compressed control.tar
+  * always create dup rules for "distupgrade" jobs
+  * use recommends also for ordering packages
+
 Version 0.6.29
 - new features:
   * support for REL_WITHOUT and REL_UNLESS dependencies

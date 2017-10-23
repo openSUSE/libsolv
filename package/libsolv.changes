@@ -1,4 +1,13 @@
 -------------------------------------------------------------------
+Mon Oct 23 11:40:22 CEST 2017 - mls@suse.de
+
+- many fixes and improvements for cleandeps
+- support debian packages with xz compressed control.tar
+- always create dup rules for "distupgrade" jobs
+- use recommends also for ordering packages
+- bump version to 0.6.30
+
+-------------------------------------------------------------------
 Thu Sep  7 16:18:20 CEST 2017 - mls@suse.de
 
 - expose solver_get_recommendations in bindings
