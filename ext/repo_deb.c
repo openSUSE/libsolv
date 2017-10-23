@@ -23,11 +23,37 @@
 #include "repo_deb.h"
 
 static unsigned char *
-decompress_gz(unsigned char *in, int inl, int *outlp)
+decompress_gz(unsigned char *in, int inl, int *outlp, int maxoutl)
 {
   z_stream strm;
   int outl, ret;
-  unsigned char *out;
+  unsigned char *bp, *out;
+
+  /* first skip the gz header */
+  if (inl <= 10 || in[0] != 0x1f || in[1] != 0x8b)
+    return 0;
+  if (in[2] != 8 || (in[3] & 0xe0) != 0)
+    return 0;
+  bp = in + 4;
+  bp += 6;	/* skip time, xflags and OS code */
+  if (in[3] & 0x04)
+    {
+      /* skip extra field */
+      int l = bp + 2 >= in + inl ? 0 : (bp[0] | bp[1] << 8);
+      bp += l + 2;
+    }
+  if (in[3] & 0x08)	/* orig filename */
+    while (bp < in + inl && *bp++)
+      ;
+  if (in[3] & 0x10)	/* file comment */
+    while (bp < in + inl && *bp++)
+      ;
+  if (in[3] & 0x02)	/* header crc */
+    bp += 2;
+  if (bp >= in + inl)
+    return 0;
+  inl -= bp - in;
+  in = bp;
 
   memset(&strm, 0, sizeof(strm));
   strm.next_in = in;
@@ -47,6 +73,12 @@ decompress_gz(unsigned char *in, int inl, int *outlp)
       if (strm.avail_out == 0)
 	{
 	  outl += 4096;
+	  if (outl >= maxoutl)
+	    {
+	      inflateEnd(&strm);
+	      free(out);
+	      return 0;
+	    }
 	  out = solv_realloc(out, outl + 4096);
 	  strm.next_out = out + outl;
 	  strm.avail_out = 4096;
@@ -56,6 +88,7 @@ decompress_gz(unsigned char *in, int inl, int *outlp)
 	break;
       if (ret != Z_OK)
 	{
+	  inflateEnd(&strm);
 	  free(out);
 	  return 0;
 	}
@@ -67,7 +100,7 @@ decompress_gz(unsigned char *in, int inl, int *outlp)
 }
 
 static unsigned char *
-decompress_xz(unsigned char *in, int inl, int *outlp)
+decompress_xz(unsigned char *in, int inl, int *outlp, int maxoutl)
 {
   static lzma_stream stream_init = LZMA_STREAM_INIT;
   lzma_stream strm;
@@ -92,6 +125,12 @@ decompress_xz(unsigned char *in, int inl, int *outlp)
       if (strm.avail_out == 0)
 	{
 	  outl += 4096;
+	  if (outl >= maxoutl)
+	    {
+	      lzma_end(&strm);
+	      free(out);
+	      return 0;
+	    }
 	  out = solv_realloc(out, outl + 4096);
 	  strm.next_out = out + outl;
 	  strm.avail_out = 4096;
@@ -101,6 +140,7 @@ decompress_xz(unsigned char *in, int inl, int *outlp)
 	break;
       if (ret != LZMA_OK)
 	{
+	  lzma_end(&strm);
 	  free(out);
 	  return 0;
 	}
@@ -594,47 +634,9 @@ repo_add_deb(Repo *repo, const char *deb, int flags)
     }
   ctar = 0;
   if (control_comp == CONTROL_COMP_GZIP)
-    {
-      if (clen <= 10 || ctgz[0] != 0x1f || ctgz[1] != 0x8b)
-	{
-	  pool_error(pool, -1, "%s: control.tar.gz is not gzipped", deb);
-	  solv_free(ctgz);
-	  return 0;
-	}
-      if (ctgz[2] != 8 || (ctgz[3] & 0xe0) != 0)
-	{
-	  pool_error(pool, -1, "%s: control.tar.gz is compressed in a strange way", deb);
-	  solv_free(ctgz);
-	  return 0;
-	}
-      bp = ctgz + 4;
-      bp += 6;	/* skip time, xflags and OS code */
-      if (ctgz[3] & 0x04)
-	{
-	  /* skip extra field */
-	  l = bp + 2 >= ctgz + clen ? 0 : (bp[0] | bp[1] << 8);
-	  bp += l + 2;
-	}
-      if (ctgz[3] & 0x08)	/* orig filename */
-	while (bp < ctgz + clen && *bp++)
-	  ;
-      if (ctgz[3] & 0x10)	/* file comment */
-	while (bp < ctgz + clen && *bp++)
-	  ;
-      if (ctgz[3] & 0x02)	/* header crc */
-	bp += 2;
-      if (bp >= ctgz + clen)
-	{
-	  pool_error(pool, -1, "%s: control.tar.gz is corrupt", deb);
-	  solv_free(ctgz);
-	  return 0;
-	}
-      ctar = decompress_gz(bp, ctgz + clen - bp, &ctarlen);
-    }
+    ctar = decompress_gz(ctgz, clen, &ctarlen, 0x1000000);
   else if (control_comp == CONTROL_COMP_XZ)
-    {
-      ctar = decompress_xz(ctgz, clen, &ctarlen);
-    }
+    ctar = decompress_xz(ctgz, clen, &ctarlen, 0x1000000);
   else
     {
       ctarlen = clen;
@@ -648,6 +650,7 @@ repo_add_deb(Repo *repo, const char *deb, int flags)
     }
   bp = ctar;
   l = ctarlen;
+  l2 = 0;
   while (l > 512)
     {
       int j;
@@ -655,6 +658,12 @@ repo_add_deb(Repo *repo, const char *deb, int flags)
       for (j = 124; j < 124 + 12; j++)
 	if (bp[j] >= '0' && bp[j] <= '7')
 	  l2 = l2 * 8 + (bp[j] - '0');
+      if (l2 < 0 || l2 > l)
+	{
+	  l2 = 0;
+	  break;
+	}
+      bp[124] = 0;
       if (!strcmp((char *)bp, "./control") || !strcmp((char *)bp, "control"))
 	break;
       l2 = 512 + ((l2 + 511) & ~511);
