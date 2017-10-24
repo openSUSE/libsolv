@@ -1,7 +1,7 @@
 #
 # spec file for package libsolv
 #
-# Copyright (c) 2012 SUSE LINUX Products GmbH, Nuernberg, Germany.
+# Copyright (c) 2017 SUSE LINUX Products GmbH, Nuernberg, Germany.
 #
 # All modifications and additions to the file contributed by third parties
 # remain the property of their copyright owners, unless otherwise agreed
@@ -102,24 +102,29 @@ BuildRequires:  xz-devel
 %endif
 
 
-Summary:        A new approach to package dependency solving
+Summary:        Package dependency solver using a satisfiability algorithm
 License:        BSD-3-Clause
 Group:          Development/Libraries/C and C++
 
 %description
-A new approach to package dependency solving
+libsolv is a library for solving packages and reading repositories.
+The solver uses a satisfiability algorithm.
 
 %if !%{with disable_shared}
 %package -n libsolv@LIBSOLV_SOVERSION@
-Summary:        A new approach to package dependency solving
-Group:          Development/Libraries/C and C++
+Summary:        Package dependency solver using a satisfiability algorithm
+Group:          System/Libraries
 
 %description -n libsolv@LIBSOLV_SOVERSION@
-A new approach to package dependency solving
+libsolv is a library for solving packages and reading repositories.
+It consists of two central blocks: Using a dictionary approach to
+store and retrieve package and dependency information, and, using a
+so-called satisfiability algorithm for resolving package
+dependencies.
 
 %endif
 %package devel
-Summary:        A new approach to package dependency solving
+Summary:        Development files for libsolv, a package solver
 Group:          Development/Libraries/C and C++
 %if !%{with disable_shared}
 Requires:       libsolv@LIBSOLV_SOVERSION@ = %version
@@ -128,18 +133,22 @@ Requires:       rpm-devel
 Conflicts:      libsatsolver-devel
 
 %description devel
-Development files for libsolv, a new approach to package dependency solving
+Development files for libsolv, a library for solving packages and
+reading repositories.
 
 %package tools
-Summary:        A new approach to package dependency solving
-Group:          Development/Libraries/C and C++
+Summary:        Utilities to work with .solv files
+Group:          System/Management
 Obsoletes:      satsolver-tools < 0.18
 Provides:       satsolver-tools = 0.18
 Conflicts:      satsolver-tools-obsolete
 Requires:       gzip bzip2 coreutils findutils
 
 %description tools
-A new approach to package dependency solving.
+libsolv is a library for solving packages and reading repositories.
+
+This subpackage contains utilities to create and work with the .solv
+files used by libsolv.
 
 %package demo
 Summary:        Applications demoing the libsolv library
@@ -161,7 +170,7 @@ Summary:        Ruby bindings for the libsolv library
 Group:          Development/Languages/Ruby
 
 %description -n ruby-solv
-Ruby bindings for sat solver.
+Ruby bindings for libsolv.
 
 %package -n python-solv
 %if 0%{?py_requires:1} && %{with python_binding}
@@ -171,14 +180,14 @@ Summary:        Python bindings for the libsolv library
 Group:          Development/Languages/Python
 
 %description -n python-solv
-Python bindings for sat solver.
+Python bindings for libsolv.
 
 %package -n python3-solv
 Summary:        Python3 bindings for the libsolv library
 Group:          Development/Languages/Python
 
 %description -n python3-solv
-Python3 bindings for sat solver.
+Python3 bindings for libsolv.
 
 %package -n perl-solv
 Requires:       perl = %{perl_version}
@@ -186,13 +195,13 @@ Summary:        Perl bindings for the libsolv library
 Group:          Development/Languages/Perl
 
 %description -n perl-solv
-Perl bindings for sat solver.
+Perl bindings for libsolv.
 
 %prep
 %setup -n libsolv-%{version}
 
 %build
-export CFLAGS="$RPM_OPT_FLAGS"
+export CFLAGS="%{optflags}"
 export CXXFLAGS="$CFLAGS"
 
 CMAKE_FLAGS=
@@ -227,25 +236,22 @@ cmake	$CMAKE_FLAGS \
 make %{?_smp_mflags}
 
 %install
-make DESTDIR=$RPM_BUILD_ROOT install
+make DESTDIR=%{buildroot} install
 %if 0%{?suse_version}
 %if %{with python_binding}
-pushd $RPM_BUILD_ROOT/%{python_sitearch}
+pushd %{buildroot}/%{python_sitearch}
 python %py_libdir/py_compile.py *.py
 python -O %py_libdir/py_compile.py *.py
 popd
 %endif
 %if %{with python3_binding}
-%py3_compile $RPM_BUILD_ROOT/%{python3_sitearch}
+%py3_compile %{buildroot}/%{python3_sitearch}
 %endif
 %endif
 %if %{with disable_shared}
 # we want to leave the .a file untouched
 export NO_BRP_STRIP_DEBUG=true
 %endif
-
-%clean
-rm -rf "$RPM_BUILD_ROOT"
 
 %if !%{with disable_shared}
 %post -n libsolv@LIBSOLV_SOVERSION@ -p /sbin/ldconfig
