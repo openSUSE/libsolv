@@ -5,6 +5,8 @@ Mon Oct 23 11:40:22 CEST 2017 - mls@suse.de
 - support debian packages with xz compressed control.tar
 - always create dup rules for "distupgrade" jobs
 - use recommends also for ordering packages
+- Fix splitprovides handling with addalreadyrecommended turned off
+  [bnc#1059065]
 - bump version to 0.6.30
 
 -------------------------------------------------------------------
