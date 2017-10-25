@@ -3588,7 +3588,7 @@ solver_solve(Solver *solv, Queue *job)
 		}
 	      break;
 	    case SOLVER_DROP_ORPHANED:
-	      if (select == SOLVER_SOLVABLE_ALL || (select == SOLVER_SOLVABLE_REPO && what == installed->repoid))
+	      if (select == SOLVER_SOLVABLE_ALL || (select == SOLVER_SOLVABLE_REPO && installed && what == installed->repoid))
 		solv->droporphanedmap_all = 1;
 	      FOR_JOB_SELECT(p, pp, select, what)
 		{
