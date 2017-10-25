@@ -3398,6 +3398,8 @@ solver_addbestrules(Solver *solv, int havebestinstalljobs)
 
 
 /* yumobs rule handling */
+/* note that we use pool->obsoleteusescolors || pool->implicitobsoleteusescolors
+ * like in policy_findupdatepackages */
 
 static void
 find_obsolete_group(Solver *solv, Id obs, Queue *q)
@@ -3422,7 +3424,7 @@ find_obsolete_group(Solver *solv, Id obs, Queue *q)
 	  Id obs2, *obsp2;
 	  if (!os->obsoletes)
 	    continue;
-	  if (pool->obsoleteusescolors && !pool_colormatch(pool, s2, os))
+	  if ((pool->obsoleteusescolors || pool->implicitobsoleteusescolors) && !pool_colormatch(pool, s2, os))
 	    continue;
 	  obsp2 = os->repo->idarraydata + os->obsoletes; 
 	  while ((obs2 = *obsp2++) != 0)
@@ -3440,7 +3442,7 @@ find_obsolete_group(Solver *solv, Id obs, Queue *q)
 	    continue;
 	  if (!os->obsoletes)
 	    continue;
-	  if (pool->obsoleteusescolors && !pool_colormatch(pool, s2, os))
+	  if ((pool->obsoleteusescolors || pool->implicitobsoleteusescolors) && !pool_colormatch(pool, s2, os))
 	    continue;
 	  obsp2 = os->repo->idarraydata + os->obsoletes; 
 	  while ((obs2 = *obsp2++) != 0)
@@ -3539,7 +3541,7 @@ printf("checking yumobs for %s\n", pool_solvable2str(pool, s));
 		    continue;
 		  if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p2, obs))
 		    continue;
-		  if (pool->obsoleteusescolors && !pool_colormatch(pool, s, s2))
+		  if ((pool->obsoleteusescolors || pool->implicitobsoleteusescolors) && !pool_colormatch(pool, s, s2))
 		    continue;
 		  queue_pushunique(&qo, obs);
 		  break;
