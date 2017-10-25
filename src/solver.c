@@ -4079,7 +4079,7 @@ solver_solve(Solver *solv, Queue *job)
   map_free(&installcandidatemap);
   queue_free(&q);
 
-  POOL_DEBUG(SOLV_DEBUG_STATS, "%d pkg rules, 2 * %d update rules, %d job rules, %d infarch rules, %d dup rules, %d choice rules, %d best rules\n", solv->pkgrules_end - 1, solv->updaterules_end - solv->updaterules, solv->jobrules_end - solv->jobrules, solv->infarchrules_end - solv->infarchrules, solv->duprules_end - solv->duprules, solv->choicerules_end - solv->choicerules, solv->bestrules_end - solv->bestrules);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "%d pkg rules, 2 * %d update rules, %d job rules, %d infarch rules, %d dup rules, %d choice rules, %d best rules, %d yumobs rules\n", solv->pkgrules_end - 1, solv->updaterules_end - solv->updaterules, solv->jobrules_end - solv->jobrules, solv->infarchrules_end - solv->infarchrules, solv->duprules_end - solv->duprules, solv->choicerules_end - solv->choicerules, solv->bestrules_end - solv->bestrules, solv->yumobsrules_end - solv->yumobsrules);
   POOL_DEBUG(SOLV_DEBUG_STATS, "overall rule memory used: %d K\n", solv->nrules * (int)sizeof(Rule) / 1024);
 
   /* create weak map */
