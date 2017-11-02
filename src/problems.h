@@ -30,10 +30,9 @@ struct _Solver;
 
 void solver_recordproblem(struct _Solver *solv, Id rid);
 void solver_fixproblem(struct _Solver *solv, Id rid);
-Id solver_autouninstall(struct _Solver *solv, Id *problem);
+Id solver_autouninstall(struct _Solver *solv, int start);
+void solver_disableproblemset(struct _Solver *solv, int start);
 
-void solver_disableproblem(struct _Solver *solv, Id v);
-void solver_enableproblem(struct _Solver *solv, Id v);
 int solver_prepare_solutions(struct _Solver *solv);
 
 unsigned int solver_problem_count(struct _Solver *solv);

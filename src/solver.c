@@ -256,7 +256,7 @@ makeruledecisions(Solver *solv, int disablerules)
 	  if (doautouninstall)
 	    {
 	      if (solv->allowuninstall || solv->allowuninstall_all || solv->allowuninstallmap.size)
-		if (solver_autouninstall(solv, solv->problems.elements + oldproblemcount + 1) != 0)
+		if (solver_autouninstall(solv, oldproblemcount) != 0)
 		  {
 		    solv->problems.count = oldproblemcount;
 		    havedisabled = 1;
@@ -280,9 +280,7 @@ makeruledecisions(Solver *solv, int disablerules)
 	      return -1;
 	    }
 	  /* disable all problem rules */
-	  for (i = oldproblemcount + 1; i < solv->problems.count - 1; i++)
-	    solver_disableproblem(solv, solv->problems.elements[i]);
-
+	  solver_disableproblemset(solv, oldproblemcount);
 	  havedisabled = 1;
 	  break;	/* start over */
 	}
@@ -1010,7 +1008,7 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
   queue_free(&weakq);
 
   if (solv->allowuninstall || solv->allowuninstall_all || solv->allowuninstallmap.size)
-    if (solver_autouninstall(solv, solv->problems.elements + oldproblemcount + 1) != 0)
+    if (solver_autouninstall(solv, oldproblemcount) != 0)
       {
 	solv->problems.count = oldproblemcount;
 	solv->learnt_pool.count = oldlearntpoolcount;
@@ -1028,8 +1026,7 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
   /* + 2: index + trailing zero */
   if (disablerules && oldproblemcount + 2 < solv->problems.count)
     {
-      for (i = oldproblemcount + 1; i < solv->problems.count - 1; i++)
-        solver_disableproblem(solv, solv->problems.elements[i]);
+      solver_disableproblemset(solv, oldproblemcount);
       /* XXX: might want to enable all weak rules again */
       solver_reset(solv);
       return 0;
