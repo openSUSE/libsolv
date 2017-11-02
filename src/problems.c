@@ -35,7 +35,6 @@
 void
 solver_disableproblem(Solver *solv, Id v)
 {
-  Rule *r;
   int i;
   Id *jp;
 
@@ -76,9 +75,19 @@ solver_disableproblem(Solver *solv, Id v)
     }
   v = -(v + 1);
   jp = solv->ruletojob.elements;
-  for (i = solv->jobrules, r = solv->rules + i; i < solv->jobrules_end; i++, r++, jp++)
+  if (solv->bestrules_pkg)
+    {
+      int ni = solv->bestrules_end - solv->bestrules;
+      for (i = 0; i < ni; i++)
+	{
+	  int j = solv->bestrules_pkg[i];
+	  if (j < 0 && jp[-j - solv->jobrules] == v)
+	    solver_disablerule(solv, solv->rules + solv->bestrules + i);
+	}
+    }
+  for (i = solv->jobrules; i < solv->jobrules_end; i++, jp++)
     if (*jp == v)
-      solver_disablerule(solv, r);
+      solver_disablerule(solv, solv->rules + i);
 }
 
 /*-------------------------------------------------------------------
@@ -133,9 +142,19 @@ solver_enableproblem(Solver *solv, Id v)
     }
   v = -(v + 1);
   jp = solv->ruletojob.elements;
-  for (i = solv->jobrules, r = solv->rules + i; i < solv->jobrules_end; i++, r++, jp++)
+  if (solv->bestrules_pkg)
+    {
+      int ni = solv->bestrules_end - solv->bestrules;
+      for (i = 0; i < ni; i++)
+	{
+	  int j = solv->bestrules_pkg[i];
+	  if (j < 0 && jp[-j - solv->jobrules] == v)
+	    solver_enablerule(solv, solv->rules + solv->bestrules + i);
+	}
+    }
+  for (i = solv->jobrules; i < solv->jobrules_end; i++, jp++)
     if (*jp == v)
-      solver_enablerule(solv, r);
+      solver_enablerule(solv, solv->rules + i);
 }
 
 

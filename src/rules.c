@@ -1466,7 +1466,7 @@ disableupdaterule(Solver *solv, Id p)
     {
       int i, ni;
       ni = solv->bestrules_end - solv->bestrules;
-      for (i = 0; i < ni; i++)
+      for (i = solv->bestrules_up - solv->bestrules; i < ni; i++)
 	if (solv->bestrules_pkg[i] == p)
 	  solver_disablerule(solv, solv->rules + solv->bestrules + i);
     }
@@ -1509,7 +1509,7 @@ reenableupdaterule(Solver *solv, Id p)
     {
       int i, ni;
       ni = solv->bestrules_end - solv->bestrules;
-      for (i = 0; i < ni; i++)
+      for (i = solv->bestrules_up - solv->bestrules; i < ni; i++)
 	if (solv->bestrules_pkg[i] == p)
 	  solver_enablerule(solv, solv->rules + solv->bestrules + i);
     }
@@ -3257,36 +3257,47 @@ solver_addbestrules(Solver *solv, int havebestinstalljobs)
     {
       for (i = 0; i < solv->job.count; i += 2)
 	{
-	  if ((solv->job.elements[i] & (SOLVER_JOBMASK | SOLVER_FORCEBEST)) == (SOLVER_INSTALL | SOLVER_FORCEBEST))
+	  Id how = solv->job.elements[i];
+	  if ((how & (SOLVER_JOBMASK | SOLVER_FORCEBEST)) == (SOLVER_INSTALL | SOLVER_FORCEBEST))
 	    {
 	      int j;
 	      Id p2, pp2;
 	      for (j = 0; j < solv->ruletojob.count; j++)
-		if (solv->ruletojob.elements[j] == i)
-		  break;
-	      if (j == solv->ruletojob.count)
-		continue;
-	      r = solv->rules + solv->jobrules + j;
-	      queue_empty(&q);
-	      FOR_RULELITERALS(p2, pp2, r)
-		if (p2 > 0)
-		  queue_push(&q, p2);
-	      if (!q.count)
-		continue;	/* orphaned */
-	      /* select best packages, just look at prio and version */
-	      oldcnt = q.count;
-	      policy_filter_unwanted(solv, &q, POLICY_MODE_RECOMMEND);
-	      if (q.count == oldcnt)
-		continue;	/* nothing filtered */
-	      p2 = queue_shift(&q);
-	      if (q.count < 2)
-	        solver_addrule(solv, p2, q.count ? q.elements[0] : 0, 0);
-	      else
-	        solver_addrule(solv, p2, 0, pool_queuetowhatprovides(pool, &q));
-	      queue_push(&r2pkg, -(solv->jobrules + j));
+		{
+		  if (solv->ruletojob.elements[j] != i)
+		    continue;
+		  r = solv->rules + solv->jobrules + j;
+		  queue_empty(&q);
+		  queue_empty(&q2);
+		  FOR_RULELITERALS(p2, pp2, r)
+		    {
+		      if (p2 > 0)
+		        queue_push(&q, p2);
+		      else if (p2 < 0)
+		        queue_push(&q2, p2);
+		    }
+		  if (!q.count)
+		    continue;	/* orphaned */
+		  /* select best packages, just look at prio and version */
+		  oldcnt = q.count;
+		  policy_filter_unwanted(solv, &q, POLICY_MODE_RECOMMEND);
+		  if (q.count == oldcnt)
+		    continue;	/* nothing filtered */
+		  if (q2.count)
+		    queue_insertn(&q, 0, q2.count, q2.elements);
+		  p2 = queue_shift(&q);
+		  if (q.count < 2)
+		    solver_addrule(solv, p2, q.count ? q.elements[0] : 0, 0);
+		  else
+		    solver_addrule(solv, p2, 0, pool_queuetowhatprovides(pool, &q));
+		  if ((how & SOLVER_WEAK) != 0)
+		    queue_push(&solv->weakruleq, solv->nrules - 1);
+		  queue_push(&r2pkg, -(solv->jobrules + j));
+		}
 	    }
 	}
     }
+  solv->bestrules_up = solv->nrules;
 
   if (installed && (solv->bestupdatemap_all || solv->bestupdatemap.size))
     {

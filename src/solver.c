@@ -288,6 +288,8 @@ makeruledecisions(Solver *solv)
 	      POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, "conflict with system solvable, disabling rule #%d\n", ri);
 	      if  (ri >= solv->jobrules && ri < solv->jobrules_end)
 		v = -(solv->ruletojob.elements[ri - solv->jobrules] + 1);
+	      else if (ri >= solv->bestrules && ri < solv->bestrules_up && solv->bestrules_pkg[ri - solv->bestrules] < 0)
+		v = -(solv->ruletojob.elements[-solv->bestrules_pkg[ri - solv->bestrules] - solv->jobrules] + 1);
 	      else
 		v = ri;
 	      queue_push(&solv->problems, v);
@@ -329,6 +331,8 @@ makeruledecisions(Solver *solv)
 	      POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, "conflict with pkg rule, disabling rule #%d\n", ri);
 	      if (ri >= solv->jobrules && ri < solv->jobrules_end)
 		v = -(solv->ruletojob.elements[ri - solv->jobrules] + 1);
+	      else if (ri >= solv->bestrules && ri < solv->bestrules_up && solv->bestrules_pkg[ri - solv->bestrules] < 0)
+		v = -(solv->ruletojob.elements[-solv->bestrules_pkg[ri - solv->bestrules] - solv->jobrules] + 1);
 	      else
 		v = ri;
 	      queue_push(&solv->problems, v);
@@ -383,9 +387,12 @@ makeruledecisions(Solver *solv)
 	      POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, " - disabling rule #%d\n", i);
 	      solver_printruleclass(solv, SOLV_DEBUG_UNSOLVABLE, solv->rules + i);
 		
-	      v = i;
 	      if (i >= solv->jobrules && i < solv->jobrules_end)
 		v = -(solv->ruletojob.elements[i - solv->jobrules] + 1);
+	      else if (i >= solv->bestrules && i < solv->bestrules_up && solv->bestrules_pkg[i - solv->bestrules] < 0)
+		v = -(solv->ruletojob.elements[-solv->bestrules_pkg[i - solv->bestrules] - solv->jobrules] + 1);
+	      else
+	        v = i;
 	      queue_push(&solv->problems, v);
 	    }
 	  queue_push(&solv->problems, 0);
@@ -448,6 +455,8 @@ makeruledecisions(Solver *solv)
 
 	  if (ri >= solv->jobrules && ri < solv->jobrules_end)
 	    v = -(solv->ruletojob.elements[ri - solv->jobrules] + 1);
+	  else if (ri >= solv->bestrules && ri < solv->bestrules_up && solv->bestrules_pkg[ri - solv->bestrules] < 0)
+	    v = -(solv->ruletojob.elements[-solv->bestrules_pkg[ri - solv->bestrules] - solv->jobrules] + 1);
 	  else
 	    v = ri;
 	  solver_disableproblem(solv, v);
@@ -1019,6 +1028,8 @@ analyze_unsolvable_rule(Solver *solv, Rule *r, Queue *weakq, Map *rseen)
   /* turn rule into problem */
   if (why >= solv->jobrules && why < solv->jobrules_end)
     why = -(solv->ruletojob.elements[why - solv->jobrules] + 1);
+  else if (why >= solv->bestrules && why < solv->bestrules_up && solv->bestrules_pkg[why - solv->bestrules] < 0)
+    why = -(solv->ruletojob.elements[-solv->bestrules_pkg[why - solv->bestrules] - solv->jobrules] + 1);
   /* normalize dup/infarch rules */
   if (why > solv->infarchrules && why < solv->infarchrules_end)
     {
@@ -3494,7 +3505,6 @@ solver_solve(Solver *solv, Queue *job)
     deduceq2addedmap(solv, &addedmap);
   if (solv->nrules != initialnrules)
     solver_shrinkrules(solv, initialnrules);
-  solv->nrules = initialnrules;
   solv->lastpkgrule = 0;
   solv->pkgrules_end = 0;
 
@@ -4021,18 +4031,7 @@ solver_solve(Solver *solv, Queue *job)
 
   /* now create infarch and dup rules */
   if (!solv->noinfarchcheck)
-    {
-      solver_addinfarchrules(solv, &addedmap);
-#if 0
-      if (pool->implicitobsoleteusescolors)
-	{
-	  /* currently doesn't work well with infarch rules, so make
-           * them weak */
-	  for (i = solv->infarchrules; i < solv->infarchrules_end; i++)
-	    queue_push(&solv->weakruleq, i);
-	}
-#endif
-    }
+    solver_addinfarchrules(solv, &addedmap);
   else
     solv->infarchrules = solv->infarchrules_end = solv->nrules;
 
@@ -4049,7 +4048,7 @@ solver_solve(Solver *solv, Queue *job)
   if (solv->bestupdatemap_all || solv->bestupdatemap.size || hasbestinstalljob)
     solver_addbestrules(solv, hasbestinstalljob);
   else
-    solv->bestrules = solv->bestrules_end = solv->nrules;
+    solv->bestrules = solv->bestrules_end = solv->bestrules_up = solv->nrules;
 
   if (needduprules)
     solver_freedupmaps(solv);	/* no longer needed */

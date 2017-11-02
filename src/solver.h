@@ -68,6 +68,7 @@ struct _Solver {
   Id duprules_end;
 
   Id bestrules;				/* rules from SOLVER_FORCEBEST */
+  Id bestrules_up;			/* update rule part starts here*/
   Id bestrules_end;
   Id *bestrules_pkg;
 
