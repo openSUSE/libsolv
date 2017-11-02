@@ -31,82 +31,6 @@
 #define RULES_BLOCK 63
 
 
-static Id
-autouninstall(Solver *solv, Id *problem)
-{
-  Pool *pool = solv->pool;
-  int i;
-  int lastfeature = 0, lastupdate = 0;
-  Id v;
-  Id extraflags = -1;
-  Map *m = 0;
-
-  if (!solv->allowuninstall && !solv->allowuninstall_all)
-    {
-      if (!solv->allowuninstallmap.size)
-	return 0;		/* why did we get called? */
-      m = &solv->allowuninstallmap;
-    }
-  for (i = 0; (v = problem[i]) != 0; i++)
-    {
-      if (v < 0)
-	extraflags &= solv->job.elements[-v - 1];
-      if (v >= solv->updaterules && v < solv->updaterules_end)
-	{
-	  Rule *r;
-	  if (m && !MAPTST(m, v - solv->updaterules))
-	    continue;
-	  /* check if identical to feature rule, we don't like that (except for orphans) */
-	  r = solv->rules + solv->featurerules + (v - solv->updaterules);
-	  if (!r->p)
-	    {
-	      /* update rule == feature rule */
-	      if (v > lastfeature)
-		lastfeature = v;
-	      /* prefer orphaned packages in dup mode */
-	      if (solv->keep_orphans)
-		{
-		  r = solv->rules + v;
-		  if (!r->d && !r->w2 && r->p == (solv->installed->start + (v - solv->updaterules)))
-		    {
-		      lastfeature = v;
-		      lastupdate = 0;
-		      break;
-		    }
-		}
-	      continue;
-	    }
-	  if (v > lastupdate)
-	    lastupdate = v;
-	}
-    }
-  if (!lastupdate && !lastfeature)
-    return 0;
-  v = lastupdate ? lastupdate : lastfeature;
-  POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, "allowuninstall disabling ");
-  solver_printruleclass(solv, SOLV_DEBUG_UNSOLVABLE, solv->rules + v);
-  solver_disableproblem(solv, v);
-  if (extraflags != -1 && (extraflags & SOLVER_CLEANDEPS) != 0 && solv->cleandepsmap.size)
-    {
-      /* add the package to the updatepkgs list, this will automatically turn
-       * on cleandeps mode */
-      Id p = solv->rules[v].p;
-      if (!solv->cleandeps_updatepkgs)
-	{
-	  solv->cleandeps_updatepkgs = solv_calloc(1, sizeof(Queue));
-	  queue_init(solv->cleandeps_updatepkgs);
-	}
-      if (p > 0)
-	{
-	  int oldupdatepkgscnt = solv->cleandeps_updatepkgs->count;
-          queue_pushunique(solv->cleandeps_updatepkgs, p);
-	  if (solv->cleandeps_updatepkgs->count != oldupdatepkgscnt)
-	    solver_disablepolicyrules(solv);
-	}
-    }
-  return v;
-}
-
 /************************************************************************/
 
 /*
@@ -164,17 +88,18 @@ enabledisablelearntrules(Solver *solv)
  * If we find a conflict, disable rules and add them to problem queue.
  */
 
-static void
-makeruledecisions(Solver *solv)
+static int
+makeruledecisions(Solver *solv, int disablerules)
 {
   Pool *pool = solv->pool;
-  int i, ri, ii;
+  int i, ri, ii, ori;
   Rule *r, *rr;
   Id v, vv;
   int decisionstart;
   int record_proof = 1;
   int oldproblemcount;
   int havedisabled = 0;
+  int doautouninstall;
 
   /* The system solvable is always installed first */
   assert(solv->decisionq.count == 0);
@@ -260,8 +185,7 @@ makeruledecisions(Solver *solv)
 	    }
 
 	  POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, "ANALYZE UNSOLVABLE ASSERTION ----------------------\n");
-	  IF_POOLDEBUG (SOLV_DEBUG_UNSOLVABLE)
-	    solver_printruleclass(solv, SOLV_DEBUG_UNSOLVABLE, solv->rules + ri);
+	  assert(ri >= solv->pkgrules_end);	/* must not have a conflict in the pkg rules! */
 
 	  /*
 	   * find the decision which is the "opposite" of the rule
@@ -271,142 +195,94 @@ makeruledecisions(Solver *solv)
 	      break;
 	  assert(i < solv->decisionq.count);         /* assert that we found it */
 	  oldproblemcount = solv->problems.count;
+	  queue_push(&solv->problems, 0);
 
-	  /*
-	   * conflict with system solvable ?
-	   */
 	  if (v == -SYSTEMSOLVABLE)
+	    ori = 0;
+	  else
 	    {
-	      if (record_proof)
-		{
-		  queue_push(&solv->problems, solv->learnt_pool.count);
-		  queue_push(&solv->learnt_pool, ri);
-		  queue_push(&solv->learnt_pool, 0);
-		}
-	      else
-		queue_push(&solv->problems, 0);
-	      POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, "conflict with system solvable, disabling rule #%d\n", ri);
-	      if  (ri >= solv->jobrules && ri < solv->jobrules_end)
-		v = -(solv->ruletojob.elements[ri - solv->jobrules] + 1);
-	      else if (ri >= solv->bestrules && ri < solv->bestrules_up && solv->bestrules_pkg[ri - solv->bestrules] < 0)
-		v = -(solv->ruletojob.elements[-solv->bestrules_pkg[ri - solv->bestrules] - solv->jobrules] + 1);
-	      else
-		v = ri;
-	      queue_push(&solv->problems, v);
-	      queue_push(&solv->problems, 0);
-	      if (v >= solv->featurerules && v < solv->updaterules_end)
-		{
-		  if (solv->allowuninstall || solv->allowuninstall_all || solv->allowuninstallmap.size)
-		    if (autouninstall(solv, solv->problems.elements + oldproblemcount + 1) != 0)
-		      {
-		        solv->problems.count = oldproblemcount;
-		        havedisabled = 1;
-		        break;	/* start over */
-		      }
-		}
-	      solver_disableproblem(solv, v);
-	      havedisabled = 1;
-	      break;	/* start over */
+	      ori = solv->decisionq_why.elements[i];		/* the conflicting rule */
+	      assert(ori > 0);
 	    }
 
-	  assert(solv->decisionq_why.elements[i] > 0);
-	  IF_POOLDEBUG (SOLV_DEBUG_UNSOLVABLE)
-	    solver_printruleclass(solv, SOLV_DEBUG_UNSOLVABLE, solv->rules + solv->decisionq_why.elements[i]);
-
 	  /*
-	   * conflict with a pkg rule ?
+	   * conflict with system solvable or pkg rule?
 	   */
-	  if (solv->decisionq_why.elements[i] < solv->pkgrules_end)
+	  doautouninstall = 0;
+	  if (ori < solv->pkgrules_end)
 	    {
-	      if (record_proof)
-		{
-		  queue_push(&solv->problems, solv->learnt_pool.count);
-		  queue_push(&solv->learnt_pool, ri);
-		  queue_push(&solv->learnt_pool, solv->decisionq_why.elements[i]);
-		  queue_push(&solv->learnt_pool, 0);
-		}
-	      else
-		queue_push(&solv->problems, 0);
 	      assert(v > 0 || v == -SYSTEMSOLVABLE);
-	      POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, "conflict with pkg rule, disabling rule #%d\n", ri);
-	      if (ri >= solv->jobrules && ri < solv->jobrules_end)
-		v = -(solv->ruletojob.elements[ri - solv->jobrules] + 1);
-	      else if (ri >= solv->bestrules && ri < solv->bestrules_up && solv->bestrules_pkg[ri - solv->bestrules] < 0)
-		v = -(solv->ruletojob.elements[-solv->bestrules_pkg[ri - solv->bestrules] - solv->jobrules] + 1);
-	      else
-		v = ri;
-	      queue_push(&solv->problems, v);
-	      queue_push(&solv->problems, 0);
-	      if (v >= solv->featurerules && v < solv->updaterules_end)
+	      IF_POOLDEBUG (SOLV_DEBUG_UNSOLVABLE)
 		{
-		  if (solv->allowuninstall || solv->allowuninstall_all || solv->allowuninstallmap.size)
-		    if (autouninstall(solv, solv->problems.elements + oldproblemcount + 1) != 0)
-		      {
-		        solv->problems.count = oldproblemcount;
-		        havedisabled = 1;
-		        break;	/* start over */
-		      }
+		  if (ori)
+		    POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, "conflict with pkg rule, disabling rule #%d\n", ri);
+		  else
+		    POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, "conflict with system solvable, disabling rule #%d\n", ri);
+		  solver_printruleclass(solv, SOLV_DEBUG_UNSOLVABLE, solv->rules + ri);
+		  if (ori)
+		    solver_printruleclass(solv, SOLV_DEBUG_UNSOLVABLE, solv->rules + ori);
 		}
-	      solver_disableproblem(solv, v);
-	      havedisabled = 1;
-	      break;	/* start over */
-	    }
-
-	  /*
-	   * conflict with another job or update/feature rule
-	   */
-
-	  /* record proof */
-	  if (record_proof)
-	    {
-	      queue_push(&solv->problems, solv->learnt_pool.count);
-	      queue_push(&solv->learnt_pool, ri);
-	      queue_push(&solv->learnt_pool, solv->decisionq_why.elements[i]);
-	      queue_push(&solv->learnt_pool, 0);
+	      solver_recordproblem(solv, ri);
+	      if (ri >= solv->featurerules && ri < solv->updaterules_end)
+		doautouninstall = 1;
 	    }
 	  else
-	    queue_push(&solv->problems, 0);
-
-	  POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, "conflicting update/job assertions over literal %d\n", vv);
-
-	  /*
-	   * push all of our rules (can only be feature or job rules)
-	   * asserting this literal on the problem stack
-	   */
-	  for (i = solv->featurerules, rr = solv->rules + i; i < solv->learntrules; i++, rr++)
 	    {
-	      if (rr->d < 0                          /* disabled */
-		  || rr->w2)                         /*  or no assertion */
-		continue;
-	      if (rr->p != vv                        /* not affecting the literal */
-		  && rr->p != -vv)
-		continue;
-	      if (solv->weakrulemap.size && MAPTST(&solv->weakrulemap, i))     /* weak: silently ignore */
-		continue;
-		
-	      POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, " - disabling rule #%d\n", i);
-	      solver_printruleclass(solv, SOLV_DEBUG_UNSOLVABLE, solv->rules + i);
-		
-	      if (i >= solv->jobrules && i < solv->jobrules_end)
-		v = -(solv->ruletojob.elements[i - solv->jobrules] + 1);
-	      else if (i >= solv->bestrules && i < solv->bestrules_up && solv->bestrules_pkg[i - solv->bestrules] < 0)
-		v = -(solv->ruletojob.elements[-solv->bestrules_pkg[i - solv->bestrules] - solv->jobrules] + 1);
-	      else
-	        v = i;
-	      queue_push(&solv->problems, v);
+	      POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, "conflicting update/job assertions over literal %d\n", vv);
+	      /*
+	       * push all of our rules (can only be feature or job rules)
+	       * asserting this literal on the problem stack
+	       */
+	      for (i = solv->pkgrules_end, rr = solv->rules + i; i < solv->learntrules; i++, rr++)
+		{
+		  if (rr->d < 0                          /* disabled */
+		      || rr->w2)                         /*  or no assertion */
+		    continue;
+		  if (rr->p != vv                        /* not affecting the literal */
+		      && rr->p != -vv)
+		    continue;
+		  if (solv->weakrulemap.size && MAPTST(&solv->weakrulemap, i))     /* weak: silently ignore */
+		    continue;
+		    
+		  POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, " - disabling rule #%d\n", i);
+		  solver_printruleclass(solv, SOLV_DEBUG_UNSOLVABLE, solv->rules + i);
+		  solver_recordproblem(solv, i);
+		  if (i >= solv->featurerules && i < solv->updaterules_end)
+		    doautouninstall = 1;
+		}
 	    }
 	  queue_push(&solv->problems, 0);
 
-	  if (solv->allowuninstall || solv->allowuninstall_all || solv->allowuninstallmap.size)
-	    if (autouninstall(solv, solv->problems.elements + oldproblemcount + 1) != 0)
-	      {
-	        solv->problems.count = oldproblemcount;
-	        havedisabled = 1;
-	        break;	/* start over */
-	      }
+	  if (doautouninstall)
+	    {
+	      if (solv->allowuninstall || solv->allowuninstall_all || solv->allowuninstallmap.size)
+		if (solver_autouninstall(solv, solv->problems.elements + oldproblemcount + 1) != 0)
+		  {
+		    solv->problems.count = oldproblemcount;
+		    havedisabled = 1;
+		    break;	/* start over */
+		  }
+	    }
 
+	  /* record the proof if requested */
+	  if (record_proof)
+	    {
+	      solv->problems.elements[oldproblemcount] = solv->learnt_pool.count;
+	      queue_push(&solv->learnt_pool, ri);
+	      if (ori)
+		queue_push(&solv->learnt_pool, ori);
+	      queue_push(&solv->learnt_pool, 0);
+	    }
+
+	  if (!disablerules)
+	    {
+	      POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, "UNSOLVABLE\n");
+	      return -1;
+	    }
+	  /* disable all problem rules */
 	  for (i = oldproblemcount + 1; i < solv->problems.count - 1; i++)
 	    solver_disableproblem(solv, solv->problems.elements[i]);
+
 	  havedisabled = 1;
 	  break;	/* start over */
 	}
@@ -451,23 +327,15 @@ makeruledecisions(Solver *solv)
 	    continue;
 
 	  POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, "assertion conflict, but I am weak, disabling ");
-	  solver_printrule(solv, SOLV_DEBUG_UNSOLVABLE, r);
-
-	  if (ri >= solv->jobrules && ri < solv->jobrules_end)
-	    v = -(solv->ruletojob.elements[ri - solv->jobrules] + 1);
-	  else if (ri >= solv->bestrules && ri < solv->bestrules_up && solv->bestrules_pkg[ri - solv->bestrules] < 0)
-	    v = -(solv->ruletojob.elements[-solv->bestrules_pkg[ri - solv->bestrules] - solv->jobrules] + 1);
-	  else
-	    v = ri;
-	  solver_disableproblem(solv, v);
-	  if (v < 0)
-	    solver_reenablepolicyrules(solv, -v);
+	  solver_printruleclass(solv, SOLV_DEBUG_UNSOLVABLE, r);
+	  solver_fixproblem(solv, ri);
 	  havedisabled = 1;
 	  break;	/* start over */
 	}
       if (ii == solv->ruleassertions.count)
 	break;	/* finished! */
     }
+  return 1;
 }
 
 
@@ -1022,38 +890,9 @@ analyze_unsolvable_rule(Solver *solv, Rule *r, Queue *weakq, Map *rseen)
     }
   if (solv->weakrulemap.size && MAPTST(&solv->weakrulemap, why) && weakq)
     queue_push(weakq, why);
-  /* do not add pkg rules to problem */
-  if (why < solv->pkgrules_end)
-    return;
-  /* turn rule into problem */
-  if (why >= solv->jobrules && why < solv->jobrules_end)
-    why = -(solv->ruletojob.elements[why - solv->jobrules] + 1);
-  else if (why >= solv->bestrules && why < solv->bestrules_up && solv->bestrules_pkg[why - solv->bestrules] < 0)
-    why = -(solv->ruletojob.elements[-solv->bestrules_pkg[why - solv->bestrules] - solv->jobrules] + 1);
-  /* normalize dup/infarch rules */
-  if (why > solv->infarchrules && why < solv->infarchrules_end)
-    {
-      Id name = pool->solvables[-solv->rules[why].p].name;
-      while (why > solv->infarchrules && pool->solvables[-solv->rules[why - 1].p].name == name)
-	why--;
-    }
-  if (why > solv->duprules && why < solv->duprules_end)
-    {
-      Id name = pool->solvables[-solv->rules[why].p].name;
-      while (why > solv->duprules && pool->solvables[-solv->rules[why - 1].p].name == name)
-	why--;
-    }
-
-  /* return if problem already countains our rule */
-  if (solv->problems.count)
-    {
-      for (i = solv->problems.count - 1; i >= 0; i--)
-	if (solv->problems.elements[i] == 0)	/* end of last problem reached? */
-	  break;
-	else if (solv->problems.elements[i] == why)
-	  return;
-    }
-  queue_push(&solv->problems, why);
+  /* add non-pkg rules to problem and disable */
+  if (why >= solv->pkgrules_end)
+    solver_recordproblem(solv, why);
 }
 
 
@@ -1160,24 +999,18 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
 	  return 0;
 	}
       queue_free(&weakq);
-      if (lastweak >= solv->jobrules && lastweak < solv->jobrules_end)
-	v = -(solv->ruletojob.elements[lastweak - solv->jobrules] + 1);
-      else
-        v = lastweak;
       POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, "disabling ");
       solver_printruleclass(solv, SOLV_DEBUG_UNSOLVABLE, solv->rules + lastweak);
       if (lastweak >= solv->choicerules && lastweak < solv->choicerules_end)
 	solver_disablechoicerules(solv, solv->rules + lastweak);
-      solver_disableproblem(solv, v);
-      if (v < 0)
-	solver_reenablepolicyrules(solv, -v);
+      solver_fixproblem(solv, lastweak);
       solver_reset(solv);
       return 0;
     }
   queue_free(&weakq);
 
   if (solv->allowuninstall || solv->allowuninstall_all || solv->allowuninstallmap.size)
-    if (autouninstall(solv, solv->problems.elements + oldproblemcount + 1) != 0)
+    if (solver_autouninstall(solv, solv->problems.elements + oldproblemcount + 1) != 0)
       {
 	solv->problems.count = oldproblemcount;
 	solv->learnt_pool.count = oldlearntpoolcount;
@@ -2683,13 +2516,9 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	{
 	  if (level < 0)
 	    break;
-	  makeruledecisions(solv);
-	  level = 1;
-	  if (!disablerules && solv->problems.count)
-	    {
-	      level = -1;
-	      break;
-	    }
+	  level = makeruledecisions(solv, disablerules);
+	  if (level < 0)
+	    break;
 	  POOL_DEBUG(SOLV_DEBUG_PROPAGATE, "initial propagate (propagate_index: %d;  size decisionq: %d)...\n", solv->propagate_index, solv->decisionq.count);
 	  if ((r = propagate(solv, level)) != 0)
 	    {
