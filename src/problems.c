@@ -365,7 +365,6 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined, int essenti
   queue_empty(refined);
   if (!essentialok && sug < 0 && (solv->job.elements[-sug - 1] & SOLVER_ESSENTIAL) != 0)
     return;
-  queue_init(&disabled);
   queue_push(refined, sug);
 
   /* re-enable all problem rules with the exception of "sug"(gestion) */
@@ -374,10 +373,14 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined, int essenti
   for (i = 0; problem[i]; i++)
     if (problem[i] != sug)
       solver_enableproblem(solv, problem[i]);
-
   if (sug < 0)
     solver_reenablepolicyrules(solv, -sug);
-  else if (sug >= solv->updaterules && sug < solv->updaterules_end)
+
+  /* here is where the feature rules come into play: if we disabled an
+   * update rule, we enable the corresponding feature rule if there is
+   * one. We do this to make the solver downgrade packages instead of
+   * deinstalling them */
+  if (sug >= solv->updaterules && sug < solv->updaterules_end)
     {
       /* enable feature rule */
       Rule *r = solv->rules + solv->featurerules + (sug - solv->updaterules);
@@ -387,11 +390,15 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined, int essenti
 
   enableweakrules(solv);
 
+  /* disabled contains all of the rules we disabled in the refinement process */
+  queue_init(&disabled);
   for (;;)
     {
-      int njob, nfeature, nupdate, pass;
+      int nother, nfeature, nupdate, pass;
       queue_empty(&solv->problems);
       solver_reset(solv);
+      /* we set disablerules to zero because we are only interested in
+       * the first problem and we don't want the solver to disable the problems */
       solver_run_sat(solv, 0, 0);
 
       if (!solv->problems.count)
@@ -400,16 +407,18 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined, int essenti
 	  break;		/* great, no more problems */
 	}
       disabledcnt = disabled.count;
-      /* start with 1 to skip over proof index */
-      njob = nfeature = nupdate = 0;
+      nother = nfeature = nupdate = 0;
       for (pass = 0; pass < 2; pass++)
 	{
+	  /* start with 1 to skip over proof index */
 	  for (i = 1; i < solv->problems.count - 1; i++)
 	    {
 	      /* ignore solutions in refined */
 	      v = solv->problems.elements[i];
 	      if (v == 0)
 		break;	/* end of problem reached */
+	      if (!essentialok && v < 0 && (solv->job.elements[-v - 1] & SOLVER_ESSENTIAL) != 0)
+		continue;	/* not that one! */
 	      if (sug != v)
 		{
 		  /* check if v is in the given problems list
@@ -423,14 +432,10 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined, int essenti
 		}
 	      if (v >= solv->featurerules && v < solv->featurerules_end)
 		nfeature++;
-	      else if (v > 0)
+	      else if (v > solv->updaterules && v < solv->updaterules_end)
 		nupdate++;
 	      else
-		{
-		  if (!essentialok && (solv->job.elements[-v - 1] & SOLVER_ESSENTIAL) != 0)
-		    continue;	/* not that one! */
-		  njob++;
-		}
+	        nother++;
 	      queue_push(&disabled, v);
 	    }
 	  if (disabled.count != disabledcnt)
@@ -443,7 +448,7 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined, int essenti
 	  refined->count = 0;
 	  break;
 	}
-      if (!njob && nupdate && nfeature)
+      if (!nother && nupdate && nfeature)
 	{
 	  /* got only update rules, filter out feature rules */
 	  POOL_DEBUG(SOLV_DEBUG_SOLUTIONS, "throwing away feature rules\n");
@@ -463,14 +468,14 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined, int essenti
 	  if (!nfeature && v != sug)
 	    queue_push(refined, v);	/* do not record feature rules */
 	  solver_disableproblem(solv, v);
+	  if (v < 0)
+	    solver_reenablepolicyrules(solv, -v);
 	  if (v >= solv->updaterules && v < solv->updaterules_end)
 	    {
 	      Rule *r = solv->rules + (v - solv->updaterules + solv->featurerules);
 	      if (r->p)
 		solver_enablerule(solv, r);	/* enable corresponding feature rule */
 	    }
-	  if (v < 0)
-	    solver_reenablepolicyrules(solv, -v);
 	}
       else
 	{
@@ -502,6 +507,7 @@ refine_suggestion(Solver *solv, Id *problem, Id sug, Queue *refined, int essenti
   for (i = 0; i < disabled.count; i++)
     solver_enableproblem(solv, disabled.elements[i]);
   queue_free(&disabled);
+
   /* reset policy rules */
   for (i = 0; problem[i]; i++)
     solver_enableproblem(solv, problem[i]);
