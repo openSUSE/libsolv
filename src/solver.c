@@ -194,9 +194,6 @@ makeruledecisions(Solver *solv, int disablerules)
 	    if (solv->decisionq.elements[i] == -v)
 	      break;
 	  assert(i < solv->decisionq.count);         /* assert that we found it */
-	  oldproblemcount = solv->problems.count;
-	  queue_push(&solv->problems, 0);
-
 	  if (v == -SYSTEMSOLVABLE)
 	    ori = 0;
 	  else
@@ -206,11 +203,14 @@ makeruledecisions(Solver *solv, int disablerules)
 	    }
 
 	  /*
-	   * conflict with system solvable or pkg rule?
-	   */
+           * record the problem
+           */
 	  doautouninstall = 0;
+	  oldproblemcount = solv->problems.count;
+	  queue_push(&solv->problems, 0);			/* start problem */
 	  if (ori < solv->pkgrules_end)
 	    {
+	      /* easy: conflict with system solvable or pkg rule */
 	      assert(v > 0 || v == -SYSTEMSOLVABLE);
 	      IF_POOLDEBUG (SOLV_DEBUG_UNSOLVABLE)
 		{
@@ -251,8 +251,9 @@ makeruledecisions(Solver *solv, int disablerules)
 		    doautouninstall = 1;
 		}
 	    }
-	  queue_push(&solv->problems, 0);
+	  queue_push(&solv->problems, 0);			/* finish problem */
 
+	  /* try autouninstall if requested */
 	  if (doautouninstall)
 	    {
 	      if (solv->allowuninstall || solv->allowuninstall_all || solv->allowuninstallmap.size)
@@ -333,7 +334,7 @@ makeruledecisions(Solver *solv, int disablerules)
       if (ii == solv->ruleassertions.count)
 	break;	/* finished! */
     }
-  return 1;
+  return 1;		/* the new level */
 }
 
 

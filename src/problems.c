@@ -66,7 +66,7 @@ solver_disableproblem(Solver *solv, Id v)
   jp = solv->ruletojob.elements;
   if (solv->bestrules_pkg)
     {
-      int ni = solv->bestrules_end - solv->bestrules;
+      int ni = solv->bestrules_up - solv->bestrules;
       for (i = 0; i < ni; i++)
 	{
 	  int j = solv->bestrules_pkg[i];
@@ -133,7 +133,7 @@ solver_enableproblem(Solver *solv, Id v)
   jp = solv->ruletojob.elements;
   if (solv->bestrules_pkg)
     {
-      int ni = solv->bestrules_end - solv->bestrules;
+      int ni = solv->bestrules_up - solv->bestrules;
       for (i = 0; i < ni; i++)
 	{
 	  int j = solv->bestrules_pkg[i];
