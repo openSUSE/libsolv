@@ -9,10 +9,6 @@
 
 - deal with DIRSTR entries having dirid 0 (for source rpms)
 
-- test rich dep rule creation
-
-- clean up rich dep rule code (see perl-BSSolv)
-
 - drop patchcheck
 
 - rename repo2solv.sh to repo2solv (maybe rewrite in C?)
@@ -23,7 +19,7 @@
 
 - write more manpages
 
-- bindings: selections.flags() should be a attribute and not a method
+- bindings: selection.flags() should be a attribute and not a method
 
 - rename repodata_lookup_id_uninternalized to repodata_lookup_id_voidid_uninternalized
   and add a notfound argument
