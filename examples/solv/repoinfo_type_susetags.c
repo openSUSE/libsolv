@@ -12,6 +12,9 @@
 #ifdef ENABLE_APPDATA
 #include "repo_appdata.h"
 #endif
+#ifdef SUSE
+#include "repo_autopattern.h"
+#endif
 
 #include "repoinfo.h"
 #include "repoinfo_cache.h"
@@ -263,6 +266,9 @@ susetags_load(struct repoinfo *cinfo, Pool **sigpoolp)
     }
 #endif
   repo_internalize(repo);
+#ifdef SUSE
+  repo_add_autopattern(repo, 0);
+#endif
   data = repo_add_repodata(repo, 0);
   repodata_extend_block(data, repo->start, repo->end - repo->start);
   susetags_add_ext(repo, data);
