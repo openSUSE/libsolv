@@ -37,6 +37,7 @@ str2archid(Pool *pool, const char *arch)
   return id;
 }
 
+/* remove empty jobs from the selection */
 static void
 selection_prune(Pool *pool, Queue *selection)
 {
@@ -155,10 +156,32 @@ selection_flatten(Pool *pool, Queue *selection)
     }
 }
 
+/* only supports simple rels plus REL_ARCH */
+static int
+match_nevr_rel(Pool *pool, Solvable *s, Id rflags, Id revr)
+{
+  if (rflags == REL_ARCH)
+    {
+      if (s->arch != revr) 
+	{
+	  if (revr != ARCH_SRC || s->arch != ARCH_NOSRC)
+	    return 0;
+	}
+      return 1;
+    }
+  if (rflags > 7)
+    return 0;
+  return pool_intersect_evrs(pool, REL_EQ, s->evr, rflags, revr);
+}
+
+/* only supports simple rels plus REL_ARCH */
 static void
 selection_filter_rel(Pool *pool, Queue *selection, Id relflags, Id relevr)
 {
   int i;
+
+  if (!selection->count)
+    return;
 
   for (i = 0; i < selection->count; i += 2)
     {
@@ -169,19 +192,13 @@ selection_filter_rel(Pool *pool, Queue *selection, Id relflags, Id relevr)
 	  /* done by selection_addsrc, currently implies SELECTION_NAME */
 	  Queue q;
 	  Id p, pp;
-	  Id rel = 0, relname = 0;
 	  int miss = 0;
 
 	  queue_init(&q);
 	  FOR_JOB_SELECT(p, pp, select, id)
 	    {
 	      Solvable *s = pool->solvables + p;
-	      if (!rel || s->name != relname)
-		{
-		  relname = s->name;
-		  rel = pool_rel2id(pool, relname, relevr, relflags, 1);
-		}
-	      if (pool_match_nevr(pool, s, rel))
+	      if (match_nevr_rel(pool, s, relflags, relevr))
 	        queue_push(&q, p);
 	      else
 		miss = 1;
@@ -213,19 +230,21 @@ selection_filter_rel(Pool *pool, Queue *selection, Id relflags, Id relevr)
 	  selection->elements[i + 1] = pool_rel2id(pool, id, relevr, relflags, 1);
 	}
       else
-	continue;	/* actually internal error */
+	continue;	/* actually cannot happen */
+
+      /* now add the setflags we gained */
       if (relflags == REL_ARCH)
-        selection->elements[i] |= SOLVER_SETARCH;
+	selection->elements[i] |= SOLVER_SETARCH;
       if (relflags == REL_EQ && select != SOLVER_SOLVABLE_PROVIDES)
-        {
+	{
 	  if (pool->disttype == DISTTYPE_DEB)
-            selection->elements[i] |= SOLVER_SETEVR;	/* debian can't match version only like rpm */
+	    selection->elements[i] |= SOLVER_SETEVR;	/* debian can't match version only like rpm */
 	  else
 	    {
 	      const char *rel =  strrchr(pool_id2str(pool, relevr), '-');
 	      selection->elements[i] |= rel ? SOLVER_SETEVR : SOLVER_SETEV;
 	    }
-        }
+	}
     }
   selection_prune(pool, selection);
 }
@@ -237,7 +256,10 @@ selection_filter_installed(Pool *pool, Queue *selection)
   int i, j;
 
   if (!pool->installed)
-    queue_empty(selection);
+    {
+      queue_empty(selection);
+      return;
+    }
   queue_init(&q);
   for (i = j = 0; i < selection->count; i += 2)
     {
@@ -291,6 +313,7 @@ selection_filter_installed(Pool *pool, Queue *selection)
   queue_free(&q);
 }
 
+/* add matching src packages to SOLVABLE_NAME selections */
 static void
 selection_addsrc(Pool *pool, Queue *selection, int flags)
 {
@@ -496,6 +519,7 @@ selection_depglob(Pool *pool, Queue *selection, const char *name, int flags)
       for (id = 1; id < pool->ss.nstrings; id++)
 	{
 	  const char *n;
+	  /* do we habe packages providing this id? */
 	  if (!pool->whatprovides[id] || pool->whatprovides[id] == 1)
 	    continue;
 	  n = pool_id2str(pool, id);
@@ -519,6 +543,8 @@ selection_depglob(Pool *pool, Queue *selection, const char *name, int flags)
   return 0;
 }
 
+/* like selection_depglob, but check for a .arch suffix if the depglob did
+   not work and SELECTION_DOTARCH is used */
 static int
 selection_depglob_arch(Pool *pool, Queue *selection, const char *name, int flags)
 {
@@ -864,14 +890,14 @@ selection_make(Pool *pool, Queue *selection, const char *name, int flags)
     ret = selection_canon(pool, selection, name, flags);
   if (selection->count && (flags & SELECTION_INSTALLED_ONLY) != 0)
     selection_filter_installed(pool, selection);
-  if (ret && !selection->count)
-    ret = 0;	/* no match -> always return zero */
+  if (!selection->count)
+    return 0;	/* no match -> always return zero */
   if (ret && (flags & SELECTION_FLAT) != 0)
     selection_flatten(pool, selection);
   return ret;
 }
 
-static inline int
+static int
 matchdep_str(const char *pattern, const char *string, int flags)
 {
   if (flags & SELECTION_GLOB)
@@ -884,36 +910,36 @@ matchdep_str(const char *pattern, const char *string, int flags)
   return strcmp(pattern, string) == 0 ? 1 : 0;
 }
 
+/* like pool_match_dep but uses matchdep_str to match the name for glob and nocase matching */
 static int
-matchdep(Pool *pool, Id id, char *rname, int rflags, char *revr, int flags)
+matchdep(Pool *pool, Id id, char *rname, int rflags, Id revr, int flags)
 {
   if (ISRELDEP(id))
     {
       Reldep *rd = GETRELDEP(pool, id);
-      if (rd->flags == REL_AND || rd->flags == REL_OR || rd->flags == REL_WITH || rd->flags == REL_WITHOUT || rd->flags == REL_COND || rd->flags == REL_UNLESS)
+      if (rd->flags > 7)
 	{
-	  if (matchdep(pool, rd->name, rname, rflags, revr, flags))
-	    return 1;
-	  if ((rd->flags == REL_COND || rd->flags == REL_UNLESS) && ISRELDEP(rd->evr))
+	  if (rd->flags == REL_AND || rd->flags == REL_OR || rd->flags == REL_WITH || rd->flags == REL_WITHOUT || rd->flags == REL_COND || rd->flags == REL_UNLESS)
 	    {
-	      rd = GETRELDEP(pool, rd->evr);
-	      if (rd->flags != REL_ELSE)
-		return 0;
+	      if (matchdep(pool, rd->name, rname, rflags, revr, flags))
+		return 1;
+	      if ((rd->flags == REL_COND || rd->flags == REL_UNLESS) && ISRELDEP(rd->evr))
+		{
+		  rd = GETRELDEP(pool, rd->evr);
+		  if (rd->flags != REL_ELSE)
+		    return 0;
+		}
+	      if (rd->flags != REL_COND && rd->flags != REL_UNLESS && rd->flags != REL_WITHOUT && matchdep(pool, rd->evr, rname, rflags, revr, flags))
+		return 1;
+	      return 0;
 	    }
-	  if (rd->flags != REL_COND && rd->flags != REL_UNLESS && rd->flags != REL_WITHOUT && matchdep(pool, rd->evr, rname, rflags, revr, flags))
-	    return 1;
-	  return 0;
+	  if (rd->flags == REL_ARCH)
+	    return matchdep(pool, rd->name, rname, rflags, revr, flags);
 	}
-      if (rd->flags == REL_ARCH)
-	return matchdep(pool, rd->name, rname, rflags, revr, flags);
       if (!matchdep(pool, rd->name, rname, rflags, revr, flags))
 	return 0;
-      if (rflags)
-	{
-	  /* XXX: need pool_match_flags_evr here */
-	  if (!pool_match_dep(pool, pool_rel2id(pool, rd->name, pool_str2id(pool, revr, 1), rflags, 1), id))
-	    return 0;
-	}
+      if (rflags && !pool_intersect_evrs(pool, rd->flags, rd->evr, rflags, revr))
+	return 0;
       return 1;
     }
   return matchdep_str(rname, pool_id2str(pool, id), flags);
@@ -929,6 +955,7 @@ selection_make_matchdeps(Pool *pool, Queue *selection, const char *name, int fla
 {
   char *rname, *r = 0;
   int rflags = 0;
+  Id revr = 0;
   Id p;
   Queue q;
 
@@ -944,9 +971,20 @@ selection_make_matchdeps(Pool *pool, Queue *selection, const char *name, int fla
 	      return 0;
 	    }
 	}
+      revr = pool_str2id(pool, r, 1);	/* should do this different */
     }
   if ((flags & SELECTION_GLOB) != 0 && !strpbrk(rname, "[*?") != 0)
     flags &= ~SELECTION_GLOB;
+
+  if ((flags & SELECTION_GLOB) == 0 && (flags & SELECTION_NOCASE) == 0 && (flags & SELECTION_MATCH_DEPSTR) == 0)
+    {
+      /* we can use the faster selection_make_matchdepid */
+      Id dep = pool_str2id(pool, rname, 1);
+      if (revr)
+	dep = pool_rel2id(pool, dep, revr, rflags, 1);
+      solv_free(rname);
+      return selection_make_matchdepid(pool, selection, dep, flags, keyname, marker);
+    }
 
   queue_init(&q);
   FOR_POOL_SOLVABLES(p)
@@ -965,6 +1003,24 @@ selection_make_matchdeps(Pool *pool, Queue *selection, const char *name, int fla
 	continue;
       if ((s->arch == ARCH_SRC || s->arch == ARCH_NOSRC) && !(flags & SELECTION_SOURCE_ONLY) && !(flags & SELECTION_WITH_SOURCE))
 	continue;
+      if (keyname == SOLVABLE_NAME)			/* nevr match hack */
+	{
+	  if ((flags & SELECTION_MATCH_DEPSTR) != 0)	/* mis-use */
+	    {
+	      char *tmp = pool_tmpjoin(pool, pool_id2str(pool, s->name), " = ", pool_id2str(pool, s->evr));
+	      if (!matchdep_str(rname, tmp, flags))
+		continue;
+	    }
+	  else
+	    {
+	      if (!matchdep(pool, s->name, rname, rflags, revr, flags))
+		continue;
+	      if (rflags && !pool_intersect_evrs(pool, rflags, revr, REL_EQ, s->evr))
+		continue;
+	    }
+	  queue_push2(selection, SOLVER_SOLVABLE | SOLVER_NOAUTOSET, p);
+	  continue;
+	}
       queue_empty(&q);
       repo_lookup_deparray(s->repo, p, keyname, &q, marker);
       for (i = 0; i < q.count; i++)
@@ -974,10 +1030,12 @@ selection_make_matchdeps(Pool *pool, Queue *selection, const char *name, int fla
 	    {
 	      if (matchdep_str(rname, pool_dep2str(pool, id), flags))
 		break;
-	      continue;
 	    }
-	  if (matchdep(pool, id, rname, rflags, r, flags))
-	    break;
+	  else
+	    {
+	      if (matchdep(pool, id, rname, rflags, revr, flags))
+		break;
+	    }
 	}
       if (i < q.count)
 	queue_push2(selection, SOLVER_SOLVABLE | SOLVER_NOAUTOSET, p);
@@ -988,7 +1046,7 @@ selection_make_matchdeps(Pool *pool, Queue *selection, const char *name, int fla
     return 0;
   if ((flags & SELECTION_FLAT) != 0)
     selection_flatten(pool, selection);
-  return SELECTION_PROVIDES;
+  return keyname == SOLVABLE_NAME ? SELECTION_NAME : SELECTION_PROVIDES;
 }
 
 int
@@ -996,10 +1054,19 @@ selection_make_matchdepid(Pool *pool, Queue *selection, Id dep, int flags, int k
 {
   Id p;
   Queue q;
+  Reldep *rd = 0;
 
   queue_empty(selection);
   if (!dep)
     return 0;
+  if (keyname == SOLVABLE_NAME && (flags & SELECTION_MATCH_DEPSTR) != 0)
+    {
+      if (!ISRELDEP(dep))
+	return 0;
+      rd = GETRELDEP(pool, dep);
+      if (rd->flags != REL_EQ)
+	return 0;
+    }
   queue_init(&q);
   FOR_POOL_SOLVABLES(p)
     {
@@ -1017,6 +1084,21 @@ selection_make_matchdepid(Pool *pool, Queue *selection, Id dep, int flags, int k
 	continue;
       if ((s->arch == ARCH_SRC || s->arch == ARCH_NOSRC) && !(flags & SELECTION_SOURCE_ONLY) && !(flags & SELECTION_WITH_SOURCE))
 	continue;
+      if (keyname == SOLVABLE_NAME)			/* nevr match hack */
+	{
+	  if ((flags & SELECTION_MATCH_DEPSTR) != 0)	/* mis-use */
+	    {
+	      if (rd->name != s->name || rd->evr != s->evr)
+		continue;
+	    }
+	  else
+	    {
+	      if (!pool_match_nevr(pool, s, dep))
+		continue;
+	    }
+	  queue_push2(selection, SOLVER_SOLVABLE | SOLVER_NOAUTOSET, p);
+	  continue;
+	}
       queue_empty(&q);
       repo_lookup_deparray(s->repo, p, keyname, &q, marker);
       for (i = 0; i < q.count; i++)
@@ -1025,10 +1107,12 @@ selection_make_matchdepid(Pool *pool, Queue *selection, Id dep, int flags, int k
 	    {
 	      if (q.elements[i] == dep)
 		break;
-	      continue;
 	    }
-	  if (pool_match_dep(pool, q.elements[i], dep))
-	    break;
+	  else
+	    {
+	      if (pool_match_dep(pool, q.elements[i], dep))
+		break;
+	    }
 	}
       if (i < q.count)
 	queue_push2(selection, SOLVER_SOLVABLE | SOLVER_NOAUTOSET, p);
@@ -1038,7 +1122,7 @@ selection_make_matchdepid(Pool *pool, Queue *selection, Id dep, int flags, int k
     return 0;
   if ((flags & SELECTION_FLAT) != 0)
     selection_flatten(pool, selection);
-  return SELECTION_PROVIDES;
+  return keyname == SOLVABLE_NAME ? SELECTION_NAME : SELECTION_PROVIDES;
 }
 
 static inline int
@@ -1064,10 +1148,81 @@ pool_is_kind(Pool *pool, Id name, Id kind)
     }
 }
 
+static void
+selection_filter_map(Pool *pool, Queue *sel, Map *m, int setflags)
+{
+  int i, j, miss;
+  Queue q;
+  Id p, pp;
+
+  queue_init(&q);
+  for (i = j = 0; i < sel->count; i += 2)
+    {
+      Id select = sel->elements[i] & SOLVER_SELECTMASK;
+      queue_empty(&q);
+      miss = 0;
+      if (select == SOLVER_SOLVABLE_ALL)
+	{
+	  FOR_POOL_SOLVABLES(p)
+	    {
+	      if (map_tst(m, p))
+	        queue_push(&q, p);
+	      else
+	        miss = 1;
+	    }
+	}
+      else if (select == SOLVER_SOLVABLE_REPO)
+	{
+	  Solvable *s;
+	  Repo *repo = pool_id2repo(pool, sel->elements[i + 1]);
+	  if (repo)
+	    {
+	      FOR_REPO_SOLVABLES(repo, p, s)
+		{
+		  if (map_tst(m, p))
+		    queue_push(&q, p);
+		  else
+		    miss = 1;
+		}
+	    }
+	}
+      else
+	{
+	  FOR_JOB_SELECT(p, pp, select, sel->elements[i + 1])
+	    {
+	      if (map_tst(m, p))
+	        queue_pushunique(&q, p);
+	      else
+	        miss = 1;
+	    }
+	}
+      if (!q.count)
+	continue;
+      if (!miss)
+	{
+	  sel->elements[j] = sel->elements[i] | setflags;
+	  sel->elements[j + 1] = sel->elements[i + 1];
+	}
+      else if (q.count > 1)
+	{
+	  sel->elements[j] = (sel->elements[i] & ~SOLVER_SELECTMASK) | SOLVER_SOLVABLE_ONE_OF | setflags;
+	  sel->elements[j + 1] = pool_queuetowhatprovides(pool, &q);
+	}
+      else
+	{
+	  sel->elements[j] = (sel->elements[i] & ~SOLVER_SELECTMASK) | SOLVER_SOLVABLE | SOLVER_NOAUTOSET | setflags;
+	  sel->elements[j + 1] = q.elements[0];
+	}
+      j += 2;
+    }
+  queue_truncate(sel, j);
+  queue_free(&q);
+}
+
 void
 selection_filter(Pool *pool, Queue *sel1, Queue *sel2)
 {
-  int i, j, miss;
+  int i, j;
   Id p, pp, q1filled = 0;
   Queue q1;
   Map m2;
@@ -1088,6 +1243,8 @@ selection_filter(Pool *pool, Queue *sel1, Queue *sel2)
         sel1->elements[i] = (sel1->elements[i] & (SOLVER_SELECTMASK | SOLVER_SETMASK)) | p ;
       return;
     }
+
+  /* convert sel2 into a map */
   queue_init(&q1);
   map_init(&m2, pool->nsolvables);
   for (i = 0; i < sel2->count; i += 2)
@@ -1147,78 +1304,20 @@ selection_filter(Pool *pool, Queue *sel1, Queue *sel2)
 	    map_set(&m2, p);
 	}
     }
+  queue_free(&q1);
+
+  /* now filter sel1 with the map */
   if (sel2->count == 2)		/* XXX: AND all setmasks instead? */
     setflags = sel2->elements[0] & SOLVER_SETMASK & ~SOLVER_NOAUTOSET;
-  for (i = j = 0; i < sel1->count; i += 2)
-    {
-      Id select = sel1->elements[i] & SOLVER_SELECTMASK;
-      queue_empty(&q1);
-      miss = 0;
-      if (select == SOLVER_SOLVABLE_ALL)
-	{
-	  FOR_POOL_SOLVABLES(p)
-	    {
-	      if (map_tst(&m2, p))
-	        queue_push(&q1, p);
-	      else
-	        miss = 1;
-	    }
-	}
-      else if (select == SOLVER_SOLVABLE_REPO)
-	{
-	  Solvable *s;
-	  Repo *repo = pool_id2repo(pool, sel1->elements[i + 1]);
-	  if (repo)
-	    {
-	      FOR_REPO_SOLVABLES(repo, p, s)
-		{
-		  if (map_tst(&m2, p))
-		    queue_push(&q1, p);
-		  else
-		    miss = 1;
-		}
-	    }
-	}
-      else
-	{
-	  FOR_JOB_SELECT(p, pp, select, sel1->elements[i + 1])
-	    {
-	      if (map_tst(&m2, p))
-	        queue_pushunique(&q1, p);
-	      else
-	        miss = 1;
-	    }
-	}
-      if (!q1.count)
-	continue;
-      if (!miss)
-	{
-	  sel1->elements[j] = sel1->elements[i] | setflags;
-	  sel1->elements[j + 1] = sel1->elements[i + 1];
-	}
-      else if (q1.count > 1)
-	{
-	  sel1->elements[j] = (sel1->elements[i] & ~SOLVER_SELECTMASK) | SOLVER_SOLVABLE_ONE_OF | setflags;
-	  sel1->elements[j + 1] = pool_queuetowhatprovides(pool, &q1);
-	}
-      else
-	{
-	  sel1->elements[j] = (sel1->elements[i] & ~SOLVER_SELECTMASK) | SOLVER_SOLVABLE | SOLVER_NOAUTOSET | setflags;
-	  sel1->elements[j + 1] = q1.elements[0];
-	}
-      j += 2;
-    }
-  queue_truncate(sel1, j);
-  queue_free(&q1);
+  selection_filter_map(pool, sel1, &m2, setflags);
   map_free(&m2);
 }
 
 void
 selection_add(Pool *pool, Queue *sel1, Queue *sel2)
 {
-  int i;
-  for (i = 0; i < sel2->count; i++)
-    queue_push(sel1, sel2->elements[i]);
+  if (sel2->count)
+    queue_insertn(sel1, sel1->count, sel2->count, sel2->elements);
 }
 
 const char *
