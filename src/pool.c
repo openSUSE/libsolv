@@ -859,7 +859,7 @@ pool_match_dep(Pool *pool, Id d1, Id d2)
   if (!ISRELDEP(d1))
     {
       if (!ISRELDEP(d2))
-	return 0;
+	return 0;	/* cannot match as d1 != d2 */
       rd2 = GETRELDEP(pool, d2);
       return pool_match_dep(pool, d1, rd2->name);
     }
