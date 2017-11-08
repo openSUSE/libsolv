@@ -86,6 +86,7 @@ static struct resultflags2str {
   { TESTCASE_RESULT_GENID,		"genid" },
   { TESTCASE_RESULT_REASON,		"reason" },
   { TESTCASE_RESULT_CLEANDEPS,		"cleandeps" },
+  { TESTCASE_RESULT_JOBS,		"jobs" },
   { 0, 0 }
 };
 
@@ -169,6 +170,8 @@ static struct selflags2str {
   { SELECTION_NOCASE, "nocase" },
   { SELECTION_SOURCE_ONLY, "sourceonly" },
   { SELECTION_WITH_SOURCE, "withsource" },
+  { SELECTION_SKIP_KIND, "skipkind" },
+  { SELECTION_MATCH_DEPSTR, "depstr" },
   { 0, 0 }
 };
 
@@ -1123,12 +1126,13 @@ testcase_str2job(Pool *pool, const char *str, Id *whatp)
 }
 
 static int
-addselectionjob(Pool *pool, char **pieces, int npieces, Queue *jobqueue)
+addselectionjob(Pool *pool, char **pieces, int npieces, Queue *jobqueue, int keyname)
 {
   Id job;
   int i, r;
   int selflags;
   Queue sel;
+  char *sp;
 
   for (i = 0; job2str[i].str; i++)
     if (!strcmp(pieces[0], job2str[i].str))
@@ -1149,9 +1153,18 @@ addselectionjob(Pool *pool, char **pieces, int npieces, Queue *jobqueue)
     }
   if (npieces < 4)
     return pool_error(pool, -1, "selstr2job: no selection flags");
-  selflags = str2selflags(pool, pieces[3]);
+  selflags = str2selflags(pool, pieces[npieces - 1]);
+  /* re-join pieces */
+  for (sp = pieces[2]; sp < pieces[npieces - 2]; sp++)
+    if (*sp == 0)
+      *sp = ' ';
   queue_init(&sel);
-  r = selection_make(pool, &sel, pieces[2], selflags);
+  if (keyname > 0)
+    r = selection_make_matchdeps(pool, &sel, pieces[2], selflags, keyname, 0);
+  else if (keyname < 0)
+    r = selection_make_matchdepid(pool, &sel, testcase_str2dep(pool, pieces[2]), selflags, -keyname, 0);
+  else
+    r = selection_make(pool, &sel, pieces[2], selflags);
   for (i = 0; i < sel.count; i += 2)
     queue_push2(jobqueue, job | sel.elements[i], sel.elements[i + 1]);
   queue_free(&sel);
@@ -2120,6 +2133,15 @@ testcase_solverresult(Solver *solv, int resultflags)
 	}
       queue_free(&q);
     }
+  if ((resultflags & TESTCASE_RESULT_JOBS) != 0)
+    {
+      for (i = 0; i < solv->job.count; i += 2)
+	{
+	  s = (char *)testcase_job2str(pool, solv->job.elements[i], solv->job.elements[i + 1]);
+	  s = pool_tmpjoin(pool, "job ", s, 0);
+	  strqueue_push(&sq, s);
+	}
+    }
   strqueue_sort(&sq);
   result = strqueue_join(&sq);
   strqueue_free(&sq);
@@ -2702,7 +2724,19 @@ testcase_read(Pool *pool, FILE *fp, const char *testcase, Queue *job, char **res
 	    }
 	  if (npieces >= 3 && !strcmp(pieces[2], "selection"))
 	    {
-	      addselectionjob(pool, pieces + 1, npieces - 1, job);
+	      addselectionjob(pool, pieces + 1, npieces - 1, job, 0);
+	      continue;
+	    }
+	  if (npieces >= 4 && !strcmp(pieces[2], "selection_matchdeps"))
+	    {
+	      pieces[2] = pieces[1];
+	      addselectionjob(pool, pieces + 2, npieces - 2, job, pool_str2id(pool, pieces[3], 1));
+	      continue;
+	    }
+	  if (npieces >= 4 && !strcmp(pieces[2], "selection_matchdepid"))
+	    {
+	      pieces[2] = pieces[1];
+	      addselectionjob(pool, pieces + 2, npieces - 2, job, -pool_str2id(pool, pieces[3], 1));
 	      continue;
 	    }
 	  /* rejoin */

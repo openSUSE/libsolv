@@ -19,6 +19,7 @@
 #define TESTCASE_RESULT_GENID		(1 << 7)
 #define TESTCASE_RESULT_REASON		(1 << 8)
 #define TESTCASE_RESULT_CLEANDEPS	(1 << 9)
+#define TESTCASE_RESULT_JOBS		(1 << 10)
 
 /* reuse solver hack, testsolv use only */
 #define TESTCASE_RESULT_REUSE_SOLVER	(1 << 31)
