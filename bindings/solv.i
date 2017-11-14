@@ -1261,8 +1261,17 @@ typedef struct {
   static const Id SELECTION_GLOB = SELECTION_GLOB;
   static const Id SELECTION_FLAT = SELECTION_FLAT;
   static const Id SELECTION_NOCASE = SELECTION_NOCASE;
+  static const Id SELECTION_SKIP_KIND = SELECTION_SKIP_KIND;
+  static const Id SELECTION_MATCH_DEPSTR = SELECTION_MATCH_DEPSTR;
   static const Id SELECTION_SOURCE_ONLY = SELECTION_SOURCE_ONLY;
   static const Id SELECTION_WITH_SOURCE = SELECTION_WITH_SOURCE;
+  static const Id SELECTION_WITH_DISABLED = SELECTION_WITH_DISABLED;
+  static const Id SELECTION_WITH_BADARCH = SELECTION_WITH_BADARCH;
+  static const Id SELECTION_WITH_ALL = SELECTION_WITH_ALL;
+  static const Id SELECTION_ADD = SELECTION_ADD;
+  static const Id SELECTION_SUBTRACT = SELECTION_SUBTRACT;
+  static const Id SELECTION_FILTER = SELECTION_FILTER;
+  static const Id SELECTION_FILTER_KEEP_IFEMPTY = SELECTION_FILTER_KEEP_IFEMPTY;
 
   Selection(Pool *pool) {
     Selection *s;
@@ -1300,6 +1309,27 @@ typedef struct {
   void add_raw(Id how, Id what) {
     queue_push2(&$self->q, how, what);
   }
+  void subtract(Selection *lsel) {
+    if ($self->pool == lsel->pool)
+      selection_subtract($self->pool, &$self->q, &lsel->q);
+  }
+  
+  void select(const char *name, int flags) {
+    if ((flags & SELECTION_MODEBITS) == 0)
+      flags |= SELECTION_FILTER;
+    $self->flags = selection_make($self->pool, &$self->q, name, flags);
+  }
+  void matchdeps(const char *name, int flags, Id keyname, Id marker = -1) {
+    if ((flags & SELECTION_MODEBITS) == 0)
+      flags |= SELECTION_FILTER;
+    $self->flags = selection_make_matchdeps($self->pool, &$self->q, name, flags, keyname, marker);
+  }
+  void matchdepid(DepId dep, int flags, Id keyname, Id marker = -1) {
+    if ((flags & SELECTION_MODEBITS) == 0)
+      flags |= SELECTION_FILTER;
+    $self->flags = selection_make_matchdepid($self->pool, &$self->q, dep, flags, keyname, marker);
+  }
+
   %typemap(out) Queue jobs Queue2Array(Job *, 2, new_Job(arg1->pool, id, idp[1]));
   %newobject jobs;
   Queue jobs(int flags) {
@@ -1890,6 +1920,20 @@ typedef struct {
   Selection *select(const char *name, int flags) {
     Selection *sel = new_Selection($self);
     sel->flags = selection_make($self, &sel->q, name, flags);
+    return sel;
+  }
+
+  %newobject matchdeps;
+  Selection *matchdeps(const char *name, int flags, Id keyname, Id marker = -1) {
+    Selection *sel = new_Selection($self);
+    sel->flags = selection_make_matchdeps($self, &sel->q, name, flags, keyname, marker);
+    return sel;
+  }
+
+  %newobject matchdepid;
+  Selection *matchdepid(DepId dep, int flags, Id keyname, Id marker = -1) {
+    Selection *sel = new_Selection($self);
+    sel->flags = selection_make_matchdepid($self, &sel->q, dep, flags, keyname, marker);
     return sel;
   }
 
