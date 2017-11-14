@@ -98,6 +98,15 @@ static inline int pool_disabled_solvable(const Pool *pool, Solvable *s)
   return 0;
 }
 
+static inline int pool_badarch_solvable(const Pool *pool, Solvable *s)
+{
+  if (!s->arch)
+    return 1;
+  if (pool->id2arch && (s->arch > pool->lastarch || !pool->id2arch[s->arch]))
+    return 1;
+  return 0;
+}
+
 static inline int pool_installable(const Pool *pool, Solvable *s)
 {
   if (!s->arch || s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
