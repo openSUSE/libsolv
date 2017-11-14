@@ -172,6 +172,8 @@ static struct selflags2str {
   { SELECTION_WITH_SOURCE, "withsource" },
   { SELECTION_SKIP_KIND, "skipkind" },
   { SELECTION_MATCH_DEPSTR, "depstr" },
+  { SELECTION_WITH_DISABLED, "withdisabled" },
+  { SELECTION_WITH_BADARCH, "withbadarch" },
   { 0, 0 }
 };
 
