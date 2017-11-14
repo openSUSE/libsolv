@@ -41,6 +41,7 @@ extern void map_free(Map *m);
 extern void map_and(Map *t, Map *s);
 extern void map_or(Map *t, Map *s);
 extern void map_subtract(Map *t, Map *s);
+extern void map_invertall(Map *m);
 
 static inline void map_empty(Map *m)
 {
