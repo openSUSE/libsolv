@@ -33,6 +33,7 @@ SOLV_1.0 {
 		map_grow;
 		map_init;
 		map_init_clone;
+		map_invertall;
 		map_or;
 		policy_filter_unwanted;
 		policy_findupdatepackages;
@@ -250,6 +251,7 @@ SOLV_1.0 {
 		selection_make_matchdepid;
 		selection_make_matchdeps;
 		selection_solvables;
+		selection_subtract;
 		solv_bin2hex;
 		solv_calloc;
 		solv_chksum_add;
