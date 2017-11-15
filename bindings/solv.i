@@ -1293,6 +1293,15 @@ typedef struct {
   bool isempty() {
     return $self->q.count == 0;
   }
+  %newobject clone;
+  Selection *clone(Selection *from, int flags = 0) { 
+    Selection *s;
+    s = solv_calloc(1, sizeof(*s));
+    s->pool = from->pool;
+    s->flags = from->flags;
+    queue_init_clone(&s->q, &from->q);
+    return s;
+  }
   void filter(Selection *lsel) {
     if ($self->pool != lsel->pool)
       queue_empty(&$self->q);
