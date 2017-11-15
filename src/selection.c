@@ -175,9 +175,8 @@ match_nevr_rel(Pool *pool, Solvable *s, Id rflags, Id revr)
 }
 
 /* only supports simple rels plus REL_ARCH */
-/* prunes empty jobs */
 static void
-selection_filter_rel(Pool *pool, Queue *selection, Id relflags, Id relevr)
+selection_filter_rel_noprune(Pool *pool, Queue *selection, Id relflags, Id relevr)
 {
   int i;
 
@@ -247,7 +246,14 @@ selection_filter_rel(Pool *pool, Queue *selection, Id relflags, Id relevr)
 	    }
 	}
     }
-  /* now prune out empty elements */
+}
+
+/* only supports simple rels plus REL_ARCH */
+/* prunes empty jobs */
+static void
+selection_filter_rel(Pool *pool, Queue *selection, Id relflags, Id relevr)
+{
+  selection_filter_rel_noprune(pool, selection, relflags, relevr);
   selection_prune(pool, selection);
 }
 
@@ -326,15 +332,28 @@ selection_filter_repo(Pool *pool, Queue *selection, Repo *repo)
 }
 
 
-/* change a SOLVER_SOLVABLE_NAME selection to something that also includes extra packages */
-/* extra packages are: src, badarch, disabled */
-/* used by selection_depglob and selection_depglob_id */
+static int
+matchprovides(Pool *pool, Solvable *s, Id dep)
+{
+  Id id, *idp;
+  idp = s->repo->idarraydata + s->provides;
+  while ((id = *idp++) != 0)
+    if (pool_match_dep(pool, id, dep))
+      return 1;
+  return 0;
+}
+
+/* change a SOLVER_SOLVABLE_NAME/PROVIDES selection to something that also includes
+ * extra packages.
+ * extra packages are: src, badarch, disabled
+ * used by selection_depglob and selection_depglob_id
+ */
 static void
 selection_addextra(Pool *pool, Queue *selection, int flags)
 {
   Queue q;
-  Id p, name;
-  int i, haveextra;
+  Id p, pp, dep;
+  int i, isextra, haveextra, doprovides;
 
   if ((flags & SELECTION_INSTALLED_ONLY) != 0)
     flags &= ~SELECTION_WITH_SOURCE;
@@ -345,23 +364,40 @@ selection_addextra(Pool *pool, Queue *selection, int flags)
   queue_init(&q);
   for (i = 0; i < selection->count; i += 2)
     {
-      if (selection->elements[i] != SOLVER_SOLVABLE_NAME)
+      if (selection->elements[i] == SOLVER_SOLVABLE_NAME)
+	doprovides = 0;
+      else if (selection->elements[i] == SOLVER_SOLVABLE_PROVIDES)
+	doprovides = 1;
+      else
 	continue;
-      name = selection->elements[i + 1];
+      dep = selection->elements[i + 1];
       haveextra = 0;
       queue_empty(&q);
+      if (doprovides)
+	{
+	  /* first put all non-extra packages on the queue */
+	  FOR_PROVIDES(p, pp, dep)
+	    {
+	      if ((flags & SELECTION_INSTALLED_ONLY) != 0 && pool->solvables[p].repo != pool->installed)
+		continue;
+	      queue_push(&q, p);
+	    }
+	}
       FOR_POOL_SOLVABLES(p)
 	{
 	  Solvable *s = pool->solvables + p;
-	  if (s->name != name)
+	  if (!doprovides && s->name != dep)
 	    continue;
+	  if ((flags & SELECTION_INSTALLED_ONLY) != 0 && s->repo != pool->installed)
+	    continue;
+	  isextra = 0;
 	  if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
 	    {
 	      if (!(flags & SELECTION_WITH_SOURCE))
 		continue;
 	      if (!(flags & SELECTION_WITH_DISABLED) && pool_disabled_solvable(pool, s))
 		continue;
-	      haveextra = 1;
+	      isextra = 1;
 	    }
 	  else
 	    {
@@ -373,30 +409,38 @@ selection_addextra(Pool *pool, Queue *selection, int flags)
 		    {
 		      if (!(flags & SELECTION_WITH_DISABLED))
 			continue;
-		      if (!(flags & SELECTION_WITH_BADARCH) && pool_badarch_solvable(pool, s))
-			continue;
-		      haveextra = 1;
+		      isextra = 1;
 		    }
-		  else if (pool_badarch_solvable(pool, s))
+		  if (pool_badarch_solvable(pool, s))
 		    {
 		      if (!(flags & SELECTION_WITH_BADARCH))
 			continue;
-		      haveextra = 1;
+		      isextra = 1;
 		    }
 		}
 	    }
+	  if (doprovides)
+	    {
+	      if (!isextra)
+		continue;	/* already done above in FOR_PROVIDES */
+	      if (!s->provides || !matchprovides(pool, s, dep))
+		continue;
+	    }
+	  haveextra |= isextra;
 	  queue_push(&q, p);
 	}
       if (!haveextra || !q.count)
 	continue;
       if (q.count == 1)
 	{
-	  selection->elements[i] = SOLVER_SOLVABLE | SOLVER_NOAUTOSET;
+	  selection->elements[i] = (selection->elements[i] & ~SOLVER_SELECTMASK) | SOLVER_SOLVABLE | SOLVER_NOAUTOSET;
 	  selection->elements[i + 1] = q.elements[0];
 	}
       else
 	{
-	  selection->elements[i] = SOLVER_SOLVABLE_ONE_OF;
+	  if (doprovides)
+	    solv_sort(q.elements, q.count, sizeof(Id), selection_solvables_sortcmp, NULL);
+	  selection->elements[i] = (selection->elements[i] & ~SOLVER_SELECTMASK) | SOLVER_SOLVABLE_ONE_OF;
 	  selection->elements[i + 1] = pool_queuetowhatprovides(pool, &q);
 	}
     }
@@ -481,6 +525,70 @@ selection_depglob_id(Pool *pool, Queue *selection, Id id, int flags)
       return SELECTION_PROVIDES;
     }
   return 0;
+}
+
+static int
+selection_depglob_extra(Pool *pool, Queue *selection, const char *name, int flags)
+{
+  Id p, id, *idp;
+  int match = 0;
+  int doglob = 0;
+  int nocase = 0;
+  int globflags = 0;
+
+  if ((flags & SELECTION_INSTALLED_ONLY) != 0)
+    return 0;	/* neither disabled nor badarch nor src */
+
+  nocase = flags & SELECTION_NOCASE;
+  if ((flags & SELECTION_GLOB) != 0 && strpbrk(name, "[*?") != 0)
+    doglob = 1;
+  if (doglob && nocase)
+    globflags = FNM_CASEFOLD;
+
+  FOR_POOL_SOLVABLES(p)
+    {
+      const char *n;
+      Solvable *s = pool->solvables + p;
+      if (!s->provides)
+	continue;
+      if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)	/* no provides */
+	continue;
+      if (s->repo == pool->installed)
+	continue;
+      if (pool_disabled_solvable(pool, s))
+	{
+	  if (!(flags & SELECTION_WITH_DISABLED))
+	    continue;
+	  if (!(flags & SELECTION_WITH_BADARCH) && pool_badarch_solvable(pool, s))
+	    continue;
+	}
+      else if (pool_badarch_solvable(pool, s))
+	{
+	  if (!(flags & SELECTION_WITH_BADARCH))
+	    continue;
+	}
+      else
+	continue;
+      /* here is an extra solvable we need to consider */
+      idp = s->repo->idarraydata + s->provides;
+      while ((id = *idp++) != 0)
+	{
+	  while (ISRELDEP(id))
+	    {
+	      Reldep *rd = GETRELDEP(pool, id);
+	      id = rd->name;
+	    }
+	  if (pool->whatprovides[id] > 1)
+	    continue;
+	  n = pool_id2str(pool, id);
+	  if ((doglob ? fnmatch(name, n, globflags) : nocase ? strcasecmp(name, n) : strcmp(name, n)) == 0)
+	    {
+	      queue_pushunique2(selection, SOLVER_SOLVABLE_PROVIDES, id);
+	      match = 1;
+	    }
+	}
+    }
+  return match;
 }
 
 /* match the name or a provides of a package */
@@ -600,6 +708,8 @@ selection_depglob(Pool *pool, Queue *selection, const char *name, int flags)
 	      match = 1;
 	    }
 	}
+      if (flags & (SELECTION_WITH_BADARCH | SELECTION_WITH_DISABLED))
+	match |= selection_depglob_extra(pool, selection, name, flags);
       if (match)
         return SELECTION_PROVIDES;
     }
@@ -609,7 +719,7 @@ selection_depglob(Pool *pool, Queue *selection, const char *name, int flags)
 /* like selection_depglob, but check for a .arch suffix if the depglob did
    not work and SELECTION_DOTARCH is used */
 static int
-selection_depglob_arch(Pool *pool, Queue *selection, const char *name, int flags)
+selection_depglob_arch(Pool *pool, Queue *selection, const char *name, int flags, int noprune)
 {
   int ret;
   const char *r;
@@ -628,7 +738,10 @@ selection_depglob_arch(Pool *pool, Queue *selection, const char *name, int flags
 	flags |= SELECTION_SOURCE_ONLY;
       if ((ret = selection_depglob(pool, selection, rname, flags)) != 0)
 	{
-	  selection_filter_rel(pool, selection, REL_ARCH, archid);
+	  if (noprune)
+	    selection_filter_rel_noprune(pool, selection, REL_ARCH, archid);
+	  else
+	    selection_filter_rel(pool, selection, REL_ARCH, archid);
 	  solv_free(rname);
 	  return selection->count ? ret | SELECTION_DOTARCH : 0;
 	}
@@ -749,13 +862,16 @@ selection_rel(Pool *pool, Queue *selection, const char *name, int flags)
       solv_free(rname);
       return 0;
     }
-  if ((ret = selection_depglob_arch(pool, selection, rname, flags)) == 0)
+  if ((ret = selection_depglob_arch(pool, selection, rname, flags, 1)) == 0)
     {
       solv_free(rname);
       return 0;
     }
-  if (rflags)
-    selection_filter_rel(pool, selection, rflags, pool_str2id(pool, r, 1));
+  selection_filter_rel_noprune(pool, selection, rflags, pool_str2id(pool, r, 1));
+  /* this is why we did noprune: add extra packages */
+  if ((ret & SELECTION_PROVIDES) == SELECTION_PROVIDES && (flags & (SELECTION_WITH_DISABLED | SELECTION_WITH_BADARCH)) != 0)
+    selection_addextra(pool, selection, flags);
+  selection_prune(pool, selection);
   solv_free(rname);
   return selection->count ? ret | SELECTION_REL : 0;
 }
@@ -949,6 +1065,74 @@ selection_canon(Pool *pool, Queue *selection, const char *name, int flags)
   return selection->count ? ret | SELECTION_CANON : 0;
 }
 
+/* return the needed withbits to match the provided selection */
+static int
+selection_extrabits(Pool *pool, Queue *selection, int flags)
+{
+  int i, needflags, isextra;
+  int allflags;
+  Id p;
+  Solvable *s;
+  Queue qlimit;
+
+  allflags = flags & (SELECTION_WITH_SOURCE | SELECTION_WITH_DISABLED | SELECTION_WITH_BADARCH);
+  if (!selection->count)
+    return allflags;
+  if (selection->count == 2 && selection->elements[0] == SOLVER_SOLVABLE_ALL)
+    return allflags;	/* don't bother */
+  queue_init(&qlimit);
+  selection_solvables(pool, selection, &qlimit);
+  needflags = 0;
+  for (i = 0; i < qlimit.count; i++)
+    {
+      p = qlimit.elements[i];
+      s = pool->solvables + p;
+      if ((flags & SELECTION_INSTALLED_ONLY) != 0 && s->repo != pool->installed)
+	continue;
+      isextra = 0;
+      if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
+	{
+	  if (!(flags & SELECTION_WITH_SOURCE))
+	    continue;
+          isextra |= SELECTION_WITH_SOURCE;
+	  if (pool_disabled_solvable(pool, s))
+	    {
+	      if (!(flags & SELECTION_WITH_DISABLED))
+		continue;
+	      isextra |= SELECTION_WITH_DISABLED;
+	    }
+	}
+      else
+	{
+	  if ((flags & SELECTION_SOURCE_ONLY) != 0)
+	    continue;
+	  if (s->repo != pool->installed)
+	    {
+	      if (pool_disabled_solvable(pool, s))
+		{
+		  if (!(flags & SELECTION_WITH_DISABLED))
+		    continue;
+		  isextra |= SELECTION_WITH_DISABLED;
+		}
+	      if (pool_badarch_solvable(pool, s))
+		{
+		  if (!(flags & SELECTION_WITH_BADARCH))
+		    continue;
+		  isextra |= SELECTION_WITH_BADARCH;
+		}
+	    }
+	}
+      if (isextra)
+	{
+	  needflags |= isextra;
+	  if (needflags == allflags)
+	    break;
+	}
+    }
+  queue_free(&qlimit);
+  return needflags;
+}
+
 int
 selection_make(Pool *pool, Queue *selection, const char *name, int flags)
 {
@@ -956,7 +1140,21 @@ selection_make(Pool *pool, Queue *selection, const char *name, int flags)
   if ((flags & SELECTION_MODEBITS) != 0)
     {
       Queue q;
+
       queue_init(&q);
+      if ((flags & SELECTION_MODEBITS) == SELECTION_SUBTRACT || (flags & SELECTION_MODEBITS) == SELECTION_FILTER)
+	{
+	  if (!selection->count)
+	    {
+	      queue_free(&q);
+	      return 0;
+	    }
+	  if ((flags & (SELECTION_WITH_DISABLED | SELECTION_WITH_BADARCH | SELECTION_WITH_SOURCE)) != 0)
+	    {
+	      /* try to drop expensive extra bits */
+	      flags = (flags & ~(SELECTION_WITH_DISABLED | SELECTION_WITH_BADARCH | SELECTION_WITH_SOURCE)) | selection_extrabits(pool, selection, flags);
+	    }
+	}
       ret = selection_make(pool, &q, name, flags & ~SELECTION_MODEBITS);
       if ((flags & SELECTION_MODEBITS) == SELECTION_ADD)
 	selection_add(pool, selection, &q);
@@ -975,7 +1173,7 @@ selection_make(Pool *pool, Queue *selection, const char *name, int flags)
   if (!ret && (flags & SELECTION_REL) != 0)
     ret = selection_rel(pool, selection, name, flags);
   if (!ret)
-    ret = selection_depglob_arch(pool, selection, name, flags);
+    ret = selection_depglob_arch(pool, selection, name, flags, 0);
   if (!ret && (flags & SELECTION_CANON) != 0)
     ret = selection_canon(pool, selection, name, flags);
   if (selection->count && (flags & SELECTION_INSTALLED_ONLY) != 0)
