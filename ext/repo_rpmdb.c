@@ -1247,7 +1247,15 @@ opendbenv(struct rpmdbstate *state)
     {
 #if defined(FEDORA) || defined(MAGEIA)
       int serialize_fd = serialize_dbenv_ops(state);
-      r = dbenv->open(dbenv, dbpath, DB_CREATE|DB_INIT_CDB|DB_INIT_MPOOL, 0644);
+      int eflags = DB_CREATE|DB_INIT_CDB|DB_INIT_MPOOL;
+      r = dbenv->open(dbenv, dbpath, eflags, 0644);
+      /* see rpm commit 2822ccbcdf3e898b960fafb23c4d571e26cef0a4 */
+      if (r == DB_VERSION_MISMATCH)
+	{
+	  eflags |= DB_PRIVATE;
+	  dbenv->errx(dbenv, "warning: DB_VERSION_MISMATCH, retrying with DB_PRIVATE");
+	  r = dbenv->open(dbenv, dbpath, eflags, 0644);
+	}
       if (serialize_fd >= 0)
 	close(serialize_fd);
 #else
