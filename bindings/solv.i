@@ -1325,17 +1325,17 @@ typedef struct {
   
   void select(const char *name, int flags) {
     if ((flags & SELECTION_MODEBITS) == 0)
-      flags |= SELECTION_FILTER;
+      flags |= SELECTION_FILTER | SELECTION_WITH_ALL;
     $self->flags = selection_make($self->pool, &$self->q, name, flags);
   }
   void matchdeps(const char *name, int flags, Id keyname, Id marker = -1) {
     if ((flags & SELECTION_MODEBITS) == 0)
-      flags |= SELECTION_FILTER;
+      flags |= SELECTION_FILTER | SELECTION_WITH_ALL;
     $self->flags = selection_make_matchdeps($self->pool, &$self->q, name, flags, keyname, marker);
   }
   void matchdepid(DepId dep, int flags, Id keyname, Id marker = -1) {
     if ((flags & SELECTION_MODEBITS) == 0)
-      flags |= SELECTION_FILTER;
+      flags |= SELECTION_FILTER | SELECTION_WITH_ALL;
     $self->flags = selection_make_matchdepid($self->pool, &$self->q, dep, flags, keyname, marker);
   }
 
