@@ -533,14 +533,12 @@ main(int argc, char **argv)
 	flags |= SELECTION_WITH_SOURCE;
       if (argv[i][0] == '/')
 	flags |= SELECTION_FILELIST | (mode == MODE_ERASE ? SELECTION_INSTALLED_ONLY : 0);
+      if (keyname && keyname_depstr)
+	flags |= SELECTION_MATCH_DEPSTR;
       if (!keyname)
         rflags = selection_make(pool, &job2, argv[i], flags);
       else
-	{
-	  if (keyname_depstr)
-	    flags |= SELECTION_MATCH_DEPSTR;
-          rflags = selection_make_matchdeps(pool, &job2, argv[i], flags, pool_str2id(pool, keyname, 1), 0);
-	}
+        rflags = selection_make_matchdeps(pool, &job2, argv[i], flags, pool_str2id(pool, keyname, 1), 0);
       if (repofilter.count)
 	selection_filter(pool, &job2, &repofilter);
       if (archfilter.count)
