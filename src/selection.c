@@ -1261,11 +1261,12 @@ matchdep(Pool *pool, Id id, char *rname, int rflags, Id revr, int flags)
   return matchdep_str(rname, pool_id2str(pool, id), flags);
 }
 
-int
-selection_make_matchdeps_limited(Pool *pool, Queue *selection, const char *name, int flags, int keyname, int marker, struct limiter *limiter)
+static int
+selection_make_matchdeps_common_limited(Pool *pool, Queue *selection, const char *name, Id dep, int flags, int keyname, int marker, struct limiter *limiter)
 {
   int li, i, j;
-  char *rname, *r = 0;
+  int ret = 0;
+  char *rname = 0, *r = 0;
   int rflags = 0;
   Id revr = 0;
   Id p;
@@ -1274,35 +1275,55 @@ selection_make_matchdeps_limited(Pool *pool, Queue *selection, const char *name,
   queue_empty(selection);
   if (!limiter->end)
     return 0;
+  if (!name && !dep)
+    return 0;
 
   if ((flags & SELECTION_MATCH_DEPSTR) != 0)
     flags &= ~SELECTION_REL;
 
-  rname = solv_strdup(name);
-  if ((flags & SELECTION_REL) != 0)
+  if (name)
     {
-      if ((r = strpbrk(rname, "<=>")) != 0)
+      rname = solv_strdup(name);
+      if ((flags & SELECTION_REL) != 0)
 	{
-	  if ((r = splitrel(rname, r, &rflags)) == 0)
+	  if ((r = strpbrk(rname, "<=>")) != 0)
 	    {
-	      solv_free(rname);
-	      return 0;
+	      if ((r = splitrel(rname, r, &rflags)) == 0)
+		{
+		  solv_free(rname);
+		  return 0;
+		}
 	    }
+	  revr = pool_str2id(pool, r, 1);
+	  ret |= SELECTION_REL;
 	}
-      revr = pool_str2id(pool, r, 1);
+      if ((flags & SELECTION_GLOB) != 0 && !strpbrk(rname, "[*?") != 0)
+	flags &= ~SELECTION_GLOB;
+
+      if ((flags & SELECTION_GLOB) == 0 && (flags & SELECTION_NOCASE) == 0 && (flags & SELECTION_MATCH_DEPSTR) == 0)
+	{
+	  /* we can use the faster selection_make_matchdepid */
+	  dep = pool_str2id(pool, rname, 1);
+	  if (rflags)
+	    dep = pool_rel2id(pool, dep, revr, rflags, 1);
+	  rname = solv_free(rname);
+	  name = 0;
+	}
     }
-
-  if ((flags & SELECTION_GLOB) != 0 && !strpbrk(rname, "[*?") != 0)
-    flags &= ~SELECTION_GLOB;
-
-  if ((flags & SELECTION_GLOB) == 0 && (flags & SELECTION_NOCASE) == 0 && (flags & SELECTION_MATCH_DEPSTR) == 0)
+  if (dep)
     {
-      /* we can use the faster selection_make_matchdepid */
-      Id dep = pool_str2id(pool, rname, 1);
-      if (rflags)
-	dep = pool_rel2id(pool, dep, revr, rflags, 1);
-      solv_free(rname);
-      return selection_make_matchdepid(pool, selection, dep, flags, keyname, marker);
+      if (keyname == SOLVABLE_NAME && (flags & SELECTION_MATCH_DEPSTR) != 0)
+	{
+	  Reldep *rd;
+	  if (!ISRELDEP(dep))
+	    return 0;
+	  rd = GETRELDEP(pool, dep);
+	  if (!rd->name || rd->flags != REL_EQ)
+	    return 0;
+	  dep = rd->name;
+	  rflags = rd->flags;
+	  revr = rd->evr;
+	}
     }
 
   queue_init(&q);
@@ -1334,36 +1355,70 @@ selection_make_matchdeps_limited(Pool *pool, Queue *selection, const char *name,
 	}
       if (keyname == SOLVABLE_NAME)			/* nevr match hack */
 	{
-	  if ((flags & SELECTION_MATCH_DEPSTR) != 0)	/* mis-use */
+	  if (dep)
 	    {
-	      char *tmp = pool_tmpjoin(pool, pool_id2str(pool, s->name), " = ", pool_id2str(pool, s->evr));
-	      if (!matchdep_str(rname, tmp, flags))
-		continue;
+	      if ((flags & SELECTION_MATCH_DEPSTR) != 0)
+		{
+		  if (s->name != dep || s->evr != revr)
+		    continue;
+		}
+	      else
+		{
+		  if (!pool_match_nevr(pool, s, dep))
+		    continue;
+		}
 	    }
 	  else
 	    {
-	      if (!matchdep(pool, s->name, rname, rflags, revr, flags))
-		continue;
-	      if (rflags && !pool_intersect_evrs(pool, rflags, revr, REL_EQ, s->evr))
-		continue;
+	      if ((flags & SELECTION_MATCH_DEPSTR) != 0)	/* mis-use */
+		{
+		  char *tmp = pool_tmpjoin(pool, pool_id2str(pool, s->name), " = ", pool_id2str(pool, s->evr));
+		  if (!matchdep_str(rname, tmp, flags))
+		    continue;
+		}
+	      else
+		{
+		  if (!matchdep(pool, s->name, rname, rflags, revr, flags))
+		    continue;
+		  if (rflags && !pool_intersect_evrs(pool, rflags, revr, REL_EQ, s->evr))
+		    continue;
+		}
 	    }
 	  queue_push(selection, p);
 	  continue;
 	}
       queue_empty(&q);
       repo_lookup_deparray(s->repo, p, keyname, &q, marker);
-      for (i = 0; i < q.count; i++)
+      if (!q.count)
+	continue;
+      if (dep)
 	{
-	  Id id = q.elements[i];
-	  if ((flags & SELECTION_MATCH_DEPSTR) != 0)
+	  if ((flags & SELECTION_MATCH_DEPSTR) != 0)    /* mis-use */
 	    {
-	      if (matchdep_str(rname, pool_dep2str(pool, id), flags))
-		break;
+	      for (i = 0; i < q.count; i++)
+	        if (q.elements[i] == dep)
+		  break;
 	    }
 	  else
 	    {
-	      if (matchdep(pool, id, rname, rflags, revr, flags))
-		break;
+	      for (i = 0; i < q.count; i++)
+	        if (pool_match_dep(pool, q.elements[i], dep))
+		  break;
+	    }
+	}
+      else
+	{
+	  if ((flags & SELECTION_MATCH_DEPSTR) != 0)
+	    {
+	      for (i = 0; i < q.count; i++)
+	        if (matchdep_str(rname, pool_dep2str(pool, q.elements[i]), flags))
+		  break;
+	    }
+	  else
+	    {
+	      for (i = 0; i < q.count; i++)
+	        if (matchdep(pool, q.elements[i], rname, rflags, revr, flags))
+		  break;
 	    }
 	}
       if (i < q.count)
@@ -1385,22 +1440,16 @@ selection_make_matchdeps_limited(Pool *pool, Queue *selection, const char *name,
 
   if ((flags & SELECTION_FLAT) != 0)
     selection_flatten(pool, selection);
-  return keyname == SOLVABLE_NAME ? SELECTION_NAME : SELECTION_PROVIDES;
+  return ret | (keyname == SOLVABLE_NAME ? SELECTION_NAME : SELECTION_PROVIDES);
 }
 
-/*
- *  select against the dependencies in keyname
- *  like SELECTION_REL and SELECTION_PROVIDES, but with the
- *  deps in keyname instead of provides.
- */
-int
-selection_make_matchdeps(Pool *pool, Queue *selection, const char *name, int flags, int keyname, int marker)
+static int
+selection_make_matchdeps_common(Pool *pool, Queue *selection, const char *name, Id dep, int flags, int keyname, int marker)
 {
   struct limiter limiter;
 
   setup_limiter(pool, flags, &limiter);
-
-  if ((flags & SELECTION_MODEBITS) != 0)
+  if ((flags & SELECTION_MODEBITS) != SELECTION_REPLACE)
     {
       int ret;
       Queue q, qlimit;
@@ -1413,7 +1462,7 @@ selection_make_matchdeps(Pool *pool, Queue *selection, const char *name, int fla
 	  limiter.end = qlimit.count;
 	  limiter.mapper = qlimit.elements;
 	}
-      ret = selection_make_matchdeps_limited(pool, &q, name, flags & ~SELECTION_MODEBITS, keyname, marker, &limiter);
+      ret = selection_make_matchdeps_common_limited(pool, &q, name, dep, flags & ~SELECTION_MODEBITS, keyname, marker, &limiter);
       queue_free(&qlimit);
       if ((flags & SELECTION_MODEBITS) == SELECTION_ADD)
 	selection_add(pool, selection, &q);
@@ -1424,105 +1473,21 @@ selection_make_matchdeps(Pool *pool, Queue *selection, const char *name, int fla
       queue_free(&q);
       return ret;
     }
-  return selection_make_matchdeps_limited(pool, selection, name, flags, keyname, marker, &limiter);
+  return selection_make_matchdeps_common_limited(pool, selection, name, dep, flags, keyname, marker, &limiter);
 }
 
+/*
+ *  select against the dependencies in keyname
+ *  like SELECTION_PROVIDES, but with the deps in keyname instead of provides.
+ *  supported match modifiers:
+ *    SELECTION_REL
+ *    SELECTION_GLOB
+ *    SELECTION_NOCASE
+ */
 int
-selection_make_matchdepid_limited(Pool *pool, Queue *selection, Id dep, int flags, int keyname, int marker, struct limiter *limiter)
+selection_make_matchdeps(Pool *pool, Queue *selection, const char *name, int flags, int keyname, int marker)
 {
-  int i, j, li;
-  Id p;
-  Queue q;
-  Reldep *rd = 0;
-
-  queue_empty(selection);
-
-  if (!limiter->end || !dep)
-    return 0;
-  if (keyname == SOLVABLE_NAME && (flags & SELECTION_MATCH_DEPSTR) != 0)
-    {
-      if (!ISRELDEP(dep))
-	return 0;
-      rd = GETRELDEP(pool, dep);
-      if (rd->flags != REL_EQ)
-	return 0;
-    }
-  queue_init(&q);
-  for (li = limiter->start; li < limiter->end; li++)
-    {
-      Solvable *s;
-      p = limiter->mapper ? limiter->mapper[li] : li;
-      s = pool->solvables + p;
-      if (!s->repo || (limiter->repofilter && s->repo != limiter->repofilter))
-	continue;
-      if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
-	{
-	  if (!(flags & SELECTION_SOURCE_ONLY) && !(flags & SELECTION_WITH_SOURCE))
-	    continue;
-	  if (!(flags & SELECTION_WITH_DISABLED) && pool_disabled_solvable(pool, s))
-	    continue;
-	}
-      else
-        {
-	  if ((flags & SELECTION_SOURCE_ONLY) != 0)
-	    continue;
-	  if (s->repo != pool->installed)
-	    {
-	      if (!(flags & SELECTION_WITH_DISABLED) && pool_disabled_solvable(pool, s))
-		continue;
-	      if (!(flags & SELECTION_WITH_BADARCH) && pool_badarch_solvable(pool, s))
-		continue;
-	    }
-	}
-      if (keyname == SOLVABLE_NAME)			/* nevr match hack */
-	{
-	  if ((flags & SELECTION_MATCH_DEPSTR) != 0)	/* mis-use */
-	    {
-	      if (rd->name != s->name || rd->evr != s->evr)
-		continue;
-	    }
-	  else
-	    {
-	      if (!pool_match_nevr(pool, s, dep))
-		continue;
-	    }
-	  queue_push(selection, p);
-	  continue;
-	}
-      queue_empty(&q);
-      repo_lookup_deparray(s->repo, p, keyname, &q, marker);
-      for (i = 0; i < q.count; i++)
-	{
-	  if ((flags & SELECTION_MATCH_DEPSTR) != 0)	/* mis-use */
-	    {
-	      if (q.elements[i] == dep)
-		break;
-	    }
-	  else
-	    {
-	      if (pool_match_dep(pool, q.elements[i], dep))
-		break;
-	    }
-	}
-      if (i < q.count)
-	queue_push(selection, p);
-    }
-  queue_free(&q);
-  if (!selection->count)
-    return 0;
-
-  /* convert package list to selection */
-  j = selection->count;
-  queue_insertn(selection, 0, selection->count, 0);
-  for (i = 0; i < selection->count; )
-    {
-      selection->elements[i++] = SOLVER_SOLVABLE | SOLVER_NOAUTOSET;
-      selection->elements[i++] = selection->elements[j++];
-    }
-
-  if ((flags & SELECTION_FLAT) != 0)
-    selection_flatten(pool, selection);
-  return keyname == SOLVABLE_NAME ? SELECTION_NAME : SELECTION_PROVIDES;
+  return selection_make_matchdeps_common(pool, selection, name, 0, flags, keyname, marker);
 }
 
 /*
@@ -1531,38 +1496,7 @@ selection_make_matchdepid_limited(Pool *pool, Queue *selection, Id dep, int flag
 int
 selection_make_matchdepid(Pool *pool, Queue *selection, Id dep, int flags, int keyname, int marker)
 {
-  struct limiter limiter;
-
-  limiter.start = 2;
-  limiter.end = pool->nsolvables;
-  limiter.mapper = 0;
-  limiter.repofilter = 0;
-
-  if ((flags & SELECTION_MODEBITS) != 0)
-    {
-      int ret;
-      Queue q, qlimit;
-      queue_init(&q);
-      queue_init(&qlimit);
-      if ((flags & SELECTION_MODEBITS) == SELECTION_SUBTRACT || (flags & SELECTION_MODEBITS) == SELECTION_FILTER)
-	{
-	  selection_solvables(pool, selection, &qlimit);
-	  limiter.start = 0;
-	  limiter.end = qlimit.count;
-	  limiter.mapper = qlimit.elements;
-	}
-      ret = selection_make_matchdepid_limited(pool, &q, dep, flags & ~SELECTION_MODEBITS, keyname, marker, &limiter);
-      queue_free(&qlimit);
-      if ((flags & SELECTION_MODEBITS) == SELECTION_ADD)
-	selection_add(pool, selection, &q);
-      else if ((flags & SELECTION_MODEBITS) == SELECTION_SUBTRACT)
-	selection_subtract(pool, selection, &q);
-      else if (ret || !(flags & SELECTION_FILTER_KEEP_IFEMPTY))
-	selection_filter(pool, selection, &q);
-      queue_free(&q);
-      return ret;
-    }
-  return selection_make_matchdepid_limited(pool, selection, dep, flags, keyname, marker, &limiter);
+  return selection_make_matchdeps_common(pool, selection, 0, dep, flags, keyname, marker);
 }
 
 static inline int
