@@ -1202,14 +1202,10 @@ setup_limiter(Pool *pool, int flags, struct limiter *limiter)
   limiter->repofilter = 0;
   if ((flags & SELECTION_INSTALLED_ONLY) != 0)
     {
-      if (!pool->installed)
-	limiter->end = 0;
-      else
-	{
-	  limiter->repofilter = pool->installed;
-	  limiter->start = pool->installed->start;
-	  limiter->end = pool->installed->end;
-	}
+      Repo *repo = pool->installed;
+      limiter->repofilter = repo;
+      limiter->start = repo ? repo->start : 0;
+      limiter->end = repo ? repo->end : 0;
     }
 }
 
@@ -1455,7 +1451,23 @@ selection_make_matchdeps_common(Pool *pool, Queue *selection, const char *name, 
       Queue q, qlimit;
       queue_init(&q);
       queue_init(&qlimit);
-      if ((flags & SELECTION_MODEBITS) == SELECTION_SUBTRACT || (flags & SELECTION_MODEBITS) == SELECTION_FILTER)
+      /* deal with special filter cases */
+      if ((flags & SELECTION_MODEBITS) == SELECTION_FILTER && selection->count == 2 && limiter.end)
+	{
+	  if ((selection->elements[0] & SOLVER_SELECTMASK) == SOLVER_SOLVABLE_ALL)
+	    flags = (flags & ~SELECTION_MODEBITS) | SELECTION_REPLACE;
+	  else if ((selection->elements[0] & SOLVER_SELECTMASK) == SOLVER_SOLVABLE_REPO)
+	    {
+	      Repo *repo = pool_id2repo(pool, selection->elements[1]);
+	      if (limiter.repofilter && repo != limiter.repofilter)
+		repo = 0;
+	      limiter.repofilter = repo;
+	      limiter.start = repo ? repo->start : 0;
+	      limiter.end = repo ? repo->end : 0;
+	      flags = (flags & ~SELECTION_MODEBITS) | SELECTION_REPLACE;
+	    }
+	}
+      if (limiter.end && ((flags & SELECTION_MODEBITS) == SELECTION_SUBTRACT || (flags & SELECTION_MODEBITS) == SELECTION_FILTER))
 	{
 	  selection_solvables(pool, selection, &qlimit);
 	  limiter.start = 0;
@@ -1468,8 +1480,21 @@ selection_make_matchdeps_common(Pool *pool, Queue *selection, const char *name, 
 	selection_add(pool, selection, &q);
       else if ((flags & SELECTION_MODEBITS) == SELECTION_SUBTRACT)
 	selection_subtract(pool, selection, &q);
+      else if ((flags & SELECTION_MODEBITS) == SELECTION_FILTER)
+	{
+          if (ret || !(flags & SELECTION_FILTER_KEEP_IFEMPTY))
+	    selection_filter(pool, selection, &q);
+	}
       else if (ret || !(flags & SELECTION_FILTER_KEEP_IFEMPTY))
-	selection_filter(pool, selection, &q);
+	{
+	  /* special filter case from above */
+	  int i;
+	  Id f = selection->elements[0] & ~(SOLVER_SELECTMASK|SOLVER_NOAUTOSET);	/* job, jobflags, setflags */
+	  queue_free(selection);
+	  queue_init_clone(selection, &q);
+	  for (i = 0; i < selection->count; i += 2)
+	    selection->elements[i] = (selection->elements[i] & (SOLVER_SELECTMASK | SOLVER_SETMASK)) | f;
+	}
       queue_free(&q);
       return ret;
     }

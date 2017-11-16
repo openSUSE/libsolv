@@ -31,10 +31,10 @@ extern "C" {
 
 /* string comparison modifiers */
 #define SELECTION_GLOB			(1 << 9)
-#define SELECTION_FLAT			(1 << 10)
 #define SELECTION_NOCASE		(1 << 11)
 
 /* extra flags */
+#define SELECTION_FLAT			(1 << 10)	/* flatten the resulting selection */
 #define SELECTION_SKIP_KIND		(1 << 14)	/* remove kind: name prefix in SELECTION_NAME matches */
 #define SELECTION_MATCH_DEPSTR		(1 << 15)	/* match dep2str result */
 
