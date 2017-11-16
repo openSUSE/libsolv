@@ -21,7 +21,7 @@ findfastest(char **urls, int nurls)
   struct pollfd *fds;
   char *p, *p2, *q;
   char portstr[16];
-  struct addrinfo hints, *result;;
+  struct addrinfo hints, *result;
 
   fds = solv_calloc(nurls, sizeof(*fds));
   socks = solv_calloc(nurls, sizeof(*socks));
