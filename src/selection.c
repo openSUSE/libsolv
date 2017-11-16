@@ -1275,7 +1275,6 @@ selection_make_matchdeps_limited(Pool *pool, Queue *selection, const char *name,
   if (!limiter->end)
     return 0;
 
-  flags |= SELECTION_REL;	/* XXX: remove */
   if ((flags & SELECTION_MATCH_DEPSTR) != 0)
     flags &= ~SELECTION_REL;
 
