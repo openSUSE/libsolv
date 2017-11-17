@@ -28,7 +28,6 @@
 #include "tools_util.h"
 #include "repo_zyppdb.h"
 
-
 enum state {
   STATE_START,
   STATE_PRODUCT,
@@ -42,15 +41,14 @@ enum state {
 };
 
 static struct solv_xmlparser_element stateswitches[] = {
-  { STATE_START,     "product",       STATE_PRODUCT,       0 },
-  { STATE_PRODUCT,   "name",          STATE_NAME,          1 },
-  { STATE_PRODUCT,   "version",       STATE_VERSION,       0 },
-  { STATE_PRODUCT,   "arch",          STATE_ARCH,          1 },
-  { STATE_PRODUCT,   "summary",       STATE_SUMMARY,       1 },
-  { STATE_PRODUCT,   "install-time",  STATE_INSTALLTIME,   1 },
-  { STATE_PRODUCT,   "vendor",        STATE_VENDOR,        1 },
-  { NUMSTATES }
-};
+    {STATE_START, "product", STATE_PRODUCT, 0},
+    {STATE_PRODUCT, "name", STATE_NAME, 1},
+    {STATE_PRODUCT, "version", STATE_VERSION, 0},
+    {STATE_PRODUCT, "arch", STATE_ARCH, 1},
+    {STATE_PRODUCT, "summary", STATE_SUMMARY, 1},
+    {STATE_PRODUCT, "install-time", STATE_INSTALLTIME, 1},
+    {STATE_PRODUCT, "vendor", STATE_VENDOR, 1},
+    {NUMSTATES}};
 
 struct parsedata {
   Pool *pool;
@@ -64,8 +62,6 @@ struct parsedata {
   struct joindata jd;
 };
 
-
-
 static void
 startElement(struct solv_xmlparser *xmlp, int state, const char *name, const char **atts)
 {
@@ -73,34 +69,33 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
   Pool *pool = pd->pool;
   Solvable *s = pd->solvable;
 
-  switch(state)
+  switch (state)
     {
     case STATE_PRODUCT:
       {
-	/* parse 'type' */
-	const char *type = solv_xmlparser_find_attr("type", atts);
-	s = pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->repo));
-	pd->handle = s - pool->solvables;
-	if (type)
-	  repodata_set_str(pd->data, pd->handle, PRODUCT_TYPE, type);
+        /* parse 'type' */
+        const char *type = solv_xmlparser_find_attr("type", atts);
+        s = pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->repo));
+        pd->handle = s - pool->solvables;
+        if (type)
+          repodata_set_str(pd->data, pd->handle, PRODUCT_TYPE, type);
       }
       break;
     case STATE_VERSION:
       {
-	const char *ver = solv_xmlparser_find_attr("ver", atts);
-	const char *rel = solv_xmlparser_find_attr("rel", atts);
-	/* const char *epoch = solv_xmlparser_find_attr("epoch", atts); ignored */
-	s->evr = makeevr(pd->pool, join2(&pd->jd, ver, "-", rel));
+        const char *ver = solv_xmlparser_find_attr("ver", atts);
+        const char *rel = solv_xmlparser_find_attr("rel", atts);
+        /* const char *epoch = solv_xmlparser_find_attr("epoch", atts); ignored */
+        s->evr = makeevr(pd->pool, join2(&pd->jd, ver, "-", rel));
       }
       break;
-    case STATE_SUMMARY:		/* <summary lang="xy">... */
+    case STATE_SUMMARY: /* <summary lang="xy">... */
       pd->tmplang = join_dup(&pd->jd, solv_xmlparser_find_attr("lang", atts));
       break;
     default:
       break;
     }
 }
-
 
 static void
 endElement(struct solv_xmlparser *xmlp, int state, char *content)
@@ -112,11 +107,11 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
     {
     case STATE_PRODUCT:
       if (!s->arch)
-	s->arch = ARCH_NOARCH;
+        s->arch = ARCH_NOARCH;
       if (!s->evr)
-	s->evr = ID_EMPTY;
+        s->evr = ID_EMPTY;
       if (s->name && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
-	s->provides = repo_addid_dep(pd->repo, s->provides, pool_rel2id(pd->pool, s->name, s->evr, REL_EQ, 1), 0);
+        s->provides = repo_addid_dep(pd->repo, s->provides, pool_rel2id(pd->pool, s->name, s->evr, REL_EQ, 1), 0);
       pd->solvable = 0;
       break;
     case STATE_NAME:
@@ -150,7 +145,6 @@ errorCallback(struct solv_xmlparser *xmlp, const char *errstr, unsigned int line
     }
 }
 
-
 /*
  * read all installed products
  *
@@ -180,19 +174,19 @@ repo_add_zyppdb_products(Repo *repo, const char *dirpath, int flags)
   if (dir)
     {
       while ((entry = readdir(dir)))
-	{
-	  if (entry->d_name[0] == '.')
-	    continue;	/* skip dot files */
-	  fullpath = join2(&pd.jd, dirpath, "/", entry->d_name);
-	  if ((fp = fopen(fullpath, "r")) == 0)
-	    {
-	      pool_error(repo->pool, 0, "%s: %s", fullpath, strerror(errno));
-	      continue;
-	    }
+        {
+          if (entry->d_name[0] == '.')
+            continue; /* skip dot files */
+          fullpath = join2(&pd.jd, dirpath, "/", entry->d_name);
+          if ((fp = fopen(fullpath, "r")) == 0)
+            {
+              pool_error(repo->pool, 0, "%s: %s", fullpath, strerror(errno));
+              continue;
+            }
           pd.filename = entry->d_name;
-	  solv_xmlparser_parse(&pd.xmlp, fp);
-	  fclose(fp);
-	}
+          solv_xmlparser_parse(&pd.xmlp, fp);
+          fclose(fp);
+        }
     }
   closedir(dir);
 

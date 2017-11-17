@@ -43,7 +43,7 @@ pool_solvable2str(Pool *pool, Solvable *s)
       /* strip the distepoch from the evr */
       const char *de = strrchr(e, '-');
       if (de && (de = strchr(de, ':')) != 0)
-	el = de - e;
+        el = de - e;
     }
   p = pool_alloctmpspace(pool, nl + el + al + 3);
   strcpy(p, n);
@@ -106,14 +106,14 @@ solvable_lookup_str_joinarray(Solvable *s, Id keyname, const char *joinstr)
   Id qbuf[10];
   char *str = 0;
 
-  queue_init_buffer(&q, qbuf, sizeof(qbuf)/sizeof(*qbuf));
+  queue_init_buffer(&q, qbuf, sizeof(qbuf) / sizeof(*qbuf));
   if (solvable_lookup_idarray(s, keyname, &q) && q.count)
     {
       Pool *pool = s->repo->pool;
       int i;
       str = pool_tmpjoin(pool, pool_id2str(pool, q.elements[0]), 0, 0);
       for (i = 1; i < q.count; i++)
-	str = pool_tmpappend(pool, str, joinstr, pool_id2str(pool, q.elements[i]));
+        str = pool_tmpappend(pool, str, joinstr, pool_id2str(pool, q.elements[i]));
     }
   queue_free(&q);
   return str;
@@ -157,33 +157,33 @@ solvable_lookup_str_base(Solvable *s, Id keyname, Id basekeyname, int usebase)
   /* we do this in two passes, first same vendor, then all other vendors */
   for (pass = 0; pass < 2; pass++)
     {
-      FOR_PROVIDES(p, pp, name)
-	{
-	  s2 = pool->solvables + p;
-	  if (s2->name != name)
-	    continue;
-	  if ((s->vendor == s2->vendor) != (pass == 0))
-	    continue;
-	  str = solvable_lookup_str(s2, basekeyname);
-	  if (!str || strcmp(str, basestr))
-	    continue;
-	  str = solvable_lookup_str(s2, keyname);
-	  if (str)
-	    return str;
-	}
+      FOR_PROVIDES (p, pp, name)
+        {
+          s2 = pool->solvables + p;
+          if (s2->name != name)
+            continue;
+          if ((s->vendor == s2->vendor) != (pass == 0))
+            continue;
+          str = solvable_lookup_str(s2, basekeyname);
+          if (!str || strcmp(str, basestr))
+            continue;
+          str = solvable_lookup_str(s2, keyname);
+          if (str)
+            return str;
+        }
 #ifdef ENABLE_LINKED_PKGS
       /* autopattern/product translation magic */
       if (pass)
-	{
-	  const char *n = pool_id2str(pool, name);
-	  if (*n == 'p')
-	    {
-	      if (!strncmp("pattern:", n, 8) && (name = find_autopattern_name(pool, s)) != 0)
-		pass = -1;
-	      if (!strncmp("product:", n, 8) && (name = find_autoproduct_name(pool, s)) != 0)
-		pass = -1;
-	    }
-	}
+        {
+          const char *n = pool_id2str(pool, name);
+          if (*n == 'p')
+            {
+              if (!strncmp("pattern:", n, 8) && (name = find_autopattern_name(pool, s)) != 0)
+                pass = -1;
+              if (!strncmp("product:", n, 8) && (name = find_autoproduct_name(pool, s)) != 0)
+                pass = -1;
+            }
+        }
 #endif
     }
   return usebase ? basestr : 0;
@@ -212,25 +212,25 @@ solvable_lookup_str_poollang(Solvable *s, Id keyname)
     {
       row = pool->languagecache + ID_NUM_INTERNAL * cols;
       for (i = 0; i < pool->languagecacheother; i++, row += cols)
-	if (*row == keyname)
-	  break;
+        if (*row == keyname)
+          break;
       if (i >= pool->languagecacheother)
-	{
-	  pool->languagecache = solv_realloc2(pool->languagecache, pool->languagecacheother + 1, cols * sizeof(Id));
-	  row = pool->languagecache + cols * (ID_NUM_INTERNAL + pool->languagecacheother++);
-	  *row = keyname;
-	}
+        {
+          pool->languagecache = solv_realloc2(pool->languagecache, pool->languagecacheother + 1, cols * sizeof(Id));
+          row = pool->languagecache + cols * (ID_NUM_INTERNAL + pool->languagecacheother++);
+          *row = keyname;
+        }
     }
   else
     row = pool->languagecache + keyname * cols;
-  row++;	/* skip keyname */
+  row++; /* skip keyname */
   for (i = 0; i < pool->nlanguages; i++, row++)
     {
       if (!*row)
         *row = pool_id2langid(pool, keyname, pool->languages[i], 1);
       str = solvable_lookup_str_base(s, *row, keyname, 0);
       if (str)
-	return str;
+        return str;
     }
   return solvable_lookup_str(s, keyname);
 }
@@ -244,7 +244,7 @@ solvable_lookup_str_lang(Solvable *s, Id keyname, const char *lang, int usebase)
       if (id)
         return solvable_lookup_str_base(s, id, keyname, usebase);
       if (!usebase)
-	return 0;
+        return 0;
     }
   return solvable_lookup_str(s, keyname);
 }
@@ -347,20 +347,20 @@ solvable_lookup_location(Solvable *s, unsigned int *medianrp)
       /* name-vr.arch.rpm */
       loc = pool_alloctmpspace(pool, l + strlen(name) + strlen(evr) + strlen(arch) + 7);
       if (mediadir)
-	sprintf(loc, "%s/%s-%s.%s.rpm", mediadir, name, evr, arch);
+        sprintf(loc, "%s/%s-%s.%s.rpm", mediadir, name, evr, arch);
       else
-	sprintf(loc, "%s-%s.%s.rpm", name, evr, arch);
+        sprintf(loc, "%s-%s.%s.rpm", name, evr, arch);
     }
   else
     {
       mediafile = solvable_lookup_str(s, SOLVABLE_MEDIAFILE);
       if (!mediafile)
-	return 0;
+        return 0;
       loc = pool_alloctmpspace(pool, l + strlen(mediafile) + 1);
       if (mediadir)
-	sprintf(loc, "%s/%s", mediadir, mediafile);
+        sprintf(loc, "%s/%s", mediadir, mediafile);
       else
-	strcpy(loc, mediafile);
+        strcpy(loc, mediafile);
     }
   return loc;
 }
@@ -370,7 +370,7 @@ solvable_get_location(Solvable *s, unsigned int *medianrp)
 {
   const char *loc = solvable_lookup_location(s, medianrp);
   if (medianrp && *medianrp == 0)
-    *medianrp = 1;	/* compat, to be removed */
+    *medianrp = 1; /* compat, to be removed */
   return loc;
 }
 
@@ -403,9 +403,8 @@ solvable_lookup_sourcepkg(Solvable *s)
       return pool_tmpappend(pool, str, ".rpm", 0);
     }
   else
-    return name;	/* FIXME */
+    return name; /* FIXME */
 }
-
 
 /*****************************************************************************/
 
@@ -431,21 +430,21 @@ pool_create_state_maps(Pool *pool, Queue *installed, Map *installedmap, Map *con
   for (i = 0; i < installed->count; i++)
     {
       p = installed->elements[i];
-      if (p <= 0)	/* makes it work with decisionq */
-	continue;
+      if (p <= 0) /* makes it work with decisionq */
+        continue;
       MAPSET(installedmap, p);
       if (!conflictsmap)
-	continue;
+        continue;
       s = pool->solvables + p;
       if (!s->conflicts)
-	continue;
+        continue;
       conp = s->repo->idarraydata + s->conflicts;
       while ((con = *conp++) != 0)
-	{
-	  dp = pool_whatprovides_ptr(pool, con);
-	  for (; *dp; dp++)
-	    MAPSET(conflictsmap, *dp);
-	}
+        {
+          dp = pool_whatprovides_ptr(pool, con);
+          for (; *dp; dp++)
+            MAPSET(conflictsmap, *dp);
+        }
     }
 }
 
@@ -471,7 +470,7 @@ solvable_identical(Solvable *s1, Solvable *s2)
     {
       /* workaround for bug 881493 */
       if (s1->repo && !strncmp(pool_id2str(s1->repo->pool, s1->name), "product:", 8))
-	return 1;
+        return 1;
       return 0;
     }
 
@@ -487,22 +486,22 @@ solvable_identical(Solvable *s1, Solvable *s2)
   else
     {
       if (s1->repo)
-	{
+        {
           /* workaround for bugs 881493 and 885830*/
-	  const char *n = pool_id2str(s1->repo->pool, s1->name);
-	  if (!strncmp(n, "product:", 8) || !strncmp(n, "application:", 12))
-	    return 1;
-	}
+          const char *n = pool_id2str(s1->repo->pool, s1->name);
+          if (!strncmp(n, "product:", 8) || !strncmp(n, "application:", 12))
+            return 1;
+        }
       /* look at requires in a last attempt to find recompiled packages */
       rq1 = rq2 = 0;
       if (s1->requires)
-	for (reqp = s1->repo->idarraydata + s1->requires; *reqp; reqp++)
-	  rq1 ^= *reqp;
+        for (reqp = s1->repo->idarraydata + s1->requires; *reqp; reqp++)
+          rq1 ^= *reqp;
       if (s2->requires)
-	for (reqp = s2->repo->idarraydata + s2->requires; *reqp; reqp++)
-	  rq2 ^= *reqp;
+        for (reqp = s2->repo->idarraydata + s2->requires; *reqp; reqp++)
+          rq2 ^= *reqp;
       if (rq1 != rq2)
-	 return 0;
+        return 0;
     }
   return 1;
 }
@@ -522,13 +521,13 @@ solvable_selfprovidedep(Solvable *s)
     {
       provp = s->repo->idarraydata + s->provides;
       while ((prov = *provp++) != 0)
-	{
-	  if (!ISRELDEP(prov))
-	    continue;
-	  rd = GETRELDEP(pool, prov);
-	  if (rd->name == s->name && rd->evr == s->evr && rd->flags == REL_EQ)
-	    return prov;
-	}
+        {
+          if (!ISRELDEP(prov))
+            continue;
+          rd = GETRELDEP(pool, prov);
+          if (rd->name == s->name && rd->evr == s->evr && rd->flags == REL_EQ)
+            return prov;
+        }
     }
   return pool_rel2id(pool, s->name, s->evr, REL_EQ, 1);
 }
@@ -603,7 +602,7 @@ solvable_matchesdep(Solvable *s, Id keyname, Id dep, int marker)
   Queue q;
 
   if (keyname == SOLVABLE_NAME)
-    return pool_match_nevr(pool, s, dep) ? 1 : 0;	/* nevr match hack */
+    return pool_match_nevr(pool, s, dep) ? 1 : 0; /* nevr match hack */
   queue_init(&q);
   solvable_lookup_deparray(s, keyname, &q, marker);
   for (i = 0; i < q.count; i++)

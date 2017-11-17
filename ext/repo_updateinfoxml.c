@@ -74,30 +74,29 @@ enum state {
 };
 
 static struct solv_xmlparser_element stateswitches[] = {
-  { STATE_START,       "updates",         STATE_UPDATES,     0 },
-  { STATE_START,       "update",          STATE_UPDATE,      0 },
-  { STATE_UPDATES,     "update",          STATE_UPDATE,      0 },
-  { STATE_UPDATE,      "id",              STATE_ID,          1 },
-  { STATE_UPDATE,      "title",           STATE_TITLE,       1 },
-  { STATE_UPDATE,      "severity",        STATE_SEVERITY,    1 },
-  { STATE_UPDATE,      "rights",          STATE_RIGHTS,      1 },
-  { STATE_UPDATE,      "release",         STATE_RELEASE,     1 },
-  { STATE_UPDATE,      "issued",          STATE_ISSUED,      0 },
-  { STATE_UPDATE,      "updated",         STATE_UPDATED,     0 },
-  { STATE_UPDATE,      "description",     STATE_DESCRIPTION, 1 },
-  { STATE_UPDATE,      "message",         STATE_MESSAGE    , 1 },
-  { STATE_UPDATE,      "references",      STATE_REFERENCES,  0 },
-  { STATE_UPDATE,      "pkglist",         STATE_PKGLIST,     0 },
-  { STATE_REFERENCES,  "reference",       STATE_REFERENCE,   0 },
-  { STATE_PKGLIST,     "collection",      STATE_COLLECTION,  0 },
-  { STATE_COLLECTION,  "name",            STATE_NAME,        1 },
-  { STATE_COLLECTION,  "package",         STATE_PACKAGE,     0 },
-  { STATE_PACKAGE,     "filename",        STATE_FILENAME,    1 },
-  { STATE_PACKAGE,     "reboot_suggested",STATE_REBOOT,      1 },
-  { STATE_PACKAGE,     "restart_suggested",STATE_RESTART,    1 },
-  { STATE_PACKAGE,     "relogin_suggested",STATE_RELOGIN,    1 },
-  { NUMSTATES }
-};
+    {STATE_START, "updates", STATE_UPDATES, 0},
+    {STATE_START, "update", STATE_UPDATE, 0},
+    {STATE_UPDATES, "update", STATE_UPDATE, 0},
+    {STATE_UPDATE, "id", STATE_ID, 1},
+    {STATE_UPDATE, "title", STATE_TITLE, 1},
+    {STATE_UPDATE, "severity", STATE_SEVERITY, 1},
+    {STATE_UPDATE, "rights", STATE_RIGHTS, 1},
+    {STATE_UPDATE, "release", STATE_RELEASE, 1},
+    {STATE_UPDATE, "issued", STATE_ISSUED, 0},
+    {STATE_UPDATE, "updated", STATE_UPDATED, 0},
+    {STATE_UPDATE, "description", STATE_DESCRIPTION, 1},
+    {STATE_UPDATE, "message", STATE_MESSAGE, 1},
+    {STATE_UPDATE, "references", STATE_REFERENCES, 0},
+    {STATE_UPDATE, "pkglist", STATE_PKGLIST, 0},
+    {STATE_REFERENCES, "reference", STATE_REFERENCE, 0},
+    {STATE_PKGLIST, "collection", STATE_COLLECTION, 0},
+    {STATE_COLLECTION, "name", STATE_NAME, 1},
+    {STATE_COLLECTION, "package", STATE_PACKAGE, 0},
+    {STATE_PACKAGE, "filename", STATE_FILENAME, 1},
+    {STATE_PACKAGE, "reboot_suggested", STATE_REBOOT, 1},
+    {STATE_PACKAGE, "restart_suggested", STATE_RESTART, 1},
+    {STATE_PACKAGE, "relogin_suggested", STATE_RELOGIN, 1},
+    {NUMSTATES}};
 
 struct parsedata {
   int ret;
@@ -148,11 +147,11 @@ makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
   for (; *atts; atts += 2)
     {
       if (!strcmp(*atts, "epoch"))
-	e = atts[1];
+        e = atts[1];
       else if (!strcmp(*atts, "version"))
-	v = atts[1];
+        v = atts[1];
       else if (!strcmp(*atts, "release"))
-	r = atts[1];
+        r = atts[1];
     }
   if (e && (!*e || !strcmp(e, "0")))
     e = 0;
@@ -161,7 +160,7 @@ makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
       for (v2 = v; *v2 >= '0' && *v2 <= '9'; v2++)
         ;
       if (v2 > v && *v2 == ':')
-	e = "0";
+        e = "0";
     }
   l = 1;
   if (e)
@@ -170,7 +169,7 @@ makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
     l += strlen(v);
   if (r)
     l += strlen(r) + 1;
-  
+
   c = space = solv_xmlparser_contentspace(&pd->xmlp, l);
   if (e)
     {
@@ -198,8 +197,6 @@ makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
   return pool_str2id(pool, space, 1);
 }
 
-
-
 static void
 startElement(struct solv_xmlparser *xmlp, int state, const char *name, const char **atts)
 {
@@ -207,7 +204,7 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
   Pool *pool = pd->pool;
   Solvable *solvable = pd->solvable;
 
-  switch(state)
+  switch (state)
     {
       /*
        * <update from="rel-eng@fedoraproject.org"
@@ -217,24 +214,24 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
        */
     case STATE_UPDATE:
       {
-	const char *from = 0, *type = 0, *version = 0;
-	for (; *atts; atts += 2)
-	  {
-	    if (!strcmp(*atts, "from"))
-	      from = atts[1];
-	    else if (!strcmp(*atts, "type"))
-	      type = atts[1];
-	    else if (!strcmp(*atts, "version"))
-	      version = atts[1];
-	  }
-	solvable = pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->repo));
-	pd->handle = pd->solvable - pool->solvables;
+        const char *from = 0, *type = 0, *version = 0;
+        for (; *atts; atts += 2)
+          {
+            if (!strcmp(*atts, "from"))
+              from = atts[1];
+            else if (!strcmp(*atts, "type"))
+              type = atts[1];
+            else if (!strcmp(*atts, "version"))
+              version = atts[1];
+          }
+        solvable = pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->repo));
+        pd->handle = pd->solvable - pool->solvables;
 
-	solvable->vendor = pool_str2id(pool, from, 1);
-	solvable->evr = pool_str2id(pool, version, 1);
-	solvable->arch = ARCH_NOARCH;
-	if (type)
-	  repodata_set_str(pd->data, pd->handle, SOLVABLE_PATCHCATEGORY, type);
+        solvable->vendor = pool_str2id(pool, from, 1);
+        solvable->evr = pool_str2id(pool, version, 1);
+        solvable->arch = ARCH_NOARCH;
+        if (type)
+          repodata_set_str(pd->data, pd->handle, SOLVABLE_PATCHCATEGORY, type);
         pd->buildtime = (time_t)0;
       }
       break;
@@ -242,41 +239,41 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
     case STATE_ISSUED:
     case STATE_UPDATED:
       {
-	const char *date = solv_xmlparser_find_attr("date", atts);
-	if (date)
-	  {
-	    time_t t = datestr2timestamp(date);
-	    if (t && t > pd->buildtime)
+        const char *date = solv_xmlparser_find_attr("date", atts);
+        if (date)
+          {
+            time_t t = datestr2timestamp(date);
+            if (t && t > pd->buildtime)
               pd->buildtime = t;
-	  }
+          }
       }
       break;
 
     case STATE_REFERENCE:
       {
         const char *href = 0, *id = 0, *title = 0, *type = 0;
-	Id refhandle;
-	for (; *atts; atts += 2)
-	  {
-	    if (!strcmp(*atts, "href"))
-	      href = atts[1];
-	    else if (!strcmp(*atts, "id"))
-	      id = atts[1];
-	    else if (!strcmp(*atts, "title"))
-	      title = atts[1];
-	    else if (!strcmp(*atts, "type"))
-	      type = atts[1];
-	  }
-	refhandle = repodata_new_handle(pd->data);
-	if (href)
-	  repodata_set_str(pd->data, refhandle, UPDATE_REFERENCE_HREF, href);
-	if (id)
-	  repodata_set_str(pd->data, refhandle, UPDATE_REFERENCE_ID, id);
-	if (title)
-	  repodata_set_str(pd->data, refhandle, UPDATE_REFERENCE_TITLE, title);
-	if (type)
-	  repodata_set_poolstr(pd->data, refhandle, UPDATE_REFERENCE_TYPE, type);
-	repodata_add_flexarray(pd->data, pd->handle, UPDATE_REFERENCE, refhandle);
+        Id refhandle;
+        for (; *atts; atts += 2)
+          {
+            if (!strcmp(*atts, "href"))
+              href = atts[1];
+            else if (!strcmp(*atts, "id"))
+              id = atts[1];
+            else if (!strcmp(*atts, "title"))
+              title = atts[1];
+            else if (!strcmp(*atts, "type"))
+              type = atts[1];
+          }
+        refhandle = repodata_new_handle(pd->data);
+        if (href)
+          repodata_set_str(pd->data, refhandle, UPDATE_REFERENCE_HREF, href);
+        if (id)
+          repodata_set_str(pd->data, refhandle, UPDATE_REFERENCE_ID, id);
+        if (title)
+          repodata_set_str(pd->data, refhandle, UPDATE_REFERENCE_TITLE, title);
+        if (type)
+          repodata_set_poolstr(pd->data, refhandle, UPDATE_REFERENCE_TYPE, type);
+        repodata_add_flexarray(pd->data, pd->handle, UPDATE_REFERENCE, refhandle);
       }
       break;
 
@@ -289,36 +286,36 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
        */
     case STATE_PACKAGE:
       {
-	const char *arch = 0, *name = 0;
-	Id evr = makeevr_atts(pool, pd, atts); /* parse "epoch", "version", "release" */
-	Id n, a = 0;
-	Id rel_id;
+        const char *arch = 0, *name = 0;
+        Id evr = makeevr_atts(pool, pd, atts); /* parse "epoch", "version", "release" */
+        Id n, a = 0;
+        Id rel_id;
 
-	for (; *atts; atts += 2)
-	  {
-	    if (!strcmp(*atts, "arch"))
-	      arch = atts[1];
-	    else if (!strcmp(*atts, "name"))
-	      name = atts[1];
-	  }
-	/* generated Id for name */
-	n = pool_str2id(pool, name, 1);
-	rel_id = n;
-	if (arch)
-	  {
-	    /*  generate Id for arch and combine with name */
-	    a = pool_str2id(pool, arch, 1);
-	    rel_id = pool_rel2id(pool, n, a, REL_ARCH, 1);
-	  }
-	rel_id = pool_rel2id(pool, rel_id, evr, REL_LT, 1);
-	solvable->conflicts = repo_addid_dep(pd->repo, solvable->conflicts, rel_id, 0);
+        for (; *atts; atts += 2)
+          {
+            if (!strcmp(*atts, "arch"))
+              arch = atts[1];
+            else if (!strcmp(*atts, "name"))
+              name = atts[1];
+          }
+        /* generated Id for name */
+        n = pool_str2id(pool, name, 1);
+        rel_id = n;
+        if (arch)
+          {
+            /*  generate Id for arch and combine with name */
+            a = pool_str2id(pool, arch, 1);
+            rel_id = pool_rel2id(pool, n, a, REL_ARCH, 1);
+          }
+        rel_id = pool_rel2id(pool, rel_id, evr, REL_LT, 1);
+        solvable->conflicts = repo_addid_dep(pd->repo, solvable->conflicts, rel_id, 0);
 
         /* who needs the collection anyway? */
         pd->collhandle = repodata_new_handle(pd->data);
-	repodata_set_id(pd->data, pd->collhandle, UPDATE_COLLECTION_NAME, n);
-	repodata_set_id(pd->data, pd->collhandle, UPDATE_COLLECTION_EVR, evr);
-	if (a)
-	  repodata_set_id(pd->data, pd->collhandle, UPDATE_COLLECTION_ARCH, a);
+        repodata_set_id(pd->data, pd->collhandle, UPDATE_COLLECTION_NAME, n);
+        repodata_set_id(pd->data, pd->collhandle, UPDATE_COLLECTION_EVR, evr);
+        if (a)
+          repodata_set_id(pd->data, pd->collhandle, UPDATE_COLLECTION_ARCH, a);
         break;
       }
 
@@ -327,7 +324,6 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
     }
   return;
 }
-
 
 static void
 endElement(struct solv_xmlparser *xmlp, int state, char *content)
@@ -342,10 +338,10 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
     case STATE_UPDATE:
       s->provides = repo_addid_dep(repo, s->provides, pool_rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
       if (pd->buildtime)
-	{
-	  repodata_set_num(pd->data, pd->handle, SOLVABLE_BUILDTIME, pd->buildtime);
-	  pd->buildtime = (time_t)0;
-	}
+        {
+          repodata_set_num(pd->data, pd->handle, SOLVABLE_BUILDTIME, pd->buildtime);
+          pd->buildtime = (time_t)0;
+        }
       break;
 
     case STATE_ID:
@@ -395,32 +391,32 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
 
       /* <reboot_suggested>True</reboot_suggested> */
     case STATE_REBOOT:
-      if (content[0] == 'T' || content[0] == 't'|| content[0] == '1')
-	{
-	  /* FIXME: this is per-package, the global flag should be computed at runtime */
-	  repodata_set_void(pd->data, pd->handle, UPDATE_REBOOT);
-	  repodata_set_void(pd->data, pd->collhandle, UPDATE_REBOOT);
-	}
+      if (content[0] == 'T' || content[0] == 't' || content[0] == '1')
+        {
+          /* FIXME: this is per-package, the global flag should be computed at runtime */
+          repodata_set_void(pd->data, pd->handle, UPDATE_REBOOT);
+          repodata_set_void(pd->data, pd->collhandle, UPDATE_REBOOT);
+        }
       break;
 
       /* <restart_suggested>True</restart_suggested> */
     case STATE_RESTART:
-      if (content[0] == 'T' || content[0] == 't'|| content[0] == '1')
-	{
-	  /* FIXME: this is per-package, the global flag should be computed at runtime */
-	  repodata_set_void(pd->data, pd->handle, UPDATE_RESTART);
-	  repodata_set_void(pd->data, pd->collhandle, UPDATE_RESTART);
-	}
+      if (content[0] == 'T' || content[0] == 't' || content[0] == '1')
+        {
+          /* FIXME: this is per-package, the global flag should be computed at runtime */
+          repodata_set_void(pd->data, pd->handle, UPDATE_RESTART);
+          repodata_set_void(pd->data, pd->collhandle, UPDATE_RESTART);
+        }
       break;
 
       /* <relogin_suggested>True</relogin_suggested> */
     case STATE_RELOGIN:
-      if (content[0] == 'T' || content[0] == 't'|| content[0] == '1')
-	{
-	  /* FIXME: this is per-package, the global flag should be computed at runtime */
-	  repodata_set_void(pd->data, pd->handle, UPDATE_RELOGIN);
-	  repodata_set_void(pd->data, pd->collhandle, UPDATE_RELOGIN);
-	}
+      if (content[0] == 'T' || content[0] == 't' || content[0] == '1')
+        {
+          /* FIXME: this is per-package, the global flag should be computed at runtime */
+          repodata_set_void(pd->data, pd->handle, UPDATE_RELOGIN);
+          repodata_set_void(pd->data, pd->collhandle, UPDATE_RELOGIN);
+        }
       break;
     default:
       break;
@@ -456,4 +452,3 @@ repo_add_updateinfoxml(Repo *repo, FILE *fp, int flags)
     repodata_internalize(data);
   return pd.ret;
 }
-

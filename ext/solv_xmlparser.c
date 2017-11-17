@@ -27,21 +27,20 @@
 static inline void
 add_contentspace(struct solv_xmlparser *xmlp, int l)
 {
-  l += xmlp->lcontent + 1;	/* plus room for trailing zero */
+  l += xmlp->lcontent + 1; /* plus room for trailing zero */
   if (l > xmlp->acontent)
-    {    
-      xmlp->acontent = l + 256; 
+    {
+      xmlp->acontent = l + 256;
       xmlp->content = solv_realloc(xmlp->content, xmlp->acontent);
-    }    
+    }
 }
-
 
 #ifdef WITH_LIBXML2
 static void
 character_data(void *userData, const xmlChar *s, int len)
 #else
 static void XMLCALL
-character_data(void *userData, const XML_Char *s, int len) 
+character_data(void *userData, const XML_Char *s, int len)
 #endif
 {
   struct solv_xmlparser *xmlp = userData;
@@ -50,7 +49,7 @@ character_data(void *userData, const XML_Char *s, int len)
     return;
   add_contentspace(xmlp, len);
   memcpy(xmlp->content + xmlp->lcontent, s, len);
-  xmlp->lcontent += len; 
+  xmlp->lcontent += len;
 }
 
 #ifdef WITH_LIBXML2
@@ -129,11 +128,11 @@ end_element(void *userData, const char *name)
 
 void
 solv_xmlparser_init(struct solv_xmlparser *xmlp,
-    struct solv_xmlparser_element *elements,
-    void *userdata,
-    void (*startelement)(struct solv_xmlparser *, int state, const char *name, const char **atts),
-    void (*endelement)(struct solv_xmlparser *, int state, char *content),
-    void (*errorhandler)(struct solv_xmlparser *, const char *errstr, unsigned int line, unsigned int column))
+                    struct solv_xmlparser_element *elements,
+                    void *userdata,
+                    void (*startelement)(struct solv_xmlparser *, int state, const char *name, const char **atts),
+                    void (*endelement)(struct solv_xmlparser *, int state, char *content),
+                    void (*errorhandler)(struct solv_xmlparser *, const char *errstr, unsigned int line, unsigned int column))
 {
   int i, nstates, nelements;
   struct solv_xmlparser_element *el;
@@ -146,9 +145,9 @@ solv_xmlparser_init(struct solv_xmlparser *xmlp,
     {
       nelements++;
       if (el->fromstate > nstates)
-	nstates = el->fromstate;
+        nstates = el->fromstate;
       if (el->tostate > nstates)
-	nstates = el->tostate;
+        nstates = el->tostate;
     }
   nstates++;
 
@@ -197,7 +196,8 @@ free_parser(struct solv_xmlparser *xmlp)
   xmlp->parser = 0;
 }
 
-static xmlParserCtxtPtr create_parser_ctx(struct solv_xmlparser *xmlp, char *buf, int l)
+static xmlParserCtxtPtr
+create_parser_ctx(struct solv_xmlparser *xmlp, char *buf, int l)
 {
   xmlSAXHandler sax;
   memset(&sax, 0, sizeof(sax));
@@ -215,14 +215,14 @@ parse_block(struct solv_xmlparser *xmlp, char *buf, int l)
       int l2 = l > 4 ? 4 : 0;
       xmlp->parser = create_parser_ctx(xmlp, buf, l2);
       if (!xmlp->parser)
-	{
-	  xmlp->errorhandler(xmlp, "could not create parser", 0, 0);
-	  return 0;
-	}
+        {
+          xmlp->errorhandler(xmlp, "could not create parser", 0, 0);
+          return 0;
+        }
       buf += l2;
       l -= l2;
       if (l2 && !l)
-	return 1;
+        return 1;
     }
   if (xmlParseChunk(xmlp->parser, buf, l, l == 0 ? 1 : 0))
     {
@@ -302,7 +302,7 @@ solv_xmlparser_parse(struct solv_xmlparser *xmlp, FILE *fp)
     {
       l = fread(buf, 1, sizeof(buf), fp);
       if (!parse_block(xmlp, buf, l) || !l)
-	break;
+        break;
     }
   free_parser(xmlp);
 }
@@ -312,10 +312,9 @@ solv_xmlparser_contentspace(struct solv_xmlparser *xmlp, int l)
 {
   xmlp->lcontent = 0;
   if (l > xmlp->acontent)
-    {    
-      xmlp->acontent = l + 256; 
+    {
+      xmlp->acontent = l + 256;
       xmlp->content = solv_realloc(xmlp->content, xmlp->acontent);
-    }    
+    }
   return xmlp->content;
 }
-

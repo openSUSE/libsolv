@@ -61,7 +61,7 @@ mpdomod(int len, mp_t *target, mp2_t x, mp_t *mod)
       x = (x << MP_T_BITS) | target[i];
       target[i] = 0;
       if (mod[i])
-	break;
+        break;
     }
   if (i < 0)
     return;
@@ -71,17 +71,17 @@ mpdomod(int len, mp_t *target, mp2_t x, mp_t *mod)
       mp2_t z = x / ((mp2_t)mod[i] + 1);
       mp2_t n = 0;
       if ((z >> MP_T_BITS) != 0)
-	z = (mp2_t)1 << MP_T_BITS;	/* just in case... */
+        z = (mp2_t)1 << MP_T_BITS; /* just in case... */
       for (j = 0; j < i; j++)
-	{
-	  mp_t n2;
-	  n += mod[j] * z;
-	  n2 = (mp_t)n;
-	  n >>= MP_T_BITS;
-	  if (n2 > target[j])
-	    n++;
-	  target[j] -= n2;
-	}
+        {
+          mp_t n2;
+          n += mod[j] * z;
+          n2 = (mp_t)n;
+          n >>= MP_T_BITS;
+          if (n2 > target[j])
+            n++;
+          target[j] -= n2;
+        }
       n += mod[j] * z;
       x -= n;
     }
@@ -90,21 +90,21 @@ mpdomod(int len, mp_t *target, mp2_t x, mp_t *mod)
     {
       mp_t n;
       if (x == mod[i])
-	{
-	  for (j = i - 1; j >= 0; j--)
-	    if (target[j] < mod[j])
-	      return;
-	    else if (target[j] > mod[j])
-	      break;
-	}
+        {
+          for (j = i - 1; j >= 0; j--)
+            if (target[j] < mod[j])
+              return;
+            else if (target[j] > mod[j])
+              break;
+        }
       /* target >= mod, subtract mod */
       n = 0;
       for (j = 0; j <= i; j++)
-	{
-	  mp2_t n2 = mod[j] + n;
-	  n = n2 > target[j] ? 1 : 0;
-	  target[j] -= (mp_t)n2;
-	}
+        {
+          mp2_t n2 = mod[j] + n;
+          n = n2 > target[j] ? 1 : 0;
+          target[j] -= (mp_t)n2;
+        }
     }
 }
 
@@ -205,12 +205,12 @@ mppow(int len, mp_t *target, mp_t *b, int elen, mp_t *e, mp_t *mod)
       mppow_int(len, target, t, mod, (e[i] >> 20) & 0x0f);
       mppow_int(len, target, t, mod, (e[i] >> 16) & 0x0f);
       mppow_int(len, target, t, mod, (e[i] >> 12) & 0x0f);
-      mppow_int(len, target, t, mod, (e[i] >>  8) & 0x0f);
-      mppow_int(len, target, t, mod, (e[i] >>  4) & 0x0f);
-      mppow_int(len, target, t, mod,  e[i]        & 0x0f);
+      mppow_int(len, target, t, mod, (e[i] >> 8) & 0x0f);
+      mppow_int(len, target, t, mod, (e[i] >> 4) & 0x0f);
+      mppow_int(len, target, t, mod, e[i] & 0x0f);
 #elif MP_T_BYTES == 1
-      mppow_int(len, target, t, mod, (e[i] >>  4) & 0x0f);
-      mppow_int(len, target, t, mod,  e[i]        & 0x0f);
+      mppow_int(len, target, t, mod, (e[i] >> 4) & 0x0f);
+      mppow_int(len, target, t, mod, e[i] & 0x0f);
 #endif
     }
   free(t);
@@ -276,33 +276,33 @@ mpdsa(int pl, mp_t *p, int ql, mp_t *q, mp_t *g, mp_t *y, mp_t *r, mp_t *s, int 
   mpdump(hl, h, "h = ");
 #endif
   if (pl < ql || !mpisless(pl, g, p) || !mpisless(pl, y, p))
-    return 0;				/* hmm, bad pubkey? */
+    return 0; /* hmm, bad pubkey? */
   if (!mpisless(ql, r, q) || mpiszero(ql, r))
     return 0;
   if (!mpisless(ql, s, q) || mpiszero(ql, s))
     return 0;
-  tmp = mpnew(pl);			/* note pl */
-  mpcpy(ql, tmp, q);			/* tmp = q */
-  mpdec(ql, tmp);			/* tmp-- */
-  mpdec(ql, tmp);			/* tmp-- */
+  tmp = mpnew(pl);   /* note pl */
+  mpcpy(ql, tmp, q); /* tmp = q */
+  mpdec(ql, tmp);    /* tmp-- */
+  mpdec(ql, tmp);    /* tmp-- */
   w = mpnew(ql);
-  mppow(ql, w, s, ql, tmp, q);		/* w = s ^ tmp (s ^ -1) */
-  u1 = mpnew(pl);			/* note pl */
+  mppow(ql, w, s, ql, tmp, q); /* w = s ^ tmp (s ^ -1) */
+  u1 = mpnew(pl);              /* note pl */
   /* order is important here: h can be >= q */
-  mpmult(ql, u1, w, hl, h, q);		/* u1 = w * h */
-  u2 = mpnew(ql);			/* u2 = 0 */
-  mpmult(ql, u2, w, ql, r, q);		/* u2 = w * r */
+  mpmult(ql, u1, w, hl, h, q); /* u1 = w * h */
+  u2 = mpnew(ql);              /* u2 = 0 */
+  mpmult(ql, u2, w, ql, r, q); /* u2 = w * r */
   free(w);
   gu1 = mpnew(pl);
   yu2 = mpnew(pl);
-  mppow(pl, gu1, g, ql, u1, p);		/* gu1 = g ^ u1 */
-  mppow(pl, yu2, y, ql, u2, p);		/* yu2 = y ^ u2 */
-  mpmult(pl, u1, gu1, pl, yu2, p);	/* u1 = gu1 * yu2 */
+  mppow(pl, gu1, g, ql, u1, p);    /* gu1 = g ^ u1 */
+  mppow(pl, yu2, y, ql, u2, p);    /* yu2 = y ^ u2 */
+  mpmult(pl, u1, gu1, pl, yu2, p); /* u1 = gu1 * yu2 */
   free(gu1);
   free(yu2);
   mpzero(ql, u2);
-  u2[0] = 1;				/* u2 = 1 */
-  mpmult(ql, tmp, u2, pl, u1, q);	/* tmp = u2 * u1 */
+  u2[0] = 1;                      /* u2 = 1 */
+  mpmult(ql, tmp, u2, pl, u1, q); /* tmp = u2 * u1 */
   free(u1);
   free(u2);
 #if 0
@@ -332,7 +332,7 @@ mprsa(int nl, mp_t *n, int el, mp_t *e, mp_t *m, mp_t *c)
   if (!mpisless(nl, c, n))
     return 0;
   tmp = mpnew(nl);
-  mppow(nl, tmp, m, el, e, n);		/* tmp = m ^ e */
+  mppow(nl, tmp, m, el, e, n); /* tmp = m ^ e */
 #if 0
   mpdump(nl, tmp, "res = ");
 #endif
@@ -402,122 +402,121 @@ solv_pgpvrfy(const unsigned char *pub, int publ, const unsigned char *sig, int s
   if (!pub || !sig || publ < 1 || sigl < 2)
     return 0;
   if (pub[0] != sig[0])
-    return 0;		/* key algo mismatch */
-  switch(sig[1])
+    return 0; /* key algo mismatch */
+  switch (sig[1])
     {
     case 1:
-      hashl = 16;	/* MD5 */
+      hashl = 16; /* MD5 */
       oid = (unsigned char *)"\022\060\040\060\014\006\010\052\206\110\206\367\015\002\005\005\000\004\020";
       break;
     case 2:
-      hashl = 20;	/* SHA-1 */
+      hashl = 20; /* SHA-1 */
       oid = (unsigned char *)"\017\060\041\060\011\006\005\053\016\003\002\032\005\000\004\024";
       break;
     case 8:
-      hashl = 32;	/* SHA-256 */
+      hashl = 32; /* SHA-256 */
       oid = (unsigned char *)"\023\060\061\060\015\006\011\140\206\110\001\145\003\004\002\001\005\000\004\040";
       break;
     case 9:
-      hashl = 48;	/* SHA-384 */
+      hashl = 48; /* SHA-384 */
       oid = (unsigned char *)"\023\060\101\060\015\006\011\140\206\110\001\145\003\004\002\002\005\000\004\060";
       break;
     case 10:
-      hashl = 64;	/* SHA-512 */
+      hashl = 64; /* SHA-512 */
       oid = (unsigned char *)"\023\060\121\060\015\006\011\140\206\110\001\145\003\004\002\003\005\000\004\100";
       break;
     case 11:
-      hashl = 28;	/* SHA-224 */
+      hashl = 28; /* SHA-224 */
       oid = (unsigned char *)"\023\060\061\060\015\006\011\140\206\110\001\145\003\004\002\004\005\000\004\034";
       break;
     default:
-      return 0;		/* unsupported hash algo */
+      return 0; /* unsupported hash algo */
     }
   if (sigl < 2 + hashl)
     return 0;
   switch (pub[0])
     {
-    case 1:		/* RSA */
+    case 1: /* RSA */
       {
-	const unsigned char *n, *e, *m;
-	unsigned char *c;
-	int nlen, elen, mlen, clen;
-	mp_t *nx, *ex, *mx, *cx;
-	int nxl, exl;
+        const unsigned char *n, *e, *m;
+        unsigned char *c;
+        int nlen, elen, mlen, clen;
+        mp_t *nx, *ex, *mx, *cx;
+        int nxl, exl;
 
         mpi = pub + 1;
         mpil = publ - 1;
-	n = findmpi(&mpi, &mpil, 8192, &nlen);
-	e = findmpi(&mpi, &mpil, 1024, &elen);
+        n = findmpi(&mpi, &mpil, 8192, &nlen);
+        e = findmpi(&mpi, &mpil, 1024, &elen);
         mpi = sig + 2 + hashl;
         mpil = sigl - (2 + hashl);
-	m = findmpi(&mpi, &mpil, nlen, &mlen);
+        m = findmpi(&mpi, &mpil, nlen, &mlen);
         if (!n || !e || !m || !nlen || !elen)
-	  return 0;
-	/* build padding block */
-	clen = (nlen - 1) / 8;
-	if (hashl + *oid + 2 > clen)
-	  return 0;
-	c = solv_malloc(clen);
-	memset(c, 0xff, clen);
-	c[0] = 1;
-	memcpy(c + clen - hashl, sig + 2, hashl);
-	memcpy(c + clen - hashl - *oid, oid + 1, *oid);
-	c[clen - hashl - *oid - 1] = 0;
-	clen = clen * 8 - 7;	/* always <= nlen */
-	nx = mpbuild(n, nlen, nlen, &nxl);
-	ex = mpbuild(e, elen, elen, &exl);
-	mx = mpbuild(m, mlen, nlen, 0);
-	cx = mpbuild(c, clen, nlen, 0);
-	free(c);
-	res = mprsa(nxl, nx, exl, ex, mx, cx);
-	free(nx);
-	free(ex);
-	free(mx);
-	free(cx);
-	break;
+          return 0;
+        /* build padding block */
+        clen = (nlen - 1) / 8;
+        if (hashl + *oid + 2 > clen)
+          return 0;
+        c = solv_malloc(clen);
+        memset(c, 0xff, clen);
+        c[0] = 1;
+        memcpy(c + clen - hashl, sig + 2, hashl);
+        memcpy(c + clen - hashl - *oid, oid + 1, *oid);
+        c[clen - hashl - *oid - 1] = 0;
+        clen = clen * 8 - 7; /* always <= nlen */
+        nx = mpbuild(n, nlen, nlen, &nxl);
+        ex = mpbuild(e, elen, elen, &exl);
+        mx = mpbuild(m, mlen, nlen, 0);
+        cx = mpbuild(c, clen, nlen, 0);
+        free(c);
+        res = mprsa(nxl, nx, exl, ex, mx, cx);
+        free(nx);
+        free(ex);
+        free(mx);
+        free(cx);
+        break;
       }
-    case 17:		/* DSA */
+    case 17: /* DSA */
       {
-	const unsigned char *p, *q, *g, *y, *r, *s;
-	int plen, qlen, glen, ylen, rlen, slen, hlen;
-	mp_t *px, *qx, *gx, *yx, *rx, *sx, *hx;
-	int pxl, qxl, hxl;
+        const unsigned char *p, *q, *g, *y, *r, *s;
+        int plen, qlen, glen, ylen, rlen, slen, hlen;
+        mp_t *px, *qx, *gx, *yx, *rx, *sx, *hx;
+        int pxl, qxl, hxl;
 
         mpi = pub + 1;
         mpil = publ - 1;
-	p = findmpi(&mpi, &mpil, 8192, &plen);
-	q = findmpi(&mpi, &mpil, 1024, &qlen);
-	g = findmpi(&mpi, &mpil, plen, &glen);
-	y = findmpi(&mpi, &mpil, plen, &ylen);
+        p = findmpi(&mpi, &mpil, 8192, &plen);
+        q = findmpi(&mpi, &mpil, 1024, &qlen);
+        g = findmpi(&mpi, &mpil, plen, &glen);
+        y = findmpi(&mpi, &mpil, plen, &ylen);
         mpi = sig + 2 + hashl;
         mpil = sigl - (2 + hashl);
-	r = findmpi(&mpi, &mpil, qlen, &rlen);
-	s = findmpi(&mpi, &mpil, qlen, &slen);
+        r = findmpi(&mpi, &mpil, qlen, &rlen);
+        s = findmpi(&mpi, &mpil, qlen, &slen);
         if (!p || !q || !g || !y || !r || !s || !plen || !qlen)
-	  return 0;
-	hlen = (qlen + 7) & ~7;
-	if (hlen > hashl * 8)
-	  return 0;
-	px = mpbuild(p, plen, plen, &pxl);
-	qx = mpbuild(q, qlen, qlen, &qxl);
-	gx = mpbuild(g, glen, plen, 0);
-	yx = mpbuild(y, ylen, plen, 0);
-	rx = mpbuild(r, rlen, qlen, 0);
-	sx = mpbuild(s, slen, qlen, 0);
-	hx = mpbuild(sig + 2, hlen, hlen, &hxl);
+          return 0;
+        hlen = (qlen + 7) & ~7;
+        if (hlen > hashl * 8)
+          return 0;
+        px = mpbuild(p, plen, plen, &pxl);
+        qx = mpbuild(q, qlen, qlen, &qxl);
+        gx = mpbuild(g, glen, plen, 0);
+        yx = mpbuild(y, ylen, plen, 0);
+        rx = mpbuild(r, rlen, qlen, 0);
+        sx = mpbuild(s, slen, qlen, 0);
+        hx = mpbuild(sig + 2, hlen, hlen, &hxl);
         res = mpdsa(pxl, px, qxl, qx, gx, yx, rx, sx, hxl, hx);
-	free(px);
-	free(qx);
-	free(gx);
-	free(yx);
-	free(rx);
-	free(sx);
-	free(hx);
-	break;
+        free(px);
+        free(qx);
+        free(gx);
+        free(yx);
+        free(rx);
+        free(sx);
+        free(hx);
+        break;
       }
     default:
-      return 0;		/* unsupported pubkey algo */
+      return 0; /* unsupported pubkey algo */
     }
   return res;
 }
-

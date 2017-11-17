@@ -88,13 +88,13 @@ queue_alloc_one(Queue *q)
     {
       int extra_space = queue_extra_space(q->count);
       if (!q->alloc)
-	{
-	  q->alloc = solv_malloc2(q->count + extra_space, sizeof(Id));
-	  if (q->count)
-	    memcpy(q->alloc, q->elements, q->count * sizeof(Id));
-	}
+        {
+          q->alloc = solv_malloc2(q->count + extra_space, sizeof(Id));
+          if (q->count)
+            memcpy(q->alloc, q->elements, q->count * sizeof(Id));
+        }
       else
-	q->alloc = solv_realloc2(q->alloc, q->count + extra_space, sizeof(Id));
+        q->alloc = solv_realloc2(q->alloc, q->count + extra_space, sizeof(Id));
       q->elements = q->alloc;
       q->left = extra_space;
     }
@@ -106,7 +106,7 @@ queue_alloc_one_head(Queue *q)
 {
   int l, extra_space;
   if (!q->alloc || !q->left)
-    queue_alloc_one(q);		/* easy way to make room */
+    queue_alloc_one(q); /* easy way to make room */
   extra_space = queue_extra_space(q->count);
   l = q->left > extra_space ? extra_space : q->left;
   if (q->count)
@@ -118,7 +118,7 @@ queue_alloc_one_head(Queue *q)
 void
 queue_insert(Queue *q, int pos, Id id)
 {
-  queue_push(q, id);	/* make room */
+  queue_push(q, id); /* make room */
   if (pos < q->count - 1)
     {
       memmove(q->elements + pos + 1, q->elements + pos, (q->count - 1 - pos) * sizeof(Id));
@@ -140,8 +140,8 @@ queue_delete(Queue *q, int pos)
 void
 queue_insert2(Queue *q, int pos, Id id1, Id id2)
 {
-  queue_push(q, id1);	/* make room */
-  queue_push(q, id2);	/* make room */
+  queue_push(q, id1); /* make room */
+  queue_push(q, id2); /* make room */
   if (pos < q->count - 2)
     {
       memmove(q->elements + pos + 2, q->elements + pos, (q->count - 2 - pos) * sizeof(Id));
@@ -214,4 +214,3 @@ queue_prealloc(Queue *q, int n)
   q->elements = q->alloc + off;
   q->left = n + extra_space;
 }
-

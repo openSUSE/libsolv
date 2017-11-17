@@ -87,15 +87,15 @@ solv_extend_realloc(void *old, size_t len, size_t size, size_t block)
     {
       xblock <<= 1;
       while (len >= xblock && xblock)
-	xblock <<= 1;
+        xblock <<= 1;
       if (xblock)
-	{
-	  size_t nlen;
+        {
+          size_t nlen;
           xblock = (xblock >> 5) - 1;
-	  nlen = (len + xblock) & ~xblock;
-	  if (nlen > len)
-	    len = nlen;
-	}
+          nlen = (len + xblock) & ~xblock;
+          if (nlen > len)
+            len = nlen;
+        }
     }
   return solv_realloc2(old, len, size);
 }
@@ -144,13 +144,12 @@ solv_timems(unsigned int subtract)
 void
 solv_sort(void *base, size_t nmemb, size_t size, int (*compar)(const void *, const void *, void *), void *compard)
 {
-# if defined(HAVE_QSORT_R)
+#if defined(HAVE_QSORT_R)
   qsort_r(base, nmemb, size, compar, compard);
-# else
+#else
   /* backported for SLE10-SP2 */
   __qsort_r(base, nmemb, size, compar, compard);
-# endif
-
+#endif
 }
 
 #elif defined(HAVE_QSORT_R) /* not glibc, but has qsort_r() */
@@ -234,7 +233,7 @@ solv_hex2bin(const char **strp, unsigned char *buf, int bufl)
       else if (c >= 'A' && c <= 'F')
         d = c - ('A' - 10);
       else
-	break;
+        break;
       c = str[1];
       d <<= 4;
       if (c >= '0' && c <= '9')
@@ -244,7 +243,7 @@ solv_hex2bin(const char **strp, unsigned char *buf, int bufl)
       else if (c >= 'A' && c <= 'F')
         d |= c - ('A' - 10);
       else
-	break;
+        break;
       buf[i] = d;
       str += 2;
     }
@@ -276,46 +275,46 @@ solv_validutf8(const char *buf)
   for (p = (const unsigned char *)buf; (x = *p) != 0; p++)
     {
       if (x < 0x80)
-	continue;
+        continue;
       if (x < 0xc0)
-	break;
+        break;
       if (x < 0xe0)
-	{
-	  /* one byte to follow */
-	  if ((p[1] & 0xc0) != 0x80)
-	    break;
-	  if ((x & 0x1e) == 0)
-	    break;	/* not minimal */
-	  p += 1;
-	  continue;
-	}
+        {
+          /* one byte to follow */
+          if ((p[1] & 0xc0) != 0x80)
+            break;
+          if ((x & 0x1e) == 0)
+            break; /* not minimal */
+          p += 1;
+          continue;
+        }
       if (x < 0xf0)
-	{
-	  /* two bytes to follow */
-	  if ((p[1] & 0xc0) != 0x80 || (p[2] & 0xc0) != 0x80)
-	    break;
-	  if ((x & 0x0f) == 0 && (p[1] & 0x20) == 0)
-	    break;	/* not minimal */
-	  if (x == 0xed && (p[1] & 0x20) != 0)
-	    break;	/* d800-dfff surrogate */
-	  if (x == 0xef && p[1] == 0xbf && (p[2] == 0xbe || p[2] == 0xbf))
-	    break;	/* fffe or ffff */
-	  p += 2;
-	  continue;
-	}
+        {
+          /* two bytes to follow */
+          if ((p[1] & 0xc0) != 0x80 || (p[2] & 0xc0) != 0x80)
+            break;
+          if ((x & 0x0f) == 0 && (p[1] & 0x20) == 0)
+            break; /* not minimal */
+          if (x == 0xed && (p[1] & 0x20) != 0)
+            break; /* d800-dfff surrogate */
+          if (x == 0xef && p[1] == 0xbf && (p[2] == 0xbe || p[2] == 0xbf))
+            break; /* fffe or ffff */
+          p += 2;
+          continue;
+        }
       if (x < 0xf8)
-	{
-	  /* three bytes to follow */
-	  if ((p[1] & 0xc0) != 0x80 || (p[2] & 0xc0) != 0x80 || (p[3] & 0xc0) != 0x80)
-	    break;
-	  if ((x & 0x07) == 0 && (p[1] & 0x30) == 0)
-	    break;	/* not minimal */
-	  if ((x & 0x07) > 4 || ((x & 0x07) == 4 && (p[1] & 0x30) != 0))
-	    break;	/* above 0x10ffff */
-	  p += 3;
-	  continue;
-	}
-      break;	/* maybe valid utf8, but above 0x10ffff */
+        {
+          /* three bytes to follow */
+          if ((p[1] & 0xc0) != 0x80 || (p[2] & 0xc0) != 0x80 || (p[3] & 0xc0) != 0x80)
+            break;
+          if ((x & 0x07) == 0 && (p[1] & 0x30) == 0)
+            break; /* not minimal */
+          if ((x & 0x07) > 4 || ((x & 0x07) == 4 && (p[1] & 0x30) != 0))
+            break; /* above 0x10ffff */
+          p += 3;
+          continue;
+        }
+      break; /* maybe valid utf8, but above 0x10ffff */
     }
   return (const char *)p - buf;
 }
@@ -334,10 +333,10 @@ solv_latin1toutf8(const char *buf)
   for (p = buf; *p; p++)
     {
       if ((*(const unsigned char *)p & 128) != 0)
-	{
-	  *rp++ = *(const unsigned char *)p & 64 ? 0xc3 : 0xc2;
-	  *rp++ = *p & 0xbf;
-	}
+        {
+          *rp++ = *(const unsigned char *)p & 64 ? 0xc3 : 0xc2;
+          *rp++ = *p & 0xbf;
+        }
       else
         *rp++ = *p;
     }
@@ -379,44 +378,43 @@ solv_replacebadutf8(const char *buf, int replchar)
     }
   for (;;)
     {
-      for (p = buf, nl = 0; *p; )
-	{
-	  l = solv_validutf8(p);
-	  if (rp && l)
-	    {
-	      memcpy(rp, p, l);
-	      rp += l;
-	    }
-	  nl += l;
-	  p += l;
-	  if (!*p)
-	    break;
-	  /* found a bad char, replace with replchar */
-	  if (rp && replchar)
-	    {
-	      switch (repllen)
-		{
-		case 4:
-		  *rp++ = (replchar >> 18 & 0x3f) | 0x80;
-		case 3:
-		  *rp++ = (replchar >> 12 & 0x3f) | 0x80;
-		case 2:
-		  *rp++ = (replchar >> 6  & 0x3f) | 0x80;
-		default:
-		  *rp++ = (replchar       & 0x3f) | 0x80;
-		}
-	      rp[-repllen] ^= replin;
-	    }
-	  nl += repllen;
-	  p++;
-	  while ((*(const unsigned char *)p & 0xc0) == 0x80)
-	    p++;
-	}
+      for (p = buf, nl = 0; *p;)
+        {
+          l = solv_validutf8(p);
+          if (rp && l)
+            {
+              memcpy(rp, p, l);
+              rp += l;
+            }
+          nl += l;
+          p += l;
+          if (!*p)
+            break;
+          /* found a bad char, replace with replchar */
+          if (rp && replchar)
+            {
+              switch (repllen)
+                {
+                case 4:
+                  *rp++ = (replchar >> 18 & 0x3f) | 0x80;
+                case 3:
+                  *rp++ = (replchar >> 12 & 0x3f) | 0x80;
+                case 2:
+                  *rp++ = (replchar >> 6 & 0x3f) | 0x80;
+                default:
+                  *rp++ = (replchar & 0x3f) | 0x80;
+                }
+              rp[-repllen] ^= replin;
+            }
+          nl += repllen;
+          p++;
+          while ((*(const unsigned char *)p & 0xc0) == 0x80)
+            p++;
+        }
       if (rp)
-	break;
+        break;
       r = rp = solv_malloc(nl + 1);
     }
   *rp = 0;
   return r;
 }
-

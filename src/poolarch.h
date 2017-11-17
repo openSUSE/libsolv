@@ -18,11 +18,12 @@ extern void pool_setarch(Pool *, const char *);
 extern void pool_setarchpolicy(Pool *, const char *);
 extern unsigned char pool_arch2color_slow(Pool *pool, Id arch);
 
-#define ARCHCOLOR_32    1
-#define ARCHCOLOR_64    2
-#define ARCHCOLOR_ALL   255
+#define ARCHCOLOR_32 1
+#define ARCHCOLOR_64 2
+#define ARCHCOLOR_ALL 255
 
-static inline unsigned char pool_arch2color(Pool *pool, Id arch)
+static inline unsigned char
+pool_arch2color(Pool *pool, Id arch)
 {
   if (arch > pool->lastarch)
     return ARCHCOLOR_ALL;
@@ -31,7 +32,8 @@ static inline unsigned char pool_arch2color(Pool *pool, Id arch)
   return pool_arch2color_slow(pool, arch);
 }
 
-static inline int pool_colormatch(Pool *pool, Solvable *s1, Solvable *s2)
+static inline int
+pool_colormatch(Pool *pool, Solvable *s1, Solvable *s2)
 {
   if (s1->arch == s2->arch)
     return 1;

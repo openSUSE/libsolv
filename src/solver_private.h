@@ -25,7 +25,6 @@ extern void solver_intersect_obsoleted(Solver *solv, Id p, Queue *q, int qstart,
 extern void solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded);
 extern int solver_check_cleandeps_mistakes(Solver *solv);
 
-
 #define ISSIMPLEDEP(pool, dep) (!ISRELDEP(dep) || GETRELDEP(pool, dep)->flags < 8)
 
 static inline int
@@ -36,8 +35,8 @@ solver_dep_possible(Solver *solv, Id dep, Map *m)
 
   if (!ISSIMPLEDEP(pool, dep))
     return solver_dep_possible_slow(solv, dep, m);
-  FOR_PROVIDES(p, pp, dep)
-    {  
+  FOR_PROVIDES (p, pp, dep)
+    {
       if (MAPTST(m, p))
         return 1;
     }
@@ -54,11 +53,11 @@ solver_dep_fulfilled(Solver *solv, Id dep)
     {
       Reldep *rd = GETRELDEP(pool, dep);
       if (rd->flags == REL_COND || rd->flags == REL_UNLESS || rd->flags == REL_AND || rd->flags == REL_OR)
-	return solver_dep_fulfilled_cplx(solv, rd);
+        return solver_dep_fulfilled_cplx(solv, rd);
       if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_SPLITPROVIDES)
         return solver_splitprovides(solv, rd->evr, 0);
     }
-  FOR_PROVIDES(p, pp, dep)
+  FOR_PROVIDES (p, pp, dep)
     {
       if (solv->decisionmap[p] > 0)
         return 1;

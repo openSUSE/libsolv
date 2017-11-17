@@ -59,27 +59,26 @@ enum state {
 };
 
 static struct solv_xmlparser_element stateswitches[] = {
-  { STATE_START,       "comps",         STATE_COMPS,         0 },
-  { STATE_COMPS,       "group",         STATE_GROUP,         0 },
-  { STATE_COMPS,       "category",      STATE_CATEGORY,      0 },
-  { STATE_GROUP,       "id",            STATE_ID,            1 },
-  { STATE_GROUP,       "name",          STATE_NAME,          1 },
-  { STATE_GROUP,       "description",   STATE_DESCRIPTION,   1 },
-  { STATE_GROUP,       "uservisible",   STATE_USERVISIBLE,   1 },
-  { STATE_GROUP,       "display_order", STATE_DISPLAY_ORDER, 1 },
-  { STATE_GROUP,       "default",       STATE_DEFAULT,       1 },
-  { STATE_GROUP,       "langonly",      STATE_LANGONLY,      1 },
-  { STATE_GROUP,       "lang_only",     STATE_LANG_ONLY,     1 },
-  { STATE_GROUP,       "packagelist",   STATE_PACKAGELIST,   0 },
-  { STATE_PACKAGELIST, "packagereq",    STATE_PACKAGEREQ,    1 },
-  { STATE_CATEGORY,    "id",            STATE_ID,            1 },
-  { STATE_CATEGORY,    "name",          STATE_NAME,          1 },
-  { STATE_CATEGORY,    "description",   STATE_DESCRIPTION,   1 },
-  { STATE_CATEGORY ,   "grouplist",     STATE_GROUPLIST,     0 },
-  { STATE_CATEGORY ,   "display_order", STATE_DISPLAY_ORDER, 1 },
-  { STATE_GROUPLIST,   "groupid",       STATE_GROUPID,       1 },
-  { NUMSTATES }
-};
+    {STATE_START, "comps", STATE_COMPS, 0},
+    {STATE_COMPS, "group", STATE_GROUP, 0},
+    {STATE_COMPS, "category", STATE_CATEGORY, 0},
+    {STATE_GROUP, "id", STATE_ID, 1},
+    {STATE_GROUP, "name", STATE_NAME, 1},
+    {STATE_GROUP, "description", STATE_DESCRIPTION, 1},
+    {STATE_GROUP, "uservisible", STATE_USERVISIBLE, 1},
+    {STATE_GROUP, "display_order", STATE_DISPLAY_ORDER, 1},
+    {STATE_GROUP, "default", STATE_DEFAULT, 1},
+    {STATE_GROUP, "langonly", STATE_LANGONLY, 1},
+    {STATE_GROUP, "lang_only", STATE_LANG_ONLY, 1},
+    {STATE_GROUP, "packagelist", STATE_PACKAGELIST, 0},
+    {STATE_PACKAGELIST, "packagereq", STATE_PACKAGEREQ, 1},
+    {STATE_CATEGORY, "id", STATE_ID, 1},
+    {STATE_CATEGORY, "name", STATE_NAME, 1},
+    {STATE_CATEGORY, "description", STATE_DESCRIPTION, 1},
+    {STATE_CATEGORY, "grouplist", STATE_GROUPLIST, 0},
+    {STATE_CATEGORY, "display_order", STATE_DISPLAY_ORDER, 1},
+    {STATE_GROUPLIST, "groupid", STATE_GROUPID, 1},
+    {NUMSTATES}};
 
 struct parsedata {
   Pool *pool;
@@ -100,8 +99,6 @@ struct parsedata {
   Id handle;
 };
 
-
-
 static void
 startElement(struct solv_xmlparser *xmlp, int state, const char *name, const char **atts)
 {
@@ -109,7 +106,7 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
   Pool *pool = pd->pool;
   Solvable *s = pd->solvable;
 
-  switch(state)
+  switch (state)
     {
     case STATE_GROUP:
     case STATE_CATEGORY:
@@ -127,27 +124,26 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
 
     case STATE_PACKAGEREQ:
       {
-	const char *type = solv_xmlparser_find_attr("type", atts);
-	pd->condreq = 0;
-	pd->reqtype = SOLVABLE_RECOMMENDS;
-	if (type && !strcmp(type, "conditional"))
-	  {
-	    const char *requires = solv_xmlparser_find_attr("requires", atts);
-	    if (requires && *requires)
-	      pd->condreq = pool_str2id(pool, requires, 1);
-	  }
-	else if (type && !strcmp(type, "mandatory"))
-	  pd->reqtype = SOLVABLE_REQUIRES;
-	else if (type && !strcmp(type, "optional"))
-	  pd->reqtype = SOLVABLE_SUGGESTS;
-	break;
+        const char *type = solv_xmlparser_find_attr("type", atts);
+        pd->condreq = 0;
+        pd->reqtype = SOLVABLE_RECOMMENDS;
+        if (type && !strcmp(type, "conditional"))
+          {
+            const char *requires = solv_xmlparser_find_attr("requires", atts);
+            if (requires && *requires)
+              pd->condreq = pool_str2id(pool, requires, 1);
+          }
+        else if (type && !strcmp(type, "mandatory"))
+          pd->reqtype = SOLVABLE_REQUIRES;
+        else if (type && !strcmp(type, "optional"))
+          pd->reqtype = SOLVABLE_SUGGESTS;
+        break;
       }
 
     default:
       break;
     }
 }
-
 
 static void
 endElement(struct solv_xmlparser *xmlp, int state, char *content)
@@ -161,11 +157,11 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
     case STATE_GROUP:
     case STATE_CATEGORY:
       if (!s->arch)
-	s->arch = ARCH_NOARCH;
+        s->arch = ARCH_NOARCH;
       if (!s->evr)
-	s->evr = ID_EMPTY;
+        s->evr = ID_EMPTY;
       if (s->name && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
-	s->provides = repo_addid_dep(pd->repo, s->provides, pool_rel2id(pd->pool, s->name, s->evr, REL_EQ, 1), 0);
+        s->provides = repo_addid_dep(pd->repo, s->provides, pool_rel2id(pd->pool, s->name, s->evr, REL_EQ, 1), 0);
       pd->solvable = 0;
       break;
 
@@ -184,7 +180,7 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
     case STATE_PACKAGEREQ:
       id = pool_str2id(pd->pool, content, 1);
       if (pd->condreq)
-	id = pool_rel2id(pd->pool, id, pd->condreq, REL_COND, 1);
+        id = pool_rel2id(pd->pool, id, pd->condreq, REL_COND, 1);
       repo_add_idarray(pd->repo, pd->handle, pd->reqtype, id);
       break;
 
@@ -212,7 +208,6 @@ errorCallback(struct solv_xmlparser *xmlp, const char *errstr, unsigned int line
   struct parsedata *pd = xmlp->userdata;
   pool_debug(pd->pool, SOLV_ERROR, "repo_comps: %s at line %u:%u\n", errstr, line, column);
 }
-
 
 int
 repo_add_comps(Repo *repo, FILE *fp, int flags)

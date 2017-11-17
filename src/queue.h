@@ -20,15 +20,14 @@ extern "C" {
 #endif
 
 typedef struct _Queue {
-  Id *elements;		/* pointer to elements */
-  int count;		/* current number of elements in queue */
-  Id *alloc;		/* this is whats actually allocated, elements > alloc if shifted */
-  int left;		/* space left in alloc *after* elements+count */
+  Id *elements; /* pointer to elements */
+  int count;    /* current number of elements in queue */
+  Id *alloc;    /* this is whats actually allocated, elements > alloc if shifted */
+  int left;     /* space left in alloc *after* elements+count */
 } Queue;
 
-
-extern void queue_alloc_one(Queue *q);		/* internal */
-extern void queue_alloc_one_head(Queue *q);	/* internal */
+extern void queue_alloc_one(Queue *q);      /* internal */
+extern void queue_alloc_one_head(Queue *q); /* internal */
 
 /* clear queue */
 static inline void
@@ -84,7 +83,7 @@ static inline void
 queue_pushunique(Queue *q, Id id)
 {
   int i;
-  for (i = q->count; i > 0; )
+  for (i = q->count; i > 0;)
     if (q->elements[--i] == id)
       return;
   queue_push(q, id);

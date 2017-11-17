@@ -26,11 +26,11 @@ opentmpfile()
 
   strcpy(tmpl, "/var/tmp/solvXXXXXX");
   fd = mkstemp(tmpl);
-  if (fd < 0) 
-    {    
+  if (fd < 0)
+    {
       perror("mkstemp");
       exit(1);
-    }    
+    }
   unlink(tmpl);
   return fd;
 }
@@ -79,34 +79,34 @@ curlfopen(struct repoinfo *cinfo, const char *file, int uncompress, const unsign
       if (!cinfo->metalink && !cinfo->mirrorlist)
         return 0;
       if (file != cinfo->metalink && file != cinfo->mirrorlist)
-	{
-	  unsigned char mlchksum[32];
-	  Id mlchksumtype = 0;
-	  fp = curlfopen(cinfo, cinfo->metalink ? cinfo->metalink : cinfo->mirrorlist, 0, 0, 0, 0);
-	  if (!fp)
-	    return 0;
-	  if (cinfo->metalink)
-	    cinfo->baseurl = findmetalinkurl(fp, mlchksum, &mlchksumtype);
-	  else
-	    cinfo->baseurl = findmirrorlisturl(fp);
-	  fclose(fp);
-	  if (!cinfo->baseurl)
-	    return 0;
+        {
+          unsigned char mlchksum[32];
+          Id mlchksumtype = 0;
+          fp = curlfopen(cinfo, cinfo->metalink ? cinfo->metalink : cinfo->mirrorlist, 0, 0, 0, 0);
+          if (!fp)
+            return 0;
+          if (cinfo->metalink)
+            cinfo->baseurl = findmetalinkurl(fp, mlchksum, &mlchksumtype);
+          else
+            cinfo->baseurl = findmirrorlisturl(fp);
+          fclose(fp);
+          if (!cinfo->baseurl)
+            return 0;
 #if defined(FEDORA) || defined(MAGEIA)
-	  if (strchr(cinfo->baseurl, '$'))
-	    {
-	      char *b = yum_substitute(cinfo->repo->pool, cinfo->baseurl);
-	      free(cinfo->baseurl);
-	      cinfo->baseurl = strdup(b);
-	    }
+          if (strchr(cinfo->baseurl, '$'))
+            {
+              char *b = yum_substitute(cinfo->repo->pool, cinfo->baseurl);
+              free(cinfo->baseurl);
+              cinfo->baseurl = strdup(b);
+            }
 #endif
-	  if (!chksumtype && mlchksumtype && !strcmp(file, "repodata/repomd.xml"))
-	    {
-	      chksumtype = mlchksumtype;
-	      chksum = mlchksum;
-	    }
-	  return curlfopen(cinfo, file, uncompress, chksum, chksumtype, markincomplete);
-	}
+          if (!chksumtype && mlchksumtype && !strcmp(file, "repodata/repomd.xml"))
+            {
+              chksumtype = mlchksumtype;
+              chksum = mlchksum;
+            }
+          return curlfopen(cinfo, file, uncompress, chksum, chksumtype, markincomplete);
+        }
       snprintf(url, sizeof(url), "%s", file);
     }
   else
@@ -128,10 +128,10 @@ curlfopen(struct repoinfo *cinfo, const char *file, int uncompress, const unsign
   if (pid == 0)
     {
       if (fd != 1)
-	{
+        {
           dup2(fd, 1);
-	  close(fd);
-	}
+          close(fd);
+        }
       execlp("curl", "curl", "-f", "-s", "-L", url, (char *)0);
       perror("curl");
       _exit(0);
@@ -150,14 +150,14 @@ curlfopen(struct repoinfo *cinfo, const char *file, int uncompress, const unsign
     {
       printf("%s: download error %d\n", file, status >> 8 ? status >> 8 : status);
       if (markincomplete)
-	cinfo->incomplete = 1;
+        cinfo->incomplete = 1;
       close(fd);
       return 0;
     }
   if (chksumtype && !verify_checksum(fd, file, chksum, chksumtype))
     {
       if (markincomplete)
-	cinfo->incomplete = 1;
+        cinfo->incomplete = 1;
       close(fd);
       return 0;
     }
@@ -165,13 +165,13 @@ curlfopen(struct repoinfo *cinfo, const char *file, int uncompress, const unsign
   if (uncompress)
     {
       if (solv_xfopen_iscompressed(file) < 0)
-	{
-	  printf("%s: unsupported compression\n", file);
-	  if (markincomplete)
-	    cinfo->incomplete = 1;
-	  close(fd);
-	  return 0;
-	}
+        {
+          printf("%s: unsupported compression\n", file);
+          if (markincomplete)
+            cinfo->incomplete = 1;
+          close(fd);
+          return 0;
+        }
       fp = solv_xfopen_fd(file, fd, "r");
     }
   else
@@ -204,21 +204,20 @@ int
 downloadchecksig(struct repoinfo *cinfo, FILE *fp, const char *sigurl, Pool **sigpool)
 {
   FILE *sigfp;
-  sigfp = curlfopen(cinfo, sigurl, 0, 0, 0, 0); 
+  sigfp = curlfopen(cinfo, sigurl, 0, 0, 0, 0);
   if (!sigfp)
-    {    
+    {
       printf(" unsigned, skipped\n");
       return 0;
-    }    
+    }
   if (!*sigpool)
     *sigpool = read_sigs();
   if (!checksig(*sigpool, fp, sigfp))
-    {    
+    {
       printf(" checksig failed, skipped\n");
       fclose(sigfp);
       return 0;
-    }    
+    }
   fclose(sigfp);
   return 1;
 }
-

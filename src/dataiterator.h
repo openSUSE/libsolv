@@ -28,8 +28,8 @@ typedef struct _KeyValue {
   unsigned int num;
   unsigned int num2;
 
-  int entry;	/* array entry, starts with 0 */
-  int eof;	/* last entry reached */
+  int entry; /* array entry, starts with 0 */
+  int eof;   /* last entry reached */
 
   struct _KeyValue *parent;
 } KeyValue;
@@ -37,49 +37,48 @@ typedef struct _KeyValue {
 #define SOLV_KV_NUM64(kv) (((unsigned long long)((kv)->num2)) << 32 | (kv)->num)
 
 /* search matcher flags */
-#define SEARCH_STRINGMASK		15
-#define SEARCH_STRING			1
-#define SEARCH_STRINGSTART		2
-#define SEARCH_STRINGEND		3
-#define SEARCH_SUBSTRING		4
-#define SEARCH_GLOB 			5
-#define SEARCH_REGEX 			6
-#define SEARCH_ERROR 			15
-#define	SEARCH_NOCASE			(1<<7)
+#define SEARCH_STRINGMASK 15
+#define SEARCH_STRING 1
+#define SEARCH_STRINGSTART 2
+#define SEARCH_STRINGEND 3
+#define SEARCH_SUBSTRING 4
+#define SEARCH_GLOB 5
+#define SEARCH_REGEX 6
+#define SEARCH_ERROR 15
+#define SEARCH_NOCASE (1 << 7)
 
 /* iterator control */
-#define	SEARCH_NO_STORAGE_SOLVABLE	(1<<8)
-#define SEARCH_SUB			(1<<9)
-#define SEARCH_ARRAYSENTINEL		(1<<10)
-#define SEARCH_DISABLED_REPOS		(1<<11)
-#define SEARCH_COMPLETE_FILELIST	(1<<12)
+#define SEARCH_NO_STORAGE_SOLVABLE (1 << 8)
+#define SEARCH_SUB (1 << 9)
+#define SEARCH_ARRAYSENTINEL (1 << 10)
+#define SEARCH_DISABLED_REPOS (1 << 11)
+#define SEARCH_COMPLETE_FILELIST (1 << 12)
 
 /* stringification flags */
-#define SEARCH_SKIP_KIND		(1<<16)
+#define SEARCH_SKIP_KIND (1 << 16)
 /* By default we stringify just to the basename of a file because
    the construction of the full filename is costly.  Specify this
    flag if you want to match full filenames */
-#define SEARCH_FILES			(1<<17)
-#define SEARCH_CHECKSUMS		(1<<18)
+#define SEARCH_FILES (1 << 17)
+#define SEARCH_CHECKSUMS (1 << 18)
 
 /* dataiterator internal */
-#define SEARCH_THISSOLVID		(1<<31)
+#define SEARCH_THISSOLVID (1 << 31)
 
 /*
  * Datamatcher: match a string against a query
  */
 typedef struct _Datamatcher {
-  int flags;		/* see matcher flags above */
-  const char *match;	/* the query string */
-  void *matchdata;	/* e.g. compiled regexp */
+  int flags;         /* see matcher flags above */
+  const char *match; /* the query string */
+  void *matchdata;   /* e.g. compiled regexp */
   int error;
 } Datamatcher;
 
-int  datamatcher_init(Datamatcher *ma, const char *match, int flags);
+int datamatcher_init(Datamatcher *ma, const char *match, int flags);
 void datamatcher_free(Datamatcher *ma);
-int  datamatcher_match(Datamatcher *ma, const char *str);
-int  datamatcher_checkbasename(Datamatcher *ma, const char *str);
-
+int datamatcher_match(Datamatcher *ma, const char *str);
+int datamatcher_checkbasename(Datamatcher *ma, const char *str);
 
 /*
  * Dataiterator
@@ -96,8 +95,7 @@ int  datamatcher_checkbasename(Datamatcher *ma, const char *str);
  *      dosomething(di.solvid, di.key, di.kv);
  *    dataiterator_free(&di);
  */
-typedef struct _Dataiterator
-{
+typedef struct _Dataiterator {
   int state;
   int flags;
 
@@ -148,7 +146,6 @@ typedef struct _Dataiterator
 
 } Dataiterator;
 
-
 /*
  * Initialize dataiterator
  *
@@ -159,18 +156,18 @@ typedef struct _Dataiterator
  * keyname: if non-null, limit search to this keyname
  * match:   if non-null, limit search to this match
  */
-int  dataiterator_init(Dataiterator *di, Pool *pool, struct _Repo *repo, Id p, Id keyname, const char *match, int flags);
+int dataiterator_init(Dataiterator *di, Pool *pool, struct _Repo *repo, Id p, Id keyname, const char *match, int flags);
 void dataiterator_init_clone(Dataiterator *di, Dataiterator *from);
 void dataiterator_set_search(Dataiterator *di, struct _Repo *repo, Id p);
 void dataiterator_set_keyname(Dataiterator *di, Id keyname);
-int  dataiterator_set_match(Dataiterator *di, const char *match, int flags);
+int dataiterator_set_match(Dataiterator *di, const char *match, int flags);
 
 void dataiterator_prepend_keyname(Dataiterator *di, Id keyname);
 void dataiterator_free(Dataiterator *di);
-int  dataiterator_step(Dataiterator *di);
+int dataiterator_step(Dataiterator *di);
 void dataiterator_setpos(Dataiterator *di);
 void dataiterator_setpos_parent(Dataiterator *di);
-int  dataiterator_match(Dataiterator *di, Datamatcher *ma);
+int dataiterator_match(Dataiterator *di, Datamatcher *ma);
 void dataiterator_skip_attribute(Dataiterator *di);
 void dataiterator_skip_solvable(Dataiterator *di);
 void dataiterator_skip_repo(Dataiterator *di);
@@ -181,10 +178,10 @@ void dataiterator_clonepos(Dataiterator *di, Dataiterator *from);
 void dataiterator_seek(Dataiterator *di, int whence);
 void dataiterator_strdup(Dataiterator *di);
 
-#define DI_SEEK_STAY    (1 << 16)
-#define DI_SEEK_CHILD   1
-#define DI_SEEK_PARENT  2
-#define DI_SEEK_REWIND  3
+#define DI_SEEK_STAY (1 << 16)
+#define DI_SEEK_CHILD 1
+#define DI_SEEK_PARENT 2
+#define DI_SEEK_REWIND 3
 
 #ifdef __cplusplus
 }

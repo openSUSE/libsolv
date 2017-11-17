@@ -27,7 +27,6 @@
 #include "evr.h"
 #include "policy.h"
 
-
 void
 solver_printruleelement(Solver *solv, int type, Rule *r, Id v)
 {
@@ -48,9 +47,9 @@ solver_printruleelement(Solver *solv, int type, Rule *r, Id v)
   if (r)
     {
       if (r->w1 == v)
-	POOL_DEBUG(type, " (w1)");
+        POOL_DEBUG(type, " (w1)");
       if (r->w2 == v)
-	POOL_DEBUG(type, " (w2)");
+        POOL_DEBUG(type, " (w2)");
     }
   if (solv->decisionmap[s - pool->solvables] > 0)
     POOL_DEBUG(type, " Install.level%d", solv->decisionmap[s - pool->solvables]);
@@ -58,7 +57,6 @@ solver_printruleelement(Solver *solv, int type, Rule *r, Id v)
     POOL_DEBUG(type, " Conflict.level%d", -solv->decisionmap[s - pool->solvables]);
   POOL_DEBUG(type, "\n");
 }
-
 
 /*
  * print rule
@@ -71,31 +69,31 @@ solver_printrule(Solver *solv, int type, Rule *r)
   int i;
   Id d, v;
 
-  if (r >= solv->rules && r < solv->rules + solv->nrules)   /* r is a solver rule */
+  if (r >= solv->rules && r < solv->rules + solv->nrules) /* r is a solver rule */
     POOL_DEBUG(type, "Rule #%d:", (int)(r - solv->rules));
   else
-    POOL_DEBUG(type, "Rule:");		       /* r is any rule */
+    POOL_DEBUG(type, "Rule:"); /* r is any rule */
   if (r->d < 0)
     POOL_DEBUG(type, " (disabled)");
   POOL_DEBUG(type, "\n");
   d = r->d < 0 ? -r->d - 1 : r->d;
-  for (i = 0; ; i++)
+  for (i = 0;; i++)
     {
       if (i == 0)
-	  /* print direct literal */
-	v = r->p;
+        /* print direct literal */
+        v = r->p;
       else if (!d)
-	{
-	  if (i == 2)
-	    break;
-	  /* binary rule --> print w2 as second literal */
-	  v = r->w2;
-	}
+        {
+          if (i == 2)
+            break;
+          /* binary rule --> print w2 as second literal */
+          v = r->w2;
+        }
       else
-	  /* every other which is in d */
-	v = solv->pool->whatprovidesdata[d + i - 1];
+        /* every other which is in d */
+        v = solv->pool->whatprovidesdata[d + i - 1];
       if (v == ID_NULL)
-	break;
+        break;
       solver_printruleelement(solv, type, r, v);
     }
   POOL_DEBUG(type, "    next rules: %d %d\n", r->n1, r->n2);
@@ -147,11 +145,11 @@ solver_printproblem(Solver *solv, Id v)
       POOL_DEBUG(SOLV_DEBUG_SOLUTIONS, "JOB %d\n", v);
       jp = solv->ruletojob.elements;
       for (i = solv->jobrules, r = solv->rules + i; i < solv->jobrules_end; i++, r++, jp++)
-	if (*jp == v)
-	  {
-	    POOL_DEBUG(SOLV_DEBUG_SOLUTIONS, "- ");
-	    solver_printrule(solv, SOLV_DEBUG_SOLUTIONS, r);
-	  }
+        if (*jp == v)
+          {
+            POOL_DEBUG(SOLV_DEBUG_SOLUTIONS, "- ");
+            solver_printrule(solv, SOLV_DEBUG_SOLUTIONS, r);
+          }
       POOL_DEBUG(SOLV_DEBUG_SOLUTIONS, "ENDJOB\n");
     }
 }
@@ -184,15 +182,15 @@ solver_printdecisionq(Solver *solv, int type)
         POOL_DEBUG(type, "%d %d conflict %s, ", i, -solv->decisionmap[-p], pool_solvid2str(pool, -p));
       why = solv->decisionq_why.elements[i];
       if (why > 0)
-	{
-	  POOL_DEBUG(type, "forced by ");
-	  solver_printruleclass(solv, type, solv->rules + why);
-	}
+        {
+          POOL_DEBUG(type, "forced by ");
+          solver_printruleclass(solv, type, solv->rules + why);
+        }
       else if (why < 0)
-	{
-	  POOL_DEBUG(type, "chosen from ");
-	  solver_printruleclass(solv, type, solv->rules - why);
-	}
+        {
+          POOL_DEBUG(type, "chosen from ");
+          solver_printruleclass(solv, type, solv->rules - why);
+        }
       else
         POOL_DEBUG(type, "picked for some unknown reason.\n");
     }
@@ -224,63 +222,63 @@ solver_printdecisions(Solver *solv)
     {
       p = trans->steps.elements[i];
       s = pool->solvables + p;
-      type = transaction_type(trans, p, SOLVER_TRANSACTION_SHOW_ACTIVE|SOLVER_TRANSACTION_SHOW_ALL|SOLVER_TRANSACTION_SHOW_OBSOLETES|SOLVER_TRANSACTION_SHOW_MULTIINSTALL);
-      switch(type)
+      type = transaction_type(trans, p, SOLVER_TRANSACTION_SHOW_ACTIVE | SOLVER_TRANSACTION_SHOW_ALL | SOLVER_TRANSACTION_SHOW_OBSOLETES | SOLVER_TRANSACTION_SHOW_MULTIINSTALL);
+      switch (type)
         {
-	case SOLVER_TRANSACTION_MULTIINSTALL:
+        case SOLVER_TRANSACTION_MULTIINSTALL:
           POOL_DEBUG(SOLV_DEBUG_RESULT, "  multi install %s", pool_solvable2str(pool, s));
-	  break;
-	case SOLVER_TRANSACTION_MULTIREINSTALL:
+          break;
+        case SOLVER_TRANSACTION_MULTIREINSTALL:
           POOL_DEBUG(SOLV_DEBUG_RESULT, "  multi reinstall %s", pool_solvable2str(pool, s));
-	  break;
-	case SOLVER_TRANSACTION_INSTALL:
+          break;
+        case SOLVER_TRANSACTION_INSTALL:
           POOL_DEBUG(SOLV_DEBUG_RESULT, "  install   %s", pool_solvable2str(pool, s));
-	  break;
-	case SOLVER_TRANSACTION_REINSTALL:
+          break;
+        case SOLVER_TRANSACTION_REINSTALL:
           POOL_DEBUG(SOLV_DEBUG_RESULT, "  reinstall %s", pool_solvable2str(pool, s));
-	  break;
-	case SOLVER_TRANSACTION_DOWNGRADE:
+          break;
+        case SOLVER_TRANSACTION_DOWNGRADE:
           POOL_DEBUG(SOLV_DEBUG_RESULT, "  downgrade %s", pool_solvable2str(pool, s));
-	  break;
-	case SOLVER_TRANSACTION_CHANGE:
+          break;
+        case SOLVER_TRANSACTION_CHANGE:
           POOL_DEBUG(SOLV_DEBUG_RESULT, "  change    %s", pool_solvable2str(pool, s));
-	  break;
-	case SOLVER_TRANSACTION_UPGRADE:
-	case SOLVER_TRANSACTION_OBSOLETES:
+          break;
+        case SOLVER_TRANSACTION_UPGRADE:
+        case SOLVER_TRANSACTION_OBSOLETES:
           POOL_DEBUG(SOLV_DEBUG_RESULT, "  upgrade   %s", pool_solvable2str(pool, s));
-	  break;
-	case SOLVER_TRANSACTION_ERASE:
+          break;
+        case SOLVER_TRANSACTION_ERASE:
           POOL_DEBUG(SOLV_DEBUG_RESULT, "  erase     %s", pool_solvable2str(pool, s));
-	  break;
-	default:
-	  break;
+          break;
+        default:
+          break;
         }
-      switch(type)
+      switch (type)
         {
-	case SOLVER_TRANSACTION_INSTALL:
-	case SOLVER_TRANSACTION_ERASE:
-	case SOLVER_TRANSACTION_MULTIINSTALL:
-	case SOLVER_TRANSACTION_MULTIREINSTALL:
-	  POOL_DEBUG(SOLV_DEBUG_RESULT, "\n");
-	  break;
-	case SOLVER_TRANSACTION_REINSTALL:
-	case SOLVER_TRANSACTION_DOWNGRADE:
-	case SOLVER_TRANSACTION_CHANGE:
-	case SOLVER_TRANSACTION_UPGRADE:
-	case SOLVER_TRANSACTION_OBSOLETES:
-	  transaction_all_obs_pkgs(trans, p, &iq);
-	  if (iq.count)
-	    {
-	      POOL_DEBUG(SOLV_DEBUG_RESULT, "  (obsoletes");
-	      for (j = 0; j < iq.count; j++)
-		POOL_DEBUG(SOLV_DEBUG_RESULT, " %s", pool_solvid2str(pool, iq.elements[j]));
-	      POOL_DEBUG(SOLV_DEBUG_RESULT, ")");
-	    }
-	  POOL_DEBUG(SOLV_DEBUG_RESULT, "\n");
-	  break;
-	default:
-	  break;
-	}
+        case SOLVER_TRANSACTION_INSTALL:
+        case SOLVER_TRANSACTION_ERASE:
+        case SOLVER_TRANSACTION_MULTIINSTALL:
+        case SOLVER_TRANSACTION_MULTIREINSTALL:
+          POOL_DEBUG(SOLV_DEBUG_RESULT, "\n");
+          break;
+        case SOLVER_TRANSACTION_REINSTALL:
+        case SOLVER_TRANSACTION_DOWNGRADE:
+        case SOLVER_TRANSACTION_CHANGE:
+        case SOLVER_TRANSACTION_UPGRADE:
+        case SOLVER_TRANSACTION_OBSOLETES:
+          transaction_all_obs_pkgs(trans, p, &iq);
+          if (iq.count)
+            {
+              POOL_DEBUG(SOLV_DEBUG_RESULT, "  (obsoletes");
+              for (j = 0; j < iq.count; j++)
+                POOL_DEBUG(SOLV_DEBUG_RESULT, " %s", pool_solvid2str(pool, iq.elements[j]));
+              POOL_DEBUG(SOLV_DEBUG_RESULT, ")");
+            }
+          POOL_DEBUG(SOLV_DEBUG_RESULT, "\n");
+          break;
+        default:
+          break;
+        }
     }
   queue_free(&iq);
 
@@ -295,18 +293,18 @@ solver_printdecisions(Solver *solv)
     {
       POOL_DEBUG(SOLV_DEBUG_RESULT, "recommended packages:\n");
       for (i = 0; i < recommendations.count; i++)
-	{
-	  s = pool->solvables + recommendations.elements[i];
+        {
+          s = pool->solvables + recommendations.elements[i];
           if (solv->decisionmap[recommendations.elements[i]] > 0)
-	    {
-	      if (installed && s->repo == installed)
-	        POOL_DEBUG(SOLV_DEBUG_RESULT, "  %s (installed)\n", pool_solvable2str(pool, s));
-	      else
-	        POOL_DEBUG(SOLV_DEBUG_RESULT, "  %s (selected)\n", pool_solvable2str(pool, s));
-	    }
+            {
+              if (installed && s->repo == installed)
+                POOL_DEBUG(SOLV_DEBUG_RESULT, "  %s (installed)\n", pool_solvable2str(pool, s));
+              else
+                POOL_DEBUG(SOLV_DEBUG_RESULT, "  %s (selected)\n", pool_solvable2str(pool, s));
+            }
           else
-	    POOL_DEBUG(SOLV_DEBUG_RESULT, "  %s\n", pool_solvable2str(pool, s));
-	}
+            POOL_DEBUG(SOLV_DEBUG_RESULT, "  %s\n", pool_solvable2str(pool, s));
+        }
       POOL_DEBUG(SOLV_DEBUG_RESULT, "\n");
     }
 
@@ -314,31 +312,31 @@ solver_printdecisions(Solver *solv)
     {
       POOL_DEBUG(SOLV_DEBUG_RESULT, "suggested packages:\n");
       for (i = 0; i < suggestions.count; i++)
-	{
-	  s = pool->solvables + suggestions.elements[i];
+        {
+          s = pool->solvables + suggestions.elements[i];
           if (solv->decisionmap[suggestions.elements[i]] > 0)
-	    {
-	      if (installed && s->repo == installed)
-	        POOL_DEBUG(SOLV_DEBUG_RESULT, "  %s (installed)\n", pool_solvable2str(pool, s));
-	      else
-	        POOL_DEBUG(SOLV_DEBUG_RESULT, "  %s (selected)\n", pool_solvable2str(pool, s));
-	    }
-	  else
-	    POOL_DEBUG(SOLV_DEBUG_RESULT, "  %s\n", pool_solvable2str(pool, s));
-	}
+            {
+              if (installed && s->repo == installed)
+                POOL_DEBUG(SOLV_DEBUG_RESULT, "  %s (installed)\n", pool_solvable2str(pool, s));
+              else
+                POOL_DEBUG(SOLV_DEBUG_RESULT, "  %s (selected)\n", pool_solvable2str(pool, s));
+            }
+          else
+            POOL_DEBUG(SOLV_DEBUG_RESULT, "  %s\n", pool_solvable2str(pool, s));
+        }
       POOL_DEBUG(SOLV_DEBUG_RESULT, "\n");
     }
   if (orphaned.count)
     {
       POOL_DEBUG(SOLV_DEBUG_RESULT, "orphaned packages:\n");
       for (i = 0; i < orphaned.count; i++)
-	{
-	  s = pool->solvables + orphaned.elements[i];
+        {
+          s = pool->solvables + orphaned.elements[i];
           if (solv->decisionmap[solv->orphaned.elements[i]] > 0)
-	    POOL_DEBUG(SOLV_DEBUG_RESULT, "  %s (kept)\n", pool_solvable2str(pool, s));
-	  else
-	    POOL_DEBUG(SOLV_DEBUG_RESULT, "  %s (erased)\n", pool_solvable2str(pool, s));
-	}
+            POOL_DEBUG(SOLV_DEBUG_RESULT, "  %s (kept)\n", pool_solvable2str(pool, s));
+          else
+            POOL_DEBUG(SOLV_DEBUG_RESULT, "  %s (erased)\n", pool_solvable2str(pool, s));
+        }
       POOL_DEBUG(SOLV_DEBUG_RESULT, "\n");
     }
   queue_free(&recommendations);
@@ -347,8 +345,8 @@ solver_printdecisions(Solver *solv)
   transaction_free(trans);
 }
 
-static inline
-const char *id2strnone(Pool *pool, Id id)
+static inline const char *
+id2strnone(Pool *pool, Id id)
 {
   return !id || id == 1 ? "(none)" : pool_id2str(pool, id);
 }
@@ -370,85 +368,85 @@ transaction_print(Transaction *trans)
     {
       Id class = classes.elements[i];
       Id cnt = classes.elements[i + 1];
-      switch(class)
-	{
-	case SOLVER_TRANSACTION_ERASE:
-	  POOL_DEBUG(SOLV_DEBUG_RESULT, "%d erased packages:\n", cnt);
-	  break;
-	case SOLVER_TRANSACTION_INSTALL:
-	  POOL_DEBUG(SOLV_DEBUG_RESULT, "%d installed packages:\n", cnt);
-	  break;
-	case SOLVER_TRANSACTION_REINSTALLED:
-	  POOL_DEBUG(SOLV_DEBUG_RESULT, "%d reinstalled packages:\n", cnt);
-	  break;
-	case SOLVER_TRANSACTION_DOWNGRADED:
-	  POOL_DEBUG(SOLV_DEBUG_RESULT, "%d downgraded packages:\n", cnt);
-	  break;
-	case SOLVER_TRANSACTION_CHANGED:
-	  POOL_DEBUG(SOLV_DEBUG_RESULT, "%d changed packages:\n", cnt);
-	  break;
-	case SOLVER_TRANSACTION_UPGRADED:
-	  POOL_DEBUG(SOLV_DEBUG_RESULT, "%d upgraded packages:\n", cnt);
-	  break;
-	case SOLVER_TRANSACTION_VENDORCHANGE:
-	  POOL_DEBUG(SOLV_DEBUG_RESULT, "%d vendor changes from '%s' to '%s':\n", cnt, id2strnone(pool, classes.elements[i + 2]), id2strnone(pool, classes.elements[i + 3]));
-	  break;
-	case SOLVER_TRANSACTION_ARCHCHANGE:
-	  POOL_DEBUG(SOLV_DEBUG_RESULT, "%d arch changes from %s to %s:\n", cnt, pool_id2str(pool, classes.elements[i + 2]), pool_id2str(pool, classes.elements[i + 3]));
-	  break;
-	default:
-	  class = SOLVER_TRANSACTION_IGNORE;
-	  break;
-	}
+      switch (class)
+        {
+        case SOLVER_TRANSACTION_ERASE:
+          POOL_DEBUG(SOLV_DEBUG_RESULT, "%d erased packages:\n", cnt);
+          break;
+        case SOLVER_TRANSACTION_INSTALL:
+          POOL_DEBUG(SOLV_DEBUG_RESULT, "%d installed packages:\n", cnt);
+          break;
+        case SOLVER_TRANSACTION_REINSTALLED:
+          POOL_DEBUG(SOLV_DEBUG_RESULT, "%d reinstalled packages:\n", cnt);
+          break;
+        case SOLVER_TRANSACTION_DOWNGRADED:
+          POOL_DEBUG(SOLV_DEBUG_RESULT, "%d downgraded packages:\n", cnt);
+          break;
+        case SOLVER_TRANSACTION_CHANGED:
+          POOL_DEBUG(SOLV_DEBUG_RESULT, "%d changed packages:\n", cnt);
+          break;
+        case SOLVER_TRANSACTION_UPGRADED:
+          POOL_DEBUG(SOLV_DEBUG_RESULT, "%d upgraded packages:\n", cnt);
+          break;
+        case SOLVER_TRANSACTION_VENDORCHANGE:
+          POOL_DEBUG(SOLV_DEBUG_RESULT, "%d vendor changes from '%s' to '%s':\n", cnt, id2strnone(pool, classes.elements[i + 2]), id2strnone(pool, classes.elements[i + 3]));
+          break;
+        case SOLVER_TRANSACTION_ARCHCHANGE:
+          POOL_DEBUG(SOLV_DEBUG_RESULT, "%d arch changes from %s to %s:\n", cnt, pool_id2str(pool, classes.elements[i + 2]), pool_id2str(pool, classes.elements[i + 3]));
+          break;
+        default:
+          class = SOLVER_TRANSACTION_IGNORE;
+          break;
+        }
       if (class == SOLVER_TRANSACTION_IGNORE)
-	continue;
+        continue;
       transaction_classify_pkgs(trans, mode, class, classes.elements[i + 2], classes.elements[i + 3], &pkgs);
       *line = 0;
       linel = 0;
       for (j = 0; j < pkgs.count; j++)
-	{
-	  Id p = pkgs.elements[j];
-	  Solvable *s = pool->solvables + p;
-	  Solvable *s2;
+        {
+          Id p = pkgs.elements[j];
+          Solvable *s = pool->solvables + p;
+          Solvable *s2;
 
-	  switch(class)
-	    {
-	    case SOLVER_TRANSACTION_DOWNGRADED:
-	    case SOLVER_TRANSACTION_UPGRADED:
-	      s2 = pool->solvables + transaction_obs_pkg(trans, p);
-	      POOL_DEBUG(SOLV_DEBUG_RESULT, "  - %s -> %s\n", pool_solvable2str(pool, s), pool_solvable2str(pool, s2));
-	      break;
-	    case SOLVER_TRANSACTION_VENDORCHANGE:
-	    case SOLVER_TRANSACTION_ARCHCHANGE:
-	      n = pool_id2str(pool, s->name);
-	      l = strlen(n);
-	      if (l + linel > sizeof(line) - 3)
-		{
-		  if (*line)
-		    POOL_DEBUG(SOLV_DEBUG_RESULT, "    %s\n", line);
-		  *line = 0;
-		  linel = 0;
-		}
-	      if (l + linel > sizeof(line) - 3)
-	        POOL_DEBUG(SOLV_DEBUG_RESULT, "    %s\n", n);
-	      else
-		{
-		  if (*line)
-		    {
-		      strcpy(line + linel, ", ");
-		      linel += 2;
-		    }
-		  strcpy(line + linel, n);
-		  linel += l;
-		}
-	      break;
-	    default:
-	      POOL_DEBUG(SOLV_DEBUG_RESULT, "  - %s\n", pool_solvable2str(pool, s));
-	      break;
-	    }
-	}
+          switch (class)
+            {
+            case SOLVER_TRANSACTION_DOWNGRADED:
+            case SOLVER_TRANSACTION_UPGRADED:
+              s2 = pool->solvables + transaction_obs_pkg(trans, p);
+              POOL_DEBUG(SOLV_DEBUG_RESULT, "  - %s -> %s\n", pool_solvable2str(pool, s), pool_solvable2str(pool, s2));
+              break;
+            case SOLVER_TRANSACTION_VENDORCHANGE:
+            case SOLVER_TRANSACTION_ARCHCHANGE:
+              n = pool_id2str(pool, s->name);
+              l = strlen(n);
+              if (l + linel > sizeof(line) - 3)
+                {
+                  if (*line)
+                    POOL_DEBUG(SOLV_DEBUG_RESULT, "    %s\n", line);
+                  *line = 0;
+                  linel = 0;
+                }
+              if (l + linel > sizeof(line) - 3)
+                POOL_DEBUG(SOLV_DEBUG_RESULT, "    %s\n", n);
+              else
+                {
+                  if (*line)
+                    {
+                      strcpy(line + linel, ", ");
+                      linel += 2;
+                    }
+                  strcpy(line + linel, n);
+                  linel += l;
+                }
+              break;
+            default:
+              POOL_DEBUG(SOLV_DEBUG_RESULT, "  - %s\n", pool_solvable2str(pool, s));
+              break;
+            }
+        }
       if (*line)
-	POOL_DEBUG(SOLV_DEBUG_RESULT, "    %s\n", line);
+        POOL_DEBUG(SOLV_DEBUG_RESULT, "    %s\n", line);
       POOL_DEBUG(SOLV_DEBUG_RESULT, "\n");
     }
   queue_free(&classes);
@@ -484,28 +482,27 @@ solver_printcompleteprobleminfo(Solver *solv, Id problem)
     {
       probr = q.elements[i];
       if (!(probr >= solv->updaterules && probr < solv->updaterules_end) && !(probr >= solv->jobrules && probr < solv->jobrules_end))
-	{
-	  nobad = 1;
-	  break;
-	}
+        {
+          nobad = 1;
+          break;
+        }
     }
   for (i = 0; i < q.count; i++)
     {
       probr = q.elements[i];
       if (nobad && ((probr >= solv->updaterules && probr < solv->updaterules_end) || (probr >= solv->jobrules && probr < solv->jobrules_end)))
-	continue;
+        continue;
       solver_printproblemruleinfo(solv, probr);
     }
   queue_free(&q);
 }
 
 static int illegals[] = {
-  POLICY_ILLEGAL_DOWNGRADE,
-  POLICY_ILLEGAL_NAMECHANGE,
-  POLICY_ILLEGAL_ARCHCHANGE,
-  POLICY_ILLEGAL_VENDORCHANGE,
-  0
-};
+    POLICY_ILLEGAL_DOWNGRADE,
+    POLICY_ILLEGAL_NAMECHANGE,
+    POLICY_ILLEGAL_ARCHCHANGE,
+    POLICY_ILLEGAL_VENDORCHANGE,
+    0};
 
 void
 solver_printsolution(Solver *solv, Id problem, Id solution)
@@ -517,23 +514,23 @@ solver_printsolution(Solver *solv, Id problem, Id solution)
   while ((element = solver_next_solutionelement(solv, problem, solution, element, &p, &rp)) != 0)
     {
       if (p > 0 && rp > 0)
-	{
-	  /* for replacements we want to know why it was illegal */
-	  Solvable *s = pool->solvables + p, *rs = pool->solvables + rp;
-	  int illegal = policy_is_illegal(solv, s, rs, 0);
-	  if (illegal)
-	    {
-	      int i;
-	      for (i = 0; illegals[i]; i++)
-	        if ((illegal & illegals[i]) != 0)
-		  {
-		    POOL_DEBUG(SOLV_DEBUG_RESULT, "  - allow %s\n", policy_illegal2str(solv, illegals[i], s, rs));
-		    illegal ^= illegals[i];
-		  }
-	      if (!illegal)
-	        continue;
-	    }
-	}
+        {
+          /* for replacements we want to know why it was illegal */
+          Solvable *s = pool->solvables + p, *rs = pool->solvables + rp;
+          int illegal = policy_is_illegal(solv, s, rs, 0);
+          if (illegal)
+            {
+              int i;
+              for (i = 0; illegals[i]; i++)
+                if ((illegal & illegals[i]) != 0)
+                  {
+                    POOL_DEBUG(SOLV_DEBUG_RESULT, "  - allow %s\n", policy_illegal2str(solv, illegals[i], s, rs));
+                    illegal ^= illegals[i];
+                  }
+              if (!illegal)
+                continue;
+            }
+        }
       POOL_DEBUG(SOLV_DEBUG_RESULT, "  - %s\n", solver_solutionelement2str(solv, p, rp));
     }
 }
@@ -562,9 +559,8 @@ solver_printallsolutions(Solver *solv)
       solution = 0;
       while ((solution = solver_next_solution(solv, problem, solution)) != 0)
         {
-	  solver_printsolution(solv, problem, solution);
+          solver_printsolution(solv, problem, solution);
           POOL_DEBUG(SOLV_DEBUG_RESULT, "\n");
         }
     }
 }
-

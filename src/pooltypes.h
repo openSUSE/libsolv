@@ -25,7 +25,7 @@
 #define SOLV_VERSION_8 8
 
 #define SOLV_FLAG_PREFIX_POOL 4
-#define SOLV_FLAG_SIZE_BYTES  8
+#define SOLV_FLAG_SIZE_BYTES 8
 
 struct _Stringpool;
 typedef struct _Stringpool Stringpool;
@@ -34,7 +34,7 @@ struct _Pool;
 typedef struct _Pool Pool;
 
 /* identifier for string values */
-typedef int Id;		/* must be signed!, since negative Id is used in solver rules to denote negation */
+typedef int Id; /* must be signed!, since negative Id is used in solver rules to denote negation */
 
 /* offset value, e.g. used to 'point' into the stringspace */
 typedef unsigned int Offset;

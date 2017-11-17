@@ -6,4 +6,3 @@
  */
 
 extern int repo_add_cudf(Repo *repo, Repo *installedrepo, FILE *fp, Queue *job, int flags);
-

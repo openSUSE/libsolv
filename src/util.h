@@ -43,18 +43,18 @@ extern size_t solv_validutf8(const char *buf);
 extern char *solv_latin1toutf8(const char *buf);
 extern char *solv_replacebadutf8(const char *buf, int replchar);
 
-
-static inline void *solv_extend(void *buf, size_t len, size_t nmemb, size_t size, size_t block)
+static inline void *
+solv_extend(void *buf, size_t len, size_t nmemb, size_t size, size_t block)
 {
   if (nmemb == 1)
     {
       if ((len & block) == 0)
-	buf = solv_extend_realloc(buf, len + 1, size, block);
+        buf = solv_extend_realloc(buf, len + 1, size, block);
     }
   else
     {
       if (((len - 1) | block) != ((len + nmemb - 1) | block))
-	buf = solv_extend_realloc(buf, len + nmemb, size, block);
+        buf = solv_extend_realloc(buf, len + nmemb, size, block);
     }
   return buf;
 }
@@ -67,21 +67,24 @@ static inline void *solv_extend(void *buf, size_t len, size_t nmemb, size_t size
  * size size of each element
  * block block size used to allocate the elements
  */
-static inline void *solv_zextend(void *buf, size_t len, size_t nmemb, size_t size, size_t block)
+static inline void *
+solv_zextend(void *buf, size_t len, size_t nmemb, size_t size, size_t block)
 {
   buf = solv_extend(buf, len, nmemb, size, block);
   memset((char *)buf + len * size, 0, nmemb * size);
   return buf;
 }
 
-static inline void *solv_extend_resize(void *buf, size_t len, size_t size, size_t block)
+static inline void *
+solv_extend_resize(void *buf, size_t len, size_t size, size_t block)
 {
   if (len)
     buf = solv_extend_realloc(buf, len, size, block);
   return buf;
 }
 
-static inline void *solv_calloc_block(size_t len, size_t size, size_t block)
+static inline void *
+solv_calloc_block(size_t len, size_t size, size_t block)
 {
   void *buf;
   if (!len)
@@ -91,7 +94,8 @@ static inline void *solv_calloc_block(size_t len, size_t size, size_t block)
   return buf;
 }
 
-static inline void *solv_memdup(void *buf, size_t len)
+static inline void *
+solv_memdup(void *buf, size_t len)
 {
   void *newbuf;
   if (!buf)
@@ -102,7 +106,8 @@ static inline void *solv_memdup(void *buf, size_t len)
   return newbuf;
 }
 
-static inline void *solv_memdup2(void *buf, size_t num, size_t len)
+static inline void *
+solv_memdup2(void *buf, size_t num, size_t len)
 {
   void *newbuf;
   if (!buf)

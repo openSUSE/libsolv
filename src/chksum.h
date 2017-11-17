@@ -32,13 +32,13 @@ int solv_chksum_cmp(Chksum *chk, Chksum *chk2);
 
 #ifdef LIBSOLV_INTERNAL
 
-#define case_CHKSUM_TYPES \
-    case REPOKEY_TYPE_MD5: \
-    case REPOKEY_TYPE_SHA1: \
-    case REPOKEY_TYPE_SHA224: \
-    case REPOKEY_TYPE_SHA256: \
-    case REPOKEY_TYPE_SHA384: \
-    case REPOKEY_TYPE_SHA512
+#define case_CHKSUM_TYPES   \
+  case REPOKEY_TYPE_MD5:    \
+  case REPOKEY_TYPE_SHA1:   \
+  case REPOKEY_TYPE_SHA224: \
+  case REPOKEY_TYPE_SHA256: \
+  case REPOKEY_TYPE_SHA384: \
+  case REPOKEY_TYPE_SHA512
 
 #endif
 

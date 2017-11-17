@@ -34,17 +34,15 @@
 
 #include <inttypes.h>
 
-
 /*** SHA-256/384/512 Various Length Definitions ***********************/
-#define SHA224_BLOCK_LENGTH		64
-#define SHA224_DIGEST_LENGTH		28
-#define SHA256_BLOCK_LENGTH		64
-#define SHA256_DIGEST_LENGTH		32
-#define SHA384_BLOCK_LENGTH		128
-#define SHA384_DIGEST_LENGTH		48
-#define SHA512_BLOCK_LENGTH		128
-#define SHA512_DIGEST_LENGTH		64
-
+#define SHA224_BLOCK_LENGTH 64
+#define SHA224_DIGEST_LENGTH 28
+#define SHA256_BLOCK_LENGTH 64
+#define SHA256_DIGEST_LENGTH 32
+#define SHA384_BLOCK_LENGTH 128
+#define SHA384_DIGEST_LENGTH 48
+#define SHA512_BLOCK_LENGTH 128
+#define SHA512_DIGEST_LENGTH 64
 
 /*** SHA-256/384/512 Context Structures *******************************/
 /* NOTE: If your architecture does not define either u_intXX_t types or
@@ -52,33 +50,32 @@
  * for your system:
  */
 typedef struct _SHA256_CTX {
-	uint32_t	state[8];
-	uint64_t	bitcount;
-	uint32_t        buffer[SHA256_BLOCK_LENGTH/4];
+  uint32_t state[8];
+  uint64_t bitcount;
+  uint32_t buffer[SHA256_BLOCK_LENGTH / 4];
 } SHA256_CTX;
 typedef struct _SHA512_CTX {
-	uint64_t	state[8];
-	uint64_t	bitcount[2];
-	uint64_t	buffer[SHA512_BLOCK_LENGTH/8];
+  uint64_t state[8];
+  uint64_t bitcount[2];
+  uint64_t buffer[SHA512_BLOCK_LENGTH / 8];
 } SHA512_CTX;
 
 typedef SHA256_CTX SHA224_CTX;
 typedef SHA512_CTX SHA384_CTX;
 
-
 /*** SHA-224/256/384/512 Function Prototypes ******************************/
 void solv_SHA224_Init(SHA224_CTX *);
-void solv_SHA224_Update(SHA224_CTX*, const uint8_t*, size_t);
-void solv_SHA224_Final(uint8_t[SHA224_DIGEST_LENGTH], SHA224_CTX*);
+void solv_SHA224_Update(SHA224_CTX *, const uint8_t *, size_t);
+void solv_SHA224_Final(uint8_t[SHA224_DIGEST_LENGTH], SHA224_CTX *);
 
 void solv_SHA256_Init(SHA256_CTX *);
-void solv_SHA256_Update(SHA256_CTX*, const uint8_t*, size_t);
-void solv_SHA256_Final(uint8_t[SHA256_DIGEST_LENGTH], SHA256_CTX*);
+void solv_SHA256_Update(SHA256_CTX *, const uint8_t *, size_t);
+void solv_SHA256_Final(uint8_t[SHA256_DIGEST_LENGTH], SHA256_CTX *);
 
-void solv_SHA384_Init(SHA384_CTX*);
-void solv_SHA384_Update(SHA384_CTX*, const uint8_t*, size_t);
-void solv_SHA384_Final(uint8_t[SHA384_DIGEST_LENGTH], SHA384_CTX*);
+void solv_SHA384_Init(SHA384_CTX *);
+void solv_SHA384_Update(SHA384_CTX *, const uint8_t *, size_t);
+void solv_SHA384_Final(uint8_t[SHA384_DIGEST_LENGTH], SHA384_CTX *);
 
-void solv_SHA512_Init(SHA512_CTX*);
-void solv_SHA512_Update(SHA512_CTX*, const uint8_t*, size_t);
-void solv_SHA512_Final(uint8_t[SHA512_DIGEST_LENGTH], SHA512_CTX*);
+void solv_SHA512_Init(SHA512_CTX *);
+void solv_SHA512_Update(SHA512_CTX *, const uint8_t *, size_t);
+void solv_SHA512_Final(uint8_t[SHA512_DIGEST_LENGTH], SHA512_CTX *);

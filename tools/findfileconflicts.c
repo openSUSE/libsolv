@@ -18,7 +18,7 @@ iterate_handle(Pool *pool, Id p, void *cbdata)
   Solvable *s = pool->solvables + p;
   Id rpmdbid;
   void *handle;
-  
+
   if (!s->repo->rpmdbid)
     return 0;
   rpmdbid = s->repo->rpmdbid[p - s->repo->start];
@@ -30,7 +30,8 @@ iterate_handle(Pool *pool, Id p, void *cbdata)
   return handle;
 }
 
-int main(int argc, char **argv)
+int
+main(int argc, char **argv)
 {
   Pool *pool;
   Repo *installed;
@@ -40,7 +41,7 @@ int main(int argc, char **argv)
   Queue todo, conflicts;
   void *state = 0;
   char *rootdir = 0;
- 
+
   if (argc == 3 && !strcmp(argv[1], "--root"))
     rootdir = argv[2];
   pool = pool_create();
@@ -56,7 +57,7 @@ int main(int argc, char **argv)
     }
   queue_init(&todo);
   queue_init(&conflicts);
-  FOR_REPO_SOLVABLES(installed, p, s)
+  FOR_REPO_SOLVABLES (installed, p, s)
     queue_push(&todo, p);
   state = rpm_state_create(pool, pool_get_rootdir(pool));
   pool_findfileconflicts(pool, &todo, 0, &conflicts, FINDFILECONFLICTS_USE_SOLVABLEFILELIST | FINDFILECONFLICTS_CHECK_DIRALIASING | FINDFILECONFLICTS_USE_ROOTDIR, &iterate_handle, state);
@@ -80,7 +81,7 @@ int main(int argc, char **argv)
       pool_createwhatprovides(pool);
       pool_setdebuglevel(pool, 0);
       Solver *solv = solver_create(pool);
-      queue_push2(&job, SOLVER_VERIFY|SOLVER_SOLVABLE_ALL, 0);
+      queue_push2(&job, SOLVER_VERIFY | SOLVER_SOLVABLE_ALL, 0);
 #if 0
       solver_set_flag(solv, SOLVER_FLAG_ALLOW_UNINSTALL, 1);
 #endif
@@ -88,11 +89,11 @@ int main(int argc, char **argv)
       if (problemcnt)
         solver_printallsolutions(solv);
       else
-	{
-	  Transaction *trans = solver_create_transaction(solv);
+        {
+          Transaction *trans = solver_create_transaction(solv);
           transaction_print(trans);
           transaction_free(trans);
-	}
+        }
       queue_free(&job);
       solver_free(solv);
     }

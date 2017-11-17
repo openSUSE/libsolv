@@ -38,7 +38,8 @@
 
 /* allows for 32 different vendor classes */
 
-Id pool_vendor2mask(Pool *pool, Id vendor)
+Id
+pool_vendor2mask(Pool *pool, Id vendor)
 {
   const char *vstr;
   int i;
@@ -53,25 +54,25 @@ Id pool_vendor2mask(Pool *pool, Id vendor)
   vstr = pool_id2str(pool, vendor);
   m = 1;
   mask = 0;
-  for (v = pool->vendorclasses; ; v++)
+  for (v = pool->vendorclasses;; v++)
     {
       vs = *v;
-      if (vs == 0)	/* end of block? */
-	{
-	  v++;
-	  if (*v == 0)
-	    break;
-	  if (m == (1 << 31))
-	    break;	/* sorry, out of bits */
-	  m <<= 1;	/* next vendor equivalence class */
-	}
+      if (vs == 0) /* end of block? */
+        {
+          v++;
+          if (*v == 0)
+            break;
+          if (m == (1 << 31))
+            break; /* sorry, out of bits */
+          m <<= 1; /* next vendor equivalence class */
+        }
       if (fnmatch(*vs == '!' ? vs + 1 : vs, vstr, FNM_CASEFOLD) == 0)
-	{
-	  if (*vs != '!')
-	    mask |= m;
-	  while (v[1])	/* forward to next block */
-	    v++;
-	}
+        {
+          if (*vs != '!')
+            mask |= m;
+          while (v[1]) /* forward to next block */
+            v++;
+        }
     }
   queue_push(&pool->vendormap, vendor);
   queue_push(&pool->vendormap, mask);
@@ -87,7 +88,7 @@ pool_setvendorclasses(Pool *pool, const char **vendorclasses)
   if (pool->vendorclasses)
     {
       for (v = pool->vendorclasses; v[0] || v[1]; v++)
-	solv_free((void *)*v);
+        solv_free((void *)*v);
       pool->vendorclasses = solv_free((void *)pool->vendorclasses);
     }
   if (!vendorclasses || !vendorclasses[0])
@@ -115,7 +116,7 @@ pool_addvendorclass(Pool *pool, const char **vendorclass)
   if (pool->vendorclasses)
     {
       for (i = 0; pool->vendorclasses[i] || pool->vendorclasses[i + 1]; i++)
-	;
+        ;
       if (i)
         i++;
     }

@@ -16,8 +16,8 @@ struct solv_xmlparser {
   int unknowncnt;
 
   char *content;
-  int lcontent;		/* current content length */
-  int acontent;		/* allocated content length */
+  int lcontent; /* current content length */
+  int acontent; /* allocated content length */
 
   struct solv_xmlparser_element *elements;
   int nelements;
@@ -40,13 +40,11 @@ solv_xmlparser_find_attr(const char *txt, const char **atts)
 }
 
 extern void solv_xmlparser_init(struct solv_xmlparser *xmlp, struct solv_xmlparser_element *elements, void *userdata,
-    void (*startelement)(struct solv_xmlparser *xmlp, int state, const char *name, const char **atts),
-    void (*endelement)(struct solv_xmlparser *xmlp, int state, char *content),
-    void (*errorhandler)(struct solv_xmlparser *xmlp, const char *errstr, unsigned int line, unsigned int column));
+                                void (*startelement)(struct solv_xmlparser *xmlp, int state, const char *name, const char **atts),
+                                void (*endelement)(struct solv_xmlparser *xmlp, int state, char *content),
+                                void (*errorhandler)(struct solv_xmlparser *xmlp, const char *errstr, unsigned int line, unsigned int column));
 
 extern void solv_xmlparser_free(struct solv_xmlparser *xmlp);
 extern void solv_xmlparser_parse(struct solv_xmlparser *xmlp, FILE *fp);
 unsigned int solv_xmlparser_lineno(struct solv_xmlparser *xmlp);
 char *solv_xmlparser_contentspace(struct solv_xmlparser *xmlp, int l);
-
-

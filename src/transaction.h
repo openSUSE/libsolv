@@ -26,9 +26,9 @@ struct _DUChanges;
 struct _TransactionOrderdata;
 
 typedef struct _Transaction {
-  struct _Pool *pool;		/* back pointer to pool */
+  struct _Pool *pool; /* back pointer to pool */
 
-  Queue steps;			/* the transaction steps */
+  Queue steps; /* the transaction steps */
 
 #ifdef LIBSOLV_INTERNAL
   Queue transaction_info;
@@ -41,56 +41,55 @@ typedef struct _Transaction {
 
 } Transaction;
 
-
 /* step types */
-#define SOLVER_TRANSACTION_IGNORE		0x00
+#define SOLVER_TRANSACTION_IGNORE 0x00
 
-#define SOLVER_TRANSACTION_ERASE		0x10
-#define SOLVER_TRANSACTION_REINSTALLED		0x11
-#define SOLVER_TRANSACTION_DOWNGRADED		0x12
-#define SOLVER_TRANSACTION_CHANGED		0x13
-#define SOLVER_TRANSACTION_UPGRADED		0x14
-#define SOLVER_TRANSACTION_OBSOLETED		0x15
+#define SOLVER_TRANSACTION_ERASE 0x10
+#define SOLVER_TRANSACTION_REINSTALLED 0x11
+#define SOLVER_TRANSACTION_DOWNGRADED 0x12
+#define SOLVER_TRANSACTION_CHANGED 0x13
+#define SOLVER_TRANSACTION_UPGRADED 0x14
+#define SOLVER_TRANSACTION_OBSOLETED 0x15
 
-#define SOLVER_TRANSACTION_INSTALL		0x20
-#define SOLVER_TRANSACTION_REINSTALL		0x21
-#define SOLVER_TRANSACTION_DOWNGRADE		0x22
-#define SOLVER_TRANSACTION_CHANGE		0x23
-#define SOLVER_TRANSACTION_UPGRADE		0x24
-#define SOLVER_TRANSACTION_OBSOLETES		0x25
+#define SOLVER_TRANSACTION_INSTALL 0x20
+#define SOLVER_TRANSACTION_REINSTALL 0x21
+#define SOLVER_TRANSACTION_DOWNGRADE 0x22
+#define SOLVER_TRANSACTION_CHANGE 0x23
+#define SOLVER_TRANSACTION_UPGRADE 0x24
+#define SOLVER_TRANSACTION_OBSOLETES 0x25
 
-#define SOLVER_TRANSACTION_MULTIINSTALL		0x30
-#define SOLVER_TRANSACTION_MULTIREINSTALL	0x31
+#define SOLVER_TRANSACTION_MULTIINSTALL 0x30
+#define SOLVER_TRANSACTION_MULTIREINSTALL 0x31
 
-#define SOLVER_TRANSACTION_MAXTYPE		0x3f
+#define SOLVER_TRANSACTION_MAXTYPE 0x3f
 
 /* modes */
-#define SOLVER_TRANSACTION_SHOW_ACTIVE		(1 << 0)
-#define SOLVER_TRANSACTION_SHOW_ALL		(1 << 1)
-#define SOLVER_TRANSACTION_SHOW_OBSOLETES	(1 << 2)
-#define SOLVER_TRANSACTION_SHOW_MULTIINSTALL	(1 << 3)
-#define SOLVER_TRANSACTION_CHANGE_IS_REINSTALL	(1 << 4)
-#define SOLVER_TRANSACTION_MERGE_VENDORCHANGES	(1 << 5)
-#define SOLVER_TRANSACTION_MERGE_ARCHCHANGES	(1 << 6)
+#define SOLVER_TRANSACTION_SHOW_ACTIVE (1 << 0)
+#define SOLVER_TRANSACTION_SHOW_ALL (1 << 1)
+#define SOLVER_TRANSACTION_SHOW_OBSOLETES (1 << 2)
+#define SOLVER_TRANSACTION_SHOW_MULTIINSTALL (1 << 3)
+#define SOLVER_TRANSACTION_CHANGE_IS_REINSTALL (1 << 4)
+#define SOLVER_TRANSACTION_MERGE_VENDORCHANGES (1 << 5)
+#define SOLVER_TRANSACTION_MERGE_ARCHCHANGES (1 << 6)
 
-#define SOLVER_TRANSACTION_RPM_ONLY		(1 << 7)
+#define SOLVER_TRANSACTION_RPM_ONLY (1 << 7)
 
-#define SOLVER_TRANSACTION_KEEP_PSEUDO		(1 << 8)
+#define SOLVER_TRANSACTION_KEEP_PSEUDO (1 << 8)
 
-#define SOLVER_TRANSACTION_OBSOLETE_IS_UPGRADE  (1 << 9)
+#define SOLVER_TRANSACTION_OBSOLETE_IS_UPGRADE (1 << 9)
 
 /* extra classifications */
-#define SOLVER_TRANSACTION_ARCHCHANGE		0x100
-#define SOLVER_TRANSACTION_VENDORCHANGE		0x101
+#define SOLVER_TRANSACTION_ARCHCHANGE 0x100
+#define SOLVER_TRANSACTION_VENDORCHANGE 0x101
 
 /* order flags */
-#define SOLVER_TRANSACTION_KEEP_ORDERDATA	(1 << 0)
-#define SOLVER_TRANSACTION_KEEP_ORDERCYCLES	(1 << 1)
+#define SOLVER_TRANSACTION_KEEP_ORDERDATA (1 << 0)
+#define SOLVER_TRANSACTION_KEEP_ORDERCYCLES (1 << 1)
 
 /* cycle severities */
-#define SOLVER_ORDERCYCLE_HARMLESS		0
-#define SOLVER_ORDERCYCLE_NORMAL		1
-#define SOLVER_ORDERCYCLE_CRITICAL		2
+#define SOLVER_ORDERCYCLE_HARMLESS 0
+#define SOLVER_ORDERCYCLE_NORMAL 1
+#define SOLVER_ORDERCYCLE_CRITICAL 2
 
 extern Transaction *transaction_create(struct _Pool *pool);
 extern Transaction *transaction_create_decisionq(struct _Pool *pool, Queue *decisionq, Map *multiversionmap);
@@ -99,11 +98,11 @@ extern void transaction_free(Transaction *trans);
 
 /* if p is installed, returns with pkg(s) obsolete p */
 /* if p is not installed, returns with pkg(s) we obsolete */
-extern Id   transaction_obs_pkg(Transaction *trans, Id p);
+extern Id transaction_obs_pkg(Transaction *trans, Id p);
 extern void transaction_all_obs_pkgs(Transaction *trans, Id p, Queue *pkgs);
 
 /* return step type of a transaction element */
-extern Id   transaction_type(Transaction *trans, Id p, int mode);
+extern Id transaction_type(Transaction *trans, Id p, int mode);
 
 /* return sorted collection of all step types */
 /* classify_pkgs can be used to return all packages of a type */
@@ -118,8 +117,6 @@ extern int transaction_installedresult(Transaction *trans, Queue *installedq);
 int transaction_calc_installsizechange(Transaction *trans);
 void transaction_calc_duchanges(Transaction *trans, struct _DUChanges *mps, int nmps);
 
-
-
 /* order a transaction */
 extern void transaction_order(Transaction *trans, int flags);
 
@@ -127,7 +124,7 @@ extern void transaction_order(Transaction *trans, int flags);
  * add pkgs free for installation to queue choices after chosen was
  * installed. start with chosen = 0
  * needs an ordered transaction created with SOLVER_TRANSACTION_KEEP_ORDERDATA */
-extern int  transaction_order_add_choices(Transaction *trans, Id chosen, Queue *choices);
+extern int transaction_order_add_choices(Transaction *trans, Id chosen, Queue *choices);
 /* add obsoleted packages into transaction steps */
 extern void transaction_add_obsoleted(Transaction *trans);
 

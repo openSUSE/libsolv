@@ -34,13 +34,13 @@ sortfunc(const void *ap, const void *bp, void *dp)
     {
       int r = strcmp(pool_id2str(pool, sa->name), pool_id2str(pool, sb->name));
       if (r)
-	return r;
+        return r;
     }
   if (sa->evr != sb->evr)
     {
       int r = pool_evrcmp(pool, sa->evr, sb->evr, EVRCMP_COMPARE);
       if (r)
-	return r;
+        return r;
     }
   return *(Id *)ap - *(Id *)bp;
 }
@@ -113,7 +113,7 @@ main(int argc, char **argv)
           printf("Problem %d:\n", problem);
           solver_printprobleminfo(solv, problem);
           printf("\n");
-	}
+        }
     }
   trans = solver_create_transaction(solv);
   solver_free(solv);
@@ -148,11 +148,10 @@ main(int argc, char **argv)
   if (ofp != stdout)
     {
       if (fclose(ofp))
-	{
-	  perror("fclose");
-	  exit(1);
-	}
+        {
+          perror("fclose");
+          exit(1);
+        }
     }
   exit(0);
 }
-

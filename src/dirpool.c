@@ -88,7 +88,7 @@ dirpool_make_dirtraverse(Dirpool *dp)
   for (parent = 0, i = 0; i < dp->ndirs; i++)
     {
       if (dp->dirs[i] > 0)
-	continue;
+        continue;
       parent = -dp->dirs[i];
       dirtraverse[i] = dirtraverse[parent];
       dirtraverse[parent] = i + 1;
@@ -104,11 +104,11 @@ dirpool_add_dir(Dirpool *dp, Id parent, Id comp, int create)
   if (!dp->ndirs)
     {
       if (!create)
-	return 0;
+        return 0;
       dp->ndirs = 2;
       dp->dirs = solv_extend_resize(dp->dirs, dp->ndirs, sizeof(Id), DIR_BLOCK);
       dp->dirs[0] = 0;
-      dp->dirs[1] = 1;	/* "" */
+      dp->dirs[1] = 1; /* "" */
     }
   if (comp <= 0)
     return 0;
@@ -124,12 +124,12 @@ dirpool_add_dir(Dirpool *dp, Id parent, Id comp, int create)
       /* ds: first component in this block
        * ds-1: parent link */
       for (d = ds--; d < dp->ndirs; d++)
-	{
-	  if (dp->dirs[d] == comp)
-	    return d;
-	  if (dp->dirs[d] <= 0)	/* reached end of this block */
-	    break;
-	}
+        {
+          if (dp->dirs[d] == comp)
+            return d;
+          if (dp->dirs[d] <= 0) /* reached end of this block */
+            break;
+        }
       if (ds)
         ds = dp->dirtraverse[ds];
     }

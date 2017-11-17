@@ -24,15 +24,15 @@ struct repoinfo {
   int incomplete;
 };
 
-#define TYPE_UNKNOWN    0
-#define TYPE_SUSETAGS   1
-#define TYPE_RPMMD      2
-#define TYPE_PLAINDIR   3
-#define TYPE_DEBIAN     4
-#define TYPE_MDK        5
+#define TYPE_UNKNOWN 0
+#define TYPE_SUSETAGS 1
+#define TYPE_RPMMD 2
+#define TYPE_PLAINDIR 3
+#define TYPE_DEBIAN 4
+#define TYPE_MDK 5
 
-#define TYPE_INSTALLED  16
-#define TYPE_CMDLINE    17
+#define TYPE_INSTALLED 16
+#define TYPE_CMDLINE 17
 
 #define METADATA_EXPIRE (60 * 15)
 
@@ -50,4 +50,3 @@ extern void commit_transactionelement(Pool *pool, Id type, Id p, FILE *fp);
 
 extern void add_ext_keys(Repodata *data, Id handle, const char *ext);
 extern int load_stub(Pool *pool, Repodata *data, void *dp);
-

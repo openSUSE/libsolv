@@ -8,10 +8,10 @@
 #include "repo.h"
 #include "chksum.h"
 
-#define ADD_KEYDIR_WITH_DOTFILES	(1 << 8)
-#define ADD_WITH_SUBKEYS		(1 << 9)
-#define ADD_MULTIPLE_PUBKEYS		(1 << 10)
-#define ADD_WITH_KEYSIGNATURES		(1 << 11)
+#define ADD_KEYDIR_WITH_DOTFILES (1 << 8)
+#define ADD_WITH_SUBKEYS (1 << 9)
+#define ADD_MULTIPLE_PUBKEYS (1 << 10)
+#define ADD_WITH_KEYSIGNATURES (1 << 11)
 
 extern int repo_add_rpmdb_pubkeys(Repo *repo, int flags);
 extern Id repo_add_pubkey(Repo *repo, const char *keyfile, int flags);
@@ -35,4 +35,3 @@ Id solvsig_verify(Solvsig *ss, Repo *repo, Chksum *chk);
 Id repo_verify_sigdata(Repo *repo, unsigned char *sigdata, int sigdatal, const char *keyid);
 Id repo_find_pubkey(Repo *repo, const char *keyid);
 void repo_find_all_pubkeys(Repo *repo, const char *keyid, Queue *q);
-

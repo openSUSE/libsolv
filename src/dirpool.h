@@ -7,7 +7,6 @@
 #ifndef LIBSOLV_DIRPOOL_H
 #define LIBSOLV_DIRPOOL_H
 
-
 #include "pooltypes.h"
 #include "util.h"
 
@@ -28,7 +27,8 @@ void dirpool_make_dirtraverse(Dirpool *dp);
 Id dirpool_add_dir(Dirpool *dp, Id parent, Id comp, int create);
 
 /* return the parent directory of child did */
-static inline Id dirpool_parent(Dirpool *dp, Id did)
+static inline Id
+dirpool_parent(Dirpool *dp, Id did)
 {
   if (!did)
     return 0;

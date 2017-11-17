@@ -47,7 +47,7 @@ setutf8string(Repodata *repodata, Id handle, Id tag, const char *str)
 {
   if (str[solv_validutf8(str)])
     {
-      char *ustr = solv_latin1toutf8(str);	/* not utf8, assume latin1 */
+      char *ustr = solv_latin1toutf8(str); /* not utf8, assume latin1 */
       repodata_set_str(repodata, handle, tag, ustr);
       solv_free(ustr);
     }
@@ -61,34 +61,34 @@ r64dec1(char *p, unsigned int *vp, int *eofp)
   int i, x;
   unsigned int v = 0;
 
-  for (i = 0; i < 4; )
+  for (i = 0; i < 4;)
     {
       x = *p++;
       if (!x)
-	return 0;
+        return 0;
       if (x >= 'A' && x <= 'Z')
-	x -= 'A';
+        x -= 'A';
       else if (x >= 'a' && x <= 'z')
-	x -= 'a' - 26;
+        x -= 'a' - 26;
       else if (x >= '0' && x <= '9')
-	x -= '0' - 52;
+        x -= '0' - 52;
       else if (x == '+')
-	x = 62;
+        x = 62;
       else if (x == '/')
-	x = 63;
+        x = 63;
       else if (x == '=')
-	{
-	  x = 0;
-	  if (i == 0)
-	    {
-	      *eofp = 3;
-	      *vp = 0;
-	      return p - 1;
-	    }
-	  *eofp += 1;
-	}
+        {
+          x = 0;
+          if (i == 0)
+            {
+              *eofp = 3;
+              *vp = 0;
+              return p - 1;
+            }
+          *eofp += 1;
+        }
       else
-	continue;
+        continue;
       v = v << 6 | x;
       i++;
     }
@@ -107,7 +107,7 @@ crc24(unsigned char *p, int len)
       crc ^= (*p++) << 16;
       for (i = 0; i < 8; i++)
         if ((crc <<= 1) & 0x1000000)
-	  crc ^= 0x1864cfb;
+          crc ^= 0x1864cfb;
     }
   return crc & 0xffffff;
 }
@@ -129,7 +129,7 @@ unarmor(char *pubkey, unsigned char **pktp, int *pktlp, const char *startstr, co
     {
       pubkey = strchr(pubkey, '\n');
       if (!pubkey)
-	return 0;
+        return 0;
       pubkey++;
     }
   pubkey = strchr(pubkey, '\n');
@@ -139,12 +139,12 @@ unarmor(char *pubkey, unsigned char **pktp, int *pktlp, const char *startstr, co
   for (;;)
     {
       while (*pubkey == ' ' || *pubkey == '\t')
-	pubkey++;
+        pubkey++;
       if (*pubkey == '\n')
-	break;
+        break;
       pubkey = strchr(pubkey, '\n');
       if (!pubkey++)
-	return 0;
+        return 0;
     }
   pubkey++;
   p = strchr(pubkey, '=');
@@ -157,10 +157,10 @@ unarmor(char *pubkey, unsigned char **pktp, int *pktlp, const char *startstr, co
     {
       pubkey = r64dec1(pubkey, &v, &eof);
       if (!pubkey)
-	{
-	  solv_free(buf);
-	  return 0;
-	}
+        {
+          solv_free(buf);
+          return 0;
+        }
       *bp++ = v >> 16;
       *bp++ = v >> 8;
       *bp++ = v;
@@ -193,7 +193,7 @@ unarmor(char *pubkey, unsigned char **pktp, int *pktlp, const char *startstr, co
   return (p ? p + 1 : pubkey + strlen(pubkey)) - pubkeystart;
 }
 
-#define ARMOR_NLAFTER	16
+#define ARMOR_NLAFTER 16
 
 static char *
 armor(unsigned char *pkt, int pktl, const char *startstr, const char *endstr, const char *version)
@@ -210,10 +210,10 @@ armor(unsigned char *pkt, int pktl, const char *startstr, const char *endstr, co
   for (i = -1; pktl > 0; pktl -= 3)
     {
       if (++i == ARMOR_NLAFTER)
-	{
-	  i = 0;
-	  *p++ = '\n';
-	}
+        {
+          i = 0;
+          *p++ = '\n';
+        }
       a = *pkt++;
       b = pktl > 1 ? *pkt++ : 0;
       c = pktl > 2 ? *pkt++ : 0;
@@ -226,8 +226,8 @@ armor(unsigned char *pkt, int pktl, const char *startstr, const char *endstr, co
   *p++ = '=';
   *p++ = bintoasc[v >> 18 & 0x3f];
   *p++ = bintoasc[v >> 12 & 0x3f];
-  *p++ = bintoasc[v >>  6 & 0x3f];
-  *p++ = bintoasc[v       & 0x3f];
+  *p++ = bintoasc[v >> 6 & 0x3f];
+  *p++ = bintoasc[v & 0x3f];
   sprintf(p, "\n%s\n", endstr);
   return str;
 }
@@ -288,14 +288,14 @@ pgpsig_makesigdata(struct pgpsig *sig, unsigned char *p, int l, unsigned char *p
   if ((type >= 0x10 && type <= 0x13))
     {
       if (p[0] != 3)
-	{
-	  b[0] = 0xb4;
-	  b[1] = useridl >> 24;
-	  b[2] = useridl >> 16;
-	  b[3] = useridl >> 8;
-	  b[4] = useridl;
-	  solv_chksum_add(h, b, 5);
-	}
+        {
+          b[0] = 0xb4;
+          b[1] = useridl >> 24;
+          b[2] = useridl >> 16;
+          b[3] = useridl >> 8;
+          b[4] = useridl;
+          solv_chksum_add(h, b, 5);
+        }
       solv_chksum_add(h, userid, useridl);
     }
   /* add trailer */
@@ -344,18 +344,18 @@ parsesubpkglength(unsigned char *q, int ql, int *pktlp)
   else if (x == 255)
     {
       if (ql < 5 || q[0] != 0)
-	return 0;
+        return 0;
       sl = q[1] << 16 | q[2] << 8 | q[3];
       hl = 5;
     }
   else
     {
       if (ql < 2)
-	return 0;
+        return 0;
       sl = ((x - 192) << 8) + q[0] + 192;
       hl = 2;
     }
-  if (!sl || ql < sl + hl)	/* sub pkg tag is included in length, i.e. sl must not be zero */
+  if (!sl || ql < sl + hl) /* sub pkg tag is included in length, i.e. sl must not be zero */
     return 0;
   *pktlp = sl;
   return hl;
@@ -371,7 +371,7 @@ pgpsig_init(struct pgpsig *sig, unsigned char *p, int l)
     {
       /* printf("V3 signature packet\n"); */
       if (l <= 19 || p[1] != 5)
-	return;
+        return;
       sig->type = p[2];
       sig->haveissuer = 1;
       memcpy(sig->issuer, p + 7, 8);
@@ -386,55 +386,55 @@ pgpsig_init(struct pgpsig *sig, unsigned char *p, int l)
 
       /* printf("V4 signature packet\n"); */
       if (l < 6)
-	return;
+        return;
       sig->type = p[1];
       sig->hashalgo = p[3];
       q = p + 4;
       sig->keyexpires = -1;
       for (j = 0; q && j < 2; j++)
-	{
-	  if (q + 2 > p + l)
-	    {
-	      q = 0;
-	      break;
-	    }
-	  ql = q[0] << 8 | q[1];
-	  q += 2;
-	  if (q + ql > p + l)
-	    {
-	      q = 0;
-	      break;
-	    }
-	  while (ql > 0)
-	    {
-	      int sl, hl;
-	      hl = parsesubpkglength(q, ql, &sl);
-	      if (!hl)
-		{
-		  q = 0;
-		  break;
-		}
-	      q += hl;
-	      ql -= hl;
-	      x = q[0] & 127;	/* strip critical bit */
-	      /* printf("%d SIGSUB %d %d\n", j, x, sl); */
-	      if (x == 16 && sl == 9 && !sig->haveissuer)
-		{
-		  sig->haveissuer = 1;
-		  memcpy(sig->issuer, q + 1, 8);
-		}
-	      if (x == 2 && j == 0)
-		sig->created = q[1] << 24 | q[2] << 16 | q[3] << 8 | q[4];
-	      if (x == 3 && j == 0)
-		sig->expires = q[1] << 24 | q[2] << 16 | q[3] << 8 | q[4];
-	      if (x == 9 && j == 0)
-		sig->keyexpires = q[1] << 24 | q[2] << 16 | q[3] << 8 | q[4];
-	      q += sl;
-	      ql -= sl;
-	    }
-	}
+        {
+          if (q + 2 > p + l)
+            {
+              q = 0;
+              break;
+            }
+          ql = q[0] << 8 | q[1];
+          q += 2;
+          if (q + ql > p + l)
+            {
+              q = 0;
+              break;
+            }
+          while (ql > 0)
+            {
+              int sl, hl;
+              hl = parsesubpkglength(q, ql, &sl);
+              if (!hl)
+                {
+                  q = 0;
+                  break;
+                }
+              q += hl;
+              ql -= hl;
+              x = q[0] & 127; /* strip critical bit */
+              /* printf("%d SIGSUB %d %d\n", j, x, sl); */
+              if (x == 16 && sl == 9 && !sig->haveissuer)
+                {
+                  sig->haveissuer = 1;
+                  memcpy(sig->issuer, q + 1, 8);
+                }
+              if (x == 2 && j == 0)
+                sig->created = q[1] << 24 | q[2] << 16 | q[3] << 8 | q[4];
+              if (x == 3 && j == 0)
+                sig->expires = q[1] << 24 | q[2] << 16 | q[3] << 8 | q[4];
+              if (x == 9 && j == 0)
+                sig->keyexpires = q[1] << 24 | q[2] << 16 | q[3] << 8 | q[4];
+              q += sl;
+              ql -= sl;
+            }
+        }
       if (q && q - p + 2 < l)
-	sig->mpioff = q - p + 2;
+        sig->mpioff = q - p + 2;
     }
 }
 
@@ -456,38 +456,38 @@ parsepkgheader(unsigned char *p, int pl, int *tagp, int *pktlp)
     return 0;
   if ((x & 64) == 0)
     {
-      *tagp = (x & 0x3c) >> 2;		/* old format */
+      *tagp = (x & 0x3c) >> 2; /* old format */
       x = 1 << (x & 3);
       if (x > 4 || pl < x || (x == 4 && p[0]))
-	return 0;
+        return 0;
       pl -= x;
       for (l = 0; x--;)
-	l = l << 8 | *p++;
+        l = l << 8 | *p++;
     }
   else
     {
-      *tagp = (x & 0x3f);		/* new format */
+      *tagp = (x & 0x3f); /* new format */
       x = *p++;
       pl--;
       if (x < 192)
-	l = x;
+        l = x;
       else if (x >= 192 && x < 224)
-	{
-	  if (pl <= 0)
-	    return 0;
-	  l = ((x - 192) << 8) + *p++ + 192;
-	  pl--;
-	}
+        {
+          if (pl <= 0)
+            return 0;
+          l = ((x - 192) << 8) + *p++ + 192;
+          pl--;
+        }
       else if (x == 255)
-	{
-	  if (pl <= 4 || p[0] != 0)	/* sanity: p[0] must be zero */
-	    return 0;
-	  l = p[1] << 16 | p[2] << 8 | p[3];
-	  p += 4;
-	  pl -= 4;
-	}
+        {
+          if (pl <= 4 || p[0] != 0) /* sanity: p[0] must be zero */
+            return 0;
+          l = p[1] << 16 | p[2] << 8 | p[3];
+          p += 4;
+          pl -= 4;
+        }
       else
-	return 0;
+        return 0;
     }
   if (l > pl)
     return 0;
@@ -517,230 +517,228 @@ parsepubkey(Solvable *s, Repodata *data, unsigned char *p, int pl, int flags)
   int pubdatal = 0;
 
   *subkeyofstr = 0;
-  for (; ; p += l, pl -= l)
+  for (;; p += l, pl -= l)
     {
       int hl = parsepkgheader(p, pl, &tag, &l);
       if (!hl || (pubkey && (tag == 6 || tag == 14)))
-	{
-	  /* finish old key */
-	  if (kcr)
-	    repodata_set_num(data, s - repo->pool->solvables, SOLVABLE_BUILDTIME, kcr);
-	  if (maxex && maxex != -1)
-	    repodata_set_num(data, s - repo->pool->solvables, PUBKEY_EXPIRES, maxex);
-	  s->name = pool_str2id(s->repo->pool, insubkey ? "gpg-subkey" : "gpg-pubkey", 1);
-	  s->evr = 1;
-	  s->arch = 1;
-	  if (userid && useridl)
-	    {
-	      char *useridstr = solv_malloc(useridl + 1);
-	      memcpy(useridstr, userid, useridl);
-	      useridstr[useridl] = 0;
-	      setutf8string(data, s - repo->pool->solvables, SOLVABLE_SUMMARY, useridstr);
-	      free(useridstr);
-	    }
-	  if (pubdata)
-	    {
-	      char keyidstr[17];
-	      char evr[8 + 1 + 8 + 1];
-	      solv_bin2hex(keyid, 8, keyidstr);
-	      repodata_set_str(data, s - repo->pool->solvables, PUBKEY_KEYID, keyidstr);
-	      /* build rpm-style evr */
-	      strcpy(evr, keyidstr + 8);
-	      sprintf(evr + 8, "-%08x", maxsigcr);
-	      s->evr = pool_str2id(repo->pool, evr, 1);
-	    }
-	  if (insubkey && *subkeyofstr)
-	    repodata_set_str(data, s - repo->pool->solvables, PUBKEY_SUBKEYOF, subkeyofstr);
-	  if (pubdata)		/* set data blob */
-	    repodata_set_binary(data, s - repo->pool->solvables, PUBKEY_DATA, pubdata, pubdatal);
-	  if (!pl)
-	    break;
-	  if (!hl)
-	    {
-	      p = 0;	/* parse error */
-	      break;
-	    }
-	  if (tag == 6 || (tag == 14 && !(flags & ADD_WITH_SUBKEYS)))
-	    break;
-	  if (tag == 14 && pubdata && !insubkey)
-	    solv_bin2hex(keyid, 8, subkeyofstr);
-	  /* create new solvable for subkey */
-	  s = pool_id2solvable(repo->pool, repo_add_solvable(repo));
-	}
+        {
+          /* finish old key */
+          if (kcr)
+            repodata_set_num(data, s - repo->pool->solvables, SOLVABLE_BUILDTIME, kcr);
+          if (maxex && maxex != -1)
+            repodata_set_num(data, s - repo->pool->solvables, PUBKEY_EXPIRES, maxex);
+          s->name = pool_str2id(s->repo->pool, insubkey ? "gpg-subkey" : "gpg-pubkey", 1);
+          s->evr = 1;
+          s->arch = 1;
+          if (userid && useridl)
+            {
+              char *useridstr = solv_malloc(useridl + 1);
+              memcpy(useridstr, userid, useridl);
+              useridstr[useridl] = 0;
+              setutf8string(data, s - repo->pool->solvables, SOLVABLE_SUMMARY, useridstr);
+              free(useridstr);
+            }
+          if (pubdata)
+            {
+              char keyidstr[17];
+              char evr[8 + 1 + 8 + 1];
+              solv_bin2hex(keyid, 8, keyidstr);
+              repodata_set_str(data, s - repo->pool->solvables, PUBKEY_KEYID, keyidstr);
+              /* build rpm-style evr */
+              strcpy(evr, keyidstr + 8);
+              sprintf(evr + 8, "-%08x", maxsigcr);
+              s->evr = pool_str2id(repo->pool, evr, 1);
+            }
+          if (insubkey && *subkeyofstr)
+            repodata_set_str(data, s - repo->pool->solvables, PUBKEY_SUBKEYOF, subkeyofstr);
+          if (pubdata) /* set data blob */
+            repodata_set_binary(data, s - repo->pool->solvables, PUBKEY_DATA, pubdata, pubdatal);
+          if (!pl)
+            break;
+          if (!hl)
+            {
+              p = 0; /* parse error */
+              break;
+            }
+          if (tag == 6 || (tag == 14 && !(flags & ADD_WITH_SUBKEYS)))
+            break;
+          if (tag == 14 && pubdata && !insubkey)
+            solv_bin2hex(keyid, 8, subkeyofstr);
+          /* create new solvable for subkey */
+          s = pool_id2solvable(repo->pool, repo_add_solvable(repo));
+        }
       p += hl;
       pl -= hl;
       if (!pubkey && tag != 6)
-	continue;
-      if (tag == 6 || (tag == 14 && (flags & ADD_WITH_SUBKEYS) != 0))		/* Public-Key Packet */
-	{
-	  if (tag == 6)
-	    {
-	      pubkey = solv_memdup(p, l);
-	      pubkeyl = l;
-	    }
-	  else
-	    insubkey = 1;
-	  pubdata = 0;
-	  pubdatal = 0;
-	  if (p[0] == 3 && l >= 10)
-	    {
-	      unsigned int ex;
-	      Chksum *h;
-	      maxsigcr = kcr = p[1] << 24 | p[2] << 16 | p[3] << 8 | p[4];
-	      ex = 0;
-	      if (p[5] || p[6])
-		{
-		  ex = kcr + 24*3600 * (p[5] << 8 | p[6]);
-		  if (ex > maxex)
-		    maxex = ex;
-		}
-	      memset(keyid, 0, 8);
-	      if (p[7] == 1)	/* RSA */
-		{
-		  int ql, ql2;
-		  unsigned char fp[16];
-		  char fpx[32 + 1];
-		  unsigned char *q;
+        continue;
+      if (tag == 6 || (tag == 14 && (flags & ADD_WITH_SUBKEYS) != 0)) /* Public-Key Packet */
+        {
+          if (tag == 6)
+            {
+              pubkey = solv_memdup(p, l);
+              pubkeyl = l;
+            }
+          else
+            insubkey = 1;
+          pubdata = 0;
+          pubdatal = 0;
+          if (p[0] == 3 && l >= 10)
+            {
+              unsigned int ex;
+              Chksum *h;
+              maxsigcr = kcr = p[1] << 24 | p[2] << 16 | p[3] << 8 | p[4];
+              ex = 0;
+              if (p[5] || p[6])
+                {
+                  ex = kcr + 24 * 3600 * (p[5] << 8 | p[6]);
+                  if (ex > maxex)
+                    maxex = ex;
+                }
+              memset(keyid, 0, 8);
+              if (p[7] == 1) /* RSA */
+                {
+                  int ql, ql2;
+                  unsigned char fp[16];
+                  char fpx[32 + 1];
+                  unsigned char *q;
 
-		  ql = ((p[8] << 8 | p[9]) + 7) / 8;		/* length of public modulus */
-		  if (ql >= 8 && 10 + ql + 2 <= l)
-		    {
-		      memcpy(keyid, p + 10 + ql - 8, 8);	/* keyid is last 64 bits of public modulus */
-		      q = p + 10 + ql;
-		      ql2 = ((q[0] << 8 | q[1]) + 7) / 8;	/* length of encryption exponent */
-		      if (10 + ql + 2 + ql2 <= l)
-			{
-			  /* fingerprint is the md5 over the two MPI bodies */
-			  h = solv_chksum_create(REPOKEY_TYPE_MD5);
-			  solv_chksum_add(h, p + 10, ql);
-			  solv_chksum_add(h, q + 2, ql2);
-			  solv_chksum_free(h, fp);
-			  solv_bin2hex(fp, 16, fpx);
-			  repodata_set_str(data, s - s->repo->pool->solvables, PUBKEY_FINGERPRINT, fpx);
-			}
-		    }
-		  pubdata = p + 7;
-		  pubdatal = l - 7;
-		}
-	    }
-	  else if (p[0] == 4 && l >= 6)
-	    {
-	      Chksum *h;
-	      unsigned char hdr[3];
-	      unsigned char fp[20];
-	      char fpx[40 + 1];
+                  ql = ((p[8] << 8 | p[9]) + 7) / 8; /* length of public modulus */
+                  if (ql >= 8 && 10 + ql + 2 <= l)
+                    {
+                      memcpy(keyid, p + 10 + ql - 8, 8); /* keyid is last 64 bits of public modulus */
+                      q = p + 10 + ql;
+                      ql2 = ((q[0] << 8 | q[1]) + 7) / 8; /* length of encryption exponent */
+                      if (10 + ql + 2 + ql2 <= l)
+                        {
+                          /* fingerprint is the md5 over the two MPI bodies */
+                          h = solv_chksum_create(REPOKEY_TYPE_MD5);
+                          solv_chksum_add(h, p + 10, ql);
+                          solv_chksum_add(h, q + 2, ql2);
+                          solv_chksum_free(h, fp);
+                          solv_bin2hex(fp, 16, fpx);
+                          repodata_set_str(data, s - s->repo->pool->solvables, PUBKEY_FINGERPRINT, fpx);
+                        }
+                    }
+                  pubdata = p + 7;
+                  pubdatal = l - 7;
+                }
+            }
+          else if (p[0] == 4 && l >= 6)
+            {
+              Chksum *h;
+              unsigned char hdr[3];
+              unsigned char fp[20];
+              char fpx[40 + 1];
 
-	      maxsigcr = kcr = p[1] << 24 | p[2] << 16 | p[3] << 8 | p[4];
-	      hdr[0] = 0x99;
-	      hdr[1] = l >> 8;
-	      hdr[2] = l;
-	      /* fingerprint is the sha1 over the packet */
-	      h = solv_chksum_create(REPOKEY_TYPE_SHA1);
-	      solv_chksum_add(h, hdr, 3);
-	      solv_chksum_add(h, p, l);
-	      solv_chksum_free(h, fp);
-	      solv_bin2hex(fp, 20, fpx);
-	      repodata_set_str(data, s - s->repo->pool->solvables, PUBKEY_FINGERPRINT, fpx);
-	      memcpy(keyid, fp + 12, 8);	/* keyid is last 64 bits of fingerprint */
-	      pubdata = p + 5;
-	      pubdatal = l - 5;
-	    }
-	}
-      if (tag == 2)		/* Signature Packet */
-	{
-	  struct pgpsig sig;
-	  Id htype;
-	  if (!pubdata)
-	    continue;
-	  pgpsig_init(&sig, p, l);
-	  if (!sig.haveissuer || !((sig.type >= 0x10 && sig.type <= 0x13) || sig.type == 0x1f))
-	    continue;
-	  if (sig.type >= 0x10 && sig.type <= 0x13 && !userid)
-	    continue;
-	  htype = pgphashalgo2type(sig.hashalgo);
-	  if (htype && sig.mpioff)
-	    {
-	      Chksum *h = solv_chksum_create(htype);
-	      pgpsig_makesigdata(&sig, p, l, pubkey, pubkeyl, userid, useridl, h);
-	      solv_chksum_free(h, 0);
-	    }
-	  if (!memcmp(keyid, sig.issuer, 8))
-	    {
+              maxsigcr = kcr = p[1] << 24 | p[2] << 16 | p[3] << 8 | p[4];
+              hdr[0] = 0x99;
+              hdr[1] = l >> 8;
+              hdr[2] = l;
+              /* fingerprint is the sha1 over the packet */
+              h = solv_chksum_create(REPOKEY_TYPE_SHA1);
+              solv_chksum_add(h, hdr, 3);
+              solv_chksum_add(h, p, l);
+              solv_chksum_free(h, fp);
+              solv_bin2hex(fp, 20, fpx);
+              repodata_set_str(data, s - s->repo->pool->solvables, PUBKEY_FINGERPRINT, fpx);
+              memcpy(keyid, fp + 12, 8); /* keyid is last 64 bits of fingerprint */
+              pubdata = p + 5;
+              pubdatal = l - 5;
+            }
+        }
+      if (tag == 2) /* Signature Packet */
+        {
+          struct pgpsig sig;
+          Id htype;
+          if (!pubdata)
+            continue;
+          pgpsig_init(&sig, p, l);
+          if (!sig.haveissuer || !((sig.type >= 0x10 && sig.type <= 0x13) || sig.type == 0x1f))
+            continue;
+          if (sig.type >= 0x10 && sig.type <= 0x13 && !userid)
+            continue;
+          htype = pgphashalgo2type(sig.hashalgo);
+          if (htype && sig.mpioff)
+            {
+              Chksum *h = solv_chksum_create(htype);
+              pgpsig_makesigdata(&sig, p, l, pubkey, pubkeyl, userid, useridl, h);
+              solv_chksum_free(h, 0);
+            }
+          if (!memcmp(keyid, sig.issuer, 8))
+            {
 #ifdef ENABLE_PGPVRFY
-	      /* found self sig, verify */
-	      if (solv_pgpvrfy(pubdata, pubdatal, sig.sigdata, sig.sigdatal))
+              /* found self sig, verify */
+              if (solv_pgpvrfy(pubdata, pubdatal, sig.sigdata, sig.sigdatal))
 #endif
-		{
-		  if (sig.keyexpires && maxex != -1)
-		    {
-		      if (sig.keyexpires == -1)
-			maxex = -1;
-		      else if (sig.keyexpires + kcr > maxex)
-			maxex = sig.keyexpires + kcr;
-		    }
-		  if (sig.created > maxsigcr)
-		    maxsigcr = sig.created;
-		}
-	    }
-	  else if (flags & ADD_WITH_KEYSIGNATURES)
-	    {
-	      char issuerstr[17];
-	      Id shandle = repodata_new_handle(data);
-	      solv_bin2hex(sig.issuer, 8, issuerstr);
-	      repodata_set_str(data, shandle, SIGNATURE_ISSUER, issuerstr);
-	      if (sig.created)
-	        repodata_set_num(data, shandle, SIGNATURE_TIME, sig.created);
-	      if (sig.expires)
-	        repodata_set_num(data, shandle, SIGNATURE_EXPIRES, sig.created + sig.expires);
-	      if (sig.sigdata)
-	        repodata_set_binary(data, shandle, SIGNATURE_DATA, sig.sigdata, sig.sigdatal);
-	      repodata_add_flexarray(data, s - s->repo->pool->solvables, PUBKEY_SIGNATURES, shandle);
-	    }
-	  solv_free(sig.sigdata);
-	}
-      if (tag == 13 && !insubkey)		/* User ID Packet */
-	{
-	  userid = solv_realloc(userid, l);
-	  if (l)
-	    memcpy(userid, p, l);
-	  useridl = l;
-	}
+                {
+                  if (sig.keyexpires && maxex != -1)
+                    {
+                      if (sig.keyexpires == -1)
+                        maxex = -1;
+                      else if (sig.keyexpires + kcr > maxex)
+                        maxex = sig.keyexpires + kcr;
+                    }
+                  if (sig.created > maxsigcr)
+                    maxsigcr = sig.created;
+                }
+            }
+          else if (flags & ADD_WITH_KEYSIGNATURES)
+            {
+              char issuerstr[17];
+              Id shandle = repodata_new_handle(data);
+              solv_bin2hex(sig.issuer, 8, issuerstr);
+              repodata_set_str(data, shandle, SIGNATURE_ISSUER, issuerstr);
+              if (sig.created)
+                repodata_set_num(data, shandle, SIGNATURE_TIME, sig.created);
+              if (sig.expires)
+                repodata_set_num(data, shandle, SIGNATURE_EXPIRES, sig.created + sig.expires);
+              if (sig.sigdata)
+                repodata_set_binary(data, shandle, SIGNATURE_DATA, sig.sigdata, sig.sigdatal);
+              repodata_add_flexarray(data, s - s->repo->pool->solvables, PUBKEY_SIGNATURES, shandle);
+            }
+          solv_free(sig.sigdata);
+        }
+      if (tag == 13 && !insubkey) /* User ID Packet */
+        {
+          userid = solv_realloc(userid, l);
+          if (l)
+            memcpy(userid, p, l);
+          useridl = l;
+        }
     }
   solv_free(pubkey);
   solv_free(userid);
   return p ? p - pstart : 0;
 }
 
-
 #ifdef ENABLE_RPMDB
 
 /* this is private to rpm, but rpm lacks an interface to retrieve
  * the values. Sigh. */
 struct pgpDigParams_s {
-    const char * userid;
-    const unsigned char * hash;
+  const char *userid;
+  const unsigned char *hash;
 #ifndef HAVE_PGPDIGGETPARAMS
-    const char * params[4];
+  const char *params[4];
 #endif
-    unsigned char tag;
-    unsigned char version;               /*!< version number. */
-    unsigned char time[4];               /*!< time that the key was created. */
-    unsigned char pubkey_algo;           /*!< public key algorithm. */
-    unsigned char hash_algo;
-    unsigned char sigtype;
-    unsigned char hashlen;
-    unsigned char signhash16[2];
-    unsigned char signid[8];
-    unsigned char saved;
+  unsigned char tag;
+  unsigned char version;     /*!< version number. */
+  unsigned char time[4];     /*!< time that the key was created. */
+  unsigned char pubkey_algo; /*!< public key algorithm. */
+  unsigned char hash_algo;
+  unsigned char sigtype;
+  unsigned char hashlen;
+  unsigned char signhash16[2];
+  unsigned char signid[8];
+  unsigned char saved;
 };
 
 #ifndef HAVE_PGPDIGGETPARAMS
 struct pgpDig_s {
-    struct pgpDigParams_s signature;
-    struct pgpDigParams_s pubkey;
+  struct pgpDigParams_s signature;
+  struct pgpDigParams_s pubkey;
 };
 #endif
-
 
 /* only rpm knows how to do the release calculation, we don't dare
  * to recreate all the bugs in libsolv */
@@ -759,7 +757,7 @@ parsepubkey_rpm(Solvable *s, Repodata *data, unsigned char *pkts, int pktsl)
 #else
   dig = pgpDigNew(RPMVSF_DEFAULT, 0);
 #endif
-  (void) pgpPrtPkts(pkts, pktsl, dig, 0);
+  (void)pgpPrtPkts(pkts, pktsl, dig, 0);
 #ifdef HAVE_PGPDIGGETPARAMS
   digpubkey = pgpDigGetParams(dig, PGPTAG_PUBLIC_KEY);
 #else
@@ -775,9 +773,9 @@ parsepubkey_rpm(Solvable *s, Repodata *data, unsigned char *pkts, int pktsl)
       s->evr = pool_str2id(pool, evrbuf, 1);
       repodata_set_str(data, s - s->repo->pool->solvables, PUBKEY_KEYID, keyid);
       if (digpubkey->userid)
-	setutf8string(data, s - s->repo->pool->solvables, SOLVABLE_SUMMARY, digpubkey->userid);
+        setutf8string(data, s - s->repo->pool->solvables, SOLVABLE_SUMMARY, digpubkey->userid);
       if (btime)
-	repodata_set_num(data, s - s->repo->pool->solvables, SOLVABLE_BUILDTIME, btime);
+        repodata_set_num(data, s - s->repo->pool->solvables, SOLVABLE_BUILDTIME, btime);
     }
 #ifndef RPM5
   (void)pgpFreeDig(dig);
@@ -786,7 +784,7 @@ parsepubkey_rpm(Solvable *s, Repodata *data, unsigned char *pkts, int pktsl)
 #endif
 }
 
-#endif	/* ENABLE_RPMDB */
+#endif /* ENABLE_RPMDB */
 
 /* parse an ascii armored pubkey
  * adds multiple pubkeys if ADD_MULTIPLE_PUBKEYS is set */
@@ -806,20 +804,20 @@ pubkey2solvable(Pool *pool, Id p, Repodata *data, char *pubkey, int flags)
   while (pktsl)
     {
       if (tag == 6)
-	{
-	  setutf8string(data, p, SOLVABLE_DESCRIPTION, pubkey);
-	  pl = parsepubkey(pool->solvables + p, data, pkts, pktsl, flags);
+        {
+          setutf8string(data, p, SOLVABLE_DESCRIPTION, pubkey);
+          pl = parsepubkey(pool->solvables + p, data, pkts, pktsl, flags);
 #ifdef ENABLE_RPMDB
-	  parsepubkey_rpm(pool->solvables + p, data, pkts, pktsl);
+          parsepubkey_rpm(pool->solvables + p, data, pkts, pktsl);
 #endif
-	  if (!pl || !(flags & ADD_MULTIPLE_PUBKEYS))
-	    break;
-	}
+          if (!pl || !(flags & ADD_MULTIPLE_PUBKEYS))
+            break;
+        }
       pkts += pl;
       pktsl -= pl;
       hl = parsepkgheader(pkts, pktsl, &tag, &l);
       if (!hl)
-	break;
+        break;
       pl = l + hl;
       if (tag == 6)
         p = repo_add_solvable(pool->solvables[p].repo);
@@ -855,27 +853,27 @@ repo_add_rpmdb_pubkeys(Repo *repo, int flags)
 
       handle = rpm_byrpmdbid(state, q.elements[i]);
       if (!handle)
-	continue;
+        continue;
       str = rpm_query(handle, SOLVABLE_DESCRIPTION);
       if (!str)
-	continue;
+        continue;
       p = repo_add_solvable(repo);
       if (!pubkey2solvable(pool, p, data, str, flags))
-	{
-	  solv_free(str);
-	  repo_free_solvable(repo, p, 1);
-	  continue;
-	}
+        {
+          solv_free(str);
+          repo_free_solvable(repo, p, 1);
+          continue;
+        }
       solv_free(str);
       itime = rpm_query_num(handle, SOLVABLE_INSTALLTIME, 0);
       for (p2 = p; p2 < pool->nsolvables; p2++)
-	{
-	  if (itime)
-	    repodata_set_num(data, p2, SOLVABLE_INSTALLTIME, itime);
-	  if (!repo->rpmdbid)
-	    repo->rpmdbid = repo_sidedata_create(repo, sizeof(Id));
-	  repo->rpmdbid[p2 - repo->start] = q.elements[i];
-	}
+        {
+          if (itime)
+            repodata_set_num(data, p2, SOLVABLE_INSTALLTIME, itime);
+          if (!repo->rpmdbid)
+            repo->rpmdbid = repo_sidedata_create(repo, sizeof(Id));
+          repo->rpmdbid[p2 - repo->start] = q.elements[i];
+        }
     }
   queue_free(&q);
   rpm_state_free(state);
@@ -893,25 +891,25 @@ solv_slurp(FILE *fp, int *lenp)
   char *buf = 0;
   int bufl = 0;
 
-  for (l = 0; ; l += ll)
+  for (l = 0;; l += ll)
     {
       if (bufl - l < 4096)
-	{
-	  bufl += 4096;
-	  buf = solv_realloc(buf, bufl);
-	}
+        {
+          bufl += 4096;
+          buf = solv_realloc(buf, bufl);
+        }
       ll = fread(buf + l, 1, bufl - l, fp);
       if (ll < 0)
-	{
-	  buf = solv_free(buf);
-	  l = 0;
-	  break;
-	}
+        {
+          buf = solv_free(buf);
+          l = 0;
+          break;
+        }
       if (ll == 0)
-	{
-	  buf[l] = 0;	/* always zero-terminate */
-	  break;
-	}
+        {
+          buf[l] = 0; /* always zero-terminate */
+          break;
+        }
     }
   if (lenp)
     *lenp = l;
@@ -1010,14 +1008,14 @@ repo_add_keyring(Repo *repo, FILE *fp, int flags)
       int nl, ubufl;
       bufl = 0;
       for (l = 0; (nl = unarmor((char *)buf + l, &ubuf, &ubufl, "-----BEGIN PGP PUBLIC KEY BLOCK-----", "-----END PGP PUBLIC KEY BLOCK-----")) != 0; l += nl)
-	{
-	  /* found another block. concat. */
-	  nbuf = solv_realloc(nbuf, bufl + ubufl);
-	  if (ubufl)
-	    memcpy(nbuf + bufl, ubuf, ubufl);
+        {
+          /* found another block. concat. */
+          nbuf = solv_realloc(nbuf, bufl + ubufl);
+          if (ubufl)
+            memcpy(nbuf + bufl, ubuf, ubufl);
           bufl += ubufl;
-	  solv_free(ubuf);
-	}
+          solv_free(ubuf);
+        }
       solv_free(buf);
       buf = nbuf;
     }
@@ -1029,22 +1027,22 @@ repo_add_keyring(Repo *repo, FILE *fp, int flags)
       int tag;
       int hl = parsepkgheader(p, bufl, &tag, &pl);
       if (!hl)
-	break;
+        break;
       pl += hl;
       if (tag == 6)
-	{
-	  /* found new pubkey! flush old */
-	  if (pbufl)
-	    {
-	      add_one_pubkey(pool, repo, data, pbuf, pbufl, flags);
-	      pbuf = solv_free(pbuf);
-	      pbufl = 0;
-	    }
-	}
+        {
+          /* found new pubkey! flush old */
+          if (pbufl)
+            {
+              add_one_pubkey(pool, repo, data, pbuf, pbufl, flags);
+              pbuf = solv_free(pbuf);
+              pbufl = 0;
+            }
+        }
       if (tag != 6 && !pbufl)
-	continue;
+        continue;
       if (tag != 6 && tag != 2 && tag != 13 && tag != 14 && tag != 17)
-	continue;
+        continue;
       /* we want that packet. concat. */
       pbuf = solv_realloc(pbuf, pbufl + pl);
       memcpy(pbuf + pbufl, p, pl);
@@ -1079,10 +1077,10 @@ repo_add_keydir(Repo *repo, const char *keydir, const char *suffix, int flags)
       const char *dn = namelist[i]->d_name;
       int l;
       if (*dn == '.' && !(flags & ADD_KEYDIR_WITH_DOTFILES))
-	continue;
+        continue;
       l = strlen(dn);
       if (sl && (l < sl || strcmp(dn + l - sl, suffix) != 0))
-	continue;
+        continue;
       repo_add_pubkey(repo, pool_tmpjoin(pool, rkeydir, "/", dn), flags | REPO_REUSE_REPODATA);
     }
   solv_free(rkeydir);
@@ -1109,17 +1107,17 @@ solvsig_create(FILE *fp)
       /* not a raw sig, check armored */
       unsigned char *nsig;
       if (!unarmor((char *)sig, &nsig, &sigl, "-----BEGIN PGP SIGNATURE-----", "-----END PGP SIGNATURE-----"))
-	{
-	  solv_free(sig);
-	  return 0;
-	}
+        {
+          solv_free(sig);
+          return 0;
+        }
       solv_free(sig);
       sig = nsig;
       if (!is_sig_packet(sig, sigl))
-	{
-	  solv_free(sig);
-	  return 0;
-	}
+        {
+          solv_free(sig);
+          return 0;
+        }
     }
   hl = parsepkgheader(sig, sigl, &tag, &pktl);
   if (!hl || tag != 2 || !pktl)
@@ -1171,12 +1169,12 @@ repo_find_all_pubkeys(Repo *repo, const char *keyid, Queue *q)
   if (!keyid)
     return;
   queue_init(q);
-  FOR_REPO_SOLVABLES(repo, p, s)
+  FOR_REPO_SOLVABLES (repo, p, s)
     {
       const char *kidstr, *evr = pool_id2str(s->repo->pool, s->evr);
 
       if (!evr || strncmp(evr, keyid + 8, 8) != 0)
-       continue;
+        continue;
       kidstr = solvable_lookup_str(s, PUBKEY_KEYID);
       if (kidstr && !strcmp(kidstr, keyid))
         queue_push(q, p);
@@ -1217,9 +1215,9 @@ repo_verify_sigdata(Repo *repo, unsigned char *sigdata, int sigdatal, const char
       int pubdatal;
       const unsigned char *pubdata = repo_lookup_binary(repo, q.elements[i], PUBKEY_DATA, &pubdatal);
       if (pubdata && solv_pgpvrfy(pubdata, pubdatal, sigdata, sigdatal))
-	break;
+        break;
     }
-  p = i < q.count? q.elements[i] : 0;
+  p = i < q.count ? q.elements[i] : 0;
   queue_free(&q);
   return p;
 }
@@ -1245,4 +1243,3 @@ solvsig_verify(Solvsig *ss, Repo *repo, Chksum *chk)
 }
 
 #endif
-

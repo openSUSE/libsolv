@@ -36,21 +36,18 @@
 #include "repo_autopattern.h"
 #endif
 
-
 static void
 usage(int status)
 {
   fprintf(stderr, "\nUsage:\n"
-	  "rpmdb2solv [-n] [-b <basefile>] [-p <productsdir>] [-r <root>]\n"
-	  " -n : No packages, do not read rpmdb, useful to only parse products\n"
-	  " -b <basefile> : Write .solv to <basefile>.solv instead of stdout\n"
-	  " -p <productsdir> : Scan <productsdir> for .prod files, representing installed products\n"
-	  " -r <root> : Prefix rpmdb path and <productsdir> with <root>\n"
-	  " -o <solv> : Write .solv to file instead of stdout\n"
-	 );
+                  "rpmdb2solv [-n] [-b <basefile>] [-p <productsdir>] [-r <root>]\n"
+                  " -n : No packages, do not read rpmdb, useful to only parse products\n"
+                  " -b <basefile> : Write .solv to <basefile>.solv instead of stdout\n"
+                  " -p <productsdir> : Scan <productsdir> for .prod files, representing installed products\n"
+                  " -r <root> : Prefix rpmdb path and <productsdir> with <root>\n"
+                  " -o <solv> : Write .solv to file instead of stdout\n");
   exit(status);
 }
-
 
 int
 main(int argc, char **argv)
@@ -81,13 +78,13 @@ main(int argc, char **argv)
   /*
    * parse arguments
    */
-  
+
   while ((c = getopt(argc, argv, "APhnkxXb:r:p:o:")) >= 0)
     switch (c)
       {
       case 'h':
-	  usage(0);
-	break;
+        usage(0);
+        break;
       case 'r':
         root = optarg;
         break;
@@ -95,28 +92,28 @@ main(int argc, char **argv)
         basefile = optarg;
         break;
       case 'n':
-	nopacks = 1;
-	break;
+        nopacks = 1;
+        break;
       case 'P':
-	percent = 1;
-	break;
+        percent = 1;
+        break;
       case 'p':
 #ifdef ENABLE_SUSEREPO
-	proddir = optarg;
+        proddir = optarg;
 #endif
-	break;
+        break;
       case 'x':
-        break;	/* extrapool no longer supported */
+        break; /* extrapool no longer supported */
       case 'X':
 #ifdef SUSE
-	add_auto = 1;
+        add_auto = 1;
 #endif
-	break;
+        break;
       case 'A':
 #ifdef ENABLE_APPDATA
-	add_appdata = 1;
+        add_appdata = 1;
 #endif
-	break;
+        break;
       case 'o':
         outfile = optarg;
         break;
@@ -127,20 +124,20 @@ main(int argc, char **argv)
         break;
 #endif
       default:
-	usage(1);
+        usage(1);
       }
-  
+
   if (outfile && !freopen(outfile, "w", stdout))
     {
       perror(outfile);
       exit(1);
     }
-    
+
   /*
    * optional arg is old version of rpmdb solv file
    * should make this a real option instead
    */
-  
+
   if (optind < argc)
     refname = argv[optind];
 
@@ -166,19 +163,19 @@ main(int argc, char **argv)
   if (!nopacks)
     {
       if (repo_add_rpmdb_reffp(repo, reffp, REPO_USE_ROOTDIR | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE | (percent ? RPMDB_REPORT_PROGRESS : 0)))
-	{
-	  fprintf(stderr, "rpmdb2solv: %s\n", pool_errstr(pool));
-	  exit(1);
-	}
+        {
+          fprintf(stderr, "rpmdb2solv: %s\n", pool_errstr(pool));
+          exit(1);
+        }
     }
 #ifdef ENABLE_PUBKEY
   if (pubkeys)
     {
       if (repo_add_rpmdb_pubkeys(repo, REPO_USE_ROOTDIR | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE | ADD_WITH_KEYSIGNATURES))
-	{
-	  fprintf(stderr, "rpmdb2solv: %s\n", pool_errstr(pool));
-	  exit(1);
-	}
+        {
+          fprintf(stderr, "rpmdb2solv: %s\n", pool_errstr(pool));
+          exit(1);
+        }
     }
 #endif
 
@@ -186,20 +183,20 @@ main(int argc, char **argv)
   if (proddir && *proddir)
     {
       if (root && *root)
-	{
-	  int rootlen = strlen(root);
-	  if (!strncmp(root, proddir, rootlen))
-	    {
-	      proddir += rootlen;
-	      if (*proddir != '/' && proddir[-1] == '/')
-		proddir--;
-	    }
-	}
+        {
+          int rootlen = strlen(root);
+          if (!strncmp(root, proddir, rootlen))
+            {
+              proddir += rootlen;
+              if (*proddir != '/' && proddir[-1] == '/')
+                proddir--;
+            }
+        }
       if (repo_add_products(repo, proddir, REPO_USE_ROOTDIR | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE))
-	{
-	  fprintf(stderr, "rpmdb2solv: %s\n", pool_errstr(pool));
-	  exit(1);
-	}
+        {
+          fprintf(stderr, "rpmdb2solv: %s\n", pool_errstr(pool));
+          exit(1);
+        }
     }
 #endif
 

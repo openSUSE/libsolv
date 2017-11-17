@@ -9,7 +9,7 @@
  * if <attrname> given, write attributes as '<attrname>.attr'
  */
 
-#define SUSETAGS_EXTEND			(1 << 9)
-#define SUSETAGS_RECORD_SHARES		(1 << 10)
+#define SUSETAGS_EXTEND (1 << 9)
+#define SUSETAGS_RECORD_SHARES (1 << 10)
 
 extern int repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int flags);

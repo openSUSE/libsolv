@@ -4,7 +4,7 @@
  * This program is licensed under the BSD license, read LICENSE.BSD
  * for further information
  */
- 
+
 #ifndef REPO_HAIKU_H
 #define REPO_HAIKU_H
 
@@ -15,7 +15,7 @@ extern "C" {
 #endif
 
 int repo_add_haiku_installed_packages(Repo *repo, const char *rootdir,
-  int flags);
+                                      int flags);
 Id repo_add_haiku_package(Repo *repo, const char *hpkgPath, int flags);
 int repo_add_haiku_packages(Repo *repo, const char *repoName, int flags);
 
@@ -26,7 +26,7 @@ namespace BPackageKit {
 }
 
 Id repo_add_haiku_package_info(Repo *repo,
-  const BPackageKit::BPackageInfo &packageInfo, int flags);
+                               const BPackageKit::BPackageInfo &packageInfo, int flags);
 
 } /* extern "C" */
 

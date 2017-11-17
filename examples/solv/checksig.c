@@ -47,7 +47,7 @@ checksig(Pool *sigpool, FILE *fp, FILE *sigfp)
   if (!gpgdir)
     return 0;
   keysfile = pool_tmpjoin(sigpool, gpgdir, "/keys", 0);
-  if (!(kfp = fopen(keysfile, "w")) )
+  if (!(kfp = fopen(keysfile, "w")))
     {
       cleanupgpg(gpgdir);
       return 0;
@@ -56,14 +56,14 @@ checksig(Pool *sigpool, FILE *fp, FILE *sigfp)
   for (p = 1, s = sigpool->solvables + p; p < sigpool->nsolvables; p++, s++)
     {
       if (!s->repo)
-	continue;
+        continue;
       pubkey = solvable_lookup_str(s, SOLVABLE_DESCRIPTION);
       if (!pubkey || !*pubkey)
-	continue;
+        continue;
       if (fwrite(pubkey, strlen(pubkey), 1, kfp) != 1)
-	break;
-      if (fputc('\n', kfp) == EOF)	/* Just in case... */
-	break;
+        break;
+      if (fputc('\n', kfp) == EOF) /* Just in case... */
+        break;
       nkeys++;
     }
   if (fclose(kfp) || !nkeys || p < sigpool->nsolvables)
@@ -84,8 +84,8 @@ checksig(Pool *sigpool, FILE *fp, FILE *sigfp)
   possigfp = lseek(fileno(sigfp), 0, SEEK_CUR);
   lseek(fileno(sigfp), 0, SEEK_SET);
   snprintf(cmd, sizeof(cmd), "gpgv -q --homedir %s --keyring %s/pubring.gpg /dev/fd/%d /dev/fd/%d >/dev/null 2>&1", gpgdir, gpgdir, fileno(sigfp), fileno(fp));
-  fcntl(fileno(fp), F_SETFD, 0);	/* clear CLOEXEC */
-  fcntl(fileno(sigfp), F_SETFD, 0);	/* clear CLOEXEC */
+  fcntl(fileno(fp), F_SETFD, 0);    /* clear CLOEXEC */
+  fcntl(fileno(sigfp), F_SETFD, 0); /* clear CLOEXEC */
   r = system(cmd);
   lseek(fileno(sigfp), possigfp, SEEK_SET);
   lseek(fileno(fp), posfp, SEEK_SET);
@@ -104,8 +104,8 @@ checksig(Pool *sigpool, FILE *fp, FILE *sigfp)
   int r;
 
   snprintf(cmd, sizeof(cmd), "gpgv -q --keyring /etc/apt/trusted.gpg /dev/fd/%d /dev/fd/%d >/dev/null 2>&1", fileno(sigfp), fileno(fp));
-  fcntl(fileno(fp), F_SETFD, 0);	/* clear CLOEXEC */
-  fcntl(fileno(sigfp), F_SETFD, 0);	/* clear CLOEXEC */
+  fcntl(fileno(fp), F_SETFD, 0);    /* clear CLOEXEC */
+  fcntl(fileno(sigfp), F_SETFD, 0); /* clear CLOEXEC */
   r = system(cmd);
   fcntl(fileno(fp), F_SETFD, FD_CLOEXEC);
   fcntl(fileno(sigfp), F_SETFD, FD_CLOEXEC);

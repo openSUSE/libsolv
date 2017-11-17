@@ -28,7 +28,7 @@
 #include "bitmap.h"
 #include "evr.h"
 
-#define SOLVABLE_BLOCK	255
+#define SOLVABLE_BLOCK 255
 
 #undef LIBSOLV_KNOWNID_H
 #define KNOWNID_INITIALIZE
@@ -44,7 +44,7 @@ pool_create(void)
 
   pool = (Pool *)solv_calloc(1, sizeof(*pool));
 
-  stringpool_init (&pool->ss, initpool_data);
+  stringpool_init(&pool->ss, initpool_data);
 
   /* alloc space for RelDep 0 */
   pool->rels = solv_extend_resize(0, 1, sizeof(Reldep), REL_BLOCK);
@@ -81,7 +81,7 @@ pool_create(void)
   s->arch = pool->noarchid;
   s->evr = ID_EMPTY;
 
-  pool->debugmask = SOLV_DEBUG_RESULT;	/* FIXME */
+  pool->debugmask = SOLV_DEBUG_RESULT; /* FIXME */
 #if defined(FEDORA) || defined(MAGEIA)
   pool->implicitobsoleteusescolors = 1;
 #endif
@@ -94,7 +94,6 @@ pool_create(void)
 #endif
   return pool;
 }
-
 
 /* free all the resources of our pool */
 void
@@ -146,7 +145,7 @@ pool_setdisttype(Pool *pool, int disttype)
 {
 #ifdef MULTI_SEMANTICS
   int olddisttype = pool->disttype;
-  switch(disttype)
+  switch (disttype)
     {
     case DISTTYPE_RPM:
       pool->noarchid = ARCH_NOARCH;
@@ -247,7 +246,6 @@ pool_set_flag(Pool *pool, int flag, int value)
   return old;
 }
 
-
 Id
 pool_add_solvable(Pool *pool)
 {
@@ -281,7 +279,6 @@ pool_free_solvable_block(Pool *pool, Id start, int count, int reuseids)
     }
   memset(pool->solvables + start, 0, sizeof(Solvable) * count);
 }
-
 
 void
 pool_set_installed(Pool *pool, Repo *installed)
@@ -343,22 +340,22 @@ pool_shrink_whatprovides(Pool *pool)
       o = pool->whatprovides[id];
       dp = pool->whatprovidesdata + o;
       if (last)
-	{
-	  lp = last;
-	  while (*dp)	
-	    if (*dp++ != *lp++)
-	      {
-		last = 0;
-	        break;
-	      }
-	  if (last && *lp)
-	    last = 0;
-	  if (last)
-	    {
-	      pool->whatprovides[id] = -lastid;
-	      continue;
-	    }
-	}
+        {
+          lp = last;
+          while (*dp)
+            if (*dp++ != *lp++)
+              {
+                last = 0;
+                break;
+              }
+          if (last && *lp)
+            last = 0;
+          if (last)
+            {
+              pool->whatprovides[id] = -lastid;
+              continue;
+            }
+        }
       last = pool->whatprovidesdata + o;
       lastid = id;
     }
@@ -368,23 +365,23 @@ pool_shrink_whatprovides(Pool *pool)
     {
       o = pool->whatprovides[id];
       if (!o)
-	continue;
+        continue;
       if ((Id)o < 0)
-	{
-	  i = -(Id)o;
-	  if (i >= id)
-	    abort();
-	  pool->whatprovides[id] = pool->whatprovides[i];
-	  continue;
-	}
+        {
+          i = -(Id)o;
+          if (i >= id)
+            abort();
+          pool->whatprovides[id] = pool->whatprovides[i];
+          continue;
+        }
       if (o < 4)
-	continue;
+        continue;
       lp = pool->whatprovidesdata + o;
       if (lp < dp)
-	abort();
+        abort();
       pool->whatprovides[id] = dp - pool->whatprovidesdata;
       while ((*dp++ = *lp++) != 0)
-	;
+        ;
     }
   o = dp - pool->whatprovidesdata;
   POOL_DEBUG(SOLV_DEBUG_STATS, "shrunk whatprovidesdata from %d to %d\n", pool->whatprovidesdataoff, o);
@@ -412,20 +409,19 @@ pool_shrink_whatprovidesaux(Pool *pool)
     {
       Offset o = pool->whatprovidesaux[i];
       if (o < 2)
-	continue;
+        continue;
       op = pool->whatprovidesauxdata + o;
       pool->whatprovidesaux[i] = wp - pool->whatprovidesauxdata;
       if (op < wp)
-	abort();
+        abort();
       while ((id = *op++) != 0)
-	*wp++ = id;
+        *wp++ = id;
     }
   newoff = wp - pool->whatprovidesauxdata;
   pool->whatprovidesauxdata = solv_realloc(pool->whatprovidesauxdata, newoff * sizeof(Id));
   POOL_DEBUG(SOLV_DEBUG_STATS, "shrunk whatprovidesauxdata from %d to %d\n", pool->whatprovidesauxdataoff, newoff);
   pool->whatprovidesauxdataoff = newoff;
 }
-
 
 /*
  * pool_createwhatprovides()
@@ -452,9 +448,9 @@ pool_createwhatprovides(Pool *pool)
   POOL_DEBUG(SOLV_DEBUG_STATS, "number of ids: %d + %d\n", pool->ss.nstrings, pool->nrels);
   POOL_DEBUG(SOLV_DEBUG_STATS, "string memory used: %d K array + %d K data,  rel memory used: %d K array\n", pool->ss.nstrings / (1024 / (int)sizeof(Id)), pool->ss.sstrings / 1024, pool->nrels * (int)sizeof(Reldep) / 1024);
   if (pool->ss.stringhashmask || pool->relhashmask)
-    POOL_DEBUG(SOLV_DEBUG_STATS, "string hash memory: %d K, rel hash memory : %d K\n", (pool->ss.stringhashmask + 1) / (int)(1024/sizeof(Id)), (pool->relhashmask + 1) / (int)(1024/sizeof(Id)));
+    POOL_DEBUG(SOLV_DEBUG_STATS, "string hash memory: %d K, rel hash memory : %d K\n", (pool->ss.stringhashmask + 1) / (int)(1024 / sizeof(Id)), (pool->relhashmask + 1) / (int)(1024 / sizeof(Id)));
 
-  pool_freeidhashes(pool);	/* XXX: should not be here! */
+  pool_freeidhashes(pool); /* XXX: should not be here! */
   pool_freewhatprovides(pool);
   num = pool->ss.nstrings;
   pool->whatprovides = whatprovides = solv_calloc_block(num, sizeof(Offset), WHATPROVIDES_BLOCK);
@@ -466,36 +462,36 @@ pool_createwhatprovides(Pool *pool)
       Id *pp;
       s = pool->solvables + i;
       if (!s->provides || !s->repo || s->repo->disabled)
-	continue;
+        continue;
       /* we always need the installed solvable in the whatprovides data,
          otherwise obsoletes/conflicts on them won't work */
       if (s->repo != installed && !pool_installable(pool, s))
-	continue;
+        continue;
       pp = s->repo->idarraydata + s->provides;
       while ((id = *pp++) != 0)
-	{
-	  while (ISRELDEP(id))
-	    {
-	      Reldep *rd = GETRELDEP(pool, id);
-	      id = rd->name;
-	    }
-	  whatprovides[id]++;	       /* inc count of providers */
-	}
+        {
+          while (ISRELDEP(id))
+            {
+              Reldep *rd = GETRELDEP(pool, id);
+              id = rd->name;
+            }
+          whatprovides[id]++; /* inc count of providers */
+        }
     }
 
-  off = 4;	/* first entry is undef, second is empty list, third is system solvable  */
-  np = 0;			       /* number of names provided */
+  off = 4; /* first entry is undef, second is empty list, third is system solvable  */
+  np = 0;  /* number of names provided */
   for (i = 0, idp = whatprovides; i < num; i++, idp++)
     {
       n = *idp;
-      if (!n)				/* no providers */
-	{
-	  *idp = 1;			/* offset for empty list */
-	  continue;
-	}
-      off += n;				/* make space for all providers */
-      *idp = off++;			/* now idp points to terminating zero */
-      np++;				/* inc # of provider 'slots' for stats */
+      if (!n) /* no providers */
+        {
+          *idp = 1; /* offset for empty list */
+          continue;
+        }
+      off += n;     /* make space for all providers */
+      *idp = off++; /* now idp points to terminating zero */
+      np++;         /* inc # of provider 'slots' for stats */
     }
 
   POOL_DEBUG(SOLV_DEBUG_STATS, "provide ids: %d\n", np);
@@ -527,31 +523,31 @@ pool_createwhatprovides(Pool *pool)
       Id *pp;
       s = pool->solvables + i;
       if (!s->provides || !s->repo || s->repo->disabled)
-	continue;
+        continue;
       if (s->repo != installed && !pool_installable(pool, s))
-	continue;
+        continue;
 
       /* for all provides of this solvable */
       pp = s->repo->idarraydata + s->provides;
       while ((id = *pp++) != 0)
-	{
-	  Id auxid = id;
-	  while (ISRELDEP(id))
-	    {
-	      Reldep *rd = GETRELDEP(pool, id);
-	      id = rd->name;
-	    }
-	  dp = whatprovidesdata + whatprovides[id];   /* offset into whatprovidesdata */
-	  if (*dp != i)		/* don't add same solvable twice */
-	    {
-	      dp[-1] = i;
-	      whatprovides[id]--;
-	    }
-	  else
-	    auxid = 1;
-	  if (whatprovidesauxdata)
-	    whatprovidesauxdata[whatprovides[id]] = auxid;
-	}
+        {
+          Id auxid = id;
+          while (ISRELDEP(id))
+            {
+              Reldep *rd = GETRELDEP(pool, id);
+              id = rd->name;
+            }
+          dp = whatprovidesdata + whatprovides[id]; /* offset into whatprovidesdata */
+          if (*dp != i)                             /* don't add same solvable twice */
+            {
+              dp[-1] = i;
+              whatprovides[id]--;
+            }
+          else
+            auxid = 1;
+          if (whatprovidesauxdata)
+            whatprovidesauxdata[whatprovides[id]] = auxid;
+        }
     }
   if (pool->whatprovidesaux)
     memcpy(pool->whatprovidesaux, pool->whatprovides, num * sizeof(Id));
@@ -561,30 +557,30 @@ pool_createwhatprovides(Pool *pool)
   pool_shrink_whatprovides(pool);
   if (pool->whatprovidesaux)
     pool_shrink_whatprovidesaux(pool);
-  POOL_DEBUG(SOLV_DEBUG_STATS, "whatprovides memory used: %d K id array, %d K data\n", (pool->ss.nstrings + pool->nrels + WHATPROVIDES_BLOCK) / (int)(1024/sizeof(Id)), (pool->whatprovidesdataoff + pool->whatprovidesdataleft) / (int)(1024/sizeof(Id)));
+  POOL_DEBUG(SOLV_DEBUG_STATS, "whatprovides memory used: %d K id array, %d K data\n", (pool->ss.nstrings + pool->nrels + WHATPROVIDES_BLOCK) / (int)(1024 / sizeof(Id)), (pool->whatprovidesdataoff + pool->whatprovidesdataleft) / (int)(1024 / sizeof(Id)));
   if (pool->whatprovidesaux)
-    POOL_DEBUG(SOLV_DEBUG_STATS, "whatprovidesaux memory used: %d K id array, %d K data\n", pool->whatprovidesauxoff / (int)(1024/sizeof(Id)), pool->whatprovidesauxdataoff / (int)(1024/sizeof(Id)));
+    POOL_DEBUG(SOLV_DEBUG_STATS, "whatprovidesaux memory used: %d K id array, %d K data\n", pool->whatprovidesauxoff / (int)(1024 / sizeof(Id)), pool->whatprovidesauxdataoff / (int)(1024 / sizeof(Id)));
 
   queue_empty(&pool->lazywhatprovidesq);
   if ((!pool->addedfileprovides && pool->disttype == DISTTYPE_RPM) || pool->addedfileprovides == 1)
     {
       if (!pool->addedfileprovides)
-	POOL_DEBUG(SOLV_DEBUG_STATS, "WARNING: pool_addfileprovides was not called, this may result in slow operation\n");
+        POOL_DEBUG(SOLV_DEBUG_STATS, "WARNING: pool_addfileprovides was not called, this may result in slow operation\n");
       /* lazyly add file provides */
       for (i = 1; i < num; i++)
-	{
-	  const char *str = pool->ss.stringspace + pool->ss.strings[i];
-	  if (str[0] != '/')
-	    continue;
-	  if (pool->addedfileprovides == 1 && repodata_filelistfilter_matches(0, str))
-	    continue;
-	  /* setup lazy adding, but remember old value */
-	  if (pool->whatprovides[i] > 1)
-	    queue_push2(&pool->lazywhatprovidesq, i, pool->whatprovides[i]);
-	  pool->whatprovides[i] = 0;
-	  if (pool->whatprovidesaux)
-	    pool->whatprovidesaux[i] = 0;	/* sorry */
-	}
+        {
+          const char *str = pool->ss.stringspace + pool->ss.strings[i];
+          if (str[0] != '/')
+            continue;
+          if (pool->addedfileprovides == 1 && repodata_filelistfilter_matches(0, str))
+            continue;
+          /* setup lazy adding, but remember old value */
+          if (pool->whatprovides[i] > 1)
+            queue_push2(&pool->lazywhatprovidesq, i, pool->whatprovides[i]);
+          pool->whatprovides[i] = 0;
+          if (pool->whatprovidesaux)
+            pool->whatprovidesaux[i] = 0; /* sorry */
+        }
       POOL_DEBUG(SOLV_DEBUG_STATS, "lazywhatprovidesq size: %d entries\n", pool->lazywhatprovidesq.count / 2);
     }
 
@@ -610,7 +606,6 @@ pool_freewhatprovides(Pool *pool)
   pool->whatprovidesauxdataoff = 0;
 }
 
-
 /******************************************************************************/
 
 /*
@@ -627,7 +622,7 @@ pool_ids2whatprovides(Pool *pool, Id *ids, int count)
 {
   Offset off;
 
-  if (count == 0)		       /* queue empty -> 1 */
+  if (count == 0) /* queue empty -> 1 */
     return 1;
   if (count == 1 && *ids == SYSTEMSOLVABLE)
     return 2;
@@ -656,22 +651,21 @@ Id
 pool_queuetowhatprovides(Pool *pool, Queue *q)
 {
   int count = q->count;
-  if (count == 0)		       /* queue empty -> 1 */
+  if (count == 0) /* queue empty -> 1 */
     return 1;
   if (count == 1 && q->elements[0] == SYSTEMSOLVABLE)
     return 2;
   return pool_ids2whatprovides(pool, q->elements, count);
 }
 
-
-/*************************************************************************/
+  /*************************************************************************/
 
 #if defined(MULTI_SEMANTICS)
-# define EVRCMP_DEPCMP (pool->disttype == DISTTYPE_DEB ? EVRCMP_COMPARE : EVRCMP_MATCH_RELEASE)
+#define EVRCMP_DEPCMP (pool->disttype == DISTTYPE_DEB ? EVRCMP_COMPARE : EVRCMP_MATCH_RELEASE)
 #elif defined(DEBIAN)
-# define EVRCMP_DEPCMP EVRCMP_COMPARE
+#define EVRCMP_DEPCMP EVRCMP_COMPARE
 #else
-# define EVRCMP_DEPCMP EVRCMP_MATCH_RELEASE
+#define EVRCMP_DEPCMP EVRCMP_MATCH_RELEASE
 #endif
 
 /* check if a package's nevr matches a dependency */
@@ -688,35 +682,35 @@ pool_match_nevr_rel(Pool *pool, Solvable *s, Id d)
   if (flags > 7)
     {
       switch (flags)
-	{
-	case REL_ARCH:
-	  if (s->arch != evr)
-	    {
-	      if (evr != ARCH_SRC || s->arch != ARCH_NOSRC)
-	        return 0;
-	    }
-	  return pool_match_nevr(pool, s, name);
-	case REL_OR:
-	  if (pool_match_nevr(pool, s, name))
-	    return 1;
-	  return pool_match_nevr(pool, s, evr);
-	case REL_AND:
-	case REL_WITH:
-	  if (!pool_match_nevr(pool, s, name))
-	    return 0;
-	  return pool_match_nevr(pool, s, evr);
-	case REL_WITHOUT:
-	  if (!pool_match_nevr(pool, s, name))
-	    return 0;
-	  return !pool_match_nevr(pool, s, evr);
-	case REL_MULTIARCH:
-	  if (evr != ARCH_ANY)
-	    return 0;
-	  /* XXX : need to check for Multi-Arch: allowed! */
-	  return pool_match_nevr(pool, s, name);
-	default:
-	  return 0;
-	}
+        {
+        case REL_ARCH:
+          if (s->arch != evr)
+            {
+              if (evr != ARCH_SRC || s->arch != ARCH_NOSRC)
+                return 0;
+            }
+          return pool_match_nevr(pool, s, name);
+        case REL_OR:
+          if (pool_match_nevr(pool, s, name))
+            return 1;
+          return pool_match_nevr(pool, s, evr);
+        case REL_AND:
+        case REL_WITH:
+          if (!pool_match_nevr(pool, s, name))
+            return 0;
+          return pool_match_nevr(pool, s, evr);
+        case REL_WITHOUT:
+          if (!pool_match_nevr(pool, s, name))
+            return 0;
+          return !pool_match_nevr(pool, s, evr);
+        case REL_MULTIARCH:
+          if (evr != ARCH_ANY)
+            return 0;
+          /* XXX : need to check for Multi-Arch: allowed! */
+          return pool_match_nevr(pool, s, name);
+        default:
+          return 0;
+        }
     }
   if (!pool_match_nevr(pool, s, name))
     return 0;
@@ -756,9 +750,9 @@ pool_match_flags_evr(Pool *pool, int pflags, Id pevr, int flags, int evr)
   if (!pflags || !flags || pflags >= 8 || flags >= 8)
     return 0;
   if (flags == 7 || pflags == 7)
-    return 1;		/* rel provides every version */
+    return 1; /* rel provides every version */
   if ((pflags & flags & (REL_LT | REL_GT)) != 0)
-    return 1;		/* both rels show in the same direction */
+    return 1; /* both rels show in the same direction */
   if (pevr == evr)
     return (flags & pflags & REL_EQ) ? 1 : 0;
 #if defined(HAIKU) || defined(MULTI_SEMANTICS)
@@ -766,7 +760,7 @@ pool_match_flags_evr(Pool *pool, int pflags, Id pevr, int flags, int evr)
     {
       Reldep *rd = GETRELDEP(pool, pevr);
       if (rd->flags == REL_COMPAT)
-	return pool_match_flags_evr_rel_compat(pool, rd, flags, evr);
+        return pool_match_flags_evr_rel_compat(pool, rd, flags, evr);
     }
 #endif
   switch (pool_evrcmp(pool, pevr, evr, EVRCMP_DEPCMP))
@@ -823,43 +817,43 @@ pool_match_dep(Pool *pool, Id d1, Id d2)
       /* we use potentially matches for complex deps */
       rd1 = GETRELDEP(pool, d1);
       if (rd1->flags == REL_AND || rd1->flags == REL_OR || rd1->flags == REL_WITH || rd1->flags == REL_WITHOUT || rd1->flags == REL_COND || rd1->flags == REL_UNLESS)
-	{
-	  if (pool_match_dep(pool, rd1->name, d2))
-	    return 1;
-	  if ((rd1->flags == REL_COND || rd1->flags == REL_UNLESS) && ISRELDEP(rd1->evr))
-	    {
-	      rd1 = GETRELDEP(pool, rd1->evr);
-	      if (rd1->flags != REL_ELSE)
-		return 0;
-	    }
-	  if (rd1->flags != REL_COND && rd1->flags != REL_UNLESS && rd1->flags != REL_WITHOUT && pool_match_dep(pool, rd1->evr, d2))
-	    return 1;
-	  return 0;
-	}
+        {
+          if (pool_match_dep(pool, rd1->name, d2))
+            return 1;
+          if ((rd1->flags == REL_COND || rd1->flags == REL_UNLESS) && ISRELDEP(rd1->evr))
+            {
+              rd1 = GETRELDEP(pool, rd1->evr);
+              if (rd1->flags != REL_ELSE)
+                return 0;
+            }
+          if (rd1->flags != REL_COND && rd1->flags != REL_UNLESS && rd1->flags != REL_WITHOUT && pool_match_dep(pool, rd1->evr, d2))
+            return 1;
+          return 0;
+        }
     }
   if (ISRELDEP(d2))
     {
       /* we use potentially matches for complex deps */
       rd2 = GETRELDEP(pool, d2);
       if (rd2->flags == REL_AND || rd2->flags == REL_OR || rd2->flags == REL_WITH || rd2->flags == REL_WITHOUT || rd2->flags == REL_COND || rd2->flags == REL_UNLESS)
-	{
-	  if (pool_match_dep(pool, d1, rd2->name))
-	    return 1;
-	  if ((rd2->flags == REL_COND || rd2->flags == REL_UNLESS) && ISRELDEP(rd2->evr))
-	    {
-	      rd2 = GETRELDEP(pool, rd2->evr);
-	      if (rd2->flags != REL_ELSE)
-		return 0;
-	    }
-	  if (rd2->flags != REL_COND && rd2->flags != REL_UNLESS && rd2->flags != REL_WITHOUT && pool_match_dep(pool, d1, rd2->evr))
-	    return 1;
-	  return 0;
-	}
+        {
+          if (pool_match_dep(pool, d1, rd2->name))
+            return 1;
+          if ((rd2->flags == REL_COND || rd2->flags == REL_UNLESS) && ISRELDEP(rd2->evr))
+            {
+              rd2 = GETRELDEP(pool, rd2->evr);
+              if (rd2->flags != REL_ELSE)
+                return 0;
+            }
+          if (rd2->flags != REL_COND && rd2->flags != REL_UNLESS && rd2->flags != REL_WITHOUT && pool_match_dep(pool, d1, rd2->evr))
+            return 1;
+          return 0;
+        }
     }
   if (!ISRELDEP(d1))
     {
       if (!ISRELDEP(d2))
-	return 0;	/* cannot match as d1 != d2 */
+        return 0; /* cannot match as d1 != d2 */
       rd2 = GETRELDEP(pool, d2);
       return pool_match_dep(pool, d1, rd2->name);
     }
@@ -889,11 +883,11 @@ pool_searchlazywhatprovidesq(Pool *pool, Id d)
     {
       int mid = (start + end) / 2 & ~1;
       if (elements[mid] == d)
-	return elements[mid + 1];
+        return elements[mid + 1];
       if (elements[mid] < d)
-	start = mid + 2;
+        start = mid + 2;
       else
-	end = mid;
+        end = mid;
     }
   for (; start < end; start += 2)
     if (elements[start] == d)
@@ -920,14 +914,14 @@ pool_addstdproviders(Pool *pool, Id d)
       pool->whatprovides[d] = 1;
       return 1;
     }
-  str =  pool->ss.stringspace + pool->ss.strings[d];
+  str = pool->ss.stringspace + pool->ss.strings[d];
   if (*str != '/')
     {
       pool->whatprovides[d] = 1;
       return 1;
     }
-  queue_init_buffer(&q, qbuf, sizeof(qbuf)/sizeof(*qbuf));
-  dataiterator_init(&di, pool, 0, 0, SOLVABLE_FILELIST, str, SEARCH_STRING|SEARCH_FILES|SEARCH_COMPLETE_FILELIST);
+  queue_init_buffer(&q, qbuf, sizeof(qbuf) / sizeof(*qbuf));
+  dataiterator_init(&di, pool, 0, 0, SOLVABLE_FILELIST, str, SEARCH_STRING | SEARCH_FILES | SEARCH_COMPLETE_FILELIST);
   for (; dataiterator_step(&di); dataiterator_skip_solvable(&di))
     {
       Solvable *s = pool->solvables + di.solvid;
@@ -935,9 +929,9 @@ pool_addstdproviders(Pool *pool, Id d)
        * OTOH this is only needed for rel deps that filter the provides,
        * and those should not use filelist entries */
       if (s->repo->disabled)
-	continue;
+        continue;
       if (s->repo != pool->installed && !pool_installable(pool, s))
-	continue;
+        continue;
       queue_push(&q, di.solvid);
     }
   dataiterator_free(&di);
@@ -947,36 +941,35 @@ pool_addstdproviders(Pool *pool, Id d)
   else
     {
       if (oldoffset)
-	{
-	  Id *oo = pool->whatprovidesdata + oldoffset;
-	  int i;
-	  /* unify both queues. easy, as we know both are sorted */
-	  for (i = 0; i < q.count; i++)
-	    {
-	      if (*oo > q.elements[i])
-		continue;
-	      if (*oo < q.elements[i])
-		queue_insert(&q, i, *oo);
-	      oo++;
-	      if (!*oo)
-		break;
-	    }
-	  while (*oo)
-	    queue_push(&q, *oo++);
-	  if (q.count == oo - (pool->whatprovidesdata + oldoffset))
-	    {
-	      /* end result has same size as oldoffset -> no new entries */
-	      queue_free(&q);
-	      pool->whatprovides[d] = oldoffset;
-	      return oldoffset;
-	    }
-	}
+        {
+          Id *oo = pool->whatprovidesdata + oldoffset;
+          int i;
+          /* unify both queues. easy, as we know both are sorted */
+          for (i = 0; i < q.count; i++)
+            {
+              if (*oo > q.elements[i])
+                continue;
+              if (*oo < q.elements[i])
+                queue_insert(&q, i, *oo);
+              oo++;
+              if (!*oo)
+                break;
+            }
+          while (*oo)
+            queue_push(&q, *oo++);
+          if (q.count == oo - (pool->whatprovidesdata + oldoffset))
+            {
+              /* end result has same size as oldoffset -> no new entries */
+              queue_free(&q);
+              pool->whatprovides[d] = oldoffset;
+              return oldoffset;
+            }
+        }
       pool->whatprovides[d] = pool_queuetowhatprovides(pool, &q);
     }
   queue_free(&q);
   return pool->whatprovides[d];
 }
-
 
 static inline int
 pool_is_kind(Pool *pool, Id name, Id kind)
@@ -994,9 +987,9 @@ pool_is_kind(Pool *pool, Id name, Id kind)
   else
     {
       if (*n == ':')
-	return 1;
-      while(*n >= 'a' && *n <= 'z')
-	n++;
+        return 1;
+      while (*n >= 'a' && *n <= 'z')
+        n++;
       return *n == ':' ? 0 : 1;
     }
 }
@@ -1017,14 +1010,14 @@ rpmeqmagic(Pool *pool, Id evr)
   if (*s == '0')
     {
       while (*s == '0' && s[1] >= '0' && s[1] <= '9')
-	s++;
+        s++;
       /* ignore epoch 0 */
       if (*s == '0' && s[1] == ':')
-	{
-	  s += 2;
-	  while (*s == '0' && s[1] >= '0' && s[1] <= '9')
-	    s++;
-	}
+        {
+          s += 2;
+          while (*s == '0' && s[1] >= '0' && s[1] <= '9')
+            s++;
+        }
     }
   if (*s >= '0' && *s <= '9')
     {
@@ -1087,7 +1080,7 @@ pool_addrelproviders(Pool *pool, Id d)
   evr = rd->evr;
   flags = rd->flags;
   d = GETRELID(d);
-  queue_init_buffer(&plist, buf, sizeof(buf)/sizeof(*buf));
+  queue_init_buffer(&plist, buf, sizeof(buf) / sizeof(*buf));
 
   if (flags >= 8)
     {
@@ -1096,201 +1089,201 @@ pool_addrelproviders(Pool *pool, Id d)
       Id *pp2, *pp3;
 
       switch (flags)
-	{
-	case REL_WITH:
-	  wp = pool_whatprovides(pool, name);
-	  pp2 = pool_whatprovides_ptr(pool, evr);
-	  pp = pool->whatprovidesdata + wp;
-	  while ((p = *pp++) != 0)
-	    {
-	      for (pp3 = pp2; *pp3; pp3++)
-		if (*pp3 == p)
-		  break;
-	      if (*pp3)
-		queue_push(&plist, p);	/* found it */
-	      else
-		wp = 0;
-	    }
-	  break;
-	case REL_WITHOUT:
-	  wp = pool_whatprovides(pool, name);
-	  pp2 = pool_whatprovides_ptr(pool, evr);
-	  pp = pool->whatprovidesdata + wp;
-	  while ((p = *pp++) != 0)
-	    {
-	      for (pp3 = pp2; *pp3; pp3++)
-		if (*pp3 == p)
-		  break;
-	      if (!*pp3)
-		queue_push(&plist, p);	/* use it */
-	      else
-		wp = 0;
-	    }
-	  break;
-	case REL_AND:
-	case REL_OR:
-	case REL_COND:
-	case REL_UNLESS:
-	  if (flags == REL_COND || flags == REL_UNLESS)
-	    {
-	      if (ISRELDEP(evr))
-		{
-		  Reldep *rd2 = GETRELDEP(pool, evr);
-		  evr = rd2->flags == REL_ELSE ? rd2->evr : 0;
-		}
-	      else
-	        evr = 0;	/* assume cond is true */
-	    }
-	  wp = pool_whatprovides(pool, name);
-	  if (!pool->whatprovidesdata[wp])
-	    wp = evr ? pool_whatprovides(pool, evr) : 1;
-	  else if (evr)
-	    {
-	      /* sorted merge */
-	      pp2 = pool_whatprovides_ptr(pool, evr);
-	      pp = pool->whatprovidesdata + wp;
-	      while (*pp && *pp2)
-		{
-		  if (*pp < *pp2)
-		    queue_push(&plist, *pp++);
-		  else
-		    {
-		      if (*pp == *pp2)
-			pp++;
-		      queue_push(&plist, *pp2++);
-		    }
-		}
-	      while (*pp)
-	        queue_push(&plist, *pp++);
-	      while (*pp2)
-	        queue_push(&plist, *pp2++);
-	      /* if the number of elements did not change, we can reuse wp */
-	      if (pp - (pool->whatprovidesdata + wp) != plist.count)
-		wp = 0;
-	    }
-	  break;
+        {
+        case REL_WITH:
+          wp = pool_whatprovides(pool, name);
+          pp2 = pool_whatprovides_ptr(pool, evr);
+          pp = pool->whatprovidesdata + wp;
+          while ((p = *pp++) != 0)
+            {
+              for (pp3 = pp2; *pp3; pp3++)
+                if (*pp3 == p)
+                  break;
+              if (*pp3)
+                queue_push(&plist, p); /* found it */
+              else
+                wp = 0;
+            }
+          break;
+        case REL_WITHOUT:
+          wp = pool_whatprovides(pool, name);
+          pp2 = pool_whatprovides_ptr(pool, evr);
+          pp = pool->whatprovidesdata + wp;
+          while ((p = *pp++) != 0)
+            {
+              for (pp3 = pp2; *pp3; pp3++)
+                if (*pp3 == p)
+                  break;
+              if (!*pp3)
+                queue_push(&plist, p); /* use it */
+              else
+                wp = 0;
+            }
+          break;
+        case REL_AND:
+        case REL_OR:
+        case REL_COND:
+        case REL_UNLESS:
+          if (flags == REL_COND || flags == REL_UNLESS)
+            {
+              if (ISRELDEP(evr))
+                {
+                  Reldep *rd2 = GETRELDEP(pool, evr);
+                  evr = rd2->flags == REL_ELSE ? rd2->evr : 0;
+                }
+              else
+                evr = 0; /* assume cond is true */
+            }
+          wp = pool_whatprovides(pool, name);
+          if (!pool->whatprovidesdata[wp])
+            wp = evr ? pool_whatprovides(pool, evr) : 1;
+          else if (evr)
+            {
+              /* sorted merge */
+              pp2 = pool_whatprovides_ptr(pool, evr);
+              pp = pool->whatprovidesdata + wp;
+              while (*pp && *pp2)
+                {
+                  if (*pp < *pp2)
+                    queue_push(&plist, *pp++);
+                  else
+                    {
+                      if (*pp == *pp2)
+                        pp++;
+                      queue_push(&plist, *pp2++);
+                    }
+                }
+              while (*pp)
+                queue_push(&plist, *pp++);
+              while (*pp2)
+                queue_push(&plist, *pp2++);
+              /* if the number of elements did not change, we can reuse wp */
+              if (pp - (pool->whatprovidesdata + wp) != plist.count)
+                wp = 0;
+            }
+          break;
 
-	case REL_NAMESPACE:
-	  if (name == NAMESPACE_OTHERPROVIDERS)
-	    {
-	      wp = pool_whatprovides(pool, evr);
-	      break;
-	    }
-	  if (pool->nscallback)
-	    {
-	      /* ask callback which packages provide the dependency
+        case REL_NAMESPACE:
+          if (name == NAMESPACE_OTHERPROVIDERS)
+            {
+              wp = pool_whatprovides(pool, evr);
+              break;
+            }
+          if (pool->nscallback)
+            {
+              /* ask callback which packages provide the dependency
 	       * 0:  none
 	       * 1:  the system (aka SYSTEMSOLVABLE)
 	       * >1: set of packages, stored as offset on whatprovidesdata
 	       */
-	      p = pool->nscallback(pool, pool->nscallbackdata, name, evr);
-	      if (p > 1)
-		wp = p;
-	      if (p == 1)
-		queue_push(&plist, SYSTEMSOLVABLE);
-	    }
-	  break;
-	case REL_ARCH:
-	  /* small hack: make it possible to match <pkg>.src
+              p = pool->nscallback(pool, pool->nscallbackdata, name, evr);
+              if (p > 1)
+                wp = p;
+              if (p == 1)
+                queue_push(&plist, SYSTEMSOLVABLE);
+            }
+          break;
+        case REL_ARCH:
+          /* small hack: make it possible to match <pkg>.src
 	   * we have to iterate over the solvables as src packages do not
 	   * provide anything, thus they are not indexed in our
 	   * whatprovides hash */
-	  if (evr == ARCH_SRC || evr == ARCH_NOSRC)
-	    {
-	      Solvable *s;
-	      for (p = 1, s = pool->solvables + p; p < pool->nsolvables; p++, s++)
-		{
-		  if (!s->repo)
-		    continue;
-		  if (s->arch != evr && s->arch != ARCH_NOSRC)
-		    continue;
-		  if (pool_disabled_solvable(pool, s))
-		    continue;
-		  if (!name || pool_match_nevr(pool, s, name))
-		    queue_push(&plist, p);
-		}
-	      break;
-	    }
-	  if (!name)
-	    {
-	      FOR_POOL_SOLVABLES(p)
-		{
-		  Solvable *s = pool->solvables + p;
-		  if (s->repo != pool->installed && !pool_installable(pool, s))
-		    continue;
-		  if (s->arch == evr)
-		    queue_push(&plist, p);
-		}
-	      break;
-	    }
-	  wp = pool_whatprovides(pool, name);
-	  pp = pool->whatprovidesdata + wp;
-	  while ((p = *pp++) != 0)
-	    {
-	      Solvable *s = pool->solvables + p;
-	      if (s->arch == evr)
-		queue_push(&plist, p);
-	      else
-		wp = 0;
-	    }
-	  break;
-	case REL_MULTIARCH:
-	  if (evr != ARCH_ANY)
-	    break;
-	  /* XXX : need to check for Multi-Arch: allowed! */
-	  wp = pool_whatprovides(pool, name);
-	  break;
-	case REL_KIND:
-	  /* package kind filtering */
-	  if (!name)
-	    {
-	      FOR_POOL_SOLVABLES(p)
-		{
-		  Solvable *s = pool->solvables + p;
-		  if (s->repo != pool->installed && !pool_installable(pool, s))
-		    continue;
-		  if (pool_is_kind(pool, s->name, evr))
-		    queue_push(&plist, p);
-		}
-	      break;
-	    }
-	  wp = pool_whatprovides(pool, name);
-	  pp = pool->whatprovidesdata + wp;
-	  while ((p = *pp++) != 0)
-	    {
-	      Solvable *s = pool->solvables + p;
-	      if (pool_is_kind(pool, s->name, evr))
-		queue_push(&plist, p);
-	      else
-		wp = 0;
-	    }
-	  break;
-	case REL_FILECONFLICT:
-	  pp = pool_whatprovides_ptr(pool, name);
-	  while ((p = *pp++) != 0)
-	    {
-	      Id origd = MAKERELDEP(d);
-	      Solvable *s = pool->solvables + p;
-	      if (!s->provides)
-		continue;
-	      pidp = s->repo->idarraydata + s->provides;
-	      while ((pid = *pidp++) != 0)
-		if (pid == origd)
-		  break;
-	      if (pid)
-		queue_push(&plist, p);
-	    }
-	  break;
-	default:
-	  break;
-	}
+          if (evr == ARCH_SRC || evr == ARCH_NOSRC)
+            {
+              Solvable *s;
+              for (p = 1, s = pool->solvables + p; p < pool->nsolvables; p++, s++)
+                {
+                  if (!s->repo)
+                    continue;
+                  if (s->arch != evr && s->arch != ARCH_NOSRC)
+                    continue;
+                  if (pool_disabled_solvable(pool, s))
+                    continue;
+                  if (!name || pool_match_nevr(pool, s, name))
+                    queue_push(&plist, p);
+                }
+              break;
+            }
+          if (!name)
+            {
+              FOR_POOL_SOLVABLES (p)
+                {
+                  Solvable *s = pool->solvables + p;
+                  if (s->repo != pool->installed && !pool_installable(pool, s))
+                    continue;
+                  if (s->arch == evr)
+                    queue_push(&plist, p);
+                }
+              break;
+            }
+          wp = pool_whatprovides(pool, name);
+          pp = pool->whatprovidesdata + wp;
+          while ((p = *pp++) != 0)
+            {
+              Solvable *s = pool->solvables + p;
+              if (s->arch == evr)
+                queue_push(&plist, p);
+              else
+                wp = 0;
+            }
+          break;
+        case REL_MULTIARCH:
+          if (evr != ARCH_ANY)
+            break;
+          /* XXX : need to check for Multi-Arch: allowed! */
+          wp = pool_whatprovides(pool, name);
+          break;
+        case REL_KIND:
+          /* package kind filtering */
+          if (!name)
+            {
+              FOR_POOL_SOLVABLES (p)
+                {
+                  Solvable *s = pool->solvables + p;
+                  if (s->repo != pool->installed && !pool_installable(pool, s))
+                    continue;
+                  if (pool_is_kind(pool, s->name, evr))
+                    queue_push(&plist, p);
+                }
+              break;
+            }
+          wp = pool_whatprovides(pool, name);
+          pp = pool->whatprovidesdata + wp;
+          while ((p = *pp++) != 0)
+            {
+              Solvable *s = pool->solvables + p;
+              if (pool_is_kind(pool, s->name, evr))
+                queue_push(&plist, p);
+              else
+                wp = 0;
+            }
+          break;
+        case REL_FILECONFLICT:
+          pp = pool_whatprovides_ptr(pool, name);
+          while ((p = *pp++) != 0)
+            {
+              Id origd = MAKERELDEP(d);
+              Solvable *s = pool->solvables + p;
+              if (!s->provides)
+                continue;
+              pidp = s->repo->idarraydata + s->provides;
+              while ((pid = *pidp++) != 0)
+                if (pid == origd)
+                  break;
+              if (pid)
+                queue_push(&plist, p);
+            }
+          break;
+        default:
+          break;
+        }
       if (wp)
-	{
-	  /* we can reuse an existing entry */
-	  queue_free(&plist);
-	  pool->whatprovides_rel[d] = wp;
-	  return wp;
-	}
+        {
+          /* we can reuse an existing entry */
+          queue_free(&plist);
+          pool->whatprovides_rel[d] = wp;
+          return wp;
+        }
     }
   else if (flags)
     {
@@ -1302,88 +1295,88 @@ pool_addrelproviders(Pool *pool, Id d)
 #endif
       pp = pool_whatprovides_ptr(pool, name);
       if (!ISRELDEP(name) && name < pool->whatprovidesauxoff)
-	ppaux = pool->whatprovidesaux[name] ? pool->whatprovidesauxdata + pool->whatprovidesaux[name] : 0;
+        ppaux = pool->whatprovidesaux[name] ? pool->whatprovidesauxdata + pool->whatprovidesaux[name] : 0;
       while (ISRELDEP(name))
-	{
+        {
           rd = GETRELDEP(pool, name);
-	  name = rd->name;
-	}
+          name = rd->name;
+        }
       while ((p = *pp++) != 0)
-	{
-	  Solvable *s = pool->solvables + p;
-	  if (ppaux)
-	    {
-	      pid = *ppaux++;
-	      if (pid && pid != 1)
-		{
+        {
+          Solvable *s = pool->solvables + p;
+          if (ppaux)
+            {
+              pid = *ppaux++;
+              if (pid && pid != 1)
+                {
 #if 0
 	          POOL_DEBUG(SOLV_DEBUG_STATS, "addrelproviders: aux hit %d %s\n", p, pool_dep2str(pool, pid));
 #endif
-		  if (!ISRELDEP(pid))
-		    {
-		      if (pid != name)
-			continue;		/* wrong provides name */
-		      if (pool->disttype == DISTTYPE_DEB)
-			continue;		/* unversioned provides can never match versioned deps */
-		    }
-		  else
-		    {
-		      prd = GETRELDEP(pool, pid);
-		      if (prd->name != name)
-			continue;		/* wrong provides name */
-		      if (!eqmagic)
-			eqmagic = rpmeqmagic_init(pool, flags, evr);
-		      if (eqmagic > 0 && prd->flags == REL_EQ && !ISRELDEP(prd->evr) &&
-			  rpmeqmagic_cantmatch(pool, prd->flags, prd->evr, eqmagic))
-			continue;
-		      /* right package, both deps are rels. check flags/evr */
-		      if (!pool_match_flags_evr(pool, prd->flags, prd->evr, flags, evr))
-			continue;
-		    }
-		  queue_push(&plist, p);
-		  continue;
-		}
-	    }
-	  if (!s->provides)
-	    {
-	      /* no provides - check nevr */
-	      if (pool_match_nevr_rel(pool, s, MAKERELDEP(d)))
-	        queue_push(&plist, p);
-	      continue;
-	    }
-	  /* solvable p provides name in some rels */
-	  if (!eqmagic)
-	    eqmagic = rpmeqmagic_init(pool, flags, evr);
-	  pidp = s->repo->idarraydata + s->provides;
-	  while ((pid = *pidp++) != 0)
-	    {
-	      if (!ISRELDEP(pid))
-		{
-		  if (pid != name)
-		    continue;		/* wrong provides name */
-		  if (pool->disttype == DISTTYPE_DEB)
-		    continue;		/* unversioned provides can never match versioned deps */
-		  break;
-		}
-	      prd = GETRELDEP(pool, pid);
-	      if (prd->name != name)
-		continue;		/* wrong provides name */
-	      /* right package, both deps are rels. check flags/evr */
-	      if (eqmagic > 0 && prd->flags == REL_EQ && !ISRELDEP(prd->evr) &&
-	          rpmeqmagic_cantmatch(pool, prd->flags, prd->evr, eqmagic))
-		continue;
-	      if (pool_match_flags_evr(pool, prd->flags, prd->evr, flags, evr))
-		break;	/* matches */
-	    }
-	  if (!pid)
-	    continue;	/* none of the providers matched */
-	  queue_push(&plist, p);
-	}
+                  if (!ISRELDEP(pid))
+                    {
+                      if (pid != name)
+                        continue; /* wrong provides name */
+                      if (pool->disttype == DISTTYPE_DEB)
+                        continue; /* unversioned provides can never match versioned deps */
+                    }
+                  else
+                    {
+                      prd = GETRELDEP(pool, pid);
+                      if (prd->name != name)
+                        continue; /* wrong provides name */
+                      if (!eqmagic)
+                        eqmagic = rpmeqmagic_init(pool, flags, evr);
+                      if (eqmagic > 0 && prd->flags == REL_EQ && !ISRELDEP(prd->evr) &&
+                          rpmeqmagic_cantmatch(pool, prd->flags, prd->evr, eqmagic))
+                        continue;
+                      /* right package, both deps are rels. check flags/evr */
+                      if (!pool_match_flags_evr(pool, prd->flags, prd->evr, flags, evr))
+                        continue;
+                    }
+                  queue_push(&plist, p);
+                  continue;
+                }
+            }
+          if (!s->provides)
+            {
+              /* no provides - check nevr */
+              if (pool_match_nevr_rel(pool, s, MAKERELDEP(d)))
+                queue_push(&plist, p);
+              continue;
+            }
+          /* solvable p provides name in some rels */
+          if (!eqmagic)
+            eqmagic = rpmeqmagic_init(pool, flags, evr);
+          pidp = s->repo->idarraydata + s->provides;
+          while ((pid = *pidp++) != 0)
+            {
+              if (!ISRELDEP(pid))
+                {
+                  if (pid != name)
+                    continue; /* wrong provides name */
+                  if (pool->disttype == DISTTYPE_DEB)
+                    continue; /* unversioned provides can never match versioned deps */
+                  break;
+                }
+              prd = GETRELDEP(pool, pid);
+              if (prd->name != name)
+                continue; /* wrong provides name */
+              /* right package, both deps are rels. check flags/evr */
+              if (eqmagic > 0 && prd->flags == REL_EQ && !ISRELDEP(prd->evr) &&
+                  rpmeqmagic_cantmatch(pool, prd->flags, prd->evr, eqmagic))
+                continue;
+              if (pool_match_flags_evr(pool, prd->flags, prd->evr, flags, evr))
+                break; /* matches */
+            }
+          if (!pid)
+            continue; /* none of the providers matched */
+          queue_push(&plist, p);
+        }
       /* make our system solvable provide all unknown rpmlib() stuff */
       if (plist.count == 0 && !strncmp(pool_id2str(pool, name), "rpmlib(", 7))
-	queue_push(&plist, SYSTEMSOLVABLE);
+        queue_push(&plist, SYSTEMSOLVABLE);
     }
-  /* add providers to whatprovides */
+      /* add providers to whatprovides */
 #if 0
   POOL_DEBUG(SOLV_DEBUG_STATS, "addrelproviders: adding %d packages to %d\n", plist.count, d);
 #endif
@@ -1405,11 +1398,11 @@ pool_flush_namespaceproviders(Pool *pool, Id ns, Id evr)
   for (d = 1, rd = pool->rels + d; d < nrels; d++, rd++)
     {
       if (rd->flags != REL_NAMESPACE || rd->name == NAMESPACE_OTHERPROVIDERS)
-	continue;
+        continue;
       if (ns && rd->name != ns)
-	continue;
+        continue;
       if (evr && rd->evr != evr)
-	continue;
+        continue;
       pool->whatprovides_rel[d] = 0;
     }
 }
@@ -1426,28 +1419,28 @@ pool_whatmatchesdep(Pool *pool, Id keyname, Id dep, Queue *q, int marker)
   if (keyname == SOLVABLE_NAME)
     {
       Id pp;
-      FOR_PROVIDES(p, pp, dep)
+      FOR_PROVIDES (p, pp, dep)
         if (pool_match_dep(pool, p, dep))
-	  queue_push(q, p);
+          queue_push(q, p);
       return;
     }
   queue_init(&qq);
-  FOR_POOL_SOLVABLES(p)
+  FOR_POOL_SOLVABLES (p)
     {
       Solvable *s = pool->solvables + p;
       if (s->repo->disabled)
-	continue;
+        continue;
       if (s->repo != pool->installed && !pool_installable(pool, s))
-	continue;
+        continue;
       if (qq.count)
-	queue_empty(&qq);
+        queue_empty(&qq);
       solvable_lookup_deparray(s, keyname, &qq, marker);
       for (i = 0; i < qq.count; i++)
-	if (pool_match_dep(pool, qq.elements[i], dep))
-	  {
-	    queue_push(q, p);
-	    break;
-	  }
+        if (pool_match_dep(pool, qq.elements[i], dep))
+          {
+            queue_push(q, p);
+            break;
+          }
     }
   queue_free(&qq);
 }
@@ -1464,7 +1457,7 @@ pool_whatcontainsdep(Pool *pool, Id keyname, Id dep, Queue *q, int marker)
   if (!dep)
     return;
   queue_init(&qq);
-  FOR_POOL_SOLVABLES(p)
+  FOR_POOL_SOLVABLES (p)
     {
       Solvable *s = pool->solvables + p;
       if (s->repo->disabled)
@@ -1492,15 +1485,15 @@ pool_debug(Pool *pool, int type, const char *format, ...)
   va_list args;
   char buf[1024];
 
-  if ((type & (SOLV_FATAL|SOLV_ERROR)) == 0)
+  if ((type & (SOLV_FATAL | SOLV_ERROR)) == 0)
     {
       if ((pool->debugmask & type) == 0)
-	return;
+        return;
     }
   va_start(args, format);
   if (!pool->debugcallback)
     {
-      if ((type & (SOLV_FATAL|SOLV_ERROR)) == 0 && !(pool->debugmask & SOLV_DEBUG_TO_STDERR))
+      if ((type & (SOLV_FATAL | SOLV_ERROR)) == 0 && !(pool->debugmask & SOLV_DEBUG_TO_STDERR))
         vprintf(format, args);
       else
         vfprintf(stderr, format, args);
@@ -1556,35 +1549,39 @@ pool_setdebuglevel(Pool *pool, int level)
 {
   int mask = SOLV_DEBUG_RESULT;
   if (level > 0)
-    mask |= SOLV_DEBUG_STATS|SOLV_DEBUG_ANALYZE|SOLV_DEBUG_UNSOLVABLE|SOLV_DEBUG_SOLVER|SOLV_DEBUG_TRANSACTION|SOLV_ERROR;
+    mask |= SOLV_DEBUG_STATS | SOLV_DEBUG_ANALYZE | SOLV_DEBUG_UNSOLVABLE | SOLV_DEBUG_SOLVER | SOLV_DEBUG_TRANSACTION | SOLV_ERROR;
   if (level > 1)
-    mask |= SOLV_DEBUG_JOB|SOLV_DEBUG_SOLUTIONS|SOLV_DEBUG_POLICY;
+    mask |= SOLV_DEBUG_JOB | SOLV_DEBUG_SOLUTIONS | SOLV_DEBUG_POLICY;
   if (level > 2)
     mask |= SOLV_DEBUG_PROPAGATE;
   if (level > 3)
     mask |= SOLV_DEBUG_RULE_CREATION;
-  mask |= pool->debugmask & SOLV_DEBUG_TO_STDERR;	/* keep bit */
+  mask |= pool->debugmask & SOLV_DEBUG_TO_STDERR; /* keep bit */
   pool->debugmask = mask;
 }
 
-void pool_setdebugcallback(Pool *pool, void (*debugcallback)(struct _Pool *, void *data, int type, const char *str), void *debugcallbackdata)
+void
+pool_setdebugcallback(Pool *pool, void (*debugcallback)(struct _Pool *, void *data, int type, const char *str), void *debugcallbackdata)
 {
   pool->debugcallback = debugcallback;
   pool->debugcallbackdata = debugcallbackdata;
 }
 
-void pool_setdebugmask(Pool *pool, int mask)
+void
+pool_setdebugmask(Pool *pool, int mask)
 {
   pool->debugmask = mask;
 }
 
-void pool_setloadcallback(Pool *pool, int (*cb)(struct _Pool *, struct _Repodata *, void *), void *loadcbdata)
+void
+pool_setloadcallback(Pool *pool, int (*cb)(struct _Pool *, struct _Repodata *, void *), void *loadcbdata)
 {
   pool->loadcallback = cb;
   pool->loadcallbackdata = loadcbdata;
 }
 
-void pool_setnamespacecallback(Pool *pool, Id (*cb)(struct _Pool *, void *, Id, Id), void *nscbdata)
+void
+pool_setnamespacecallback(Pool *pool, Id (*cb)(struct _Pool *, void *, Id, Id), void *nscbdata)
 {
   pool->nscallback = cb;
   pool->nscallbackdata = nscbdata;
@@ -1674,20 +1671,20 @@ pool_alloctmpspace_free(Pool *pool, const char *space, int len)
       int n, oldn;
       n = oldn = pool->tmpspace.n;
       for (;;)
-	{
-	  if (!n--)
-	    n = POOL_TMPSPACEBUF - 1;
-	  if (n == oldn)
-	    break;
-	  if (pool->tmpspace.buf[n] != space)
-	    continue;
-	  if (len > pool->tmpspace.len[n])
-	    {
-	      pool->tmpspace.buf[n] = solv_realloc(pool->tmpspace.buf[n], len + 32);
-	      pool->tmpspace.len[n] = len + 32;
-	    }
+        {
+          if (!n--)
+            n = POOL_TMPSPACEBUF - 1;
+          if (n == oldn)
+            break;
+          if (pool->tmpspace.buf[n] != space)
+            continue;
+          if (len > pool->tmpspace.len[n])
+            {
+              pool->tmpspace.buf[n] = solv_realloc(pool->tmpspace.buf[n], len + 32);
+              pool->tmpspace.len[n] = len + 32;
+            }
           return pool->tmpspace.buf[n];
-	}
+        }
     }
   return 0;
 }
@@ -1878,22 +1875,22 @@ add_new_provider(Pool *pool, Id id, Id p)
   for (pp = pool->whatprovidesdata + pool->whatprovides[id]; *pp; pp++)
     {
       if (*pp == p)
-	{
-	  queue_free(&q);
-	  return;
-	}
+        {
+          queue_free(&q);
+          return;
+        }
       if (*pp > p)
-	{
-	  queue_push(&q, p);
-	  p = 0;
-	}
+        {
+          queue_push(&q, p);
+          p = 0;
+        }
       queue_push(&q, *pp);
     }
   if (p)
     queue_push(&q, p);
   pool->whatprovides[id] = pool_queuetowhatprovides(pool, &q);
   if (id < pool->whatprovidesauxoff)
-    pool->whatprovidesaux[id] = 0;	/* sorry */
+    pool->whatprovidesaux[id] = 0; /* sorry */
   queue_free(&q);
 }
 
@@ -1917,15 +1914,15 @@ pool_add_fileconflicts_deps(Pool *pool, Queue *conflicts)
       id = pool_rel2id(pool, fn, md5, REL_FILECONFLICT, 1);
       s = pool->solvables + p;
       if (!s->repo)
-	continue;
+        continue;
       s->provides = repo_addid_dep(s->repo, s->provides, id, SOLVABLE_FILEMARKER);
       if (pool->whatprovides)
-	add_new_provider(pool, fn, p);
+        add_new_provider(pool, fn, p);
       if (pool->whatprovides_rel)
-	pool->whatprovides_rel[GETRELID(id)] = 0;	/* clear cache */
+        pool->whatprovides_rel[GETRELID(id)] = 0; /* clear cache */
       s = pool->solvables + q;
       if (!s->repo)
-	continue;
+        continue;
       s->conflicts = repo_addid_dep(s->repo, s->conflicts, id, 0);
     }
   if (!hadhashes)

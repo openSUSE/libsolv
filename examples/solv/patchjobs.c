@@ -20,7 +20,7 @@ add_patchjobs(Pool *pool, Queue *job)
   solver_calculate_multiversionmap(pool, job, &multiversionmap);
   if (pool->installed)
     {
-      FOR_REPO_SOLVABLES(pool->installed, p, s)
+      FOR_REPO_SOLVABLES (pool->installed, p, s)
         MAPSET(&installedmap, p);
     }
 
@@ -33,31 +33,31 @@ add_patchjobs(Pool *pool, Queue *job)
 
       s = pool->solvables + p;
       if (strncmp(pool_id2str(pool, s->name), "patch:", 6) != 0)
-	continue;
-      FOR_PROVIDES(p2, pp, s->name)
-	{
-	  Solvable *s2 = pool->solvables + p2;
-	  if (s2->name != s->name)
-	    continue;
-	  r = pool_evrcmp(pool, s->evr, s2->evr, EVRCMP_COMPARE);
-	  if (r < 0 || (r == 0 && p > p2))
-	    break;
-	}
+        continue;
+      FOR_PROVIDES (p2, pp, s->name)
+        {
+          Solvable *s2 = pool->solvables + p2;
+          if (s2->name != s->name)
+            continue;
+          r = pool_evrcmp(pool, s->evr, s2->evr, EVRCMP_COMPARE);
+          if (r < 0 || (r == 0 && p > p2))
+            break;
+        }
       if (p2)
-	continue;
+        continue;
       type = solvable_lookup_str(s, SOLVABLE_PATCHCATEGORY);
       if (type && !strcmp(type, "optional"))
-	continue;
+        continue;
       r = solvable_trivial_installable_map(s, &installedmap, 0, &multiversionmap);
       if (r == -1)
-	continue;
+        continue;
       if (solvable_lookup_bool(s, UPDATE_RESTART) && r == 0)
-	{
-	  if (!pruneyou++)
-	    queue_empty(job);
-	}
+        {
+          if (!pruneyou++)
+            queue_empty(job);
+        }
       else if (pruneyou)
-	continue;
+        continue;
       queue_push2(job, SOLVER_SOLVABLE, p);
     }
   map_free(&installedmap);

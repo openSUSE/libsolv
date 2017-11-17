@@ -9,20 +9,20 @@
 #include "repo.h"
 #include "solver.h"
 
-#define TESTCASE_RESULT_TRANSACTION	(1 << 0)
-#define TESTCASE_RESULT_PROBLEMS	(1 << 1)
-#define TESTCASE_RESULT_ORPHANED	(1 << 2)
-#define TESTCASE_RESULT_RECOMMENDED	(1 << 3)
-#define TESTCASE_RESULT_UNNEEDED	(1 << 4)
-#define TESTCASE_RESULT_ALTERNATIVES	(1 << 5)
-#define TESTCASE_RESULT_RULES		(1 << 6)
-#define TESTCASE_RESULT_GENID		(1 << 7)
-#define TESTCASE_RESULT_REASON		(1 << 8)
-#define TESTCASE_RESULT_CLEANDEPS	(1 << 9)
-#define TESTCASE_RESULT_JOBS		(1 << 10)
+#define TESTCASE_RESULT_TRANSACTION (1 << 0)
+#define TESTCASE_RESULT_PROBLEMS (1 << 1)
+#define TESTCASE_RESULT_ORPHANED (1 << 2)
+#define TESTCASE_RESULT_RECOMMENDED (1 << 3)
+#define TESTCASE_RESULT_UNNEEDED (1 << 4)
+#define TESTCASE_RESULT_ALTERNATIVES (1 << 5)
+#define TESTCASE_RESULT_RULES (1 << 6)
+#define TESTCASE_RESULT_GENID (1 << 7)
+#define TESTCASE_RESULT_REASON (1 << 8)
+#define TESTCASE_RESULT_CLEANDEPS (1 << 9)
+#define TESTCASE_RESULT_JOBS (1 << 10)
 
 /* reuse solver hack, testsolv use only */
-#define TESTCASE_RESULT_REUSE_SOLVER	(1 << 31)
+#define TESTCASE_RESULT_REUSE_SOLVER (1 << 31)
 
 extern Id testcase_str2dep(Pool *pool, const char *s);
 extern const char *testcase_dep2str(Pool *pool, Id id);

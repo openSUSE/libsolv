@@ -39,7 +39,7 @@ solv_chksum_create(Id type)
   Chksum *chk;
   chk = solv_calloc(1, sizeof(*chk));
   chk->type = type;
-  switch(type)
+  switch (type)
     {
     case REPOKEY_TYPE_MD5:
       solv_MD5_Init(&chk->c.md5);
@@ -113,7 +113,7 @@ solv_chksum_add(Chksum *chk, const void *data, int len)
 {
   if (chk->done)
     return;
-  switch(chk->type)
+  switch (chk->type)
     {
     case REPOKEY_TYPE_MD5:
       solv_MD5_Update(&chk->c.md5, (void *)data, len);
@@ -147,47 +147,47 @@ solv_chksum_get(Chksum *chk, int *lenp)
         *lenp = solv_chksum_len(chk->type);
       return chk->result;
     }
-  switch(chk->type)
+  switch (chk->type)
     {
     case REPOKEY_TYPE_MD5:
       solv_MD5_Final(chk->result, &chk->c.md5);
       chk->done = 1;
       if (lenp)
-	*lenp = 16;
+        *lenp = 16;
       return chk->result;
     case REPOKEY_TYPE_SHA1:
       solv_SHA1_Final(&chk->c.sha1, chk->result);
       chk->done = 1;
       if (lenp)
-	*lenp = 20;
+        *lenp = 20;
       return chk->result;
     case REPOKEY_TYPE_SHA224:
       solv_SHA224_Final(chk->result, &chk->c.sha224);
       chk->done = 1;
       if (lenp)
-	*lenp = 28;
+        *lenp = 28;
       return chk->result;
     case REPOKEY_TYPE_SHA256:
       solv_SHA256_Final(chk->result, &chk->c.sha256);
       chk->done = 1;
       if (lenp)
-	*lenp = 32;
+        *lenp = 32;
       return chk->result;
     case REPOKEY_TYPE_SHA384:
       solv_SHA384_Final(chk->result, &chk->c.sha384);
       chk->done = 1;
       if (lenp)
-	*lenp = 48;
+        *lenp = 48;
       return chk->result;
     case REPOKEY_TYPE_SHA512:
       solv_SHA512_Final(chk->result, &chk->c.sha512);
       chk->done = 1;
       if (lenp)
-	*lenp = 64;
+        *lenp = 64;
       return chk->result;
     default:
       if (lenp)
-	*lenp = 0;
+        *lenp = 0;
       return 0;
     }
 }
@@ -207,7 +207,7 @@ solv_chksum_isfinished(Chksum *chk)
 const char *
 solv_chksum_type2str(Id type)
 {
-  switch(type)
+  switch (type)
     {
     case REPOKEY_TYPE_MD5:
       return "md5";

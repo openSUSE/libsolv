@@ -44,4 +44,3 @@ extern void solver_printtrivial(Solver *solv);
 #endif
 
 #endif /* LIBSOLV_SOLVERDEBUG_H */
-

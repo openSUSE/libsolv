@@ -17,7 +17,7 @@
  * these are the block values (increment values) for the
  * rel hashtable
  */
-#define REL_BLOCK		1023	/* hashtable for relations */
-#define WHATPROVIDES_BLOCK	1023
+#define REL_BLOCK 1023 /* hashtable for relations */
+#define WHATPROVIDES_BLOCK 1023
 
 #endif /* LIBSOLV_POOLID_PRIVATE_H */

@@ -23,8 +23,6 @@
 #include "repoinfo_download.h"
 #include "repoinfo_type_rpmmd.h"
 
-
-
 static const char *
 repomd_find(Repo *repo, const char *what, const unsigned char **chksump, Id *chksumtypep)
 {
@@ -96,17 +94,19 @@ repomd_load_ext(Repo *repo, Repodata *data)
   printf("[%s:%s", repo->name, ext);
   if (usecachedrepo(cinfo, ext, 0))
     {
-      printf(" cached]\n"); fflush(stdout);
+      printf(" cached]\n");
+      fflush(stdout);
       return 1;
     }
-  printf(" fetching]\n"); fflush(stdout);
+  printf(" fetching]\n");
+  fflush(stdout);
   filename = repodata_lookup_str(data, SOLVID_META, REPOSITORY_REPOMD_LOCATION);
   filechksumtype = 0;
   filechksum = repodata_lookup_bin_checksum(data, SOLVID_META, REPOSITORY_REPOMD_CHECKSUM, &filechksumtype);
   if ((fp = curlfopen(cinfo, filename, 1, filechksum, filechksumtype, 0)) == 0)
     return 0;
   if (!strcmp(ext, "FL"))
-    r = repo_add_rpmmd(repo, fp, ext, REPO_USE_LOADING|REPO_EXTEND_SOLVABLES|REPO_LOCALPOOL);
+    r = repo_add_rpmmd(repo, fp, ext, REPO_USE_LOADING | REPO_EXTEND_SOLVABLES | REPO_LOCALPOOL);
   else if (!strcmp(ext, "DL"))
     r = repo_add_deltainfoxml(repo, fp, REPO_USE_LOADING);
   fclose(fp);
@@ -166,23 +166,23 @@ repomd_load(struct repoinfo *cinfo, Pool **sigpoolp)
   if (filename && (fp = curlfopen(cinfo, filename, 1, filechksum, filechksumtype, 1)) != 0)
     {
       if (repo_add_rpmmd(repo, fp, 0, 0))
-	{
-	  printf("primary: %s\n", pool_errstr(pool));
-	  cinfo->incomplete = 1;
-	}
+        {
+          printf("primary: %s\n", pool_errstr(pool));
+          cinfo->incomplete = 1;
+        }
       fclose(fp);
     }
   if (cinfo->incomplete)
-    return 0;	/* hopeless */
+    return 0; /* hopeless */
 
   filename = repomd_find(repo, "updateinfo", &filechksum, &filechksumtype);
   if (filename && (fp = curlfopen(cinfo, filename, 1, filechksum, filechksumtype, 1)) != 0)
     {
       if (repo_add_updateinfoxml(repo, fp, 0))
-	{
-	  printf("updateinfo: %s\n", pool_errstr(pool));
-	  cinfo->incomplete = 1;
-	}
+        {
+          printf("updateinfo: %s\n", pool_errstr(pool));
+          cinfo->incomplete = 1;
+        }
       fclose(fp);
     }
 
@@ -191,10 +191,10 @@ repomd_load(struct repoinfo *cinfo, Pool **sigpoolp)
   if (filename && (fp = curlfopen(cinfo, filename, 1, filechksum, filechksumtype, 1)) != 0)
     {
       if (repo_add_appdata(repo, fp, 0))
-	{
-	  printf("appdata: %s\n", pool_errstr(pool));
-	  cinfo->incomplete = 1;
-	}
+        {
+          printf("appdata: %s\n", pool_errstr(pool));
+          cinfo->incomplete = 1;
+        }
       fclose(fp);
     }
 #endif

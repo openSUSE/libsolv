@@ -28,14 +28,13 @@ static void
 usage()
 {
   fprintf(stderr, "\nUsage:\n"
-	  "mergesolv [file] [file] [...]\n"
-	  "  merges multiple solv files into one and writes it to stdout\n"
-	  );
+                  "mergesolv [file] [file] [...]\n"
+                  "  merges multiple solv files into one and writes it to stdout\n");
   exit(0);
 }
 
 static int
-loadcallback (Pool *pool, Repodata *data, void *vdata)
+loadcallback(Pool *pool, Repodata *data, void *vdata)
 {
   FILE *fp;
   const char *location = repodata_lookup_str(data, SOLVID_META, REPOSITORY_LOCATION);
@@ -44,13 +43,13 @@ loadcallback (Pool *pool, Repodata *data, void *vdata)
   if (!location)
     return 0;
   fprintf(stderr, "Loading SOLV file %s\n", location);
-  fp = fopen (location, "r");
+  fp = fopen(location, "r");
   if (!fp)
     {
       perror(location);
       return 0;
     }
-  r = repo_add_solv(data->repo, fp, REPO_USE_LOADING|REPO_LOCALPOOL);
+  r = repo_add_solv(data->repo, fp, REPO_USE_LOADING | REPO_LOCALPOOL);
   fclose(fp);
   return r ? 0 : 1;
 }
@@ -69,29 +68,29 @@ main(int argc, char **argv)
 
   pool = pool_create();
   repo = repo_create(pool, "<mergesolv>");
-  
+
   while ((c = getopt(argc, argv, "ahb:X")) >= 0)
     {
       switch (c)
-      {
-	case 'h':
-	  usage();
-	  break;
-	case 'a':
-	  with_attr = 1;
-	  break;
-	case 'b':
-	  basefile = optarg;
-	  break;
-	case 'X':
+        {
+        case 'h':
+          usage();
+          break;
+        case 'a':
+          with_attr = 1;
+          break;
+        case 'b':
+          basefile = optarg;
+          break;
+        case 'X':
 #ifdef SUSE
-	  add_auto = 1;
+          add_auto = 1;
 #endif
-	  break;
-	default:
-	  usage();
-	  exit(1);
-      }
+          break;
+        default:
+          usage();
+          exit(1);
+        }
     }
   if (with_attr)
     pool_setloadcallback(pool, loadcallback, 0);
@@ -100,15 +99,15 @@ main(int argc, char **argv)
     {
       FILE *fp;
       if ((fp = fopen(argv[optind], "r")) == NULL)
-	{
-	  perror(argv[optind]);
-	  exit(1);
-	}
+        {
+          perror(argv[optind]);
+          exit(1);
+        }
       if (repo_add_solv(repo, fp, 0))
-	{
-	  fprintf(stderr, "repo %s: %s\n", argv[optind], pool_errstr(pool));
-	  exit(1);
-	}
+        {
+          fprintf(stderr, "repo %s: %s\n", argv[optind], pool_errstr(pool));
+          exit(1);
+        }
       fclose(fp);
     }
 #ifdef SUSE

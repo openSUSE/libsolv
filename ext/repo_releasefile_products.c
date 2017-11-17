@@ -53,57 +53,56 @@ add_releasefile_product(struct parsedata *pd, FILE *fp)
       /* remove trailing \n */
       int l = strlen(buf);
       if (l && buf[l - 1] == '\n')
-	buf[--l] = 0;
+        buf[--l] = 0;
       ++lnum;
 
       if (lnum == 1)
-	{
-	  /* 1st line, <name> [(<arch>)] */
-	  ptr = strchr(buf, '(');
-	  if (ptr)
-	    {
-	      ptr1 = ptr - 1;
-	      *ptr++ = 0;
-	    }
-	  else
-	    ptr1 = buf + l - 1;
+        {
+          /* 1st line, <name> [(<arch>)] */
+          ptr = strchr(buf, '(');
+          if (ptr)
+            {
+              ptr1 = ptr - 1;
+              *ptr++ = 0;
+            }
+          else
+            ptr1 = buf + l - 1;
 
-	  /* track back until non-blank, non-digit */
-	  while (ptr1 > buf
-		 && (*ptr1 == ' ' || isdigit(*ptr1) || *ptr1 == '.'))
-	    --ptr1;
-	  *(++ptr1) = 0;
-	  name = pool_str2id(pool, join2(&pd->jd, "product", ":", buf), 1);
+          /* track back until non-blank, non-digit */
+          while (ptr1 > buf && (*ptr1 == ' ' || isdigit(*ptr1) || *ptr1 == '.'))
+            --ptr1;
+          *(++ptr1) = 0;
+          name = pool_str2id(pool, join2(&pd->jd, "product", ":", buf), 1);
 
-	  if (ptr)
-	    {
-	      /* have arch */
-	      char *ptr1 = strchr(ptr, ')');
-	      if (ptr1)
-		{
-		  *ptr1 = 0;
-		  /* downcase arch */
-		  ptr1 = ptr;
-		  while (*ptr1)
-		    {
-		      if (isupper(*ptr1))
-			 *ptr1 = tolower(*ptr1);
-		      ++ptr1;
-		    }
-		  arch = pool_str2id(pool, ptr, 1);
-		}
-	    }
-	}
+          if (ptr)
+            {
+              /* have arch */
+              char *ptr1 = strchr(ptr, ')');
+              if (ptr1)
+                {
+                  *ptr1 = 0;
+                  /* downcase arch */
+                  ptr1 = ptr;
+                  while (*ptr1)
+                    {
+                      if (isupper(*ptr1))
+                        *ptr1 = tolower(*ptr1);
+                      ++ptr1;
+                    }
+                  arch = pool_str2id(pool, ptr, 1);
+                }
+            }
+        }
       else if (strncmp(buf, "VERSION", 7) == 0)
-	{
-	  ptr = strchr(buf + 7, '=');
-	  if (ptr)
-	    {
-	      while (*++ptr == ' ')
-		;
-	      version = makeevr(pool, ptr);
-	    }
-	}
+        {
+          ptr = strchr(buf + 7, '=');
+          if (ptr)
+            {
+              while (*++ptr == ' ')
+                ;
+              version = makeevr(pool, ptr);
+            }
+        }
     }
   if (name)
     {
@@ -112,10 +111,9 @@ add_releasefile_product(struct parsedata *pd, FILE *fp)
       s->evr = version ? version : ID_EMPTY;
       s->arch = arch ? arch : ARCH_NOARCH;
       if (s->name && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
-	s->provides = repo_addid_dep(repo, s->provides, pool_rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+        s->provides = repo_addid_dep(repo, s->provides, pool_rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
     }
 }
-
 
 int
 repo_add_releasefile_products(Repo *repo, const char *dirpath, int flags)
@@ -145,18 +143,18 @@ repo_add_releasefile_products(Repo *repo, const char *dirpath, int flags)
       int len = strlen(entry->d_name);
       if (len > 8 && !strcmp(entry->d_name + len - 8, "-release"))
         {
-	  /* skip /etc/lsb-release, thats not a product per-se */
-	  if (strcmp(entry->d_name, "lsb-release") == 0)
-	    continue;
-	  fullpath = join2(&pd.jd, dirpath, "/", entry->d_name);
-	  if ((fp = fopen(fullpath, "r")) == 0)
-	    {
-	      pool_error(repo->pool, 0, "%s: %s", fullpath, strerror(errno));
-	      continue;
-	    }
-	  add_releasefile_product(&pd, fp);
-	  fclose(fp);
-	}
+          /* skip /etc/lsb-release, thats not a product per-se */
+          if (strcmp(entry->d_name, "lsb-release") == 0)
+            continue;
+          fullpath = join2(&pd.jd, dirpath, "/", entry->d_name);
+          if ((fp = fopen(fullpath, "r")) == 0)
+            {
+              pool_error(repo->pool, 0, "%s: %s", fullpath, strerror(errno));
+              continue;
+            }
+          add_releasefile_product(&pd, fp);
+          fclose(fp);
+        }
     }
   closedir(dir);
   join_freemem(&pd.jd);
@@ -167,4 +165,3 @@ repo_add_releasefile_products(Repo *repo, const char *dirpath, int flags)
     repodata_internalize(repo_last_repodata(repo));
   return 0;
 }
-

@@ -36,15 +36,14 @@ extern "C" {
  */
 
 typedef struct _Rule {
-  Id p;		/* first literal in rule */
-  Id d;		/* Id offset into 'list of providers terminated by 0' as used by whatprovides; pool->whatprovides + d */
-		/* in case of binary rules, d == 0, w1 == p, w2 == other literal */
-		/* in case of disabled rules: ~d, aka -d - 1 */
-  Id w1, w2;	/* watches, literals not-yet-decided */
-		/* if !w2, assertion, not rule */
-  Id n1, n2;	/* next rules in linked list, corresponding to w1, w2 */
+  Id p; /* first literal in rule */
+  Id d; /* Id offset into 'list of providers terminated by 0' as used by whatprovides; pool->whatprovides + d */
+  /* in case of binary rules, d == 0, w1 == p, w2 == other literal */
+  /* in case of disabled rules: ~d, aka -d - 1 */
+  Id w1, w2; /* watches, literals not-yet-decided */
+  /* if !w2, assertion, not rule */
+  Id n1, n2; /* next rules in linked list, corresponding to w1, w2 */
 } Rule;
-
 
 typedef enum {
   SOLVER_RULE_UNKNOWN = 0,
@@ -74,7 +73,7 @@ typedef enum {
   SOLVER_RULE_YUMOBS = 0xa00
 } SolverRuleinfo;
 
-#define SOLVER_RULE_TYPEMASK    0xff00
+#define SOLVER_RULE_TYPEMASK 0xff00
 
 struct _Solver;
 
@@ -143,16 +142,15 @@ extern int solver_allruleinfos(struct _Solver *solv, Id rid, Queue *rq);
 extern SolverRuleinfo solver_ruleinfo(struct _Solver *solv, Id rid, Id *fromp, Id *top, Id *depp);
 extern SolverRuleinfo solver_ruleclass(struct _Solver *solv, Id rid);
 extern void solver_ruleliterals(struct _Solver *solv, Id rid, Queue *q);
-extern int  solver_rule2jobidx(struct _Solver *solv, Id rid);
-extern Id   solver_rule2job(struct _Solver *solv, Id rid, Id *whatp);
-extern Id   solver_rule2solvable(struct _Solver *solv, Id rid);
+extern int solver_rule2jobidx(struct _Solver *solv, Id rid);
+extern Id solver_rule2job(struct _Solver *solv, Id rid, Id *whatp);
+extern Id solver_rule2solvable(struct _Solver *solv, Id rid);
 extern void solver_rule2rules(struct _Solver *solv, Id rid, Queue *q, int recursive);
-extern Id   solver_rule2pkgrule(struct _Solver *solv, Id rid);
+extern Id solver_rule2pkgrule(struct _Solver *solv, Id rid);
 
 /* orphan handling */
 extern void solver_breakorphans(struct _Solver *solv);
 extern void solver_check_brokenorphanrules(struct _Solver *solv, Queue *dq);
-
 
 /* legacy */
 #define SOLVER_RULE_RPM SOLVER_RULE_PKG
@@ -171,4 +169,3 @@ extern void solver_check_brokenorphanrules(struct _Solver *solv, Queue *dq);
 #endif
 
 #endif
-
