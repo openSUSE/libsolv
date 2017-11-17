@@ -25,9 +25,9 @@ extern "C" {
  */
 
 typedef struct _Reldep {
-  Id name;		/* "package" */
-  Id evr;		/* "0:42-3" */
-  int flags;		/* operation/relation, see REL_x in pool.h */
+  Id name;   /* "package" */
+  Id evr;    /* "0:42-3" */
+  int flags; /* operation/relation, see REL_x in pool.h */
 } Reldep;
 
 extern Id pool_str2id(Pool *pool, const char *, int);

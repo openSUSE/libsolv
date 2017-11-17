@@ -26,18 +26,16 @@
 #include "solv_xfopen.h"
 #include "common_write.h"
 
-
 static void
 usage(int status)
 {
   fprintf(stderr, "\nUsage:\n"
-          "mdk2solv [-i <infoxml>]\n"
-          "  reads a 'synthesis' repository from <stdin> and writes a .solv file to <stdout>\n"
-          "  -i : info.xml file for extra attributes\n"
-          "  -f : files.xml file for extra attributes\n"
-          "  -h : print help & exit\n"
-         );
-   exit(status);
+                  "mdk2solv [-i <infoxml>]\n"
+                  "  reads a 'synthesis' repository from <stdin> and writes a .solv file to <stdout>\n"
+                  "  -i : info.xml file for extra attributes\n"
+                  "  -f : files.xml file for extra attributes\n"
+                  "  -h : print help & exit\n");
+  exit(status);
 }
 
 int
@@ -50,21 +48,21 @@ main(int argc, char **argv)
 
   while ((c = getopt(argc, argv, "hi:f:")) >= 0)
     {
-      switch(c)
-	{
-	case 'h':
-	  usage(0);
-	  break;
-	case 'i':
-	  infofile = optarg;
-	  break;
-	case 'f':
-	  filesfile = optarg;
-	  break;
-	default:
-	  usage(1);
-	  break;
-	}
+      switch (c)
+        {
+        case 'h':
+          usage(0);
+          break;
+        case 'i':
+          infofile = optarg;
+          break;
+        case 'f':
+          filesfile = optarg;
+          break;
+        default:
+          usage(1);
+          break;
+        }
     }
   pool = pool_create();
   repo = repo_create(pool, "<stdin>");
@@ -77,30 +75,30 @@ main(int argc, char **argv)
     {
       FILE *fp = solv_xfopen(infofile, "r");
       if (!fp)
-	{
-	  perror(infofile);
-	  exit(1);
-	}
+        {
+          perror(infofile);
+          exit(1);
+        }
       if (repo_add_mdk_info(repo, fp, REPO_EXTEND_SOLVABLES | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE))
-	{
-	  fprintf(stderr, "mdk2solv: %s\n", pool_errstr(pool));
-	  exit(1);
-	}
+        {
+          fprintf(stderr, "mdk2solv: %s\n", pool_errstr(pool));
+          exit(1);
+        }
       fclose(fp);
     }
   if (filesfile)
     {
       FILE *fp = solv_xfopen(filesfile, "r");
       if (!fp)
-	{
-	  perror(filesfile);
-	  exit(1);
-	}
+        {
+          perror(filesfile);
+          exit(1);
+        }
       if (repo_add_mdk_info(repo, fp, REPO_EXTEND_SOLVABLES | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE))
-	{
-	  fprintf(stderr, "mdk2solv: %s\n", pool_errstr(pool));
-	  exit(1);
-	}
+        {
+          fprintf(stderr, "mdk2solv: %s\n", pool_errstr(pool));
+          exit(1);
+        }
       fclose(fp);
     }
   repo_internalize(repo);

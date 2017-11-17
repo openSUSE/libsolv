@@ -9,7 +9,7 @@
 #include "util.h"
 #include "strpool.h"
 
-#define STRING_BLOCK      2047
+#define STRING_BLOCK 2047
 #define STRINGSPACE_BLOCK 65535
 
 void
@@ -57,9 +57,9 @@ void
 stringpool_init_empty(Stringpool *ss)
 {
   const char *emptystrs[] = {
-    "<NULL>",
-    "",
-    0,
+      "<NULL>",
+      "",
+      0,
   };
   stringpool_init(ss, emptystrs);
 }
@@ -103,13 +103,13 @@ stringpool_strn2id(Stringpool *ss, const char *str, unsigned int len, int create
 
       /* rehash all strings into new hashtable */
       for (i = 1; i < ss->nstrings; i++)
-	{
-	  h = strhash(ss->stringspace + ss->strings[i]) & hashmask;
-	  hh = HASHCHAIN_START;
-	  while (hashtbl[h] != 0)
-	    h = HASHCHAIN_NEXT(h, hh, hashmask);
-	  hashtbl[h] = i;
-	}
+        {
+          h = strhash(ss->stringspace + ss->strings[i]) & hashmask;
+          hh = HASHCHAIN_START;
+          while (hashtbl[h] != 0)
+            h = HASHCHAIN_NEXT(h, hh, hashmask);
+          hashtbl[h] = i;
+        }
     }
 
   /* compute hash and check for match */
@@ -117,12 +117,11 @@ stringpool_strn2id(Stringpool *ss, const char *str, unsigned int len, int create
   hh = HASHCHAIN_START;
   while ((id = hashtbl[h]) != 0)
     {
-      if(!memcmp(ss->stringspace + ss->strings[id], str, len)
-         && ss->stringspace[ss->strings[id] + len] == 0)
-	break;
+      if (!memcmp(ss->stringspace + ss->strings[id], str, len) && ss->stringspace[ss->strings[id] + len] == 0)
+        break;
       h = HASHCHAIN_NEXT(h, hh, hashmask);
     }
-  if (id || !create)    /* exit here if string found */
+  if (id || !create) /* exit here if string found */
     return id;
 
   /* this should be a test for a flag that tells us if the
@@ -140,7 +139,7 @@ stringpool_strn2id(Stringpool *ss, const char *str, unsigned int len, int create
   hashtbl[h] = id;
 
   ss->strings = solv_extend(ss->strings, id, 1, sizeof(Offset), STRING_BLOCK);
-  ss->strings[id] = ss->sstrings;	/* we will append to the end */
+  ss->strings[id] = ss->sstrings; /* we will append to the end */
 
   /* append string to stringspace */
   ss->stringspace = solv_extend(ss->stringspace, ss->sstrings, len + 1, 1, STRINGSPACE_BLOCK);

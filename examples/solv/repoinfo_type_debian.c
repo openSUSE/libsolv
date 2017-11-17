@@ -33,13 +33,13 @@ debian_find_component(struct repoinfo *cinfo, FILE *fp, char *comp, const unsign
     {
       struct utsname un;
       if (uname(&un))
-	{
-	  perror("uname");
-	  exit(1);
-	}
+        {
+          perror("uname");
+          exit(1);
+        }
       basearch = strdup(un.machine);
       if (basearch[0] == 'i' && basearch[1] && !strcmp(basearch + 2, "86"))
-	basearch[1] = '3';
+        basearch[1] = '3';
     }
   binarydir = solv_dupjoin("binary-", basearch, "/");
   lbinarydir = strlen(binarydir);
@@ -49,73 +49,73 @@ debian_find_component(struct repoinfo *cinfo, FILE *fp, char *comp, const unsign
   filename = 0;
   chksum = solv_malloc(32);
   chksumtype = 0;
-  while(fgets(buf, sizeof(buf), fp))
+  while (fgets(buf, sizeof(buf), fp))
     {
       l = strlen(buf);
       if (l == 0)
-	continue;
+        continue;
       while (l && (buf[l - 1] == '\n' || buf[l - 1] == ' ' || buf[l - 1] == '\t'))
-	buf[--l] = 0;
+        buf[--l] = 0;
       if (!strncasecmp(buf, "MD5Sum:", 7))
-	{
-	  curchksumtype = REPOKEY_TYPE_MD5;
-	  continue;
-	}
+        {
+          curchksumtype = REPOKEY_TYPE_MD5;
+          continue;
+        }
       if (!strncasecmp(buf, "SHA1:", 5))
-	{
-	  curchksumtype = REPOKEY_TYPE_SHA1;
-	  continue;
-	}
+        {
+          curchksumtype = REPOKEY_TYPE_SHA1;
+          continue;
+        }
       if (!strncasecmp(buf, "SHA256:", 7))
-	{
-	  curchksumtype = REPOKEY_TYPE_SHA256;
-	  continue;
-	}
+        {
+          curchksumtype = REPOKEY_TYPE_SHA256;
+          continue;
+        }
       if (!curchksumtype)
-	continue;
+        continue;
       bp = buf;
       if (*bp++ != ' ')
-	{
-	  curchksumtype = 0;
-	  continue;
-	}
+        {
+          curchksumtype = 0;
+          continue;
+        }
       ch = bp;
       while (*bp && *bp != ' ' && *bp != '\t')
-	bp++;
+        bp++;
       if (!*bp)
-	continue;
+        continue;
       *bp++ = 0;
       while (*bp == ' ' || *bp == '\t')
-	bp++;
+        bp++;
       while (*bp && *bp != ' ' && *bp != '\t')
-	bp++;
+        bp++;
       if (!*bp)
-	continue;
+        continue;
       while (*bp == ' ' || *bp == '\t')
-	bp++;
+        bp++;
       fn = bp;
       if (strncmp(fn, comp, compl) != 0 || fn[compl] != '/')
-	continue;
-      bp += compl + 1;
+        continue;
+      bp += compl+1;
       if (strncmp(bp, binarydir, lbinarydir))
-	continue;
+        continue;
       bp += lbinarydir;
       if (!strcmp(bp, "Packages") || !strcmp(bp, "Packages.gz"))
-	{
-	  unsigned char curchksum[32];
-	  int curl;
-	  if (filename && !strcmp(bp, "Packages"))
-	    continue;
-	  curl = solv_chksum_len(curchksumtype);
-	  if (!curl || (chksumtype && solv_chksum_len(chksumtype) > curl))
-	    continue;
+        {
+          unsigned char curchksum[32];
+          int curl;
+          if (filename && !strcmp(bp, "Packages"))
+            continue;
+          curl = solv_chksum_len(curchksumtype);
+          if (!curl || (chksumtype && solv_chksum_len(chksumtype) > curl))
+            continue;
           if (solv_hex2bin((const char **)&ch, curchksum, sizeof(curchksum)) != curl)
-	    continue;
-	  solv_free(filename);
-	  filename = strdup(fn);
-	  chksumtype = curchksumtype;
-	  memcpy(chksum, curchksum, curl);
-	}
+            continue;
+          solv_free(filename);
+          filename = strdup(fn);
+          chksumtype = curchksumtype;
+          memcpy(chksum, curchksum, curl);
+        }
     }
   free(binarydir);
   if (filename)
@@ -158,12 +158,12 @@ debian_load(struct repoinfo *cinfo, Pool **sigpoolp)
     {
       filename = solv_dupjoin("dists/", cinfo->name, "/Release.gpg");
       if (!downloadchecksig(cinfo, fpr, filename, sigpoolp))
-	{
-	  fclose(fpr);
-	  solv_free((char *)filename);
-	  cinfo->incomplete = 1;
-	  return 0;
-	}
+        {
+          fclose(fpr);
+          solv_free((char *)filename);
+          cinfo->incomplete = 1;
+          return 0;
+        }
       solv_free((char *)filename);
     }
   calc_cookie_fp(fpr, REPOKEY_TYPE_SHA256, cinfo->cookie);
@@ -178,19 +178,19 @@ debian_load(struct repoinfo *cinfo, Pool **sigpoolp)
   for (j = 0; j < cinfo->ncomponents; j++)
     {
       if (!(filename = debian_find_component(cinfo, fpr, cinfo->components[j], &filechksum, &filechksumtype)))
-	{
-	  printf("[component %s not found]\n", cinfo->components[j]);
-	  continue;
-	}
+        {
+          printf("[component %s not found]\n", cinfo->components[j]);
+          continue;
+        }
       if ((fp = curlfopen(cinfo, filename, 1, filechksum, filechksumtype, 1)) != 0)
-	{
-	  if (repo_add_debpackages(repo, fp, 0))
-	    {
-	      printf("component %s: %s\n", cinfo->components[j], pool_errstr(pool));
-	      cinfo->incomplete = 1;
-	    }
-	  fclose(fp);
-	}
+        {
+          if (repo_add_debpackages(repo, fp, 0))
+            {
+              printf("component %s: %s\n", cinfo->components[j], pool_errstr(pool));
+              cinfo->incomplete = 1;
+            }
+          fclose(fp);
+        }
       solv_free((char *)filechksum);
       solv_free((char *)filename);
     }

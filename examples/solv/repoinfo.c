@@ -14,7 +14,6 @@
 #include "repo_autopattern.h"
 #endif
 
-
 #include "repoinfo.h"
 #include "repoinfo_cache.h"
 
@@ -81,7 +80,7 @@ free_repoinfos(struct repoinfo *repoinfos, int nrepoinfos)
     }
   solv_free(repoinfos);
 #if defined(SUSE) || defined(FEDORA) || defined(MAGEIA)
-  yum_substitute((Pool *)0, 0);		/* free data */
+  yum_substitute((Pool *)0, 0); /* free data */
 #endif
 }
 
@@ -140,10 +139,10 @@ Id
 add_cmdline_package(Repo *repo, const char *filename)
 {
 #if defined(ENABLE_RPMDB) && (defined(SUSE) || defined(FEDORA) || defined(MANDRIVA) || defined(MAGEIA))
-  return repo_add_rpm(repo, filename, REPO_REUSE_REPODATA|REPO_NO_INTERNALIZE);
+  return repo_add_rpm(repo, filename, REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
 #endif
 #if defined(ENABLE_DEBIAN) && defined(DEBIAN)
-  return repo_add_deb(repo, filename, REPO_REUSE_REPODATA|REPO_NO_INTERNALIZE);
+  return repo_add_deb(repo, filename, REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
 #endif
   return 0;
 }
@@ -163,14 +162,13 @@ void
 add_ext_keys(Repodata *data, Id handle, const char *ext)
 {
   static Id langtags[] = {
-    SOLVABLE_SUMMARY,     REPOKEY_TYPE_STR,
-    SOLVABLE_DESCRIPTION, REPOKEY_TYPE_STR,
-    SOLVABLE_EULA,        REPOKEY_TYPE_STR,
-    SOLVABLE_MESSAGEINS,  REPOKEY_TYPE_STR,
-    SOLVABLE_MESSAGEDEL,  REPOKEY_TYPE_STR,
-    SOLVABLE_CATEGORY,    REPOKEY_TYPE_ID,
-    0, 0
-  };
+      SOLVABLE_SUMMARY, REPOKEY_TYPE_STR,
+      SOLVABLE_DESCRIPTION, REPOKEY_TYPE_STR,
+      SOLVABLE_EULA, REPOKEY_TYPE_STR,
+      SOLVABLE_MESSAGEINS, REPOKEY_TYPE_STR,
+      SOLVABLE_MESSAGEDEL, REPOKEY_TYPE_STR,
+      SOLVABLE_CATEGORY, REPOKEY_TYPE_ID,
+      0, 0};
   if (!strcmp(ext, "DL"))
     {
       repodata_add_idarray(data, handle, REPOSITORY_KEYS, REPOSITORY_DELTAINFO);
@@ -191,10 +189,10 @@ add_ext_keys(Repodata *data, Id handle, const char *ext)
       Pool *pool = data->repo->pool;
       int i;
       for (i = 0; langtags[i]; i += 2)
-	{
-	  repodata_add_idarray(data, handle, REPOSITORY_KEYS, pool_id2langid(pool, langtags[i], ext, 1));
-	  repodata_add_idarray(data, handle, REPOSITORY_KEYS, langtags[i + 1]);
-	}
+        {
+          repodata_add_idarray(data, handle, REPOSITORY_KEYS, pool_id2langid(pool, langtags[i], ext, 1));
+          repodata_add_idarray(data, handle, REPOSITORY_KEYS, langtags[i + 1]);
+        }
     }
 }
 
@@ -233,7 +231,7 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
     {
       struct repoinfo *cinfo = repoinfos + i;
       if (!cinfo->enabled)
-	continue;
+        continue;
 
       repo = repo_create(pool, cinfo->alias);
       cinfo->repo = repo;
@@ -241,43 +239,43 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
       repo->priority = 99 - cinfo->priority;
 
       if ((!cinfo->autorefresh || cinfo->metadata_expire) && usecachedrepo(cinfo, 0, 0))
-	{
+        {
 #ifdef SUSE
-	  repo_add_autopattern(cinfo->repo, 0);
+          repo_add_autopattern(cinfo->repo, 0);
 #endif
-	  printf("repo '%s':", cinfo->alias);
-	  printf(" cached\n");
-	  continue;
-	}
+          printf("repo '%s':", cinfo->alias);
+          printf(" cached\n");
+          continue;
+        }
 
       switch (cinfo->type)
-	{
+        {
 #ifdef ENABLE_RPMMD
         case TYPE_RPMMD:
-	  repomd_load(cinfo, &sigpool);
-	  break;
+          repomd_load(cinfo, &sigpool);
+          break;
 #endif
 #ifdef ENABLE_SUSEREPO
         case TYPE_SUSETAGS:
-	  susetags_load(cinfo, &sigpool);
-	  break;
+          susetags_load(cinfo, &sigpool);
+          break;
 #endif
 #ifdef ENABLE_DEBIAN
         case TYPE_DEBIAN:
-	  debian_load(cinfo, &sigpool);
-	  break;
+          debian_load(cinfo, &sigpool);
+          break;
 #endif
 #ifdef ENABLE_MDKREPO
         case TYPE_MDK:
-	  mdk_load(cinfo, &sigpool);
-	  break;
+          mdk_load(cinfo, &sigpool);
+          break;
 #endif
-	default:
-	  printf("unsupported repo '%s': skipped\n", cinfo->alias);
-	  repo_free(repo, 1);
-	  cinfo->repo = 0;
-	  break;
-	}
+        default:
+          printf("unsupported repo '%s': skipped\n", cinfo->alias);
+          repo_free(repo, 1);
+          cinfo->repo = 0;
+          break;
+        }
 #ifdef SUSE
       if (cinfo->repo)
         repo_add_autopattern(cinfo->repo, 0);
@@ -286,4 +284,3 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
   if (sigpool)
     pool_free(sigpool);
 }
-

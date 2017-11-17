@@ -33,14 +33,14 @@ fgets0(char *s, int size, FILE *stream)
     {
       c = getc(stream);
       if (c == EOF)
-	{
-	  if (p == s)
-	    return 0;
-	  c = 0;
-	}
+        {
+          if (p == s)
+            return 0;
+          c = 0;
+        }
       *p++ = c;
       if (!c)
-	return s;
+        return s;
     }
   *p = 0;
   return s;
@@ -62,50 +62,50 @@ main(int argc, char **argv)
 
   while ((c = getopt(argc, argv, "0b:m:i")) >= 0)
     {
-      switch(c)
-	{
-	case 'b':
-	  basefile = optarg;
-	  break;
-	case 'm':
-	  manifest = optarg;
-	  break;
-	case '0':
-	  manifest0 = 1;
-	  break;
-	case 'i':
-	  flags |= ARCH_ADD_WITH_PKGID;
-	  break;
-	default:
-	  exit(1);
-	}
+      switch (c)
+        {
+        case 'b':
+          basefile = optarg;
+          break;
+        case 'm':
+          manifest = optarg;
+          break;
+        case '0':
+          manifest0 = 1;
+          break;
+        case 'i':
+          flags |= ARCH_ADD_WITH_PKGID;
+          break;
+        default:
+          exit(1);
+        }
     }
   if (manifest)
     {
       if (!strcmp(manifest, "-"))
         fp = stdin;
       else if ((fp = fopen(manifest, "r")) == 0)
-	{
-	  perror(manifest);
-	  exit(1);
-	}
+        {
+          perror(manifest);
+          exit(1);
+        }
       for (;;)
-	{
-	  if (manifest0)
-	    {
-	      if (!fgets0(buf, sizeof(buf), fp))
-		break;
-	    }
-	  else
-	    {
-	      if (!fgets(buf, sizeof(buf), fp))
-		break;
-	      if ((p = strchr(buf, '\n')) != 0)
-		*p = 0;
-	    }
+        {
+          if (manifest0)
+            {
+              if (!fgets0(buf, sizeof(buf), fp))
+                break;
+            }
+          else
+            {
+              if (!fgets(buf, sizeof(buf), fp))
+                break;
+              if ((p = strchr(buf, '\n')) != 0)
+                *p = 0;
+            }
           pkgs = solv_extend(pkgs, npkgs, 1, sizeof(char *), 15);
-	  pkgs[npkgs++] = strdup(buf);
-	}
+          pkgs[npkgs++] = strdup(buf);
+        }
       if (fp != stdin)
         fclose(fp);
     }
@@ -118,10 +118,10 @@ main(int argc, char **argv)
   repo_add_repodata(repo, 0);
   res = 0;
   for (i = 0; i < npkgs; i++)
-    if (repo_add_arch_pkg(repo, pkgs[i], REPO_REUSE_REPODATA|REPO_NO_INTERNALIZE|flags) == 0)
+    if (repo_add_arch_pkg(repo, pkgs[i], REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE | flags) == 0)
       {
-	fprintf(stderr, "archpkgs2solv: %s\n", pool_errstr(pool));
-	res = 1;
+        fprintf(stderr, "archpkgs2solv: %s\n", pool_errstr(pool));
+        res = 1;
       }
   repo_internalize(repo);
   tool_write(repo, basefile, 0);
@@ -131,4 +131,3 @@ main(int argc, char **argv)
   solv_free(pkgs);
   exit(res);
 }
-

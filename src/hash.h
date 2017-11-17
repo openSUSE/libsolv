@@ -61,7 +61,6 @@ strhash_cont(const char *str, Hashval r)
   return r;
 }
 
-
 /* hash for rel
  * rel -> hash
  */
@@ -70,7 +69,6 @@ relhash(Id name, Id evr, int flags)
 {
   return name + 7 * evr + 13 * flags;
 }
-
 
 /* compute bitmask for value
  * returns smallest (2^n-1) > 2 * num + 3

@@ -41,56 +41,56 @@ pool_addfileprovides_dep(Pool *pool, Id *ida, struct searchfiles *sf, struct sea
     {
       csf = sf;
       while (ISRELDEP(dep))
-	{
-	  Reldep *rd;
-	  sid = pool->ss.nstrings + GETRELID(dep);
-	  if (MAPTST(&csf->seen, sid))
-	    {
-	      dep = 0;
-	      break;
-	    }
-	  MAPSET(&csf->seen, sid);
-	  rd = GETRELDEP(pool, dep);
-	  if (rd->flags < 8)
-	    dep = rd->name;
-	  else if (rd->flags == REL_NAMESPACE)
-	    {
-	      if (rd->name == NAMESPACE_SPLITPROVIDES)
-		{
-		  csf = isf;
-		  if (!csf || MAPTST(&csf->seen, sid))
-		    {
-		      dep = 0;
-		      break;
-		    }
-		  MAPSET(&csf->seen, sid);
-		}
-	      dep = rd->evr;
-	    }
-	  else if (rd->flags == REL_FILECONFLICT)
-	    {
-	      dep = 0;
-	      break;
-	    }
-	  else
-	    {
-	      Id ids[2];
-	      ids[0] = rd->name;
-	      ids[1] = 0;
-	      pool_addfileprovides_dep(pool, ids, csf, isf);
-	      dep = rd->evr;
-	    }
-	}
+        {
+          Reldep *rd;
+          sid = pool->ss.nstrings + GETRELID(dep);
+          if (MAPTST(&csf->seen, sid))
+            {
+              dep = 0;
+              break;
+            }
+          MAPSET(&csf->seen, sid);
+          rd = GETRELDEP(pool, dep);
+          if (rd->flags < 8)
+            dep = rd->name;
+          else if (rd->flags == REL_NAMESPACE)
+            {
+              if (rd->name == NAMESPACE_SPLITPROVIDES)
+                {
+                  csf = isf;
+                  if (!csf || MAPTST(&csf->seen, sid))
+                    {
+                      dep = 0;
+                      break;
+                    }
+                  MAPSET(&csf->seen, sid);
+                }
+              dep = rd->evr;
+            }
+          else if (rd->flags == REL_FILECONFLICT)
+            {
+              dep = 0;
+              break;
+            }
+          else
+            {
+              Id ids[2];
+              ids[0] = rd->name;
+              ids[1] = 0;
+              pool_addfileprovides_dep(pool, ids, csf, isf);
+              dep = rd->evr;
+            }
+        }
       if (!dep)
-	continue;
+        continue;
       if (MAPTST(&csf->seen, dep))
-	continue;
+        continue;
       MAPSET(&csf->seen, dep);
       s = pool_id2str(pool, dep);
       if (*s != '/')
-	continue;
+        continue;
       if (csf != isf && pool->addedfileprovides == 1 && !repodata_filelistfilter_matches(0, s))
-	continue;	/* skip non-standard locations csf == isf: installed case */
+        continue; /* skip non-standard locations csf == isf: installed case */
       csf->ids = solv_extend(csf->ids, csf->nfiles, 1, sizeof(Id), SEARCHFILES_BLOCK);
       csf->ids[csf->nfiles++] = dep;
     }
@@ -119,31 +119,31 @@ addfileprovides_cb(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyV
     {
       map_init(&cbd->useddirs, data->dirpool.ndirs + 1);
       if (!cbd->dirs)
-	{
-	  cbd->dirs = solv_malloc2(cbd->nfiles, sizeof(char *));
-	  cbd->names = solv_malloc2(cbd->nfiles, sizeof(char *));
-	  for (i = 0; i < cbd->nfiles; i++)
-	    {
-	      char *s = solv_strdup(pool_id2str(data->repo->pool, cbd->ids[i]));
-	      cbd->dirs[i] = s;
-	      s = strrchr(s, '/');
-	      *s = 0;
-	      cbd->names[i] = s + 1;
-	    }
-	}
+        {
+          cbd->dirs = solv_malloc2(cbd->nfiles, sizeof(char *));
+          cbd->names = solv_malloc2(cbd->nfiles, sizeof(char *));
+          for (i = 0; i < cbd->nfiles; i++)
+            {
+              char *s = solv_strdup(pool_id2str(data->repo->pool, cbd->ids[i]));
+              cbd->dirs[i] = s;
+              s = strrchr(s, '/');
+              *s = 0;
+              cbd->names[i] = s + 1;
+            }
+        }
       for (i = 0; i < cbd->nfiles; i++)
-	{
-	  Id did;
-	  if (MAPTST(&cbd->providedids, cbd->ids[i]))
-	    {
-	      cbd->dids[i] = 0;
-	      continue;
-	    }
-	  did = repodata_str2dir(data, cbd->dirs[i], 0);
-	  cbd->dids[i] = did;
-	  if (did)
-	    MAPSET(&cbd->useddirs, did);
-	}
+        {
+          Id did;
+          if (MAPTST(&cbd->providedids, cbd->ids[i]))
+            {
+              cbd->dids[i] = 0;
+              continue;
+            }
+          did = repodata_str2dir(data, cbd->dirs[i], 0);
+          cbd->dids[i] = did;
+          if (did)
+            MAPSET(&cbd->useddirs, did);
+        }
       repodata_free_dircache(data);
     }
   if (value->id >= data->dirpool.ndirs || !MAPTST(&cbd->useddirs, value->id))
@@ -184,93 +184,93 @@ pool_addfileprovides_search(Pool *pool, struct addfileprovides_cbdata *cbd, stru
   for (;;)
     {
       if (!repo || repo->disabled)
-	{
-	  if (repoonly || ++repoid == pool->nrepos)
-	    break;
-	  repo = pool->repos[repoid];
-	  continue;
-	}
+        {
+          if (repoonly || ++repoid == pool->nrepos)
+            break;
+          repo = pool->repos[repoid];
+          continue;
+        }
       ndone = 0;
-      FOR_REPODATAS(repo, repodataid, data)
-	{
-	  if (ndone >= repo->nsolvables)
-	    break;
+      FOR_REPODATAS (repo, repodataid, data)
+        {
+          if (ndone >= repo->nsolvables)
+            break;
 
-	  if (repodata_lookup_idarray(data, SOLVID_META, REPOSITORY_ADDEDFILEPROVIDES, &fileprovidesq))
-	    {
-	      map_empty(&cbd->providedids);
-	      for (i = 0; i < fileprovidesq.count; i++)
-		MAPSET(&cbd->providedids, fileprovidesq.elements[i]);
-	      provstart = data->start;
-	      provend = data->end;
-	      for (i = 0; i < cbd->nfiles; i++)
-		if (!MAPTST(&cbd->providedids, cbd->ids[i]))
-		  break;
-	      if (i == cbd->nfiles)
-		{
-		  /* great! no need to search files */
-		  for (p = data->start; p < data->end; p++)
-		    if (pool->solvables[p].repo == repo)
-		      {
-			if (MAPTST(&donemap, p))
-			  continue;
-			MAPSET(&donemap, p);
-			ndone++;
-		      }
-		  continue;
-		}
-	    }
+          if (repodata_lookup_idarray(data, SOLVID_META, REPOSITORY_ADDEDFILEPROVIDES, &fileprovidesq))
+            {
+              map_empty(&cbd->providedids);
+              for (i = 0; i < fileprovidesq.count; i++)
+                MAPSET(&cbd->providedids, fileprovidesq.elements[i]);
+              provstart = data->start;
+              provend = data->end;
+              for (i = 0; i < cbd->nfiles; i++)
+                if (!MAPTST(&cbd->providedids, cbd->ids[i]))
+                  break;
+              if (i == cbd->nfiles)
+                {
+                  /* great! no need to search files */
+                  for (p = data->start; p < data->end; p++)
+                    if (pool->solvables[p].repo == repo)
+                      {
+                        if (MAPTST(&donemap, p))
+                          continue;
+                        MAPSET(&donemap, p);
+                        ndone++;
+                      }
+                  continue;
+                }
+            }
 
-	  if (!repodata_has_keyname(data, SOLVABLE_FILELIST))
-	    continue;
+          if (!repodata_has_keyname(data, SOLVABLE_FILELIST))
+            continue;
 
-	  if (data->start < provstart || data->end > provend)
-	    {
-	      map_empty(&cbd->providedids);
-	      provstart = provend = 0;
-	    }
+          if (data->start < provstart || data->end > provend)
+            {
+              map_empty(&cbd->providedids);
+              provstart = provend = 0;
+            }
 
-	  /* check if the data is incomplete */
-	  incomplete = 0;
-	  if (data->state == REPODATA_AVAILABLE)
-	    {
-	      for (j = 1; j < data->nkeys; j++)
-		if (data->keys[j].name != REPOSITORY_SOLVABLES && data->keys[j].name != SOLVABLE_FILELIST)
-		  break;
-	      if (j < data->nkeys)
-		{
+          /* check if the data is incomplete */
+          incomplete = 0;
+          if (data->state == REPODATA_AVAILABLE)
+            {
+              for (j = 1; j < data->nkeys; j++)
+                if (data->keys[j].name != REPOSITORY_SOLVABLES && data->keys[j].name != SOLVABLE_FILELIST)
+                  break;
+              if (j < data->nkeys)
+                {
 #if 0
 		  for (i = 0; i < cbd->nfiles; i++)
 		    if (!MAPTST(&cbd->providedids, cbd->ids[i]) && !repodata_filelistfilter_matches(data, pool_id2str(pool, cbd->ids[i])))
 		      printf("need complete filelist because of %s\n", pool_id2str(pool, cbd->ids[i]));
 #endif
-		  for (i = 0; i < cbd->nfiles; i++)
-		    if (!MAPTST(&cbd->providedids, cbd->ids[i]) && !repodata_filelistfilter_matches(data, pool_id2str(pool, cbd->ids[i])))
-		      break;
-		  if (i < cbd->nfiles)
-		    incomplete = 1;
-		}
-	    }
+                  for (i = 0; i < cbd->nfiles; i++)
+                    if (!MAPTST(&cbd->providedids, cbd->ids[i]) && !repodata_filelistfilter_matches(data, pool_id2str(pool, cbd->ids[i])))
+                      break;
+                  if (i < cbd->nfiles)
+                    incomplete = 1;
+                }
+            }
 
-	  /* do the search */
-	  map_init(&cbd->useddirs, 0);
-	  for (p = data->start; p < data->end; p++)
-	    if (pool->solvables[p].repo == repo)
-	      {
-		if (MAPTST(&donemap, p))
-		  continue;
-	        repodata_search(data, p, SOLVABLE_FILELIST, 0, addfileprovides_cb, cbd);
-		if (!incomplete)
-		  {
-		    MAPSET(&donemap, p);
-		    ndone++;
-		  }
-	      }
-	  map_free(&cbd->useddirs);
-	}
+          /* do the search */
+          map_init(&cbd->useddirs, 0);
+          for (p = data->start; p < data->end; p++)
+            if (pool->solvables[p].repo == repo)
+              {
+                if (MAPTST(&donemap, p))
+                  continue;
+                repodata_search(data, p, SOLVABLE_FILELIST, 0, addfileprovides_cb, cbd);
+                if (!incomplete)
+                  {
+                    MAPSET(&donemap, p);
+                    ndone++;
+                  }
+              }
+          map_free(&cbd->useddirs);
+        }
 
       if (repoonly || ++repoid == pool->nrepos)
-	break;
+        break;
       repo = pool->repos[repoid];
     }
   map_free(&donemap);
@@ -279,7 +279,7 @@ pool_addfileprovides_search(Pool *pool, struct addfileprovides_cbdata *cbd, stru
   if (cbd->dirs)
     {
       for (i = 0; i < cbd->nfiles; i++)
-	solv_free(cbd->dirs[i]);
+        solv_free(cbd->dirs[i]);
       cbd->dirs = solv_free(cbd->dirs);
       cbd->names = solv_free(cbd->names);
     }
@@ -312,7 +312,7 @@ pool_addfileprovides_queue(Pool *pool, Queue *idq, Queue *idqinst)
     {
       repo = s->repo;
       if (!repo)
-	continue;
+        continue;
       if (s->obsoletes)
         pool_addfileprovides_dep(pool, repo->idarraydata + s->obsoletes, &sf, isfp);
       if (s->conflicts)
@@ -341,10 +341,10 @@ pool_addfileprovides_queue(Pool *pool, Queue *idq, Queue *idqinst)
       pool_addfileprovides_search(pool, &cbd, &sf, 0);
       if (idq)
         for (i = 0; i < sf.nfiles; i++)
-	  queue_push(idq, sf.ids[i]);
+          queue_push(idq, sf.ids[i]);
       if (idqinst)
         for (i = 0; i < sf.nfiles; i++)
-	  queue_push(idqinst, sf.ids[i]);
+          queue_push(idqinst, sf.ids[i]);
       solv_free(sf.ids);
     }
   if (isf.nfiles)
@@ -357,11 +357,11 @@ pool_addfileprovides_queue(Pool *pool, Queue *idq, Queue *idqinst)
         pool_addfileprovides_search(pool, &cbd, &isf, installed);
       if (installed && idqinst)
         for (i = 0; i < isf.nfiles; i++)
-	  queue_pushunique(idqinst, isf.ids[i]);
+          queue_pushunique(idqinst, isf.ids[i]);
       solv_free(isf.ids);
     }
   solv_free(cbd.dids);
-  pool_freewhatprovides(pool);	/* as we have added provides */
+  pool_freewhatprovides(pool); /* as we have added provides */
   POOL_DEBUG(SOLV_DEBUG_STATS, "addfileprovides took %d ms\n", solv_timems(now));
 }
 
@@ -370,4 +370,3 @@ pool_addfileprovides(Pool *pool)
 {
   pool_addfileprovides_queue(pool, 0, 0);
 }
-

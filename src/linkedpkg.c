@@ -56,15 +56,15 @@ find_application_link(Pool *pool, Solvable *s, Id *reqidp, Queue *qr, Id *prvidp
   if (s->requires)
     {
       Id *reqp = s->repo->idarraydata + s->requires;
-      while ((req = *reqp++) != 0)            /* go through all requires */
-	{
-	  if (ISRELDEP(req))
-	    continue;
-	  if (!strncmp("appdata(", pool_id2str(pool, req), 8))
-	    appdataid = req;
-	  else
-	    pkgname = req;
-	}
+      while ((req = *reqp++) != 0) /* go through all requires */
+        {
+          if (ISRELDEP(req))
+            continue;
+          if (!strncmp("appdata(", pool_id2str(pool, req), 8))
+            appdataid = req;
+          else
+            pkgname = req;
+        }
     }
   req = appdataid ? appdataid : pkgname;
   if (!req)
@@ -75,45 +75,45 @@ find_application_link(Pool *pool, Solvable *s, Id *reqidp, Queue *qr, Id *prvidp
       Id *prvp = s->repo->idarraydata + s->provides;
       const char *reqs = pool_id2str(pool, req);
       const char *prvs;
-      while ((prv = *prvp++) != 0)            /* go through all provides */
-	{
-	  if (ISRELDEP(prv))
-	    continue;
-	  prvs = pool_id2str(pool, prv);
-	  if (strncmp("application-appdata(", prvs, 20))
-	    continue;
-	  if (appdataid)
-	    {
-	      if (!strcmp(prvs + 12, reqs))
-		break;
-	    }
-	  else
-	    {
-	      int reqsl = strlen(reqs);
-	      if (!strncmp(prvs + 20, reqs, reqsl) && !strcmp(prvs + 20 + reqsl, ")"))
-		break;
-	    }
-	}
+      while ((prv = *prvp++) != 0) /* go through all provides */
+        {
+          if (ISRELDEP(prv))
+            continue;
+          prvs = pool_id2str(pool, prv);
+          if (strncmp("application-appdata(", prvs, 20))
+            continue;
+          if (appdataid)
+            {
+              if (!strcmp(prvs + 12, reqs))
+                break;
+            }
+          else
+            {
+              int reqsl = strlen(reqs);
+              if (!strncmp(prvs + 20, reqs, reqsl) && !strcmp(prvs + 20 + reqsl, ")"))
+                break;
+            }
+        }
     }
   if (!prv)
-    return;	/* huh, no provides found? */
+    return; /* huh, no provides found? */
   /* now link em */
-  FOR_PROVIDES(p, pp, req)
+  FOR_PROVIDES (p, pp, req)
     if (pool->solvables[p].repo == s->repo)
       if (!pkgname || pool->solvables[p].name == pkgname)
         queue_push(qr, p);
   if (!qr->count && pkgname && appdataid)
     {
       /* huh, no matching package? try without pkgname filter */
-      FOR_PROVIDES(p, pp, req)
-	if (pool->solvables[p].repo == s->repo)
+      FOR_PROVIDES (p, pp, req)
+        if (pool->solvables[p].repo == s->repo)
           queue_push(qr, p);
     }
   if (qp)
     {
-      FOR_PROVIDES(p, pp, prv)
-	if (pool->solvables[p].repo == s->repo)
-	  queue_push(qp, p);
+      FOR_PROVIDES (p, pp, prv)
+        if (pool->solvables[p].repo == s->repo)
+          queue_push(qp, p);
     }
   if (reqidp)
     *reqidp = req;
@@ -135,20 +135,20 @@ find_product_link(Pool *pool, Solvable *s, Id *reqidp, Queue *qr, Id *prvidp, Qu
       Id req, *reqp = s->repo->idarraydata + s->requires;
       const char *nn = pool_id2str(pool, s->name);
       int nnl = strlen(nn);
-      while ((req = *reqp++) != 0)            /* go through all requires */
-	if (ISRELDEP(req))
-	  {
-	    const char *rn;
-	    Reldep *rd = GETRELDEP(pool, req);
-	    if (rd->flags != REL_EQ || rd->evr != s->evr)
-	      continue;
-	    rn = pool_id2str(pool, rd->name);
-	    if (!strncmp(rn, "product(", 8) && !strncmp(rn + 8, nn + 8, nnl - 8) && !strcmp( rn + nnl, ")"))
-	      {
-		namerelid = req;
-		break;
-	      }
-	  }
+      while ((req = *reqp++) != 0) /* go through all requires */
+        if (ISRELDEP(req))
+          {
+            const char *rn;
+            Reldep *rd = GETRELDEP(pool, req);
+            if (rd->flags != REL_EQ || rd->evr != s->evr)
+              continue;
+            rn = pool_id2str(pool, rd->name);
+            if (!strncmp(rn, "product(", 8) && !strncmp(rn + 8, nn + 8, nnl - 8) && !strcmp(rn + nnl, ")"))
+              {
+                namerelid = req;
+                break;
+              }
+          }
     }
   if (!namerelid)
     {
@@ -157,11 +157,11 @@ find_product_link(Pool *pool, Solvable *s, Id *reqidp, Queue *qr, Id *prvidp, Qu
       str[7] = '(';
       namerelid = pool_rel2id(pool, pool_str2id(pool, str, 1), s->evr, REL_EQ, 1);
     }
-  FOR_PROVIDES(p, pp, namerelid)
+  FOR_PROVIDES (p, pp, namerelid)
     {
       Solvable *ps = pool->solvables + p;
       if (ps->repo != s->repo || ps->arch != s->arch)
-	continue;
+        continue;
       queue_push(qr, p);
     }
   if (qr->count > 1)
@@ -169,23 +169,23 @@ find_product_link(Pool *pool, Solvable *s, Id *reqidp, Queue *qr, Id *prvidp, Qu
       /* multiple providers. try buildtime filter */
       sbt = solvable_lookup_num(s, SOLVABLE_BUILDTIME, 0);
       if (sbt)
-	{
-	  unsigned int bt;
-	  int i, j;
-	  int filterqp = 1;
-	  for (i = j = 0; i < qr->count; i++)
-	    {
-	      bt = solvable_lookup_num(pool->solvables + qr->elements[i], SOLVABLE_BUILDTIME, 0);
-	      if (!bt)
-		filterqp = 0;	/* can't filter */
-	      if (!bt || bt == sbt)
-		qr->elements[j++] = qr->elements[i];
-	    }
-	  if (j)
-	    qr->count = j;
-	  if (!j || !filterqp)
-	    sbt = 0;	/* filter failed */
-	}
+        {
+          unsigned int bt;
+          int i, j;
+          int filterqp = 1;
+          for (i = j = 0; i < qr->count; i++)
+            {
+              bt = solvable_lookup_num(pool->solvables + qr->elements[i], SOLVABLE_BUILDTIME, 0);
+              if (!bt)
+                filterqp = 0; /* can't filter */
+              if (!bt || bt == sbt)
+                qr->elements[j++] = qr->elements[i];
+            }
+          if (j)
+            qr->count = j;
+          if (!j || !filterqp)
+            sbt = 0; /* filter failed */
+        }
     }
   if (!qr->count && s->repo == pool->installed)
     {
@@ -194,28 +194,28 @@ find_product_link(Pool *pool, Solvable *s, Id *reqidp, Queue *qr, Id *prvidp, Qu
       const char *refbasename = solvable_lookup_str(s, PRODUCT_REFERENCEFILE);
       dataiterator_init(&di, pool, s->repo, 0, SOLVABLE_FILELIST, refbasename, SEARCH_STRING);
       while (dataiterator_step(&di))
-	queue_push(qr, di.solvid);
+        queue_push(qr, di.solvid);
       dataiterator_free(&di);
       if (qp)
-	{
-	  dataiterator_init(&di, pool, s->repo, 0, PRODUCT_REFERENCEFILE, refbasename, SEARCH_STRING);
-	  while (dataiterator_step(&di))
-	    queue_push(qp, di.solvid);
-	  dataiterator_free(&di);
-	}
+        {
+          dataiterator_init(&di, pool, s->repo, 0, PRODUCT_REFERENCEFILE, refbasename, SEARCH_STRING);
+          while (dataiterator_step(&di))
+            queue_push(qp, di.solvid);
+          dataiterator_free(&di);
+        }
     }
   else if (qp)
     {
       /* find qp */
-      FOR_PROVIDES(p, pp, s->name)
-	{
-	  Solvable *ps = pool->solvables + p;
-	  if (s->name != ps->name || ps->repo != s->repo || ps->arch != s->arch || s->evr != ps->evr)
-	    continue;
-	  if (sbt && solvable_lookup_num(ps, SOLVABLE_BUILDTIME, 0) != sbt)
-	    continue;
-	  queue_push(qp, p);
-	}
+      FOR_PROVIDES (p, pp, s->name)
+        {
+          Solvable *ps = pool->solvables + p;
+          if (s->name != ps->name || ps->repo != s->repo || ps->arch != s->arch || s->evr != ps->evr)
+            continue;
+          if (sbt && solvable_lookup_num(ps, SOLVABLE_BUILDTIME, 0) != sbt)
+            continue;
+          queue_push(qp, p);
+        }
     }
   if (reqidp)
     *reqidp = namerelid;
@@ -231,20 +231,20 @@ find_pattern_link(Pool *pool, Solvable *s, Id *reqidp, Queue *qr, Id *prvidp, Qu
   /* check if autopattern */
   if (!s->provides)
     return;
-  for (pr = s->repo->idarraydata + s->provides; (p = *pr++) != 0; )
+  for (pr = s->repo->idarraydata + s->provides; (p = *pr++) != 0;)
     if (ISRELDEP(p))
       {
-	Reldep *rd = GETRELDEP(pool, p);
-	if (rd->flags == REL_EQ && !strcmp(pool_id2str(pool, rd->name), "autopattern()"))
-	  {
-	    aprel = p;
-	    apevr = rd->evr;
-	    break;
-	  }
+        Reldep *rd = GETRELDEP(pool, p);
+        if (rd->flags == REL_EQ && !strcmp(pool_id2str(pool, rd->name), "autopattern()"))
+          {
+            aprel = p;
+            apevr = rd->evr;
+            break;
+          }
       }
   if (!apevr)
     return;
-  FOR_PROVIDES(p, pp, apevr)
+  FOR_PROVIDES (p, pp, apevr)
     {
       Solvable *s2 = pool->solvables + p;
       if (s2->repo == s->repo && s2->name == apevr && s2->evr == s->evr && s2->vendor == s->vendor)
@@ -252,12 +252,12 @@ find_pattern_link(Pool *pool, Solvable *s, Id *reqidp, Queue *qr, Id *prvidp, Qu
     }
   if (qp)
     {
-      FOR_PROVIDES(p, pp, aprel)
-	{
-	  Solvable *s2 = pool->solvables + p;
-	  if (s2->repo == s->repo && s2->evr == s->evr && s2->vendor == s->vendor)
-	    queue_push(qp, p);
-	}
+      FOR_PROVIDES (p, pp, aprel)
+        {
+          Solvable *s2 = pool->solvables + p;
+          if (s2->repo == s->repo && s2->evr == s->evr && s2->vendor == s->vendor)
+            queue_push(qp, p);
+        }
     }
   if (reqidp)
     *reqidp = apevr;
@@ -274,7 +274,7 @@ find_autopattern_name(Pool *pool, Solvable *s)
   Id prv, *prvp;
   if (!s->provides)
     return 0;
-  for (prvp = s->repo->idarraydata + s->provides; (prv = *prvp++) != 0; )
+  for (prvp = s->repo->idarraydata + s->provides; (prv = *prvp++) != 0;)
     if (ISRELDEP(prv))
       {
         Reldep *rd = GETRELDEP(pool, prv);
@@ -290,7 +290,7 @@ find_autoproduct_name(Pool *pool, Solvable *s)
   Id prv, *prvp;
   if (!s->provides)
     return 0;
-  for (prvp = s->repo->idarraydata + s->provides; (prv = *prvp++) != 0; )
+  for (prvp = s->repo->idarraydata + s->provides; (prv = *prvp++) != 0;)
     if (ISRELDEP(prv))
       {
         Reldep *rd = GETRELDEP(pool, prv);
@@ -320,7 +320,7 @@ name_min_max(Pool *pool, Solvable *s, Id *namep, Id *minp, Id *maxp)
   Id name, min, max;
   int i;
 
-  queue_init_buffer(&q, qbuf, sizeof(qbuf)/sizeof(*qbuf));
+  queue_init_buffer(&q, qbuf, sizeof(qbuf) / sizeof(*qbuf));
   find_package_link(pool, s, 0, &q, 0, 0);
   if (!q.count)
     {
@@ -334,16 +334,16 @@ name_min_max(Pool *pool, Solvable *s, Id *namep, Id *minp, Id *maxp)
     {
       s = pool->solvables + q.elements[i];
       if (s->name != name)
-	{
+        {
           queue_free(&q);
-	  return 0;
-	}
+          return 0;
+        }
       if (s->evr == min || s->evr == max)
-	continue;
+        continue;
       if (pool_evrcmp(pool, min, s->evr, EVRCMP_COMPARE) >= 0)
-	min = s->evr;
+        min = s->evr;
       else if (min == max || pool_evrcmp(pool, max, s->evr, EVRCMP_COMPARE) <= 0)
-	max = s->evr;
+        max = s->evr;
     }
   queue_free(&q);
   *namep = name;
@@ -359,7 +359,7 @@ pool_link_evrcmp(Pool *pool, Solvable *s1, Solvable *s2)
   Id name2, evrmin2, evrmax2;
 
   if (s1->name != s2->name)
-    return 0;	/* can't compare */
+    return 0; /* can't compare */
   if (!name_min_max(pool, s1, &name1, &evrmin1, &evrmax1))
     return 0;
   if (!name_min_max(pool, s2, &name2, &evrmin2, &evrmax2))
@@ -391,16 +391,16 @@ extend_updatemap_to_buddies(Solver *solv)
     return;
   if (!solv->updatemap.size || !solv->instbuddy)
     return;
-  FOR_REPO_SOLVABLES(installed, p, s)
+  FOR_REPO_SOLVABLES (installed, p, s)
     {
       if (!MAPTST(&solv->updatemap, p - installed->start))
-	continue;
+        continue;
       if ((ip = solv->instbuddy[p - installed->start]) <= 1)
-	continue;
-      if (!has_package_link(pool, s))	/* only look at pseudo -> real relations */
-	continue;
+        continue;
+      if (!has_package_link(pool, s)) /* only look at pseudo -> real relations */
+        continue;
       if (ip < installed->start || ip >= installed->end || pool->solvables[ip].repo != installed)
-	continue;			/* just in case... */
+        continue; /* just in case... */
       MAPSET(&solv->updatemap, ip - installed->start);
     }
 }

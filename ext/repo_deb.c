@@ -18,7 +18,7 @@
 #include "pool.h"
 #include "repo.h"
 #include "util.h"
-#include "solver.h"	/* for GET_USERINSTALLED_ flags */
+#include "solver.h" /* for GET_USERINSTALLED_ flags */
 #include "chksum.h"
 #include "repo_deb.h"
 
@@ -35,20 +35,20 @@ decompress_gz(unsigned char *in, int inl, int *outlp, int maxoutl)
   if (in[2] != 8 || (in[3] & 0xe0) != 0)
     return 0;
   bp = in + 4;
-  bp += 6;	/* skip time, xflags and OS code */
+  bp += 6; /* skip time, xflags and OS code */
   if (in[3] & 0x04)
     {
       /* skip extra field */
       int l = bp + 2 >= in + inl ? 0 : (bp[0] | bp[1] << 8);
       bp += l + 2;
     }
-  if (in[3] & 0x08)	/* orig filename */
+  if (in[3] & 0x08) /* orig filename */
     while (bp < in + inl && *bp++)
       ;
-  if (in[3] & 0x10)	/* file comment */
+  if (in[3] & 0x10) /* file comment */
     while (bp < in + inl && *bp++)
       ;
-  if (in[3] & 0x02)	/* header crc */
+  if (in[3] & 0x02) /* header crc */
     bp += 2;
   if (bp >= in + inl)
     return 0;
@@ -71,27 +71,27 @@ decompress_gz(unsigned char *in, int inl, int *outlp, int maxoutl)
   for (;;)
     {
       if (strm.avail_out == 0)
-	{
-	  outl += 4096;
-	  if (outl >= maxoutl)
-	    {
-	      inflateEnd(&strm);
-	      free(out);
-	      return 0;
-	    }
-	  out = solv_realloc(out, outl + 4096);
-	  strm.next_out = out + outl;
-	  strm.avail_out = 4096;
-	}
+        {
+          outl += 4096;
+          if (outl >= maxoutl)
+            {
+              inflateEnd(&strm);
+              free(out);
+              return 0;
+            }
+          out = solv_realloc(out, outl + 4096);
+          strm.next_out = out + outl;
+          strm.avail_out = 4096;
+        }
       ret = inflate(&strm, Z_NO_FLUSH);
       if (ret == Z_STREAM_END)
-	break;
+        break;
       if (ret != Z_OK)
-	{
-	  inflateEnd(&strm);
-	  free(out);
-	  return 0;
-	}
+        {
+          inflateEnd(&strm);
+          free(out);
+          return 0;
+        }
     }
   outl += 4096 - strm.avail_out;
   inflateEnd(&strm);
@@ -123,27 +123,27 @@ decompress_xz(unsigned char *in, int inl, int *outlp, int maxoutl)
   for (;;)
     {
       if (strm.avail_out == 0)
-	{
-	  outl += 4096;
-	  if (outl >= maxoutl)
-	    {
-	      lzma_end(&strm);
-	      free(out);
-	      return 0;
-	    }
-	  out = solv_realloc(out, outl + 4096);
-	  strm.next_out = out + outl;
-	  strm.avail_out = 4096;
-	}
+        {
+          outl += 4096;
+          if (outl >= maxoutl)
+            {
+              lzma_end(&strm);
+              free(out);
+              return 0;
+            }
+          out = solv_realloc(out, outl + 4096);
+          strm.next_out = out + outl;
+          strm.avail_out = 4096;
+        }
       ret = lzma_code(&strm, LZMA_RUN);
       if (ret == LZMA_STREAM_END)
-	break;
+        break;
       if (ret != LZMA_OK)
-	{
-	  lzma_end(&strm);
-	  free(out);
-	  return 0;
-	}
+        {
+          lzma_end(&strm);
+          free(out);
+          return 0;
+        }
     }
   outl += 4096 - strm.avail_out;
   lzma_end(&strm);
@@ -176,38 +176,38 @@ parseonedep(Pool *pool, char *p)
     {
       p++;
       while (*p == ' ' || *p == '\t' || *p == '\n')
-	p++;
+        p++;
       if (*p == '>')
-	flags |= REL_GT;
+        flags |= REL_GT;
       else if (*p == '=')
-	flags |= REL_EQ;
+        flags |= REL_EQ;
       else if (*p == '<')
-	flags |= REL_LT;
+        flags |= REL_LT;
       if (flags)
-	{
-	  p++;
-	  if (*p == '>')
-	    flags |= REL_GT;
-	  else if (*p == '=')
-	    flags |= REL_EQ;
-	  else if (*p == '<')
-	    flags |= REL_LT;
-	  else
-	    p--;
-	  p++;
-	}
+        {
+          p++;
+          if (*p == '>')
+            flags |= REL_GT;
+          else if (*p == '=')
+            flags |= REL_EQ;
+          else if (*p == '<')
+            flags |= REL_LT;
+          else
+            p--;
+          p++;
+        }
       while (*p == ' ' || *p == '\t' || *p == '\n')
-	p++;
+        p++;
       e = p;
       while (*p && *p != ' ' && *p != '\t' && *p != '\n' && *p != ')')
-	p++;
+        p++;
       ee = p;
       while (*p && *p != ')')
-	p++;
+        p++;
       if (*p)
-	p++;
+        p++;
       while (*p == ' ' || *p == '\t' || *p == '\n')
-	p++;
+        p++;
     }
   if (ne - n > 4 && ne[-4] == ':' && !strncmp(ne - 4, ":any", 4))
     {
@@ -226,7 +226,7 @@ parseonedep(Pool *pool, char *p)
     {
       Id id = parseonedep(pool, p + 1);
       if (id)
-	name = pool_rel2id(pool, name, id, REL_OR, 1);
+        name = pool_rel2id(pool, name, id, REL_OR, 1);
     }
   return name;
 }
@@ -251,7 +251,6 @@ makedeps(Repo *repo, char *deps, unsigned int olddeps, Id marker)
   return repo_addid_dep(repo, olddeps, id, marker);
 }
 
-
 /* put data from control file into the solvable */
 /* warning: does inplace changes */
 static void
@@ -271,148 +270,148 @@ control2solvable(Solvable *s, Repodata *data, char *control)
     {
       p = strchr(p, '\n');
       if (!p)
-	break;
+        break;
       if (p[1] == ' ' || p[1] == '\t')
-	{
-	  char *q;
-	  /* continuation line */
-	  q = p - 1;
-	  while (q >= control && *q == ' ' && *q == '\t')
-	    q--;
-	  l = q + 1 - control;
-	  if (l)
-	    memmove(p + 1 - l, control, l);
-	  control = p + 1 - l;
-	  p[1] = '\n';
-	  p += 2;
-	  continue;
-	}
+        {
+          char *q;
+          /* continuation line */
+          q = p - 1;
+          while (q >= control && *q == ' ' && *q == '\t')
+            q--;
+          l = q + 1 - control;
+          if (l)
+            memmove(p + 1 - l, control, l);
+          control = p + 1 - l;
+          p[1] = '\n';
+          p += 2;
+          continue;
+        }
       end = p - 1;
       if (*p)
         *p++ = 0;
       /* strip trailing space */
       while (end >= control && (*end == ' ' || *end == '\t'))
-	*end-- = 0;
+        *end-- = 0;
       tag = control;
       control = p;
       q = strchr(tag, ':');
       if (!q || q - tag < 4)
-	continue;
+        continue;
       *q++ = 0;
       while (*q == ' ' || *q == '\t')
-	q++;
+        q++;
       x = '@' + (tag[0] & 0x1f);
       x = (x << 8) + '@' + (tag[1] & 0x1f);
-      switch(x)
-	{
-	case 'A' << 8 | 'R':
-	  if (!strcasecmp(tag, "architecture"))
-	    s->arch = pool_str2id(pool, q, 1);
-	  break;
-	case 'B' << 8 | 'R':
-	  if (!strcasecmp(tag, "breaks"))
-	    s->conflicts = makedeps(repo, q, s->conflicts, 0);
-	  break;
-	case 'C' << 8 | 'O':
-	  if (!strcasecmp(tag, "conflicts"))
-	    s->conflicts = makedeps(repo, q, s->conflicts, 0);
-	  break;
-	case 'D' << 8 | 'E':
-	  if (!strcasecmp(tag, "depends"))
-	    s->requires = makedeps(repo, q, s->requires, -SOLVABLE_PREREQMARKER);
-	  else if (!strcasecmp(tag, "description"))
-	    {
-	      char *ld = strchr(q, '\n');
-	      if (ld)
-		{
-		  *ld++ = 0;
-	          repodata_set_str(data, s - pool->solvables, SOLVABLE_DESCRIPTION, ld);
-		}
-	      else
-	        repodata_set_str(data, s - pool->solvables, SOLVABLE_DESCRIPTION, q);
-	      repodata_set_str(data, s - pool->solvables, SOLVABLE_SUMMARY, q);
-	    }
-	  break;
-	case 'E' << 8 | 'N':
-	  if (!strcasecmp(tag, "enhances"))
-	    s->enhances = makedeps(repo, q, s->enhances, 0);
-	  break;
-	case 'F' << 8 | 'I':
-	  if (!strcasecmp(tag, "filename"))
-	    repodata_set_location(data, s - pool->solvables, 0, 0, q);
-	  break;
-	case 'H' << 8 | 'O':
-	  if (!strcasecmp(tag, "homepage"))
-	    repodata_set_str(data, s - pool->solvables, SOLVABLE_URL, q);
-	  break;
-	case 'I' << 8 | 'N':
-	  if (!strcasecmp(tag, "installed-size"))
-	    repodata_set_num(data, s - pool->solvables, SOLVABLE_INSTALLSIZE, strtoull(q, 0, 10) << 10);
-	  break;
-	case 'M' << 8 | 'D':
-	  if (!strcasecmp(tag, "md5sum") && !checksumtype && strlen(q) == 16 * 2)
-	    {
-	      strcpy(checksum, q);
-	      checksumtype = REPOKEY_TYPE_MD5;
-	    }
-	  break;
-	case 'P' << 8 | 'A':
-	  if (!strcasecmp(tag, "package"))
-	    s->name = pool_str2id(pool, q, 1);
-	  break;
-	case 'P' << 8 | 'R':
-	  if (!strcasecmp(tag, "pre-depends"))
-	    s->requires = makedeps(repo, q, s->requires, SOLVABLE_PREREQMARKER);
-	  else if (!strcasecmp(tag, "provides"))
-	    s->provides = makedeps(repo, q, s->provides, 0);
-	  break;
-	case 'R' << 8 | 'E':
-	  if (!strcasecmp(tag, "replaces"))
-	    s->obsoletes = makedeps(repo, q, s->obsoletes, 0);
-	  else if (!strcasecmp(tag, "recommends"))
-	    s->recommends = makedeps(repo, q, s->recommends, 0);
-	  break;
-	case 'S' << 8 | 'H':
-	  newtype = solv_chksum_str2type(tag);
-	  if (!newtype || solv_chksum_len(newtype) * 2 != strlen(q))
-	    break;
-	  if (!checksumtype || (newtype == REPOKEY_TYPE_SHA1 && checksumtype != REPOKEY_TYPE_SHA256) || newtype == REPOKEY_TYPE_SHA256)
-	    {
-	      strcpy(checksum, q);
-	      checksumtype = newtype;
-	    }
-	  break;
-	case 'S' << 8 | 'O':
-	  if (!strcasecmp(tag, "source"))
-	    {
-	      char *q2;
-	      /* ignore version for now */
-	      for (q2 = q; *q2; q2++)
-		if (*q2 == ' ' || *q2 == '\t')
-		  {
-		    *q2 = 0;
-		    break;
-		  }
-	      if (s->name && !strcmp(q, pool_id2str(pool, s->name)))
-		repodata_set_void(data, s - pool->solvables, SOLVABLE_SOURCENAME);
-	      else
-		repodata_set_id(data, s - pool->solvables, SOLVABLE_SOURCENAME, pool_str2id(pool, q, 1));
-	      havesource = 1;
-	    }
-	  break;
-	case 'S' << 8 | 'T':
-	  if (!strcasecmp(tag, "status"))
-	    repodata_set_poolstr(data, s - pool->solvables, SOLVABLE_INSTALLSTATUS, q);
-	  break;
-	case 'S' << 8 | 'U':
-	  if (!strcasecmp(tag, "suggests"))
-	    s->suggests = makedeps(repo, q, s->suggests, 0);
-	  break;
-	case 'V' << 8 | 'E':
-	  if (!strcasecmp(tag, "version"))
-	    s->evr = pool_str2id(pool, q, 1);
-	  break;
-	}
+      switch (x)
+        {
+        case 'A' << 8 | 'R':
+          if (!strcasecmp(tag, "architecture"))
+            s->arch = pool_str2id(pool, q, 1);
+          break;
+        case 'B' << 8 | 'R':
+          if (!strcasecmp(tag, "breaks"))
+            s->conflicts = makedeps(repo, q, s->conflicts, 0);
+          break;
+        case 'C' << 8 | 'O':
+          if (!strcasecmp(tag, "conflicts"))
+            s->conflicts = makedeps(repo, q, s->conflicts, 0);
+          break;
+        case 'D' << 8 | 'E':
+          if (!strcasecmp(tag, "depends"))
+            s->requires = makedeps(repo, q, s->requires, -SOLVABLE_PREREQMARKER);
+          else if (!strcasecmp(tag, "description"))
+            {
+              char *ld = strchr(q, '\n');
+              if (ld)
+                {
+                  *ld++ = 0;
+                  repodata_set_str(data, s - pool->solvables, SOLVABLE_DESCRIPTION, ld);
+                }
+              else
+                repodata_set_str(data, s - pool->solvables, SOLVABLE_DESCRIPTION, q);
+              repodata_set_str(data, s - pool->solvables, SOLVABLE_SUMMARY, q);
+            }
+          break;
+        case 'E' << 8 | 'N':
+          if (!strcasecmp(tag, "enhances"))
+            s->enhances = makedeps(repo, q, s->enhances, 0);
+          break;
+        case 'F' << 8 | 'I':
+          if (!strcasecmp(tag, "filename"))
+            repodata_set_location(data, s - pool->solvables, 0, 0, q);
+          break;
+        case 'H' << 8 | 'O':
+          if (!strcasecmp(tag, "homepage"))
+            repodata_set_str(data, s - pool->solvables, SOLVABLE_URL, q);
+          break;
+        case 'I' << 8 | 'N':
+          if (!strcasecmp(tag, "installed-size"))
+            repodata_set_num(data, s - pool->solvables, SOLVABLE_INSTALLSIZE, strtoull(q, 0, 10) << 10);
+          break;
+        case 'M' << 8 | 'D':
+          if (!strcasecmp(tag, "md5sum") && !checksumtype && strlen(q) == 16 * 2)
+            {
+              strcpy(checksum, q);
+              checksumtype = REPOKEY_TYPE_MD5;
+            }
+          break;
+        case 'P' << 8 | 'A':
+          if (!strcasecmp(tag, "package"))
+            s->name = pool_str2id(pool, q, 1);
+          break;
+        case 'P' << 8 | 'R':
+          if (!strcasecmp(tag, "pre-depends"))
+            s->requires = makedeps(repo, q, s->requires, SOLVABLE_PREREQMARKER);
+          else if (!strcasecmp(tag, "provides"))
+            s->provides = makedeps(repo, q, s->provides, 0);
+          break;
+        case 'R' << 8 | 'E':
+          if (!strcasecmp(tag, "replaces"))
+            s->obsoletes = makedeps(repo, q, s->obsoletes, 0);
+          else if (!strcasecmp(tag, "recommends"))
+            s->recommends = makedeps(repo, q, s->recommends, 0);
+          break;
+        case 'S' << 8 | 'H':
+          newtype = solv_chksum_str2type(tag);
+          if (!newtype || solv_chksum_len(newtype) * 2 != strlen(q))
+            break;
+          if (!checksumtype || (newtype == REPOKEY_TYPE_SHA1 && checksumtype != REPOKEY_TYPE_SHA256) || newtype == REPOKEY_TYPE_SHA256)
+            {
+              strcpy(checksum, q);
+              checksumtype = newtype;
+            }
+          break;
+        case 'S' << 8 | 'O':
+          if (!strcasecmp(tag, "source"))
+            {
+              char *q2;
+              /* ignore version for now */
+              for (q2 = q; *q2; q2++)
+                if (*q2 == ' ' || *q2 == '\t')
+                  {
+                    *q2 = 0;
+                    break;
+                  }
+              if (s->name && !strcmp(q, pool_id2str(pool, s->name)))
+                repodata_set_void(data, s - pool->solvables, SOLVABLE_SOURCENAME);
+              else
+                repodata_set_id(data, s - pool->solvables, SOLVABLE_SOURCENAME, pool_str2id(pool, q, 1));
+              havesource = 1;
+            }
+          break;
+        case 'S' << 8 | 'T':
+          if (!strcasecmp(tag, "status"))
+            repodata_set_poolstr(data, s - pool->solvables, SOLVABLE_INSTALLSTATUS, q);
+          break;
+        case 'S' << 8 | 'U':
+          if (!strcasecmp(tag, "suggests"))
+            s->suggests = makedeps(repo, q, s->suggests, 0);
+          break;
+        case 'V' << 8 | 'E':
+          if (!strcasecmp(tag, "version"))
+            s->evr = pool_str2id(pool, q, 1);
+          break;
+        }
     }
   if (checksumtype)
     repodata_set_checksum(data, s - pool->solvables, SOLVABLE_CHECKSUM, checksumtype, checksum);
@@ -431,26 +430,26 @@ control2solvable(Solvable *s, Repodata *data, char *control)
       int i, j, k;
       Id d, cid;
       for (i = j = s->obsoletes; (d = repo->idarraydata[i]) != 0; i++)
-	{
-	  if (!s->conflicts)
-	    continue;
-	  for (k = s->conflicts; (cid = repo->idarraydata[k]) != 0; k++)
-	    {
-	      if (repo->idarraydata[k] == cid)
-		break;
-	      if (ISRELDEP(cid))
-		{
-		  Reldep *rd = GETRELDEP(pool, cid);
-		  if (rd->flags < 8 && rd->name == d)
-		    break;	/* specialize obsoletes */
-		}
-	    }
-	  if (cid)
-	    repo->idarraydata[j++] = cid;
-	}
+        {
+          if (!s->conflicts)
+            continue;
+          for (k = s->conflicts; (cid = repo->idarraydata[k]) != 0; k++)
+            {
+              if (repo->idarraydata[k] == cid)
+                break;
+              if (ISRELDEP(cid))
+                {
+                  Reldep *rd = GETRELDEP(pool, cid);
+                  if (rd->flags < 8 && rd->name == d)
+                    break; /* specialize obsoletes */
+                }
+            }
+          if (cid)
+            repo->idarraydata[j++] = cid;
+        }
       repo->idarraydata[j] = 0;
       if (j == s->obsoletes)
-	s->obsoletes = 0;
+        s->obsoletes = 0;
     }
 }
 
@@ -472,34 +471,34 @@ repo_add_debpackages(Repo *repo, FILE *fp, int flags)
   for (;;)
     {
       if (!(p = strchr(p, '\n')))
-	{
-	  int l3;
-	  while (l + 1024 >= bufl)
-	    {
-	      buf = solv_realloc(buf, bufl + 4096);
-	      bufl += 4096;
-	    }
-	  p = buf + l;
-	  ll = fread(p, 1, bufl - l - 1, fp);
-	  if (ll <= 0)
-	    break;
-	  p[ll] = 0;
-	  while ((l3 = strlen(p)) < ll)
-	    p[l3] = '\n';
-	  l += ll;
-	  if (p != buf)
-	    p--;
-	  continue;
-	}
+        {
+          int l3;
+          while (l + 1024 >= bufl)
+            {
+              buf = solv_realloc(buf, bufl + 4096);
+              bufl += 4096;
+            }
+          p = buf + l;
+          ll = fread(p, 1, bufl - l - 1, fp);
+          if (ll <= 0)
+            break;
+          p[ll] = 0;
+          while ((l3 = strlen(p)) < ll)
+            p[l3] = '\n';
+          l += ll;
+          if (p != buf)
+            p--;
+          continue;
+        }
       p++;
       if (*p != '\n')
-	continue;
+        continue;
       *p = 0;
       ll = p - buf + 1;
       s = pool_id2solvable(pool, repo_add_solvable(repo));
       control2solvable(s, data, buf);
       if (!s->name)
-	repo_free_solvable(repo, s - pool->solvables, 1);
+        repo_free_solvable(repo, s - pool->solvables, 1);
       if (l > ll)
         memmove(buf, p + 1, l - ll);
       l -= ll;
@@ -511,7 +510,7 @@ repo_add_debpackages(Repo *repo, FILE *fp, int flags)
       s = pool_id2solvable(pool, repo_add_solvable(repo));
       control2solvable(s, data, buf);
       if (!s->name)
-	repo_free_solvable(repo, s - pool->solvables, 1);
+        repo_free_solvable(repo, s - pool->solvables, 1);
     }
   solv_free(buf);
   if (!(flags & REPO_NO_INTERNALIZE))
@@ -533,9 +532,9 @@ repo_add_debdb(Repo *repo, int flags)
   return 0;
 }
 
-#define CONTROL_COMP_NONE	0
-#define CONTROL_COMP_GZIP	1
-#define CONTROL_COMP_XZ		2
+#define CONTROL_COMP_NONE 0
+#define CONTROL_COMP_GZIP 1
+#define CONTROL_COMP_XZ 2
 
 Id
 repo_add_deb(Repo *repo, const char *deb, int flags)
@@ -616,12 +615,12 @@ repo_add_deb(Repo *repo, const char *deb, int flags)
   if (l < clen)
     {
       if (fread(ctgz + l, clen - l, 1, fp) != 1)
-	{
-	  pool_error(pool, -1, "%s: unexpected EOF", deb);
-	  solv_free(ctgz);
-	  fclose(fp);
-	  return 0;
-	}
+        {
+          pool_error(pool, -1, "%s: unexpected EOF", deb);
+          solv_free(ctgz);
+          fclose(fp);
+          return 0;
+        }
     }
   fclose(fp);
   gotpkgid = 0;
@@ -656,16 +655,16 @@ repo_add_deb(Repo *repo, const char *deb, int flags)
       int j;
       l2 = 0;
       for (j = 124; j < 124 + 12; j++)
-	if (bp[j] >= '0' && bp[j] <= '7')
-	  l2 = l2 * 8 + (bp[j] - '0');
+        if (bp[j] >= '0' && bp[j] <= '7')
+          l2 = l2 * 8 + (bp[j] - '0');
       if (l2 < 0 || l2 > l)
-	{
-	  l2 = 0;
-	  break;
-	}
+        {
+          l2 = 0;
+          break;
+        }
       bp[124] = 0;
       if (!strcmp((char *)bp, "./control") || !strcmp((char *)bp, "control"))
-	break;
+        break;
       l2 = 512 + ((l2 + 511) & ~511);
       l -= l2;
       bp += l2;
@@ -709,77 +708,76 @@ pool_deb_get_autoinstalled(Pool *pool, FILE *fp, Queue *q, int flags)
   while (!eof)
     {
       while (bufl - l < 1024)
-	{
-	  bufl += 4096;
-	  if (bufl > 1024 * 64)
-	    break;	/* hmm? */
-	  buf = solv_realloc(buf, bufl);
-	}
+        {
+          bufl += 4096;
+          if (bufl > 1024 * 64)
+            break; /* hmm? */
+          buf = solv_realloc(buf, bufl);
+        }
       if (!fgets(buf + l, bufl - l, fp))
-	{
-	  eof = 1;
-	  buf[l] = '\n';
-	  buf[l + 1] = 0;
-	}
+        {
+          eof = 1;
+          buf[l] = '\n';
+          buf[l + 1] = 0;
+        }
       l = strlen(buf);
       if (l && buf[l - 1] == '\n')
-	buf[--l] = 0;
+        buf[--l] = 0;
       if (!*buf || eof)
-	{
-	  l = 0;
-	  if (name && autoinstalled > 0)
-	    {
-	      if ((flags & GET_USERINSTALLED_NAMEARCH) != 0)
-		queue_push2(q, name, arch);
-	      else if ((flags & GET_USERINSTALLED_NAMES) != 0)
-		queue_push(q, name);
-	      else
-		{
-		  FOR_PROVIDES(p, pp, name)
-		    {
-		      Solvable *s = pool->solvables + p;
-		      if (s->name != name)
-			continue;
-		      if (arch && s->arch != arch)
-			continue;
-		      queue_push(q, p);
-		    }
-		}
-	    }
-	  name = arch = 0;
-	  autoinstalled = -1;
-	  continue;
-	}
+        {
+          l = 0;
+          if (name && autoinstalled > 0)
+            {
+              if ((flags & GET_USERINSTALLED_NAMEARCH) != 0)
+                queue_push2(q, name, arch);
+              else if ((flags & GET_USERINSTALLED_NAMES) != 0)
+                queue_push(q, name);
+              else
+                {
+                  FOR_PROVIDES (p, pp, name)
+                    {
+                      Solvable *s = pool->solvables + p;
+                      if (s->name != name)
+                        continue;
+                      if (arch && s->arch != arch)
+                        continue;
+                      queue_push(q, p);
+                    }
+                }
+            }
+          name = arch = 0;
+          autoinstalled = -1;
+          continue;
+        }
       /* strip trailing space */
       while (l && (buf[l - 1] == ' ' || buf[l - 1] == '\t'))
-	buf[--l] = 0;
+        buf[--l] = 0;
       l = 0;
 
       bp = strchr(buf, ':');
       if (!bp || bp - buf < 4)
-	continue;
+        continue;
       *bp++ = 0;
       while (*bp == ' ' || *bp == '\t')
-	bp++;
+        bp++;
       x = '@' + (buf[0] & 0x1f);
       x = (x << 8) + '@' + (buf[1] & 0x1f);
-      switch(x)
-	{
-	case 'P' << 8 | 'A':
-	  if (!strcasecmp(buf, "package"))
-	    name = pool_str2id(pool, bp, 1);
-	  break;
-	case 'A' << 8 | 'R':
-	  if (!strcasecmp(buf, "architecture"))
-	    arch = pool_str2id(pool, bp, 1);
-	  break;
-	case 'A' << 8 | 'U':
-	  if (!strcasecmp(buf, "auto-installed"))
-	    autoinstalled = atoi(bp);
-	  break;
-	default:
-	  break;
-	}
+      switch (x)
+        {
+        case 'P' << 8 | 'A':
+          if (!strcasecmp(buf, "package"))
+            name = pool_str2id(pool, bp, 1);
+          break;
+        case 'A' << 8 | 'R':
+          if (!strcasecmp(buf, "architecture"))
+            arch = pool_str2id(pool, bp, 1);
+          break;
+        case 'A' << 8 | 'U':
+          if (!strcasecmp(buf, "auto-installed"))
+            autoinstalled = atoi(bp);
+          break;
+        default:
+          break;
+        }
     }
 }
-

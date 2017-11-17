@@ -24,11 +24,11 @@
 #include "repoinfo_system_rpm.h"
 
 #ifdef SUSE
-# define PRODUCTS_PATH "/etc/products.d"
+#define PRODUCTS_PATH "/etc/products.d"
 #endif
 #ifdef ENABLE_APPDATA
-# define APPDATA_PATH "/usr/share/metainfo"
-# define APPDATA_LEGACY_PATH "/usr/share/appdata"
+#define APPDATA_PATH "/usr/share/metainfo"
+#define APPDATA_LEGACY_PATH "/usr/share/appdata"
 #endif
 
 static void
@@ -45,18 +45,18 @@ runrpm(const char *arg, const char *name, int dupfd3, const char *rootdir)
   if (pid == 0)
     {
       if (!rootdir)
-	rootdir = "/";
+        rootdir = "/";
       if (dupfd3 != -1 && dupfd3 != 3)
-	{
-	  dup2(dupfd3, 3);
-	  close(dupfd3);
-	}
+        {
+          dup2(dupfd3, 3);
+          close(dupfd3);
+        }
       if (dupfd3 != -1)
-	fcntl(3, F_SETFD, 0);   /* clear CLOEXEC */
+        fcntl(3, F_SETFD, 0); /* clear CLOEXEC */
       if (strcmp(arg, "-e") == 0)
-	execlp("rpm", "rpm", arg, "--nodeps", "--nodigest", "--nosignature", "--root", rootdir, name, (char *)0);
+        execlp("rpm", "rpm", arg, "--nodeps", "--nodigest", "--nosignature", "--root", rootdir, name, (char *)0);
       else
-	execlp("rpm", "rpm", arg, "--force", "--nodeps", "--nodigest", "--nosignature", "--root", rootdir, name, (char *)0);
+        execlp("rpm", "rpm", arg, "--force", "--nodeps", "--nodigest", "--nosignature", "--root", rootdir, name, (char *)0);
       perror("rpm");
       _exit(0);
     }
@@ -129,20 +129,20 @@ commit_transactionelement_rpm(Pool *pool, Id type, Id p, FILE *fp)
   const char *rootdir = pool_get_rootdir(pool);
   const char *evr, *evrp, *nvra;
 
-  switch(type)
+  switch (type)
     {
     case SOLVER_TRANSACTION_ERASE:
       if (!s->repo->rpmdbid || !s->repo->rpmdbid[p - s->repo->start])
-	break;
+        break;
       /* strip epoch from evr */
       evr = evrp = pool_id2str(pool, s->evr);
       while (*evrp >= '0' && *evrp <= '9')
-	evrp++;
+        evrp++;
       if (evrp > evr && evrp[0] == ':' && evrp[1])
-	evr = evrp + 1;
+        evr = evrp + 1;
       nvra = pool_tmpjoin(pool, pool_id2str(pool, s->name), "-", evr);
       nvra = pool_tmpappend(pool, nvra, ".", pool_id2str(pool, s->arch));
-      runrpm("-e", nvra, -1, rootdir);      /* too bad that --querybynumber doesn't work */
+      runrpm("-e", nvra, -1, rootdir); /* too bad that --querybynumber doesn't work */
       break;
     case SOLVER_TRANSACTION_INSTALL:
     case SOLVER_TRANSACTION_MULTIINSTALL:

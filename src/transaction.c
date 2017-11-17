@@ -55,7 +55,7 @@ obsq_sortcmp(const void *ap, const void *bp, void *dp)
     }
   r = pool_evrcmp(pool, oas->evr, obs->evr, EVRCMP_COMPARE);
   if (r)
-    return -r;	/* highest version first */
+    return -r; /* highest version first */
   if (oas->arch != obs->arch)
     {
       /* bring same arch to front */
@@ -83,34 +83,34 @@ transaction_all_obs_pkgs(Transaction *trans, Id p, Queue *pkgs)
     {
       q = trans->transaction_installed[p - pool->installed->start];
       if (!q)
-	return;
+        return;
       if (q > 0)
-	{
-	  /* only a single obsoleting package */
-	  queue_push(pkgs, q);
-	  return;
-	}
+        {
+          /* only a single obsoleting package */
+          queue_push(pkgs, q);
+          return;
+        }
       /* find which packages obsolete us */
       for (i = 0; i < ti->count; i += 2)
-	if (ti->elements[i + 1] == p)
-	  queue_push2(pkgs, p, ti->elements[i]);
+        if (ti->elements[i + 1] == p)
+          queue_push2(pkgs, p, ti->elements[i]);
       /* sort obsoleters */
       if (pkgs->count > 2)
-	solv_sort(pkgs->elements, pkgs->count / 2, 2 * sizeof(Id), obsq_sortcmp, pool);
+        solv_sort(pkgs->elements, pkgs->count / 2, 2 * sizeof(Id), obsq_sortcmp, pool);
       for (i = 0; i < pkgs->count; i += 2)
-	pkgs->elements[i / 2] = pkgs->elements[i + 1];
+        pkgs->elements[i / 2] = pkgs->elements[i + 1];
       queue_truncate(pkgs, pkgs->count / 2);
     }
   else
     {
       /* find the packages we obsolete */
       for (i = 0; i < ti->count; i += 2)
-	{
-	  if (ti->elements[i] == p)
-	    queue_push(pkgs, ti->elements[i + 1]);
-	  else if (pkgs->count)
-	    break;
-	}
+        {
+          if (ti->elements[i] == p)
+            queue_push(pkgs, ti->elements[i + 1]);
+          else if (pkgs->count)
+            break;
+        }
     }
 }
 
@@ -136,7 +136,6 @@ transaction_obs_pkg(Transaction *trans, Id p)
   return 0;
 }
 
-
 /*
  * calculate base type of transaction element
  */
@@ -156,20 +155,20 @@ transaction_base_type(Transaction *trans, Id p)
     {
       /* erase */
       if (!p2)
-	return SOLVER_TRANSACTION_ERASE;
+        return SOLVER_TRANSACTION_ERASE;
       s = pool->solvables + p;
       s2 = pool->solvables + p2;
       if (s->name == s2->name)
-	{
-	  if (s->evr == s2->evr && solvable_identical(s, s2))
-	    return SOLVER_TRANSACTION_REINSTALLED;
-	  r = pool_evrcmp(pool, s->evr, s2->evr, EVRCMP_COMPARE);
-	  if (r < 0)
-	    return SOLVER_TRANSACTION_UPGRADED;
-	  else if (r > 0)
-	    return SOLVER_TRANSACTION_DOWNGRADED;
-	  return SOLVER_TRANSACTION_CHANGED;
-	}
+        {
+          if (s->evr == s2->evr && solvable_identical(s, s2))
+            return SOLVER_TRANSACTION_REINSTALLED;
+          r = pool_evrcmp(pool, s->evr, s2->evr, EVRCMP_COMPARE);
+          if (r < 0)
+            return SOLVER_TRANSACTION_UPGRADED;
+          else if (r > 0)
+            return SOLVER_TRANSACTION_DOWNGRADED;
+          return SOLVER_TRANSACTION_CHANGED;
+        }
       return SOLVER_TRANSACTION_OBSOLETED;
     }
   else
@@ -177,32 +176,32 @@ transaction_base_type(Transaction *trans, Id p)
       /* install or multiinstall */
       int multi = trans->multiversionmap.size && MAPTST(&trans->multiversionmap, p);
       if (multi)
-	{
-	  if (p2)
-	    {
-	      s = pool->solvables + p;
-	      s2 = pool->solvables + p2;
-	      if (s->name == s2->name && s->arch == s2->arch && s->evr == s2->evr)
-		return SOLVER_TRANSACTION_MULTIREINSTALL;
-	    }
-	  return SOLVER_TRANSACTION_MULTIINSTALL;
-	}
+        {
+          if (p2)
+            {
+              s = pool->solvables + p;
+              s2 = pool->solvables + p2;
+              if (s->name == s2->name && s->arch == s2->arch && s->evr == s2->evr)
+                return SOLVER_TRANSACTION_MULTIREINSTALL;
+            }
+          return SOLVER_TRANSACTION_MULTIINSTALL;
+        }
       if (!p2)
-	return SOLVER_TRANSACTION_INSTALL;
+        return SOLVER_TRANSACTION_INSTALL;
       s = pool->solvables + p;
       s2 = pool->solvables + p2;
       if (s->name == s2->name)
-	{
-	  if (s->evr == s2->evr && solvable_identical(s, s2))
-	    return SOLVER_TRANSACTION_REINSTALL;
-	  r = pool_evrcmp(pool, s->evr, s2->evr, EVRCMP_COMPARE);
-	  if (r > 0)
-	    return SOLVER_TRANSACTION_UPGRADE;
-	  else if (r < 0)
-	    return SOLVER_TRANSACTION_DOWNGRADE;
-	  else
-	    return SOLVER_TRANSACTION_CHANGE;
-	}
+        {
+          if (s->evr == s2->evr && solvable_identical(s, s2))
+            return SOLVER_TRANSACTION_REINSTALL;
+          r = pool_evrcmp(pool, s->evr, s2->evr, EVRCMP_COMPARE);
+          if (r > 0)
+            return SOLVER_TRANSACTION_UPGRADE;
+          else if (r < 0)
+            return SOLVER_TRANSACTION_DOWNGRADE;
+          else
+            return SOLVER_TRANSACTION_CHANGE;
+        }
       return SOLVER_TRANSACTION_OBSOLETES;
     }
 }
@@ -236,12 +235,12 @@ is_noinst_pseudo_package(Pool *pool, Solvable *s)
       /* unlike normal patterns, autopatterns *can* be installed (via the package link),
          so do not filter them */
       if (s->provides)
-	{
-	  Id prv, *prvp = s->repo->idarraydata + s->provides;
-	  while ((prv = *prvp++) != 0)
-	    if (ISRELDEP(prv) && !strcmp(pool_id2str(pool, prv), "autopattern()"))
-	      return 0;
-	}
+        {
+          Id prv, *prvp = s->repo->idarraydata + s->provides;
+          while ((prv = *prvp++) != 0)
+            if (ISRELDEP(prv) && !strcmp(pool_id2str(pool, prv), "autopattern()"))
+              return 0;
+        }
 #endif
       return 1;
     }
@@ -295,24 +294,24 @@ transaction_type(Transaction *trans, Id p, int mode)
   type = transaction_base_type(trans, p);
 
   if (type == SOLVER_TRANSACTION_IGNORE)
-    return SOLVER_TRANSACTION_IGNORE;	/* not part of the transaction */
+    return SOLVER_TRANSACTION_IGNORE; /* not part of the transaction */
 
   if ((mode & SOLVER_TRANSACTION_RPM_ONLY) != 0)
     {
       /* application wants to know what to feed to the package manager */
       if (!(mode & SOLVER_TRANSACTION_KEEP_PSEUDO) && is_pseudo_package(pool, s))
-	return SOLVER_TRANSACTION_IGNORE;
+        return SOLVER_TRANSACTION_IGNORE;
       if (type == SOLVER_TRANSACTION_ERASE || type == SOLVER_TRANSACTION_INSTALL || type == SOLVER_TRANSACTION_MULTIINSTALL)
-	return type;
+        return type;
       if (s->repo == pool->installed)
-	{
-	  /* check if we're a real package that is obsoleted by pseudos */
-	  if (!is_pseudo_package(pool, s) && obsoleted_by_pseudos_only(trans, s - pool->solvables))
-	    return SOLVER_TRANSACTION_ERASE;
-	  return SOLVER_TRANSACTION_IGNORE;	/* ignore as we're being obsoleted */
-	}
+        {
+          /* check if we're a real package that is obsoleted by pseudos */
+          if (!is_pseudo_package(pool, s) && obsoleted_by_pseudos_only(trans, s - pool->solvables))
+            return SOLVER_TRANSACTION_ERASE;
+          return SOLVER_TRANSACTION_IGNORE; /* ignore as we're being obsoleted */
+        }
       if (type == SOLVER_TRANSACTION_MULTIREINSTALL)
-	return SOLVER_TRANSACTION_MULTIINSTALL;
+        return SOLVER_TRANSACTION_MULTIINSTALL;
       return SOLVER_TRANSACTION_INSTALL;
     }
 
@@ -331,9 +330,9 @@ transaction_type(Transaction *trans, Id p, int mode)
       /* application wants to make no difference between change
        * and reinstall */
       if (type == SOLVER_TRANSACTION_CHANGED)
-	type = SOLVER_TRANSACTION_REINSTALLED;
+        type = SOLVER_TRANSACTION_REINSTALLED;
       else if (type == SOLVER_TRANSACTION_CHANGE)
-	type = SOLVER_TRANSACTION_REINSTALL;
+        type = SOLVER_TRANSACTION_REINSTALL;
     }
 
   if (type == SOLVER_TRANSACTION_ERASE || type == SOLVER_TRANSACTION_INSTALL || type == SOLVER_TRANSACTION_MULTIINSTALL)
@@ -343,25 +342,25 @@ transaction_type(Transaction *trans, Id p, int mode)
     {
       /* erase element and we're showing the passive side */
       if (type == SOLVER_TRANSACTION_OBSOLETED && (mode & SOLVER_TRANSACTION_SHOW_OBSOLETES) == 0)
-	type = SOLVER_TRANSACTION_ERASE;
+        type = SOLVER_TRANSACTION_ERASE;
       if (type == SOLVER_TRANSACTION_OBSOLETED && (mode & SOLVER_TRANSACTION_OBSOLETE_IS_UPGRADE) != 0)
-	type = SOLVER_TRANSACTION_UPGRADED;
+        type = SOLVER_TRANSACTION_UPGRADED;
       return type;
     }
   if (s->repo != pool->installed && (mode & SOLVER_TRANSACTION_SHOW_ACTIVE) != 0)
     {
       /* install element and we're showing the active side */
       if (type == SOLVER_TRANSACTION_OBSOLETES && (mode & SOLVER_TRANSACTION_SHOW_OBSOLETES) == 0)
-	type = SOLVER_TRANSACTION_INSTALL;
+        type = SOLVER_TRANSACTION_INSTALL;
       if (type == SOLVER_TRANSACTION_OBSOLETES && (mode & SOLVER_TRANSACTION_OBSOLETE_IS_UPGRADE) != 0)
-	type = SOLVER_TRANSACTION_UPGRADE;
+        type = SOLVER_TRANSACTION_UPGRADE;
       return type;
     }
 
   /* the element doesn't match the show mode */
 
   /* if we're showing all references, we can ignore this package */
-  if ((mode & (SOLVER_TRANSACTION_SHOW_ALL|SOLVER_TRANSACTION_SHOW_OBSOLETES)) == (SOLVER_TRANSACTION_SHOW_ALL|SOLVER_TRANSACTION_SHOW_OBSOLETES))
+  if ((mode & (SOLVER_TRANSACTION_SHOW_ALL | SOLVER_TRANSACTION_SHOW_OBSOLETES)) == (SOLVER_TRANSACTION_SHOW_ALL | SOLVER_TRANSACTION_SHOW_OBSOLETES))
     return SOLVER_TRANSACTION_IGNORE;
 
   /* we're not showing all refs. check if some other package
@@ -375,15 +374,15 @@ transaction_type(Transaction *trans, Id p, int mode)
     {
       Solvable *sq = pool->solvables + q;
       if (sq->name != s->name)
-	{
-	  /* it's a replace but we're not showing replaces. map type. */
-	  if (s->repo == pool->installed)
-	    return SOLVER_TRANSACTION_ERASE;
-	  else if (type == SOLVER_TRANSACTION_MULTIREINSTALL)
-	    return SOLVER_TRANSACTION_MULTIINSTALL;
-	  else
-	    return SOLVER_TRANSACTION_INSTALL;
-	}
+        {
+          /* it's a replace but we're not showing replaces. map type. */
+          if (s->repo == pool->installed)
+            return SOLVER_TRANSACTION_ERASE;
+          else if (type == SOLVER_TRANSACTION_MULTIREINSTALL)
+            return SOLVER_TRANSACTION_MULTIINSTALL;
+          else
+            return SOLVER_TRANSACTION_INSTALL;
+        }
     }
 
   /* if there's a match, p will be shown when q
@@ -399,28 +398,28 @@ transaction_type(Transaction *trans, Id p, int mode)
     {
       q = oq.elements[i];
       if ((mode & SOLVER_TRANSACTION_SHOW_OBSOLETES) == 0)
-	{
-	  Solvable *sq = pool->solvables + q;
-	  if (sq->name != s->name)
-	    continue;
-	}
+        {
+          Solvable *sq = pool->solvables + q;
+          if (sq->name != s->name)
+            continue;
+        }
       /* check if we are referenced? */
       if ((mode & SOLVER_TRANSACTION_SHOW_ALL) != 0)
-	{
-	  transaction_all_obs_pkgs(trans, q, &rq);
-	  for (j = 0; j < rq.count; j++)
-	    if (rq.elements[j] == p)
-	      {
-	        ref = 1;
-	        break;
-	      }
-	  if (ref)
-	    break;
-	}
+        {
+          transaction_all_obs_pkgs(trans, q, &rq);
+          for (j = 0; j < rq.count; j++)
+            if (rq.elements[j] == p)
+              {
+                ref = 1;
+                break;
+              }
+          if (ref)
+            break;
+        }
       else if (transaction_obs_pkg(trans, q) == p)
         {
-	  ref = 1;
-	  break;
+          ref = 1;
+          break;
         }
     }
   queue_free(&oq);
@@ -430,17 +429,15 @@ transaction_type(Transaction *trans, Id p, int mode)
     {
       /* we're not referenced. map type */
       if (s->repo == pool->installed)
-	return SOLVER_TRANSACTION_ERASE;
+        return SOLVER_TRANSACTION_ERASE;
       else if (type == SOLVER_TRANSACTION_MULTIREINSTALL)
-	return SOLVER_TRANSACTION_MULTIINSTALL;
+        return SOLVER_TRANSACTION_MULTIINSTALL;
       else
-	return SOLVER_TRANSACTION_INSTALL;
+        return SOLVER_TRANSACTION_INSTALL;
     }
   /* there was a ref, so p is shown with some other package */
   return SOLVER_TRANSACTION_IGNORE;
 }
-
-
 
 static int
 classify_cmp(const void *ap, const void *bp, void *dp)
@@ -480,7 +477,7 @@ classify_cmp_pkgs(const void *ap, const void *bp, void *dp)
     {
       int r = pool_evrcmp(pool, sa->evr, sb->evr, EVRCMP_COMPARE);
       if (r)
-	return r;
+        return r;
     }
   return a - b;
 }
@@ -522,45 +519,45 @@ transaction_classify(Transaction *trans, int mode, Queue *classes)
       type = transaction_type(trans, p, mode);
       ntypes[type]++;
       if (!pool->installed || s->repo != pool->installed)
-	continue;
+        continue;
       /* don't report vendor/arch changes if we were mapped to erase. */
       if (type == SOLVER_TRANSACTION_ERASE)
-	continue;
+        continue;
       /* look at arch/vendor changes */
       q = transaction_obs_pkg(trans, p);
       if (!q)
-	continue;
+        continue;
       sq = pool->solvables + q;
 
       v = s->arch;
       vq = sq->arch;
       if (v != vq)
-	{
-	  if ((mode & SOLVER_TRANSACTION_MERGE_ARCHCHANGES) != 0)
-	    v = vq = 0;
-	  for (j = 0; j < classes->count; j += 4)
-	    if (classes->elements[j] == SOLVER_TRANSACTION_ARCHCHANGE && classes->elements[j + 2] == v && classes->elements[j + 3] == vq)
-	      break;
-	  if (j == classes->count)
-	    queue_push4(classes, SOLVER_TRANSACTION_ARCHCHANGE, 1, v, vq);
-	  else
-	    classes->elements[j + 1]++;
-	}
+        {
+          if ((mode & SOLVER_TRANSACTION_MERGE_ARCHCHANGES) != 0)
+            v = vq = 0;
+          for (j = 0; j < classes->count; j += 4)
+            if (classes->elements[j] == SOLVER_TRANSACTION_ARCHCHANGE && classes->elements[j + 2] == v && classes->elements[j + 3] == vq)
+              break;
+          if (j == classes->count)
+            queue_push4(classes, SOLVER_TRANSACTION_ARCHCHANGE, 1, v, vq);
+          else
+            classes->elements[j + 1]++;
+        }
 
       v = s->vendor ? s->vendor : 1;
       vq = sq->vendor ? sq->vendor : 1;
       if (v != vq)
-	{
-	  if ((mode & SOLVER_TRANSACTION_MERGE_VENDORCHANGES) != 0)
-	    v = vq = 0;
-	  for (j = 0; j < classes->count; j += 4)
-	    if (classes->elements[j] == SOLVER_TRANSACTION_VENDORCHANGE && classes->elements[j + 2] == v && classes->elements[j + 3] == vq)
-	      break;
-	  if (j == classes->count)
-	    queue_push4(classes, SOLVER_TRANSACTION_VENDORCHANGE, 1, v, vq);
-	  else
-	    classes->elements[j + 1]++;
-	}
+        {
+          if ((mode & SOLVER_TRANSACTION_MERGE_VENDORCHANGES) != 0)
+            v = vq = 0;
+          for (j = 0; j < classes->count; j += 4)
+            if (classes->elements[j] == SOLVER_TRANSACTION_VENDORCHANGE && classes->elements[j + 2] == v && classes->elements[j + 3] == vq)
+              break;
+          if (j == classes->count)
+            queue_push4(classes, SOLVER_TRANSACTION_VENDORCHANGE, 1, v, vq);
+          else
+            classes->elements[j + 1]++;
+        }
     }
   /* now sort all vendor/arch changes */
   if (classes->count > 4)
@@ -572,9 +569,9 @@ transaction_classify(Transaction *trans, int mode, Queue *classes)
   for (i = SOLVER_TRANSACTION_MAXTYPE; i > 0; i--)
     {
       if (!ntypes[i])
-	continue;
+        continue;
       if (i == SOLVER_TRANSACTION_ERASE)
-	continue;
+        continue;
       queue_unshift4(classes, i, ntypes[i], 0, 0);
     }
 }
@@ -593,32 +590,32 @@ transaction_classify_pkgs(Transaction *trans, int mode, Id class, Id from, Id to
       p = trans->steps.elements[i];
       s = pool->solvables + p;
       if (class <= SOLVER_TRANSACTION_MAXTYPE)
-	{
-	  type = transaction_type(trans, p, mode);
-	  if (type == class)
-	    queue_push(pkgs, p);
-	  continue;
-	}
+        {
+          type = transaction_type(trans, p, mode);
+          if (type == class)
+            queue_push(pkgs, p);
+          continue;
+        }
       if (!pool->installed || s->repo != pool->installed)
-	continue;
+        continue;
       q = transaction_obs_pkg(trans, p);
       if (!q)
-	continue;
+        continue;
       sq = pool->solvables + q;
       if (class == SOLVER_TRANSACTION_ARCHCHANGE)
-	{
-	  if ((!from && !to) || (s->arch == from && sq->arch == to))
-	    queue_push(pkgs, p);
-	  continue;
-	}
+        {
+          if ((!from && !to) || (s->arch == from && sq->arch == to))
+            queue_push(pkgs, p);
+          continue;
+        }
       if (class == SOLVER_TRANSACTION_VENDORCHANGE)
-	{
-	  Id v = s->vendor ? s->vendor : 1;
-	  Id vq = sq->vendor ? sq->vendor : 1;
-	  if ((!from && !to) || (v == from && vq == to))
-	    queue_push(pkgs, p);
-	  continue;
-	}
+        {
+          Id v = s->vendor ? s->vendor : 1;
+          Id vq = sq->vendor ? sq->vendor : 1;
+          if ((!from && !to) || (v == from && vq == to))
+            queue_push(pkgs, p);
+          continue;
+        }
     }
   if (pkgs->count > 1)
     solv_sort(pkgs->elements, pkgs->count, sizeof(Id), classify_cmp_pkgs, trans);
@@ -637,63 +634,63 @@ create_transaction_info(Transaction *trans, Queue *decisionq)
   queue_empty(ti);
   trans->transaction_installed = solv_free(trans->transaction_installed);
   if (!installed)
-    return;	/* no info needed */
+    return; /* no info needed */
   for (i = 0; i < decisionq->count; i++)
     {
       p = decisionq->elements[i];
       if (p <= 0 || p == SYSTEMSOLVABLE)
-	continue;
+        continue;
       s = pool->solvables + p;
       if (!s->repo || s->repo == installed)
-	continue;
+        continue;
       multi = trans->multiversionmap.size && MAPTST(&trans->multiversionmap, p);
-      FOR_PROVIDES(p2, pp2, s->name)
-	{
-	  if (!MAPTST(&trans->transactsmap, p2))
-	    continue;
-	  s2 = pool->solvables + p2;
-	  if (s2->repo != installed)
-	    continue;
-	  if (multi && (s->name != s2->name || s->evr != s2->evr || s->arch != s2->arch))
-	    continue;
-	  if (!pool->implicitobsoleteusesprovides && s->name != s2->name)
-	    continue;
-	  if (pool->implicitobsoleteusescolors && !pool_colormatch(pool, s, s2))
-	    continue;
-	  queue_push2(ti, p, p2);
-	}
+      FOR_PROVIDES (p2, pp2, s->name)
+        {
+          if (!MAPTST(&trans->transactsmap, p2))
+            continue;
+          s2 = pool->solvables + p2;
+          if (s2->repo != installed)
+            continue;
+          if (multi && (s->name != s2->name || s->evr != s2->evr || s->arch != s2->arch))
+            continue;
+          if (!pool->implicitobsoleteusesprovides && s->name != s2->name)
+            continue;
+          if (pool->implicitobsoleteusescolors && !pool_colormatch(pool, s, s2))
+            continue;
+          queue_push2(ti, p, p2);
+        }
       if (s->obsoletes && !multi)
-	{
-	  Id obs, *obsp = s->repo->idarraydata + s->obsoletes;
-	  while ((obs = *obsp++) != 0)
-	    {
-	      FOR_PROVIDES(p2, pp2, obs)
-		{
-		  if (!MAPTST(&trans->transactsmap, p2))
-		    continue;
-		  s2 = pool->solvables + p2;
-		  if (s2->repo != installed)
-		    continue;
-		  if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, s2, obs))
-		    continue;
-		  if (pool->obsoleteusescolors && !pool_colormatch(pool, s, s2))
-		    continue;
-		  queue_push2(ti, p, p2);
-		}
-	    }
-	}
+        {
+          Id obs, *obsp = s->repo->idarraydata + s->obsoletes;
+          while ((obs = *obsp++) != 0)
+            {
+              FOR_PROVIDES (p2, pp2, obs)
+                {
+                  if (!MAPTST(&trans->transactsmap, p2))
+                    continue;
+                  s2 = pool->solvables + p2;
+                  if (s2->repo != installed)
+                    continue;
+                  if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, s2, obs))
+                    continue;
+                  if (pool->obsoleteusescolors && !pool_colormatch(pool, s, s2))
+                    continue;
+                  queue_push2(ti, p, p2);
+                }
+            }
+        }
     }
   if (ti->count > 2)
     {
       /* sort and unify */
       solv_sort(ti->elements, ti->count / 2, 2 * sizeof(Id), obsq_sortcmp, pool);
       for (i = j = 2; i < ti->count; i += 2)
-	{
-	  if (ti->elements[i] == ti->elements[j - 2] && ti->elements[i + 1] == ti->elements[j - 1])
-	    continue;
-	  ti->elements[j++] = ti->elements[i];
-	  ti->elements[j++] = ti->elements[i + 1];
-	}
+        {
+          if (ti->elements[i] == ti->elements[j - 2] && ti->elements[i + 1] == ti->elements[j - 1])
+            continue;
+          ti->elements[j++] = ti->elements[i];
+          ti->elements[j++] = ti->elements[i + 1];
+        }
       queue_truncate(ti, j);
     }
 
@@ -704,19 +701,19 @@ create_transaction_info(Transaction *trans, Queue *decisionq)
     {
       j = ti->elements[i + 1] - installed->start;
       if (!trans->transaction_installed[j])
-	trans->transaction_installed[j] = ti->elements[i];
+        trans->transaction_installed[j] = ti->elements[i];
       else
-	{
-	  /* more than one package obsoletes us. compare to find "best" */
-	  Id q[4];
-	  if (trans->transaction_installed[j] > 0)
-	    trans->transaction_installed[j] = -trans->transaction_installed[j];
-	  q[0] = q[2] = ti->elements[i + 1];
-	  q[1] = ti->elements[i];
-	  q[3] = -trans->transaction_installed[j];
-	  if (obsq_sortcmp(q, q + 2, pool) < 0)
-	    trans->transaction_installed[j] = -ti->elements[i];
-	}
+        {
+          /* more than one package obsoletes us. compare to find "best" */
+          Id q[4];
+          if (trans->transaction_installed[j] > 0)
+            trans->transaction_installed[j] = -trans->transaction_installed[j];
+          q[0] = q[2] = ti->elements[i + 1];
+          q[1] = ti->elements[i];
+          q[3] = -trans->transaction_installed[j];
+          if (obsq_sortcmp(q, q + 2, pool) < 0)
+            trans->transaction_installed[j] = -ti->elements[i];
+        }
     }
 }
 
@@ -732,7 +729,7 @@ transaction_create_decisionq(Pool *pool, Queue *decisionq, Map *multiversionmap)
 
   trans = transaction_create(pool);
   if (multiversionmap && !multiversionmap->size)
-    multiversionmap = 0;	/* ignore empty map */
+    multiversionmap = 0; /* ignore empty map */
   queue_empty(&trans->steps);
   map_init(&trans->transactsmap, pool->nsolvables);
   needmulti = 0;
@@ -741,15 +738,15 @@ transaction_create_decisionq(Pool *pool, Queue *decisionq, Map *multiversionmap)
       p = decisionq->elements[i];
       s = pool->solvables + (p > 0 ? p : -p);
       if (!s->repo)
-	continue;
+        continue;
       if (installed && s->repo == installed && p < 0)
-	MAPSET(&trans->transactsmap, -p);
+        MAPSET(&trans->transactsmap, -p);
       if (!(installed && s->repo == installed) && p > 0)
-	{
-	  MAPSET(&trans->transactsmap, p);
-	  if (multiversionmap && MAPTST(multiversionmap, p))
-	    needmulti = 1;
-	}
+        {
+          MAPSET(&trans->transactsmap, p);
+          if (multiversionmap && MAPTST(multiversionmap, p))
+            needmulti = 1;
+        }
     }
   MAPCLR(&trans->transactsmap, SYSTEMSOLVABLE);
   if (needmulti)
@@ -759,11 +756,11 @@ transaction_create_decisionq(Pool *pool, Queue *decisionq, Map *multiversionmap)
 
   if (installed)
     {
-      FOR_REPO_SOLVABLES(installed, p, s)
-	{
-	  if (MAPTST(&trans->transactsmap, p))
-	    queue_push(&trans->steps, p);
-	}
+      FOR_REPO_SOLVABLES (installed, p, s)
+        {
+          if (MAPTST(&trans->transactsmap, p))
+            queue_push(&trans->steps, p);
+        }
     }
   for (i = 0; i < decisionq->count; i++)
     {
@@ -790,14 +787,14 @@ transaction_installedresult(Transaction *trans, Queue *installedq)
       p = trans->steps.elements[i];
       s = pool->solvables + p;
       if (installed && s->repo == installed)
-	continue;
+        continue;
       queue_push(installedq, p);
     }
   cutoff = installedq->count;
   if (installed)
     {
-      FOR_REPO_SOLVABLES(installed, p, s)
-	if (!MAPTST(&trans->transactsmap, p))
+      FOR_REPO_SOLVABLES (installed, p, s)
+        if (!MAPTST(&trans->transactsmap, p))
           queue_push(installedq, p);
     }
   return cutoff;
@@ -822,8 +819,8 @@ transaction_make_installedmap(Transaction *trans, Map *installedmap)
     }
   if (installed)
     {
-      FOR_REPO_SOLVABLES(installed, p, s)
-	if (!MAPTST(&trans->transactsmap, p))
+      FOR_REPO_SOLVABLES (installed, p, s)
+        if (!MAPTST(&trans->transactsmap, p))
           MAPSET(installedmap, p);
     }
 }
@@ -888,4 +885,3 @@ transaction_free(Transaction *trans)
     transaction_free_orderdata(trans);
   free(trans);
 }
-

@@ -31,18 +31,18 @@ rundpkg(const char *arg, const char *name, int dupfd3, const char *rootdir)
   if (pid == 0)
     {
       if (!rootdir)
-	rootdir = "/";
+        rootdir = "/";
       if (dupfd3 != -1 && dupfd3 != 3)
-	{
-	  dup2(dupfd3, 3);
-	  close(dupfd3);
-	}
+        {
+          dup2(dupfd3, 3);
+          close(dupfd3);
+        }
       if (dupfd3 != -1)
-	fcntl(3, F_SETFD, 0);   /* clear CLOEXEC */
+        fcntl(3, F_SETFD, 0); /* clear CLOEXEC */
       if (strcmp(arg, "--install") == 0)
-	execlp("dpkg", "dpkg", "--install", "--root", rootdir, "--force", "all", name, (char *)0);
+        execlp("dpkg", "dpkg", "--install", "--root", rootdir, "--force", "all", name, (char *)0);
       else
-	execlp("dpkg", "dpkg", "--remove", "--root", rootdir, "--force", "all", name, (char *)0);
+        execlp("dpkg", "dpkg", "--remove", "--root", rootdir, "--force", "all", name, (char *)0);
       perror("dpkg");
       _exit(0);
     }
@@ -89,8 +89,8 @@ commit_transactionelement_debian(Pool *pool, Id type, Id p, FILE *fp)
   Solvable *s = pool_id2solvable(pool, p);
   const char *rootdir = pool_get_rootdir(pool);
 
-  switch(type)
-    {   
+  switch (type)
+    {
     case SOLVER_TRANSACTION_ERASE:
       rundpkg("--remove", pool_id2str(pool, s->name), 0, rootdir);
       break;
@@ -102,7 +102,7 @@ commit_transactionelement_debian(Pool *pool, Id type, Id p, FILE *fp)
       break;
     default:
       break;
-    }   
+    }
 }
 
 #endif

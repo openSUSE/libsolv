@@ -94,12 +94,12 @@ data_read_num64(unsigned char *dp, unsigned int *low, unsigned int *high)
     {
       c = *dp++;
       if (!(c & 0x80))
-	{
-	  x = (x << 7) ^ c;
-	  *low = x;
-	  *high = x >> 32;
-	  return dp;
-	}
+        {
+          x = (x << 7) ^ c;
+          *low = x;
+          *high = x >> 32;
+          return dp;
+        }
       x = (x << 7) ^ (c ^ 128);
     }
 }
@@ -164,27 +164,27 @@ data_fetch(unsigned char *dp, KeyValue *kv, Repokey *key)
       kv->num2 = 0;
       return data_read_u32(dp, &kv->num);
     case REPOKEY_TYPE_MD5:
-      kv->num = 0;	/* not stringified yet */
+      kv->num = 0; /* not stringified yet */
       kv->str = (const char *)dp;
       return dp + SIZEOF_MD5;
     case REPOKEY_TYPE_SHA1:
-      kv->num = 0;	/* not stringified yet */
+      kv->num = 0; /* not stringified yet */
       kv->str = (const char *)dp;
       return dp + SIZEOF_SHA1;
     case REPOKEY_TYPE_SHA224:
-      kv->num = 0;	/* not stringified yet */
+      kv->num = 0; /* not stringified yet */
       kv->str = (const char *)dp;
       return dp + SIZEOF_SHA224;
     case REPOKEY_TYPE_SHA256:
-      kv->num = 0;	/* not stringified yet */
+      kv->num = 0; /* not stringified yet */
       kv->str = (const char *)dp;
       return dp + SIZEOF_SHA256;
     case REPOKEY_TYPE_SHA384:
-      kv->num = 0;	/* not stringified yet */
+      kv->num = 0; /* not stringified yet */
       kv->str = (const char *)dp;
       return dp + SIZEOF_SHA384;
     case REPOKEY_TYPE_SHA512:
-      kv->num = 0;	/* not stringified yet */
+      kv->num = 0; /* not stringified yet */
       kv->str = (const char *)dp;
       return dp + SIZEOF_SHA512;
     case REPOKEY_TYPE_BINARY:
@@ -195,7 +195,7 @@ data_fetch(unsigned char *dp, KeyValue *kv, Repokey *key)
       return data_read_ideof(dp, &kv->id, &kv->eof);
     case REPOKEY_TYPE_DIRSTRARRAY:
       dp = data_read_ideof(dp, &kv->id, &kv->eof);
-      kv->num = 0;	/* not stringified yet */
+      kv->num = 0; /* not stringified yet */
       kv->str = (const char *)dp;
       return dp + strlen(kv->str) + 1;
     case REPOKEY_TYPE_DIRNUMNUMARRAY:
@@ -254,9 +254,9 @@ data_skip(unsigned char *dp, int type)
       return dp + 1;
     case REPOKEY_TYPE_BINARY:
       {
-	unsigned int len;
-	dp = data_read_id(dp, (Id *)&len);
-	return dp + len;
+        unsigned int len;
+        dp = data_read_id(dp, (Id *)&len);
+        return dp + len;
       }
     case REPOKEY_TYPE_DIRSTRARRAY:
       for (;;)
@@ -324,38 +324,38 @@ data_skip_verify(unsigned char *dp, int type, int maxid, int maxdir)
     case REPOKEY_TYPE_ID:
       dp = data_read_id(dp, &id);
       if (id >= maxid)
-	return 0;
+        return 0;
       return dp;
     case REPOKEY_TYPE_DIR:
       dp = data_read_id(dp, &id);
       if (id >= maxdir)
-	return 0;
+        return 0;
       return dp;
     case REPOKEY_TYPE_IDARRAY:
       for (;;)
-	{
-	  dp = data_read_ideof(dp, &id, &eof);
-	  if (id >= maxid)
-	    return 0;
-	  if (eof)
-	    return dp;
-	}
+        {
+          dp = data_read_ideof(dp, &id, &eof);
+          if (id >= maxid)
+            return 0;
+          if (eof)
+            return dp;
+        }
     case REPOKEY_TYPE_STR:
       while ((*dp) != 0)
         dp++;
       return dp + 1;
     case REPOKEY_TYPE_BINARY:
       {
-	unsigned int len;
-	dp = data_read_id(dp, (Id *)&len);
-	return dp + len;
+        unsigned int len;
+        dp = data_read_id(dp, (Id *)&len);
+        return dp + len;
       }
     case REPOKEY_TYPE_DIRSTRARRAY:
       for (;;)
         {
-	  dp = data_read_ideof(dp, &id, &eof);
-	  if (id >= maxdir)
-	    return 0;
+          dp = data_read_ideof(dp, &id, &eof);
+          if (id >= maxdir)
+            return 0;
           while ((*dp) != 0)
             dp++;
           dp++;
@@ -365,9 +365,9 @@ data_skip_verify(unsigned char *dp, int type, int maxid, int maxdir)
     case REPOKEY_TYPE_DIRNUMNUMARRAY:
       for (;;)
         {
-	  dp = data_read_id(dp, &id);
-	  if (id >= maxdir)
-	    return 0;
+          dp = data_read_id(dp, &id);
+          if (id >= maxdir)
+            return 0;
           while ((*dp & 0x80) != 0)
             dp++;
           dp++;
@@ -382,4 +382,4 @@ data_skip_verify(unsigned char *dp, int type, int maxid, int maxdir)
     }
 }
 
-#endif	/* LIBSOLV_REPOPACK */
+#endif /* LIBSOLV_REPOPACK */

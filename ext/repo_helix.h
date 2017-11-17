@@ -26,6 +26,5 @@ extern int repo_add_helix(Repo *repo, FILE *fp, int flags);
 #ifdef __cplusplus
 }
 #endif
-    
 
 #endif /* LIBSOLV_REPO_HELIX_H */

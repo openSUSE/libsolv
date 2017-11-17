@@ -38,30 +38,29 @@
 
 enum state {
   STATE_START,
-  STATE_NEWPACKAGE,     /* 1 */
-  STATE_DELTA,          /* 2 */
-  STATE_FILENAME,       /* 3 */
-  STATE_SEQUENCE,       /* 4 */
-  STATE_SIZE,           /* 5 */
-  STATE_CHECKSUM,       /* 6 */
-  STATE_LOCATION,       /* 7 */
+  STATE_NEWPACKAGE, /* 1 */
+  STATE_DELTA,      /* 2 */
+  STATE_FILENAME,   /* 3 */
+  STATE_SEQUENCE,   /* 4 */
+  STATE_SIZE,       /* 5 */
+  STATE_CHECKSUM,   /* 6 */
+  STATE_LOCATION,   /* 7 */
   NUMSTATES
 };
 
 static struct solv_xmlparser_element stateswitches[] = {
-  /* compatibility with old yum-presto */
-  { STATE_START,       "prestodelta",     STATE_START, 0 },
-  { STATE_START,       "deltainfo",       STATE_START, 0 },
-  { STATE_START,       "newpackage",      STATE_NEWPACKAGE,  0 },
-  { STATE_NEWPACKAGE,  "delta",           STATE_DELTA,       0 },
-  /* compatibility with yum-presto */
-  { STATE_DELTA,       "filename",        STATE_FILENAME,    1 },
-  { STATE_DELTA,       "location",        STATE_LOCATION,    0 },
-  { STATE_DELTA,       "sequence",        STATE_SEQUENCE,    1 },
-  { STATE_DELTA,       "size",            STATE_SIZE,        1 },
-  { STATE_DELTA,       "checksum",        STATE_CHECKSUM,    1 },
-  { NUMSTATES }
-};
+    /* compatibility with old yum-presto */
+    {STATE_START, "prestodelta", STATE_START, 0},
+    {STATE_START, "deltainfo", STATE_START, 0},
+    {STATE_START, "newpackage", STATE_NEWPACKAGE, 0},
+    {STATE_NEWPACKAGE, "delta", STATE_DELTA, 0},
+    /* compatibility with yum-presto */
+    {STATE_DELTA, "filename", STATE_FILENAME, 1},
+    {STATE_DELTA, "location", STATE_LOCATION, 0},
+    {STATE_DELTA, "sequence", STATE_SEQUENCE, 1},
+    {STATE_DELTA, "size", STATE_SIZE, 1},
+    {STATE_DELTA, "checksum", STATE_CHECKSUM, 1},
+    {NUMSTATES}};
 
 /* Cumulated info about the current deltarpm or patchrpm */
 struct deltarpm {
@@ -96,7 +95,6 @@ struct parsedata {
   struct solv_xmlparser xmlp;
 };
 
-
 /*
  * create evr (as Id) from 'epoch', 'version' and 'release' attributes
  */
@@ -114,15 +112,15 @@ makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
       if (!strcmp(*atts, "oldepoch"))
         e = atts[1];
       else if (!strcmp(*atts, "epoch"))
-	e = atts[1];
+        e = atts[1];
       else if (!strcmp(*atts, "version"))
-	v = atts[1];
+        v = atts[1];
       else if (!strcmp(*atts, "oldversion"))
-	v = atts[1];
+        v = atts[1];
       else if (!strcmp(*atts, "release"))
-	r = atts[1];
+        r = atts[1];
       else if (!strcmp(*atts, "oldrelease"))
-	r = atts[1];
+        r = atts[1];
     }
   if (e && (!*e || !strcmp(e, "0")))
     e = 0;
@@ -131,7 +129,7 @@ makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
       for (v2 = v; *v2 >= '0' && *v2 <= '9'; v2++)
         ;
       if (v2 > v && *v2 == ':')
-	e = "0";
+        e = "0";
     }
   l = 1;
   if (e)
@@ -174,14 +172,14 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
   Pool *pool = pd->pool;
   const char *str;
 
-  switch(state)
+  switch (state)
     {
     case STATE_NEWPACKAGE:
       if ((str = solv_xmlparser_find_attr("name", atts)) != 0)
-	pd->newpkgname = pool_str2id(pool, str, 1);
+        pd->newpkgname = pool_str2id(pool, str, 1);
       pd->newpkgevr = makeevr_atts(pool, pd, atts);
       if ((str = solv_xmlparser_find_attr("arch", atts)) != 0)
-	pd->newpkgarch = pool_str2id(pool, str, 1);
+        pd->newpkgarch = pool_str2id(pool, str, 1);
       break;
 
     case STATE_DELTA:
@@ -205,18 +203,17 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
       pd->delta.filechecksum = 0;
       pd->delta.filechecksumtype = REPOKEY_TYPE_SHA1;
       if ((str = solv_xmlparser_find_attr("type", atts)) != 0)
-	{
-	  pd->delta.filechecksumtype = solv_chksum_str2type(str);
-	  if (!pd->delta.filechecksumtype)
-	    pool_debug(pool, SOLV_ERROR, "unknown checksum type: '%s'\n", str);
-	}
+        {
+          pd->delta.filechecksumtype = solv_chksum_str2type(str);
+          if (!pd->delta.filechecksumtype)
+            pool_debug(pool, SOLV_ERROR, "unknown checksum type: '%s'\n", str);
+        }
       break;
 
     default:
       break;
     }
 }
-
 
 static void
 endElement(struct solv_xmlparser *xmlp, int state, char *content)
@@ -229,36 +226,36 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
     {
     case STATE_DELTA:
       {
-	/* read all data for a deltarpm. commit into attributes */
-	Id handle;
-	struct deltarpm *d = &pd->delta;
+        /* read all data for a deltarpm. commit into attributes */
+        Id handle;
+        struct deltarpm *d = &pd->delta;
 
-	handle = repodata_new_handle(pd->data);
-	/* we commit all handles later on in one go so that the
+        handle = repodata_new_handle(pd->data);
+        /* we commit all handles later on in one go so that the
          * repodata code doesn't need to realloc every time */
-	pd->handles = solv_extend(pd->handles, pd->nhandles, 1, sizeof(Id), 63);
+        pd->handles = solv_extend(pd->handles, pd->nhandles, 1, sizeof(Id), 63);
         pd->handles[pd->nhandles++] = handle;
-	repodata_set_id(pd->data, handle, DELTA_PACKAGE_NAME, pd->newpkgname);
-	repodata_set_id(pd->data, handle, DELTA_PACKAGE_EVR, pd->newpkgevr);
-	repodata_set_id(pd->data, handle, DELTA_PACKAGE_ARCH, pd->newpkgarch);
-	if (d->location)
-	  {
-	    repodata_set_deltalocation(pd->data, handle, 0, 0, d->location);
-	    if (d->locbase)
-	      repodata_set_poolstr(pd->data, handle, DELTA_LOCATION_BASE, d->locbase);
-	  }
-	if (d->downloadsize)
-	  repodata_set_num(pd->data, handle, DELTA_DOWNLOADSIZE, d->downloadsize);
-	if (d->filechecksum)
-	  repodata_set_checksum(pd->data, handle, DELTA_CHECKSUM, d->filechecksumtype, d->filechecksum);
-	if (d->seqnum)
-	  {
-	    repodata_set_id(pd->data, handle, DELTA_BASE_EVR, d->bevr[0]);
-	    repodata_set_id(pd->data, handle, DELTA_SEQ_NAME, d->seqname);
-	    repodata_set_id(pd->data, handle, DELTA_SEQ_EVR, d->seqevr);
-	    /* should store as binary blob! */
-	    repodata_set_str(pd->data, handle, DELTA_SEQ_NUM, d->seqnum);
-	  }
+        repodata_set_id(pd->data, handle, DELTA_PACKAGE_NAME, pd->newpkgname);
+        repodata_set_id(pd->data, handle, DELTA_PACKAGE_EVR, pd->newpkgevr);
+        repodata_set_id(pd->data, handle, DELTA_PACKAGE_ARCH, pd->newpkgarch);
+        if (d->location)
+          {
+            repodata_set_deltalocation(pd->data, handle, 0, 0, d->location);
+            if (d->locbase)
+              repodata_set_poolstr(pd->data, handle, DELTA_LOCATION_BASE, d->locbase);
+          }
+        if (d->downloadsize)
+          repodata_set_num(pd->data, handle, DELTA_DOWNLOADSIZE, d->downloadsize);
+        if (d->filechecksum)
+          repodata_set_checksum(pd->data, handle, DELTA_CHECKSUM, d->filechecksumtype, d->filechecksum);
+        if (d->seqnum)
+          {
+            repodata_set_id(pd->data, handle, DELTA_BASE_EVR, d->bevr[0]);
+            repodata_set_id(pd->data, handle, DELTA_SEQ_NAME, d->seqname);
+            repodata_set_id(pd->data, handle, DELTA_SEQ_EVR, d->seqevr);
+            /* should store as binary blob! */
+            repodata_set_str(pd->data, handle, DELTA_SEQ_NUM, d->seqnum);
+          }
       }
       pd->delta.filechecksum = solv_free(pd->delta.filechecksum);
       pd->delta.bevr = solv_free(pd->delta.bevr);
@@ -278,29 +275,29 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
       break;
     case STATE_SEQUENCE:
       if ((str = content) != 0)
-	{
-	  const char *s1, *s2;
-	  s1 = strrchr(str, '-');
-	  if (s1)
-	    {
-	      for (s2 = s1 - 1; s2 > str; s2--)
-	        if (*s2 == '-')
-		  break;
-	      if (*s2 == '-')
-		{
-		  for (s2 = s2 - 1; s2 > str; s2--)
-		    if (*s2 == '-')
-		      break;
-		  if (*s2 == '-')
-		    {
-		      pd->delta.seqevr = pool_strn2id(pool, s2 + 1, s1 - s2 - 1, 1);
-		      pd->delta.seqname = pool_strn2id(pool, str, s2 - str, 1);
-		      str = s1 + 1;
-		    }
-		}
-	    }
-	  pd->delta.seqnum = solv_strdup(str);
-      }
+        {
+          const char *s1, *s2;
+          s1 = strrchr(str, '-');
+          if (s1)
+            {
+              for (s2 = s1 - 1; s2 > str; s2--)
+                if (*s2 == '-')
+                  break;
+              if (*s2 == '-')
+                {
+                  for (s2 = s2 - 1; s2 > str; s2--)
+                    if (*s2 == '-')
+                      break;
+                  if (*s2 == '-')
+                    {
+                      pd->delta.seqevr = pool_strn2id(pool, s2 + 1, s1 - s2 - 1, 1);
+                      pd->delta.seqname = pool_strn2id(pool, str, s2 - str, 1);
+                      str = s1 + 1;
+                    }
+                }
+            }
+          pd->delta.seqnum = solv_strdup(str);
+        }
     default:
       break;
     }

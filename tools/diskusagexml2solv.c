@@ -22,11 +22,10 @@ static void
 usage(int status)
 {
   fprintf(stderr, "\nUsage:\n"
-          "diskusagexml2solv [-a][-h][-n <attrname>]\n"
-	  "  reads a 'diskusage.xml' file from <stdin> and writes a .solv file to <stdout>\n"
-	  "  -h : print help & exit\n"
-	  "  -n <name>: save attributes as <name>.attr\n"
-	 );
+                  "diskusagexml2solv [-a][-h][-n <attrname>]\n"
+                  "  reads a 'diskusage.xml' file from <stdin> and writes a .solv file to <stdout>\n"
+                  "  -h : print help & exit\n"
+                  "  -n <name>: save attributes as <name>.attr\n");
   exit(status);
 }
 
@@ -35,24 +34,24 @@ main(int argc, char **argv)
 {
   int c, flags = 0;
   char *attrname = 0;
-  
+
   Pool *pool = pool_create();
   Repo *repo = repo_create(pool, "<stdin>");
 
   while ((c = getopt(argc, argv, "hn:")) >= 0)
-    {   
-      switch(c)
-	{
-	case 'h':
-	  usage(0);
-	  break;
-	case 'n':
-	  attrname = optarg;
-	  break;
-	default:
-	  usage(1);
-	  break;
-	}
+    {
+      switch (c)
+        {
+        case 'h':
+          usage(0);
+          break;
+        case 'n':
+          attrname = optarg;
+          break;
+        default:
+          usage(1);
+          break;
+        }
     }
   if (repo_add_diskusagexml(repo, stdin, flags))
     {

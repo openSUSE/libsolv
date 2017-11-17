@@ -37,38 +37,38 @@ main(int argc, char **argv)
   while ((c = getopt(argc, argv, "hd:r:")) >= 0)
     {
       switch (c)
-	{
-	case 'd':
-	  appdatadir = optarg;
-	  break;
-	case 'r':
-	  root = optarg;
-	  break;
-	default:
-	  fprintf(stderr, "usage: appdata2solv [-d appdatadir]");
-	  exit(c == 'h' ? 0 : 1);
-	}
+        {
+        case 'd':
+          appdatadir = optarg;
+          break;
+        case 'r':
+          root = optarg;
+          break;
+        default:
+          fprintf(stderr, "usage: appdata2solv [-d appdatadir]");
+          exit(c == 'h' ? 0 : 1);
+        }
     }
 
   if (root)
     pool_set_rootdir(pool, root);
-    
+
   repo = repo_create(pool, "<stdin>");
   if (!appdatadir)
     {
       if (repo_add_appdata(repo, stdin, 0))
-	{
-	  fprintf(stderr, "appdata2solv: %s\n", pool_errstr(pool));
-	  exit(1);
-	}
+        {
+          fprintf(stderr, "appdata2solv: %s\n", pool_errstr(pool));
+          exit(1);
+        }
     }
   else
     {
       if (repo_add_appdata_dir(repo, appdatadir, REPO_USE_ROOTDIR))
-	{
-	  fprintf(stderr, "appdata2solv: %s\n", pool_errstr(pool));
-	  exit(1);
-	}
+        {
+          fprintf(stderr, "appdata2solv: %s\n", pool_errstr(pool));
+          exit(1);
+        }
     }
   tool_write(repo, 0, 0);
   pool_free(pool);

@@ -42,9 +42,9 @@ splitword(char **lp)
   while (*l && *l != ' ' && *l != '\t')
     l++;
   if (*l)
-    *l++ = 0;		/* terminate word */
+    *l++ = 0; /* terminate word */
   while (*l == ' ' || *l == '\t')
-    l++; 		/* convenience: advance to next word */
+    l++; /* convenience: advance to next word */
   *lp = l;
   return w;
 }
@@ -63,14 +63,12 @@ struct parsedata {
  */
 
 static char *flagtab[] = {
-  ">",
-  "=",
-  ">=",
-  "<",
-  "!=",
-  "<="
-};
-
+    ">",
+    "=",
+    ">=",
+    "<",
+    "!=",
+    "<="};
 
 /*
  * join up to three strings into one
@@ -113,7 +111,6 @@ join(struct parsedata *pd, const char *s1, const char *s2, const char *s3)
   return pd->tmp;
 }
 
-
 /*
  * add dependency to pool
  * OBSOLETES product:SUSE_LINUX product:openSUSE < 11.0 package:openSUSE < 11.0
@@ -129,35 +126,34 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, char *line, Id ma
     {
       /* Hack, as the content file adds 'package:' for package
          dependencies sometimes.  */
-      if (!strncmp (name, "package:", 8))
+      if (!strncmp(name, "package:", 8))
         name += 8;
       id = pool_str2id(pool, name, 1);
-      if (*line == '<' || *line == '>' || *line == '=')	/* rel follows */
-	{
-	  char *rel = splitword(&line);
+      if (*line == '<' || *line == '>' || *line == '=') /* rel follows */
+        {
+          char *rel = splitword(&line);
           char *evr = splitword(&line);
-	  int flags;
+          int flags;
 
-	  if (!rel || !evr)
-	    {
-	      pool_debug(pool, SOLV_ERROR, "repo_content: bad relation '%s %s'\n", name, rel);
-	      continue;
-	    }
-	  for (flags = 0; flags < 6; flags++)
-	    if (!strcmp(rel, flagtab[flags]))
-	      break;
-	  if (flags == 6)
-	    {
-	      pool_debug(pool, SOLV_ERROR, "repo_content: unknown relation '%s'\n", rel);
-	      continue;
-	    }
-	  id = pool_rel2id(pool, id, pool_str2id(pool, evr, 1), flags + 1, 1);
-	}
+          if (!rel || !evr)
+            {
+              pool_debug(pool, SOLV_ERROR, "repo_content: bad relation '%s %s'\n", name, rel);
+              continue;
+            }
+          for (flags = 0; flags < 6; flags++)
+            if (!strcmp(rel, flagtab[flags]))
+              break;
+          if (flags == 6)
+            {
+              pool_debug(pool, SOLV_ERROR, "repo_content: unknown relation '%s'\n", rel);
+              continue;
+            }
+          id = pool_rel2id(pool, id, pool_str2id(pool, evr, 1), flags + 1, 1);
+        }
       olddeps = repo_addid_dep(pd->repo, olddeps, id, marker);
     }
   return olddeps;
 }
-
 
 /*
  * split value and add to pool
@@ -187,8 +183,6 @@ add_multiple_urls(Repodata *data, Id handle, char *value, Id type)
       repodata_add_idarray(data, handle, PRODUCT_URL_TYPE, type);
     }
 }
-
-
 
 /*
  * add 'content' to repo
@@ -238,18 +232,18 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 
       /* read line into big-enough buffer */
       if (linep - line + 16 > aline)
-	{
-	  aline = linep - line;
-	  line = solv_realloc(line, aline + 512);
-	  linep = line + aline;
-	  aline += 512;
-	}
+        {
+          aline = linep - line;
+          line = solv_realloc(line, aline + 512);
+          linep = line + aline;
+          aline += 512;
+        }
       if (!fgets(linep, aline - (linep - line), fp))
-	break;
+        break;
       linep += strlen(linep);
       if (linep == line || linep[-1] != '\n')
         continue;
-      while ( --linep > line && ( linep[-1] == ' ' ||  linep[-1] == '\t' ) )
+      while (--linep > line && (linep[-1] == ' ' || linep[-1] == '\t'))
         ; /* skip trailing ws */
       *linep = 0;
       linep = line;
@@ -264,247 +258,245 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
 	  fprintf (stderr, "key %s, value %s\n", key, value);
 #endif
 
-#define istag(x) (!strcmp (key, x))
+#define istag(x) (!strcmp(key, x))
 #define code10 (contentstyle == 10)
 #define code11 (contentstyle == 11)
 
+          if (istag("CONTENTSTYLE"))
+            {
+              if (contentstyle)
+                pool_debug(pool, SOLV_ERROR, "repo_content: 'CONTENTSTYLE' must be first line of 'content'\n");
+              contentstyle = atoi(value);
+              continue;
+            }
+          if (!contentstyle)
+            contentstyle = 10;
 
-	  if (istag ("CONTENTSTYLE"))
-	    {
-	      if (contentstyle)
-	        pool_debug(pool, SOLV_ERROR, "repo_content: 'CONTENTSTYLE' must be first line of 'content'\n");
-	      contentstyle = atoi(value);
-	      continue;
-	    }
-	  if (!contentstyle)
-	    contentstyle = 10;
-
-	  /* repository tags */
+          /* repository tags */
           /* we also replicate some of them into the product solvables
            * to be backward compatible */
 
-	  if (istag ("REPOID"))
-	    {
-	      repodata_add_poolstr_array(data, SOLVID_META, REPOSITORY_REPOID, value);
-	      continue;
-	    }
-	  if (istag ("REPOKEYWORDS"))
-	    {
-	      add_multiple_strings(data, SOLVID_META, REPOSITORY_KEYWORDS, value);
-	      continue;
-	    }
-	  if (istag ("DISTRO"))
-	    {
-	      Id dh = repodata_new_handle(data);
-	      char *p;
-	      /* like with createrepo --distro */
-	      if ((p = strchr(value, ',')) != 0)
-		{
-		  *p++ = 0;
-		  if (*value)
-		    repodata_set_poolstr(data, dh, REPOSITORY_PRODUCT_CPEID, value);
-		}
-	      else
-	        p = value;
-	      if (*p)
-		repodata_set_str(data, dh, REPOSITORY_PRODUCT_LABEL, p);
-	      repodata_add_flexarray(data, SOLVID_META, REPOSITORY_DISTROS, dh);
-	      continue;
-	    }
+          if (istag("REPOID"))
+            {
+              repodata_add_poolstr_array(data, SOLVID_META, REPOSITORY_REPOID, value);
+              continue;
+            }
+          if (istag("REPOKEYWORDS"))
+            {
+              add_multiple_strings(data, SOLVID_META, REPOSITORY_KEYWORDS, value);
+              continue;
+            }
+          if (istag("DISTRO"))
+            {
+              Id dh = repodata_new_handle(data);
+              char *p;
+              /* like with createrepo --distro */
+              if ((p = strchr(value, ',')) != 0)
+                {
+                  *p++ = 0;
+                  if (*value)
+                    repodata_set_poolstr(data, dh, REPOSITORY_PRODUCT_CPEID, value);
+                }
+              else
+                p = value;
+              if (*p)
+                repodata_set_str(data, dh, REPOSITORY_PRODUCT_LABEL, p);
+              repodata_add_flexarray(data, SOLVID_META, REPOSITORY_DISTROS, dh);
+              continue;
+            }
 
-	  if (istag ("DESCRDIR"))
-	    {
-	      if (descrdir)
-		free(descrdir);
-	      else
-	        repodata_set_str(data, SOLVID_META, SUSETAGS_DESCRDIR, value);
-	      if (s)
-	        repodata_set_str(data, s - pool->solvables, SUSETAGS_DESCRDIR, value);
-	      descrdir = solv_strdup(value);
-	      continue;
-	    }
-	  if (istag ("DATADIR"))
-	    {
-	      if (datadir)
-		free(datadir);
-	      else
-	        repodata_set_str(data, SOLVID_META, SUSETAGS_DATADIR, value);
-	      if (s)
-	        repodata_set_str(data, s - pool->solvables, SUSETAGS_DATADIR, value);
-	      datadir = solv_strdup(value);
-	      continue;
-	    }
-	  if (istag ("VENDOR"))
-	    {
-	      if (defvendor)
-		free(defvendor);
-	      else
-	        repodata_set_poolstr(data, SOLVID_META, SUSETAGS_DEFAULTVENDOR, value);
-	      if (s)
-		s->vendor = pool_str2id(pool, value, 1);
-	      defvendor = solv_strdup(value);
-	      continue;
-	    }
+          if (istag("DESCRDIR"))
+            {
+              if (descrdir)
+                free(descrdir);
+              else
+                repodata_set_str(data, SOLVID_META, SUSETAGS_DESCRDIR, value);
+              if (s)
+                repodata_set_str(data, s - pool->solvables, SUSETAGS_DESCRDIR, value);
+              descrdir = solv_strdup(value);
+              continue;
+            }
+          if (istag("DATADIR"))
+            {
+              if (datadir)
+                free(datadir);
+              else
+                repodata_set_str(data, SOLVID_META, SUSETAGS_DATADIR, value);
+              if (s)
+                repodata_set_str(data, s - pool->solvables, SUSETAGS_DATADIR, value);
+              datadir = solv_strdup(value);
+              continue;
+            }
+          if (istag("VENDOR"))
+            {
+              if (defvendor)
+                free(defvendor);
+              else
+                repodata_set_poolstr(data, SOLVID_META, SUSETAGS_DEFAULTVENDOR, value);
+              if (s)
+                s->vendor = pool_str2id(pool, value, 1);
+              defvendor = solv_strdup(value);
+              continue;
+            }
 
-	  if (istag ("META") || istag ("HASH") || istag ("KEY"))
-	    {
-	      char *checksumtype, *checksum;
-	      Id fh, type;
-	      int l;
+          if (istag("META") || istag("HASH") || istag("KEY"))
+            {
+              char *checksumtype, *checksum;
+              Id fh, type;
+              int l;
 
-	      if ((checksumtype = splitword(&value)) == 0)
-		continue;
-	      if ((checksum = splitword(&value)) == 0)
-		continue;
-	      if (!*value)
-		continue;
-	      type = solv_chksum_str2type(checksumtype);
-	      if (!type)
-		{
-		  pool_error(pool, -1, "%s: unknown checksum type '%s'", value, checksumtype);
-		  res = 1;
-		  continue;
-		}
+              if ((checksumtype = splitword(&value)) == 0)
+                continue;
+              if ((checksum = splitword(&value)) == 0)
+                continue;
+              if (!*value)
+                continue;
+              type = solv_chksum_str2type(checksumtype);
+              if (!type)
+                {
+                  pool_error(pool, -1, "%s: unknown checksum type '%s'", value, checksumtype);
+                  res = 1;
+                  continue;
+                }
               l = solv_chksum_len(type);
-	      if (strlen(checksum) != 2 * l)
-	        {
-		  pool_error(pool, -1, "%s: invalid checksum length for %s", value, checksumtype);
-		  res = 1;
-		  continue;
-	        }
-	      fh = repodata_new_handle(data);
-	      repodata_set_poolstr(data, fh, SUSETAGS_FILE_TYPE, key);
-	      repodata_set_str(data, fh, SUSETAGS_FILE_NAME, value);
-	      repodata_set_checksum(data, fh, SUSETAGS_FILE_CHECKSUM, type, checksum);
-	      repodata_add_flexarray(data, SOLVID_META, SUSETAGS_FILE, fh);
-	      continue;
-	    }
+              if (strlen(checksum) != 2 * l)
+                {
+                  pool_error(pool, -1, "%s: invalid checksum length for %s", value, checksumtype);
+                  res = 1;
+                  continue;
+                }
+              fh = repodata_new_handle(data);
+              repodata_set_poolstr(data, fh, SUSETAGS_FILE_TYPE, key);
+              repodata_set_str(data, fh, SUSETAGS_FILE_NAME, value);
+              repodata_set_checksum(data, fh, SUSETAGS_FILE_CHECKSUM, type, checksum);
+              repodata_add_flexarray(data, SOLVID_META, SUSETAGS_FILE, fh);
+              continue;
+            }
 
-	  /* product tags */
+          /* product tags */
 
-	  if ((code10 && istag ("PRODUCT"))
-	      || (code11 && istag ("NAME")))
-	    {
-	      if (s && !s->name)
-		{
-		  /* this solvable was created without seeing a
+          if ((code10 && istag("PRODUCT")) || (code11 && istag("NAME")))
+            {
+              if (s && !s->name)
+                {
+                  /* this solvable was created without seeing a
 		     PRODUCT entry, just set the name and continue */
-		  s->name = pool_str2id(pool, join(&pd, "product", ":", value), 1);
-		  continue;
-		}
-	      if (s)
-		{
-		  /* finish old solvable */
-		  if (!s->arch)
-		    s->arch = ARCH_NOARCH;
-		  if (!s->evr)
-		    s->evr = ID_EMPTY;
-		  if (s->name && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
-		    s->provides = repo_addid_dep(repo, s->provides, pool_rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
-		  if (code10)
-		    repo_rewrite_suse_deps(s, 0);
-		}
-	      /* create new solvable */
-	      s = pool_id2solvable(pool, repo_add_solvable(repo));
-	      handle = s - pool->solvables;
-	      s->name = pool_str2id(pool, join(&pd, "product", ":", value), 1);
-	      if (datadir)
-	        repodata_set_str(data, s - pool->solvables, SUSETAGS_DATADIR, datadir);
-	      if (descrdir)
-	        repodata_set_str(data, s - pool->solvables, SUSETAGS_DESCRDIR, descrdir);
-	      if (defvendor)
-		s->vendor = pool_str2id(pool, defvendor, 1);
-	      continue;
-	    }
+                  s->name = pool_str2id(pool, join(&pd, "product", ":", value), 1);
+                  continue;
+                }
+              if (s)
+                {
+                  /* finish old solvable */
+                  if (!s->arch)
+                    s->arch = ARCH_NOARCH;
+                  if (!s->evr)
+                    s->evr = ID_EMPTY;
+                  if (s->name && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
+                    s->provides = repo_addid_dep(repo, s->provides, pool_rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+                  if (code10)
+                    repo_rewrite_suse_deps(s, 0);
+                }
+              /* create new solvable */
+              s = pool_id2solvable(pool, repo_add_solvable(repo));
+              handle = s - pool->solvables;
+              s->name = pool_str2id(pool, join(&pd, "product", ":", value), 1);
+              if (datadir)
+                repodata_set_str(data, s - pool->solvables, SUSETAGS_DATADIR, datadir);
+              if (descrdir)
+                repodata_set_str(data, s - pool->solvables, SUSETAGS_DESCRDIR, descrdir);
+              if (defvendor)
+                s->vendor = pool_str2id(pool, defvendor, 1);
+              continue;
+            }
 
-	  /* Sometimes PRODUCT/NAME is not the first entry, but we need a solvable
+          /* Sometimes PRODUCT/NAME is not the first entry, but we need a solvable
 	     from here on.  */
-	  if (!s)
-	    {
-	      s = pool_id2solvable(pool, repo_add_solvable(repo));
-	      handle = s - pool->solvables;
-	    }
+          if (!s)
+            {
+              s = pool_id2solvable(pool, repo_add_solvable(repo));
+              handle = s - pool->solvables;
+            }
 
-	  if (istag ("VERSION"))
+          if (istag("VERSION"))
             pd.tmpvers = solv_strdup(value);
-          else if (istag ("RELEASE"))
+          else if (istag("RELEASE"))
             pd.tmprel = solv_strdup(value);
-	  else if (code11 && istag ("DISTRIBUTION"))
-	    repodata_set_poolstr(data, s - pool->solvables, SOLVABLE_DISTRIBUTION, value);
-	  else if (istag ("UPDATEURLS"))
-	    add_multiple_urls(data, handle, value, pool_str2id(pool, "update", 1));
-	  else if (istag ("EXTRAURLS"))
-	    add_multiple_urls(data, handle, value, pool_str2id(pool, "extra", 1));
-	  else if (istag ("OPTIONALURLS"))
-	    add_multiple_urls(data, handle, value, pool_str2id(pool, "optional", 1));
-	  else if (istag ("RELNOTESURL"))
-	    add_multiple_urls(data, handle, value, pool_str2id(pool, "releasenotes", 1));
-	  else if (istag ("SHORTLABEL"))
-	    repodata_set_str(data, s - pool->solvables, PRODUCT_SHORTLABEL, value);
-	  else if (istag ("LABEL")) /* LABEL is the products SUMMARY. */
-	    repodata_set_str(data, s - pool->solvables, SOLVABLE_SUMMARY, value);
-	  else if (!strncmp (key, "LABEL.", 6))
-	    repodata_set_str(data, s - pool->solvables, pool_id2langid(pool, SOLVABLE_SUMMARY, key + 6, 1), value);
-	  else if (istag ("FLAGS"))
-	    add_multiple_strings(data, handle, PRODUCT_FLAGS, value);
-	  else if (istag ("VENDOR"))	/* actually already handled above */
-	    s->vendor = pool_str2id(pool, value, 1);
-          else if (istag ("BASEARCHS"))
+          else if (code11 && istag("DISTRIBUTION"))
+            repodata_set_poolstr(data, s - pool->solvables, SOLVABLE_DISTRIBUTION, value);
+          else if (istag("UPDATEURLS"))
+            add_multiple_urls(data, handle, value, pool_str2id(pool, "update", 1));
+          else if (istag("EXTRAURLS"))
+            add_multiple_urls(data, handle, value, pool_str2id(pool, "extra", 1));
+          else if (istag("OPTIONALURLS"))
+            add_multiple_urls(data, handle, value, pool_str2id(pool, "optional", 1));
+          else if (istag("RELNOTESURL"))
+            add_multiple_urls(data, handle, value, pool_str2id(pool, "releasenotes", 1));
+          else if (istag("SHORTLABEL"))
+            repodata_set_str(data, s - pool->solvables, PRODUCT_SHORTLABEL, value);
+          else if (istag("LABEL")) /* LABEL is the products SUMMARY. */
+            repodata_set_str(data, s - pool->solvables, SOLVABLE_SUMMARY, value);
+          else if (!strncmp(key, "LABEL.", 6))
+            repodata_set_str(data, s - pool->solvables, pool_id2langid(pool, SOLVABLE_SUMMARY, key + 6, 1), value);
+          else if (istag("FLAGS"))
+            add_multiple_strings(data, handle, PRODUCT_FLAGS, value);
+          else if (istag("VENDOR")) /* actually already handled above */
+            s->vendor = pool_str2id(pool, value, 1);
+          else if (istag("BASEARCHS"))
             {
               char *arch;
 
-	      if ((arch = splitword(&value)) != 0)
-		{
-		  s->arch = pool_str2id(pool, arch, 1);
-		  while ((arch = splitword(&value)) != 0)
-		    {
-		       otherarchs = solv_extend(otherarchs, numotherarchs, 1, sizeof(Id), 7);
-		       otherarchs[numotherarchs++] = pool_str2id(pool, arch, 1);
-		    }
-		}
+              if ((arch = splitword(&value)) != 0)
+                {
+                  s->arch = pool_str2id(pool, arch, 1);
+                  while ((arch = splitword(&value)) != 0)
+                    {
+                      otherarchs = solv_extend(otherarchs, numotherarchs, 1, sizeof(Id), 7);
+                      otherarchs[numotherarchs++] = pool_str2id(pool, arch, 1);
+                    }
+                }
             }
-	  if (!code10)
-	    continue;
+          if (!code10)
+            continue;
 
-	  /*
+          /*
 	   * Every tag below is Code10 only
 	   *
 	   */
 
-	  if (istag ("ARCH"))
-	    /* Theoretically we want to have the best arch of the given
+          if (istag("ARCH"))
+            /* Theoretically we want to have the best arch of the given
 	       modifiers which still is compatible with the system
 	       arch.  We don't know the latter here, though.  */
-	    s->arch = ARCH_NOARCH;
-	  else if (istag ("PREREQUIRES"))
-	    s->requires = adddep(pool, &pd, s->requires, value, SOLVABLE_PREREQMARKER);
-	  else if (istag ("REQUIRES"))
-	    s->requires = adddep(pool, &pd, s->requires, value, -SOLVABLE_PREREQMARKER);
-	  else if (istag ("PROVIDES"))
-	    s->provides = adddep(pool, &pd, s->provides, value, 0);
-	  else if (istag ("CONFLICTS"))
-	    s->conflicts = adddep(pool, &pd, s->conflicts, value, 0);
-	  else if (istag ("OBSOLETES"))
-	    s->obsoletes = adddep(pool, &pd, s->obsoletes, value, 0);
-	  else if (istag ("RECOMMENDS"))
-	    s->recommends = adddep(pool, &pd, s->recommends, value, 0);
-	  else if (istag ("SUGGESTS"))
-	    s->suggests = adddep(pool, &pd, s->suggests, value, 0);
-	  else if (istag ("SUPPLEMENTS"))
-	    s->supplements = adddep(pool, &pd, s->supplements, value, 0);
-	  else if (istag ("ENHANCES"))
-	    s->enhances = adddep(pool, &pd, s->enhances, value, 0);
-	  /* FRESHENS doesn't seem to exist.  */
-	  else if (istag ("TYPE"))
-	    repodata_set_str(data, s - pool->solvables, PRODUCT_TYPE, value);
+            s->arch = ARCH_NOARCH;
+          else if (istag("PREREQUIRES"))
+            s->requires = adddep(pool, &pd, s->requires, value, SOLVABLE_PREREQMARKER);
+          else if (istag("REQUIRES"))
+            s->requires = adddep(pool, &pd, s->requires, value, -SOLVABLE_PREREQMARKER);
+          else if (istag("PROVIDES"))
+            s->provides = adddep(pool, &pd, s->provides, value, 0);
+          else if (istag("CONFLICTS"))
+            s->conflicts = adddep(pool, &pd, s->conflicts, value, 0);
+          else if (istag("OBSOLETES"))
+            s->obsoletes = adddep(pool, &pd, s->obsoletes, value, 0);
+          else if (istag("RECOMMENDS"))
+            s->recommends = adddep(pool, &pd, s->recommends, value, 0);
+          else if (istag("SUGGESTS"))
+            s->suggests = adddep(pool, &pd, s->suggests, value, 0);
+          else if (istag("SUPPLEMENTS"))
+            s->supplements = adddep(pool, &pd, s->supplements, value, 0);
+          else if (istag("ENHANCES"))
+            s->enhances = adddep(pool, &pd, s->enhances, value, 0);
+          /* FRESHENS doesn't seem to exist.  */
+          else if (istag("TYPE"))
+            repodata_set_str(data, s - pool->solvables, PRODUCT_TYPE, value);
 
-	  /* XXX do something about LINGUAS and ARCH?
+            /* XXX do something about LINGUAS and ARCH?
           * <ma>: Don't think so. zypp does not use or propagate them.
           */
 #undef istag
-	}
+        }
       else
-	pool_debug(pool, SOLV_ERROR, "repo_content: malformed line: %s\n", line);
+        pool_debug(pool, SOLV_ERROR, "repo_content: malformed line: %s\n", line);
     }
 
   if (datadir)
@@ -523,37 +515,37 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
   if (s)
     {
       if (pd.tmprel)
-	s->evr = makeevr(pool, join(&pd, pd.tmpvers, "-", pd.tmprel));
+        s->evr = makeevr(pool, join(&pd, pd.tmpvers, "-", pd.tmprel));
       else
-	s->evr = makeevr(pool, pd.tmpvers);
+        s->evr = makeevr(pool, pd.tmpvers);
       pd.tmpvers = solv_free((void *)pd.tmpvers);
       pd.tmprel = solv_free((void *)pd.tmprel);
 
       if (!s->arch)
-	s->arch = ARCH_NOARCH;
+        s->arch = ARCH_NOARCH;
       if (!s->evr)
-	s->evr = ID_EMPTY;
+        s->evr = ID_EMPTY;
       if (s->name && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
         s->provides = repo_addid_dep(repo, s->provides, pool_rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
       if (code10)
-	repo_rewrite_suse_deps(s, 0);
+        repo_rewrite_suse_deps(s, 0);
 
       /* now for every other arch, clone the product except the architecture */
       for (i = 0; i < numotherarchs; ++i)
-	{
-	  Solvable *p = pool_id2solvable(pool, repo_add_solvable(repo));
-	  p->name = s->name;
-	  p->evr = s->evr;
-	  p->vendor = s->vendor;
-	  p->arch = otherarchs[i];
+        {
+          Solvable *p = pool_id2solvable(pool, repo_add_solvable(repo));
+          p->name = s->name;
+          p->evr = s->evr;
+          p->vendor = s->vendor;
+          p->arch = otherarchs[i];
 
-	  /* self provides */
-	  if (s->name && p->arch != ARCH_SRC && p->arch != ARCH_NOSRC)
-	      p->provides = repo_addid_dep(repo, p->provides, pool_rel2id(pool, p->name, p->evr, REL_EQ, 1), 0);
+          /* self provides */
+          if (s->name && p->arch != ARCH_SRC && p->arch != ARCH_NOSRC)
+            p->provides = repo_addid_dep(repo, p->provides, pool_rel2id(pool, p->name, p->evr, REL_EQ, 1), 0);
 
-	  /* now merge the attributes */
-	  repodata_merge_attrs(data, p - pool->solvables, s - pool->solvables);
-	}
+          /* now merge the attributes */
+          repodata_merge_attrs(data, p - pool->solvables, s - pool->solvables);
+        }
     }
 
   if (pd.tmp)

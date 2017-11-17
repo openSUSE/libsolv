@@ -23,8 +23,8 @@ void
 set_userhome()
 {
   userhome = getenv("HOME");
-  if (userhome && userhome[0] != '/') 
-    userhome = 0; 
+  if (userhome && userhome[0] != '/')
+    userhome = 0;
 }
 
 void
@@ -94,26 +94,26 @@ usecachedrepo(struct repoinfo *cinfo, const char *repoext, int mark)
   int forcesystemloc;
 
   if (repoext && !cinfo->extcookieset)
-    return 0;	/* huh? */
+    return 0; /* huh? */
   forcesystemloc = mark & 2 ? 0 : 1;
   if (mark < 2 && userhome && getuid())
     {
       /* first try home location */
       int res = usecachedrepo(cinfo, repoext, mark | 2);
       if (res)
-	return res;
+        return res;
     }
   mark &= 1;
   if (!(fp = fopen(calc_cachepath(repo, repoext, forcesystemloc), "r")))
     return 0;
   if (!repoext && !cinfo->cookieset && cinfo->autorefresh && cinfo->metadata_expire != -1)
     {
-      struct stat stb;		/* no cookie set yet, check cache expiry time */
+      struct stat stb; /* no cookie set yet, check cache expiry time */
       if (fstat(fileno(fp), &stb) || time(0) - stb.st_mtime >= cinfo->metadata_expire)
-	{
-	  fclose(fp);
-	  return 0;
-	}
+        {
+          fclose(fp);
+          return 0;
+        }
     }
   if (fseek(fp, -sizeof(mycookie), SEEK_END) || fread(mycookie, sizeof(mycookie), 1, fp) != 1)
     {
@@ -128,19 +128,19 @@ usecachedrepo(struct repoinfo *cinfo, const char *repoext, int mark)
   if (cinfo->type != TYPE_INSTALLED && !repoext)
     {
       if (fseek(fp, -sizeof(mycookie) * 2, SEEK_END) || fread(myextcookie, sizeof(myextcookie), 1, fp) != 1)
-	{
-	  fclose(fp);
-	  return 0;
-	}
+        {
+          fclose(fp);
+          return 0;
+        }
     }
   rewind(fp);
 
   flags = 0;
   if (repoext)
     {
-      flags = REPO_USE_LOADING|REPO_EXTEND_SOLVABLES;
+      flags = REPO_USE_LOADING | REPO_EXTEND_SOLVABLES;
       if (strcmp(repoext, "DL") != 0)
-        flags |= REPO_LOCALPOOL;	/* no local pool for DL so that we can compare IDs */
+        flags |= REPO_LOCALPOOL; /* no local pool for DL so that we can compare IDs */
     }
   if (repo_add_solv(repo, fp, flags))
     {
@@ -155,7 +155,7 @@ usecachedrepo(struct repoinfo *cinfo, const char *repoext, int mark)
       cinfo->extcookieset = 1;
     }
   if (mark)
-    futimens(fileno(fp), 0);	/* try to set modification time */
+    futimens(fileno(fp), 0); /* try to set modification time */
   fclose(fp);
   return 1;
 }
@@ -168,13 +168,13 @@ switchtowritten(struct repoinfo *cinfo, const char *repoext, Repodata *repodata,
   int i;
 
   if (!repoext && repodata)
-    return;	/* rewrite case, don't bother for the added fileprovides */
+    return; /* rewrite case, don't bother for the added fileprovides */
   for (i = repo->start; i < repo->end; i++)
-   if (repo->pool->solvables[i].repo != repo)
-     break;
+    if (repo->pool->solvables[i].repo != repo)
+      break;
   if (i < repo->end)
-    return;	/* not a simple block */
-      /* switch to just saved repo to activate paging and save memory */
+    return; /* not a simple block */
+            /* switch to just saved repo to activate paging and save memory */
   fp = fopen(tmpl, "r");
   if (!fp)
     return;
@@ -183,23 +183,23 @@ switchtowritten(struct repoinfo *cinfo, const char *repoext, Repodata *repodata,
       /* main repo */
       repo_empty(repo, 1);
       if (repo_add_solv(repo, fp, SOLV_ADD_NO_STUBS))
-	{
-	  /* oops, no way to recover from here */
-	  fprintf(stderr, "internal error\n");
-	  exit(1);
-	}
+        {
+          /* oops, no way to recover from here */
+          fprintf(stderr, "internal error\n");
+          exit(1);
+        }
     }
   else
     {
-      int flags = REPO_USE_LOADING|REPO_EXTEND_SOLVABLES;
+      int flags = REPO_USE_LOADING | REPO_EXTEND_SOLVABLES;
       /* make sure repodata contains complete repo */
       /* (this is how repodata_write saves it) */
       repodata_extend_block(repodata, repo->start, repo->end - repo->start);
       repodata->state = REPODATA_LOADING;
       if (strcmp(repoext, "DL") != 0)
-	flags |= REPO_LOCALPOOL;
+        flags |= REPO_LOCALPOOL;
       repo_add_solv(repo, fp, flags);
-      repodata->state = REPODATA_AVAILABLE;	/* in case the load failed */
+      repodata->state = REPODATA_AVAILABLE; /* in case the load failed */
     }
   fclose(fp);
 }
@@ -241,7 +241,7 @@ writecachedrepo(struct repoinfo *cinfo, const char *repoext, Repodata *repodata)
   else
     {
       int oldnrepodata = repo->nrepodata;
-      repo->nrepodata = oldnrepodata > 2 ? 2 : oldnrepodata;	/* XXX: do this right */
+      repo->nrepodata = oldnrepodata > 2 ? 2 : oldnrepodata; /* XXX: do this right */
       repo_write(repo, fp);
       repo->nrepodata = oldnrepodata;
     }
@@ -249,22 +249,22 @@ writecachedrepo(struct repoinfo *cinfo, const char *repoext, Repodata *repodata)
   if (!repoext && cinfo->type != TYPE_INSTALLED)
     {
       if (!cinfo->extcookieset)
-	{
-	  /* create the ext cookie and append it */
-	  /* we just need some unique ID */
-	  struct stat stb;
-	  if (fstat(fileno(fp), &stb))
-	    memset(&stb, 0, sizeof(stb));
-	  calc_cookie_stat(&stb, REPOKEY_TYPE_SHA256, cinfo->cookie, cinfo->extcookie);
-	  cinfo->extcookieset = 1;
-	}
+        {
+          /* create the ext cookie and append it */
+          /* we just need some unique ID */
+          struct stat stb;
+          if (fstat(fileno(fp), &stb))
+            memset(&stb, 0, sizeof(stb));
+          calc_cookie_stat(&stb, REPOKEY_TYPE_SHA256, cinfo->cookie, cinfo->extcookie);
+          cinfo->extcookieset = 1;
+        }
       if (fwrite(cinfo->extcookie, 32, 1, fp) != 1)
-	{
-	  fclose(fp);
-	  unlink(tmpl);
-	  free(tmpl);
-	  return;
-	}
+        {
+          fclose(fp);
+          unlink(tmpl);
+          free(tmpl);
+          return;
+        }
     }
   /* append our cookie describing the metadata state */
   if (fwrite(repoext ? cinfo->extcookie : cinfo->cookie, 32, 1, fp) != 1)
@@ -287,4 +287,3 @@ writecachedrepo(struct repoinfo *cinfo, const char *repoext, Repodata *repodata)
     unlink(tmpl);
   free(tmpl);
 }
-

@@ -24,32 +24,32 @@ extern "C" {
 #endif
 
 typedef struct _Repo {
-  const char *name;		/* name pointer */
-  Id repoid;			/* our id */
-  void *appdata;		/* application private pointer */
+  const char *name; /* name pointer */
+  Id repoid;        /* our id */
+  void *appdata;    /* application private pointer */
 
-  Pool *pool;			/* pool containing this repo */
+  Pool *pool; /* pool containing this repo */
 
-  int start;			/* start of this repo solvables within pool->solvables */
-  int end;			/* last solvable + 1 of this repo */
-  int nsolvables;		/* number of solvables repo is contributing to pool */
+  int start;      /* start of this repo solvables within pool->solvables */
+  int end;        /* last solvable + 1 of this repo */
+  int nsolvables; /* number of solvables repo is contributing to pool */
 
-  int disabled;			/* ignore the solvables? */
-  int priority;			/* priority of this repo */
-  int subpriority;		/* sub-priority of this repo, used just for sorting, not pruning */
+  int disabled;    /* ignore the solvables? */
+  int priority;    /* priority of this repo */
+  int subpriority; /* sub-priority of this repo, used just for sorting, not pruning */
 
-  Id *idarraydata;		/* array of metadata Ids, solvable dependencies are offsets into this array */
+  Id *idarraydata; /* array of metadata Ids, solvable dependencies are offsets into this array */
   int idarraysize;
 
-  int nrepodata;		/* number of our stores..  */
+  int nrepodata; /* number of our stores..  */
 
-  Id *rpmdbid;			/* solvable side data: rpm database id */
+  Id *rpmdbid; /* solvable side data: rpm database id */
 
 #ifdef LIBSOLV_INTERNAL
-  Repodata *repodata;		/* our stores for non-solvable related data */
-  Offset lastoff;		/* start of last array in idarraydata */
+  Repodata *repodata; /* our stores for non-solvable related data */
+  Offset lastoff;     /* start of last array in idarraydata */
 
-  Hashtable lastidhash;		/* hash to speed up repo_addid_dep */
+  Hashtable lastidhash; /* hash to speed up repo_addid_dep */
   Hashval lastidhash_mask;
   int lastidhash_idarraysize;
   int lastmarker;
@@ -73,19 +73,22 @@ extern Offset repo_addid(Repo *repo, Offset olddeps, Id id);
 extern Offset repo_addid_dep(Repo *repo, Offset olddeps, Id id, Id marker);
 extern Offset repo_reserve_ids(Repo *repo, Offset olddeps, int num);
 
-static inline const char *repo_name(const Repo *repo)
+static inline const char *
+repo_name(const Repo *repo)
 {
   return repo->name;
 }
 
 /* those two functions are here because they need the Repo definition */
 
-static inline Repo *pool_id2repo(Pool *pool, Id repoid)
+static inline Repo *
+pool_id2repo(Pool *pool, Id repoid)
 {
   return repoid < pool->nrepos ? pool->repos[repoid] : 0;
 }
 
-static inline int pool_disabled_solvable(const Pool *pool, Solvable *s)
+static inline int
+pool_disabled_solvable(const Pool *pool, Solvable *s)
 {
   if (s->repo && s->repo->disabled)
     return 1;
@@ -93,12 +96,13 @@ static inline int pool_disabled_solvable(const Pool *pool, Solvable *s)
     {
       Id id = s - pool->solvables;
       if (!MAPTST(pool->considered, id))
-	return 1;
+        return 1;
     }
   return 0;
 }
 
-static inline int pool_badarch_solvable(const Pool *pool, Solvable *s)
+static inline int
+pool_badarch_solvable(const Pool *pool, Solvable *s)
 {
   if (!s->arch)
     return 1;
@@ -107,7 +111,8 @@ static inline int pool_badarch_solvable(const Pool *pool, Solvable *s)
   return 0;
 }
 
-static inline int pool_installable(const Pool *pool, Solvable *s)
+static inline int
+pool_installable(const Pool *pool, Solvable *s)
 {
   if (!s->arch || s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
     return 0;
@@ -119,25 +124,25 @@ static inline int pool_installable(const Pool *pool, Solvable *s)
     {
       Id id = s - pool->solvables;
       if (!MAPTST(pool->considered, id))
-	return 0;
+        return 0;
     }
   return 1;
 }
 
 /* search callback values */
-#define SEARCH_NEXT_KEY         1
-#define SEARCH_NEXT_SOLVABLE    2
-#define SEARCH_STOP             3
-#define SEARCH_ENTERSUB		-1
+#define SEARCH_NEXT_KEY 1
+#define SEARCH_NEXT_SOLVABLE 2
+#define SEARCH_STOP 3
+#define SEARCH_ENTERSUB -1
 
 /* standard flags used in the repo_add functions */
-#define REPO_REUSE_REPODATA		(1 << 0)
-#define REPO_NO_INTERNALIZE		(1 << 1)
-#define REPO_LOCALPOOL			(1 << 2)
-#define REPO_USE_LOADING		(1 << 3)
-#define REPO_EXTEND_SOLVABLES		(1 << 4)
-#define REPO_USE_ROOTDIR		(1 << 5)
-#define REPO_NO_LOCATION		(1 << 6)
+#define REPO_REUSE_REPODATA (1 << 0)
+#define REPO_NO_INTERNALIZE (1 << 1)
+#define REPO_LOCALPOOL (1 << 2)
+#define REPO_USE_LOADING (1 << 3)
+#define REPO_EXTEND_SOLVABLES (1 << 4)
+#define REPO_USE_ROOTDIR (1 << 5)
+#define REPO_NO_LOCATION (1 << 6)
 
 Repodata *repo_add_repodata(Repo *repo, int flags);
 Repodata *repo_id2repodata(Repo *repo, Id id);
@@ -174,18 +179,18 @@ void repo_internalize(Repo *repo);
 void repo_disable_paging(Repo *repo);
 
 /* iterator macros */
-#define FOR_REPO_SOLVABLES(r, p, s)						\
-  for (p = (r)->start, s = (r)->pool->solvables + p; p < (r)->end; p++, s = (r)->pool->solvables + p)	\
-    if (s->repo != (r))								\
-      continue;									\
+#define FOR_REPO_SOLVABLES(r, p, s)                                                                   \
+  for (p = (r)->start, s = (r)->pool->solvables + p; p < (r)->end; p++, s = (r)->pool->solvables + p) \
+    if (s->repo != (r))                                                                               \
+      continue;                                                                                       \
     else
 
 #ifdef LIBSOLV_INTERNAL
-#define FOR_REPODATAS(repo, rdid, data)	\
-	for (rdid = 1, data = repo->repodata + rdid; rdid < repo->nrepodata; rdid++, data++)
+#define FOR_REPODATAS(repo, rdid, data) \
+  for (rdid = 1, data = repo->repodata + rdid; rdid < repo->nrepodata; rdid++, data++)
 #else
-#define FOR_REPODATAS(repo, rdid, data)	\
-	for (rdid = 1; rdid < repo->nrepodata && (data = repo_id2repodata(repo, rdid)); rdid++)
+#define FOR_REPODATAS(repo, rdid, data) \
+  for (rdid = 1; rdid < repo->nrepodata && (data = repo_id2repodata(repo, rdid)); rdid++)
 #endif
 
 /* weird suse stuff, do not use */

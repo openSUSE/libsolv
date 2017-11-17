@@ -25,19 +25,19 @@ fileconflict_cb(Pool *pool, Id p, void *cbdata)
   Solvable *s;
   Id rpmdbid;
   int i;
-  FILE *fp; 
+  FILE *fp;
 
   s = pool_id2solvable(pool, p);
   if (pool->installed && s->repo == pool->installed)
-    {    
+    {
       if (!s->repo->rpmdbid)
         return 0;
       rpmdbid = s->repo->rpmdbid[p - s->repo->start];
       if (!rpmdbid)
         return 0;
       return rpm_byrpmdbid(fcstate->rpmstate, rpmdbid);
-    }    
-  for (i = 0; i < fcstate->newpkgscnt; i++) 
+    }
+  for (i = 0; i < fcstate->newpkgscnt; i++)
     if (fcstate->checkq->elements[i] == p)
       break;
   if (i == fcstate->newpkgscnt)
@@ -46,7 +46,7 @@ fileconflict_cb(Pool *pool, Id p, void *cbdata)
   if (!fp)
     return 0;
   rewind(fp);
-  return rpm_byfp(fcstate->rpmstate, fp, pool_solvable2str(pool, s)); 
+  return rpm_byfp(fcstate->rpmstate, fp, pool_solvable2str(pool, s));
 }
 
 int
@@ -67,7 +67,7 @@ checkfileconflicts(Pool *pool, Queue *checkq, int newpkgs, FILE **newpkgsfps, Qu
     {
       printf("\n");
       for (i = 0; i < conflicts->count; i += 6)
-	printf("file %s of package %s conflicts with package %s\n", pool_id2str(pool, conflicts->elements[i]), pool_solvid2str(pool, conflicts->elements[i + 1]), pool_solvid2str(pool, conflicts->elements[i + 4]));
+        printf("file %s of package %s conflicts with package %s\n", pool_id2str(pool, conflicts->elements[i]), pool_solvid2str(pool, conflicts->elements[i + 1]), pool_solvid2str(pool, conflicts->elements[i + 4]));
       printf("\n");
     }
   return conflicts->count;

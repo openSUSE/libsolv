@@ -27,97 +27,97 @@
 extern "C" {
 #endif
 
-#define SIZEOF_MD5	16
-#define SIZEOF_SHA1	20
-#define SIZEOF_SHA224	28
-#define SIZEOF_SHA256	32
-#define SIZEOF_SHA384	48
-#define SIZEOF_SHA512	64
+#define SIZEOF_MD5 16
+#define SIZEOF_SHA1 20
+#define SIZEOF_SHA224 28
+#define SIZEOF_SHA256 32
+#define SIZEOF_SHA384 48
+#define SIZEOF_SHA512 64
 
 struct _Repo;
 struct _KeyValue;
 
 typedef struct _Repokey {
   Id name;
-  Id type;			/* REPOKEY_TYPE_xxx */
+  Id type; /* REPOKEY_TYPE_xxx */
   unsigned int size;
-  unsigned int storage;		/* KEY_STORAGE_xxx */
+  unsigned int storage; /* KEY_STORAGE_xxx */
 } Repokey;
 
-#define KEY_STORAGE_DROPPED             0
-#define KEY_STORAGE_SOLVABLE            1
-#define KEY_STORAGE_INCORE              2
-#define KEY_STORAGE_VERTICAL_OFFSET     3
+#define KEY_STORAGE_DROPPED 0
+#define KEY_STORAGE_SOLVABLE 1
+#define KEY_STORAGE_INCORE 2
+#define KEY_STORAGE_VERTICAL_OFFSET 3
 
 #ifdef LIBSOLV_INTERNAL
 struct dircache;
 #endif
 
 typedef struct _Repodata {
-  Id repodataid;		/* our id */
-  struct _Repo *repo;		/* back pointer to repo */
+  Id repodataid;      /* our id */
+  struct _Repo *repo; /* back pointer to repo */
 
-#define REPODATA_AVAILABLE	0
-#define REPODATA_STUB		1
-#define REPODATA_ERROR		2
-#define REPODATA_STORE		3
-#define REPODATA_LOADING	4
+#define REPODATA_AVAILABLE 0
+#define REPODATA_STUB 1
+#define REPODATA_ERROR 2
+#define REPODATA_STORE 3
+#define REPODATA_LOADING 4
 
-  int state;			/* available, stub or error */
+  int state; /* available, stub or error */
 
   void (*loadcallback)(struct _Repodata *);
 
-  int start;			/* start of solvables this repodata is valid for */
-  int end;			/* last solvable + 1 of this repodata */
+  int start; /* start of solvables this repodata is valid for */
+  int end;   /* last solvable + 1 of this repodata */
 
-  Repokey *keys;		/* keys, first entry is always zero */
-  int nkeys;			/* length of keys array */
-  unsigned char keybits[32];	/* keyname hash */
+  Repokey *keys;             /* keys, first entry is always zero */
+  int nkeys;                 /* length of keys array */
+  unsigned char keybits[32]; /* keyname hash */
 
-  Id *schemata;			/* schema -> offset into schemadata */
-  int nschemata;		/* number of schemata */
-  Id *schemadata;		/* schema storage */
+  Id *schemata;   /* schema -> offset into schemadata */
+  int nschemata;  /* number of schemata */
+  Id *schemadata; /* schema storage */
 
-  Stringpool spool;		/* local string pool */
-  int localpool;		/* is local string pool used */
+  Stringpool spool; /* local string pool */
+  int localpool;    /* is local string pool used */
 
-  Dirpool dirpool;		/* local dir pool */
+  Dirpool dirpool; /* local dir pool */
 
 #ifdef LIBSOLV_INTERNAL
-  FILE *fp;			/* file pointer of solv file */
-  int error;			/* corrupt solv file */
+  FILE *fp;  /* file pointer of solv file */
+  int error; /* corrupt solv file */
 
-  unsigned int schemadatalen;   /* schema storage size */
-  Id *schematahash;		/* unification helper */
+  unsigned int schemadatalen; /* schema storage size */
+  Id *schematahash;           /* unification helper */
 
-  unsigned char *incoredata;	/* in-core data */
-  unsigned int incoredatalen;	/* in-core data used */
-  unsigned int incoredatafree;	/* free data len */
+  unsigned char *incoredata;   /* in-core data */
+  unsigned int incoredatalen;  /* in-core data used */
+  unsigned int incoredatafree; /* free data len */
 
-  Id mainschema;		/* SOLVID_META schema */
-  Id *mainschemaoffsets;	/* SOLVID_META offsets into incoredata */
+  Id mainschema;         /* SOLVID_META schema */
+  Id *mainschemaoffsets; /* SOLVID_META offsets into incoredata */
 
-  Id *incoreoffset;		/* offset for all entries */
+  Id *incoreoffset; /* offset for all entries */
 
-  Id *verticaloffset;		/* offset for all verticals, nkeys elements */
-  Id lastverticaloffset;	/* end of verticals */
+  Id *verticaloffset;    /* offset for all verticals, nkeys elements */
+  Id lastverticaloffset; /* end of verticals */
 
-  Repopagestore store;		/* our page store */
-  Id storestate;		/* incremented every time the store might change */
+  Repopagestore store; /* our page store */
+  Id storestate;       /* incremented every time the store might change */
 
-  unsigned char *vincore;	/* internal vertical data */
-  unsigned int vincorelen;	/* data size */
+  unsigned char *vincore;  /* internal vertical data */
+  unsigned int vincorelen; /* data size */
 
-  Id **attrs;			/* un-internalized attributes */
-  Id **xattrs;			/* anonymous handles */
-  int nxattrs;			/* number of handles */
+  Id **attrs;  /* un-internalized attributes */
+  Id **xattrs; /* anonymous handles */
+  int nxattrs; /* number of handles */
 
-  unsigned char *attrdata;	/* their string data space */
-  unsigned int attrdatalen;	/* its len */
-  Id *attriddata;		/* their id space */
-  unsigned int attriddatalen;	/* its len */
-  unsigned long long *attrnum64data;	/* their 64bit num data space */
-  unsigned int attrnum64datalen;	/* its len */
+  unsigned char *attrdata;           /* their string data space */
+  unsigned int attrdatalen;          /* its len */
+  Id *attriddata;                    /* their id space */
+  unsigned int attriddatalen;        /* its len */
+  unsigned long long *attrnum64data; /* their 64bit num data space */
+  unsigned int attrnum64datalen;     /* its len */
 
   /* array cache to speed up repodata_add functions*/
   Id lasthandle;
@@ -130,10 +130,9 @@ typedef struct _Repodata {
 
 } Repodata;
 
-#define SOLVID_META		-1
-#define SOLVID_POS		-2
-#define SOLVID_SUBSCHEMA	-3		/* internal! */
-
+#define SOLVID_META -1
+#define SOLVID_POS -2
+#define SOLVID_SUBSCHEMA -3 /* internal! */
 
 /*-----
  * management functions
@@ -143,7 +142,6 @@ void repodata_freedata(Repodata *data);
 
 void repodata_free(Repodata *data);
 void repodata_empty(Repodata *data, int localpool);
-
 
 /*
  * key management functions
@@ -204,7 +202,6 @@ const char *repodata_stringify(Pool *pool, Repodata *data, Repokey *key, struct 
 
 int repodata_filelistfilter_matches(Repodata *data, const char *str);
 
-
 /* lookup functions */
 Id repodata_lookup_type(Repodata *data, Id solvid, Id keyname);
 Id repodata_lookup_id(Repodata *data, Id solvid, Id keyname);
@@ -214,7 +211,6 @@ int repodata_lookup_void(Repodata *data, Id solvid, Id keyname);
 const unsigned char *repodata_lookup_bin_checksum(Repodata *data, Id solvid, Id keyname, Id *typep);
 int repodata_lookup_idarray(Repodata *data, Id solvid, Id keyname, Queue *q);
 const void *repodata_lookup_binary(Repodata *data, Id solvid, Id keyname, int *lenp);
-
 
 /*-----
  * data assignment functions
@@ -253,17 +249,15 @@ void repodata_set_constantid(Repodata *data, Id solvid, Id keyname, Id id);
 
 /* checksum */
 void repodata_set_bin_checksum(Repodata *data, Id solvid, Id keyname, Id type,
-			       const unsigned char *buf);
+                               const unsigned char *buf);
 void repodata_set_checksum(Repodata *data, Id solvid, Id keyname, Id type,
-			   const char *str);
+                           const char *str);
 void repodata_set_idarray(Repodata *data, Id solvid, Id keyname, Queue *q);
-
 
 /* directory (for package file list) */
 void repodata_add_dirnumnum(Repodata *data, Id solvid, Id keyname, Id dir, Id num, Id num2);
 void repodata_add_dirstr(Repodata *data, Id solvid, Id keyname, Id dir, const char *str);
 void repodata_free_dircache(Repodata *data);
-
 
 /* Arrays */
 void repodata_add_idarray(Repodata *data, Id solvid, Id keyname, Id id);

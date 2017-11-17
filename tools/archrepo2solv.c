@@ -26,17 +26,15 @@
 #include "solv_xfopen.h"
 #include "common_write.h"
 
-
 static void
 usage(int status)
 {
   fprintf(stderr, "\nUsage:\n"
-          "archrepo2solv\n"
-          "  reads a repository from <stdin> and writes a .solv file to <stdout>\n"
-          "  -l <dbdir> : read local database\n"
-          "  -h : print help & exit\n"
-         );
-   exit(status);
+                  "archrepo2solv\n"
+                  "  reads a repository from <stdin> and writes a .solv file to <stdout>\n"
+                  "  -l <dbdir> : read local database\n"
+                  "  -h : print help & exit\n");
+  exit(status);
 }
 
 int
@@ -49,18 +47,18 @@ main(int argc, char **argv)
 
   while ((c = getopt(argc, argv, "hl:")) >= 0)
     {
-      switch(c)
-	{
-	case 'h':
-	  usage(0);
-	  break;
-	case 'l':
-	  localdb = optarg;
-	  break;
-	default:
-	  usage(1);
-	  break;
-	}
+      switch (c)
+        {
+        case 'h':
+          usage(0);
+          break;
+        case 'l':
+          localdb = optarg;
+          break;
+        default:
+          usage(1);
+          break;
+        }
     }
   pool = pool_create();
   repo = repo_create(pool, "<stdin>");

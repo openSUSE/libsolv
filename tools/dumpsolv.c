@@ -17,7 +17,6 @@ static int dump_json;
 #include "chksum.h"
 #include "repo_solv.h"
 
-
 static int
 dump_attr(Repo *repo, Repodata *data, Repokey *key, KeyValue *kv)
 {
@@ -28,13 +27,13 @@ dump_attr(Repo *repo, Repodata *data, Repokey *key, KeyValue *kv)
   keyname = pool_id2str(repo->pool, key->name);
   for (kvp = kv; (kvp = kvp->parent) != 0; indent += 2)
     printf("  ");
-  switch(key->type)
+  switch (key->type)
     {
     case REPOKEY_TYPE_ID:
       if (data && data->localpool)
-	kv->str = stringpool_id2str(&data->spool, kv->id);
+        kv->str = stringpool_id2str(&data->spool, kv->id);
       else
-	kv->str = pool_dep2str(repo->pool, kv->id);
+        kv->str = pool_dep2str(repo->pool, kv->id);
       printf("%s: %s\n", keyname, kv->str);
       break;
     case REPOKEY_TYPE_CONSTANTID:
@@ -86,10 +85,10 @@ dump_attr(Repo *repo, Repodata *data, Repokey *key, KeyValue *kv)
       break;
     default:
       if (solv_chksum_len(key->type))
-	{
-	  printf("%s: %s (%s)\n", keyname, repodata_chk2str(data, key->type, (unsigned char *)kv->str), solv_chksum_type2str(key->type));
-	  break;
-	}
+        {
+          printf("%s: %s (%s)\n", keyname, repodata_chk2str(data, key->type, (unsigned char *)kv->str), solv_chksum_type2str(key->type));
+          break;
+        }
       printf("%s: ?\n", keyname);
       break;
     }
@@ -102,43 +101,43 @@ jsonstring(Pool *pool, const char *s)
   int needed = 0;
   const unsigned char *s1;
   char *r, *rp;
-  
+
   for (s1 = (const unsigned char *)s; *s1; s1++)
     {
       if (*s1 < 32)
-	needed += *s1 == '\n' ? 2 : 6;
+        needed += *s1 == '\n' ? 2 : 6;
       else if (*s1 == '\\' || *s1 == '\"')
-	needed += 2;
+        needed += 2;
       else
-	needed++;
+        needed++;
     }
   r = rp = pool_alloctmpspace(pool, needed + 3);
   *rp++ = '\"';
   for (s1 = (const unsigned char *)s; *s1; s1++)
     {
       if (*s1 < 32)
-	{
-	  int x;
-	  if (*s1 == '\n')
-	    {
-	      *rp++ = '\\';
-	      *rp++ = 'n';
-	      continue;
-	    }
-	  *rp++ = '\\';
-	  *rp++ = 'u';
-	  *rp++ = '0';
-	  *rp++ = '0';
-	  x = *s1 / 16;
-	  *rp++ = (x < 10 ? '0' : 'a' - 10) + x;
-	  x = *s1 & 15;
-	  *rp++ = (x < 10 ? '0' : 'a' - 10) + x;
-	}
+        {
+          int x;
+          if (*s1 == '\n')
+            {
+              *rp++ = '\\';
+              *rp++ = 'n';
+              continue;
+            }
+          *rp++ = '\\';
+          *rp++ = 'u';
+          *rp++ = '0';
+          *rp++ = '0';
+          x = *s1 / 16;
+          *rp++ = (x < 10 ? '0' : 'a' - 10) + x;
+          x = *s1 & 15;
+          *rp++ = (x < 10 ? '0' : 'a' - 10) + x;
+        }
       else if (*s1 == '\\' || *s1 == '\"')
-	{
-	  *rp++ = '\\';
-	  *rp++ = *s1;
-	}
+        {
+          *rp++ = '\\';
+          *rp++ = *s1;
+        }
       else
         *rp++ = *s1;
     }
@@ -173,7 +172,7 @@ dump_attr_json(Repo *repo, Repodata *data, Repokey *key, KeyValue *kv, struct cb
       memset(cbdata->first + cbdata->nfirst, 0, depth + 16 - cbdata->nfirst);
       cbdata->nfirst = depth + 16;
     }
-  switch(key->type)
+  switch (key->type)
     {
     case REPOKEY_TYPE_IDARRAY:
     case REPOKEY_TYPE_DIRNUMNUMARRAY:
@@ -190,7 +189,7 @@ dump_attr_json(Repo *repo, Repodata *data, Repokey *key, KeyValue *kv, struct cb
   if (!isarray || !kv->entry)
     {
       if (cbdata->first[depth])
-	printf(",\n");
+        printf(",\n");
       printf("%*s%s: ", indent, "", jsonstring(pool, keyname));
       cbdata->first[depth] = 1;
     }
@@ -198,13 +197,13 @@ dump_attr_json(Repo *repo, Repodata *data, Repokey *key, KeyValue *kv, struct cb
     printf("[\n%*s", indent + 2, "");
   else if (isarray == 1 && kv->entry)
     printf("%*s", indent + 2, "");
-  switch(key->type)
+  switch (key->type)
     {
     case REPOKEY_TYPE_ID:
       if (data && data->localpool)
-	str = stringpool_id2str(&data->spool, kv->id);
+        str = stringpool_id2str(&data->spool, kv->id);
       else
-	str = pool_dep2str(repo->pool, kv->id);
+        str = pool_dep2str(repo->pool, kv->id);
       printf("%s", jsonstring(pool, str));
       break;
     case REPOKEY_TYPE_CONSTANTID:
@@ -249,14 +248,14 @@ dump_attr_json(Repo *repo, Repodata *data, Repokey *key, KeyValue *kv, struct cb
     case REPOKEY_TYPE_FLEXARRAY:
       cbdata->first[depth + 1] = 0;
       if (!kv->entry)
-	printf("[\n");
+        printf("[\n");
       else
-	{
-	  if (kv->eof != 2)
+        {
+          if (kv->eof != 2)
             printf("\n%*s  },\n", indent, "");
-	  else
+          else
             printf("\n%*s  }\n", indent, "");
-	}
+        }
       if (kv->eof != 2)
         printf("%*s  {\n", indent, "");
       else
@@ -264,13 +263,13 @@ dump_attr_json(Repo *repo, Repodata *data, Repokey *key, KeyValue *kv, struct cb
       break;
     default:
       if (solv_chksum_len(key->type))
-	{
-	  printf("{\n");
-	  printf("%*s  \"value\": %s,\n", indent, "", jsonstring(pool, repodata_chk2str(data, key->type, (unsigned char *)kv->str)));
-	  printf("%*s  \"type\": %s\n", indent, "", jsonstring(pool, solv_chksum_type2str(key->type)));
-	  printf("%*s}", indent, "");
-	  break;
-	}
+        {
+          printf("{\n");
+          printf("%*s  \"value\": %s,\n", indent, "", jsonstring(pool, repodata_chk2str(data, key->type, (unsigned char *)kv->str)));
+          printf("%*s  \"type\": %s\n", indent, "", jsonstring(pool, solv_chksum_type2str(key->type)));
+          printf("%*s}", indent, "");
+          break;
+        }
       printf("\"?\"");
       break;
     }
@@ -303,18 +302,18 @@ dump_repodata(Repo *repo)
   if (repo->nrepodata == 0)
     return;
   printf("repo contains %d repodata sections:\n", repo->nrepodata - 1);
-  FOR_REPODATAS(repo, i, data)
+  FOR_REPODATAS (repo, i, data)
     {
       unsigned int j;
       printf("\nrepodata %d has %d keys, %d schemata\n", i, data->nkeys - 1, data->nschemata - 1);
       for (j = 1; j < data->nkeys; j++)
-	printf("  %s (type %s size %d storage %d)\n", pool_id2str(repo->pool, data->keys[j].name), pool_id2str(repo->pool, data->keys[j].type), data->keys[j].size, data->keys[j].storage);
+        printf("  %s (type %s size %d storage %d)\n", pool_id2str(repo->pool, data->keys[j].name), pool_id2str(repo->pool, data->keys[j].type), data->keys[j].size, data->keys[j].storage);
       if (data->localpool)
-	printf("  localpool has %d strings, size is %d\n", data->spool.nstrings, data->spool.sstrings);
+        printf("  localpool has %d strings, size is %d\n", data->spool.nstrings, data->spool.sstrings);
       if (data->dirpool.ndirs)
-	printf("  localpool has %d directories\n", data->dirpool.ndirs);
+        printf("  localpool has %d directories\n", data->dirpool.ndirs);
       printf("\n");
-      repodata_search(data, SOLVID_META, 0, SEARCH_ARRAYSENTINEL|SEARCH_SUB, dump_repodata_cb, 0);
+      repodata_search(data, SOLVID_META, 0, SEARCH_ARRAYSENTINEL | SEARCH_SUB, dump_repodata_cb, 0);
     }
   printf("\n");
 }
@@ -327,8 +326,8 @@ dump_repodata_json(Repo *repo, struct cbdata *cbdata)
   if (repo->nrepodata == 0)
     return;
   cbdata->baseindent = 6;
-  FOR_REPODATAS(repo, i, data)
-    repodata_search(data, SOLVID_META, 0, SEARCH_ARRAYSENTINEL|SEARCH_SUB, dump_repodata_cb, cbdata);
+  FOR_REPODATAS (repo, i, data)
+    repodata_search(data, SOLVID_META, 0, SEARCH_ARRAYSENTINEL | SEARCH_SUB, dump_repodata_cb, cbdata);
 }
 
 /*
@@ -339,7 +338,7 @@ void
 dump_solvable(Repo *repo, Id p, struct cbdata *cbdata)
 {
   Dataiterator di;
-  dataiterator_init(&di, repo->pool, repo, p, 0, 0, SEARCH_ARRAYSENTINEL|SEARCH_SUB);
+  dataiterator_init(&di, repo->pool, repo, p, 0, 0, SEARCH_ARRAYSENTINEL | SEARCH_SUB);
   if (cbdata && cbdata->first)
     cbdata->first[0] = 0;
   if (cbdata)
@@ -365,56 +364,55 @@ loadcallback(Pool *pool, Repodata *data, void *vdata)
   if (!location || !with_attr)
     return 0;
   fprintf(stderr, "[Loading SOLV file %s]\n", location);
-  fp = fopen (location, "r");
+  fp = fopen(location, "r");
   if (!fp)
     {
       perror(location);
       return 0;
     }
-  r = repo_add_solv(data->repo, fp, REPO_USE_LOADING|REPO_LOCALPOOL);
+  r = repo_add_solv(data->repo, fp, REPO_USE_LOADING | REPO_LOCALPOOL);
   fclose(fp);
   return !r ? 1 : 0;
 }
 
-
 static void
 usage(int status)
 {
-  fprintf( stderr, "\nUsage:\n"
-	   "dumpsolv [-a] [-j] [<solvfile>]\n"
-	   "  -a  read attributes.\n"
-	   "  -j  dump json format.\n"
-	   );
+  fprintf(stderr, "\nUsage:\n"
+                  "dumpsolv [-a] [-j] [<solvfile>]\n"
+                  "  -a  read attributes.\n"
+                  "  -j  dump json format.\n");
   exit(status);
 }
 
-int main(int argc, char **argv)
+int
+main(int argc, char **argv)
 {
   Repo *repo;
   Pool *pool;
   int c, i, j, n;
   Solvable *s;
-  
+
   pool = pool_create();
   pool_setloadcallback(pool, loadcallback, 0);
 
   while ((c = getopt(argc, argv, "haj")) >= 0)
     {
-      switch(c)
-	{
-	case 'h':
-	  usage(0);
-	  break;
-	case 'a':
-	  with_attr = 1;
-	  break;
-	case 'j':
-	  dump_json = 1;
-	  break;
-	default:
+      switch (c)
+        {
+        case 'h':
+          usage(0);
+          break;
+        case 'a':
+          with_attr = 1;
+          break;
+        case 'j':
+          dump_json = 1;
+          break;
+        default:
           usage(1);
           break;
-	}
+        }
     }
   if (!dump_json)
     pool_setdebuglevel(pool, 1);
@@ -423,25 +421,25 @@ int main(int argc, char **argv)
   for (; optind < argc; optind++)
     {
       if (freopen(argv[optind], "r", stdin) == 0)
-	{
-	  perror(argv[optind]);
-	  exit(1);
-	}
+        {
+          perror(argv[optind]);
+          exit(1);
+        }
       repo = repo_create(pool, argv[optind]);
       if (repo_add_solv(repo, stdin, 0))
-	{
-	  fprintf(stderr, "could not read repository: %s\n", pool_errstr(pool));
-	  exit(1);
-	}
+        {
+          fprintf(stderr, "could not read repository: %s\n", pool_errstr(pool));
+          exit(1);
+        }
     }
   if (!pool->urepos)
     {
       repo = repo_create(pool, argc != 1 ? argv[1] : "<stdin>");
       if (repo_add_solv(repo, stdin, 0))
-	{
-	  fprintf(stderr, "could not read repository: %s\n", pool_errstr(pool));
-	  exit(1);
-	}
+        {
+          fprintf(stderr, "could not read repository: %s\n", pool_errstr(pool));
+          exit(1);
+        }
     }
 
   if (dump_json)
@@ -452,34 +450,34 @@ int main(int argc, char **argv)
       memset(&cbdata, 0, sizeof(cbdata));
       printf("{\n");
       printf("  \"repositories\": [\n");
-      FOR_REPOS(j, repo)
-	{
-	  int open = 0;
+      FOR_REPOS (j, repo)
+        {
+          int open = 0;
 
-	  if (openrepo)
-	    printf("\n    },");
-	  printf("    {\n");
-	  openrepo = 1;
-	  if (cbdata.first)
-	    cbdata.first[0] = 0;
-	  dump_repodata_json(repo, &cbdata);
-	  if (cbdata.first[0])
-	    printf(",\n");
-	  printf("      \"solvables\": [\n");
-	  FOR_REPO_SOLVABLES(repo, i, s)
-	    {
-	      if (open)
-		printf("\n        },\n");
-	      printf("        {\n");
-	      open = 1;
-	      dump_solvable(repo, i, &cbdata);
-	    }
-	  if (open)
-	    printf("\n        }\n");
-	  printf("      ]\n");
-	}
+          if (openrepo)
+            printf("\n    },");
+          printf("    {\n");
+          openrepo = 1;
+          if (cbdata.first)
+            cbdata.first[0] = 0;
+          dump_repodata_json(repo, &cbdata);
+          if (cbdata.first[0])
+            printf(",\n");
+          printf("      \"solvables\": [\n");
+          FOR_REPO_SOLVABLES (repo, i, s)
+            {
+              if (open)
+                printf("\n        },\n");
+              printf("        {\n");
+              open = 1;
+              dump_solvable(repo, i, &cbdata);
+            }
+          if (open)
+            printf("\n        }\n");
+          printf("      ]\n");
+        }
       if (openrepo)
-	printf("    }\n");
+        printf("    }\n");
       printf("  ]\n");
       printf("}\n");
       solv_free(cbdata.first);
@@ -488,19 +486,19 @@ int main(int argc, char **argv)
     {
       printf("pool contains %d strings, %d rels, string size is %d\n", pool->ss.nstrings, pool->nrels, pool->ss.sstrings);
       n = 0;
-      FOR_REPOS(j, repo)
-	{
-	  dump_repodata(repo);
-	  printf("repo %d contains %d solvables\n", j, repo->nsolvables);
-	  printf("repo start: %d end: %d\n", repo->start, repo->end);
-	  FOR_REPO_SOLVABLES(repo, i, s)
-	    {
-	      n++;
-	      printf("\n");
-	      printf("solvable %d (%d):\n", n, i);
-	      dump_solvable(repo, i, 0);
-	    }
-	}
+      FOR_REPOS (j, repo)
+        {
+          dump_repodata(repo);
+          printf("repo %d contains %d solvables\n", j, repo->nsolvables);
+          printf("repo start: %d end: %d\n", repo->start, repo->end);
+          FOR_REPO_SOLVABLES (repo, i, s)
+            {
+              n++;
+              printf("\n");
+              printf("solvable %d (%d):\n", n, i);
+              dump_solvable(repo, i, 0);
+            }
+        }
     }
   pool_free(pool);
   exit(0);

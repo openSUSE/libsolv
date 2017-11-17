@@ -116,108 +116,107 @@ enum state {
 };
 
 static struct solv_xmlparser_element stateswitches[] = {
-  /** fake tag used to enclose multiple xml files in one **/
-  { STATE_START,       "rpmmd",           STATE_START,    0 },
+    /** fake tag used to enclose multiple xml files in one **/
+    {STATE_START, "rpmmd", STATE_START, 0},
 
-  /** tags for different package data, just ignore them **/
-  { STATE_START,       "patterns",        STATE_START,    0 },
-  { STATE_START,       "products",        STATE_START,    0 },
-  { STATE_START,       "metadata",        STATE_START,    0 },
-  { STATE_START,       "otherdata",       STATE_START,    0 },
-  { STATE_START,       "filelists",       STATE_START,    0 },
-  { STATE_START,       "diskusagedata",   STATE_START,    0 },
-  { STATE_START,       "susedata",        STATE_START,    0 },
+    /** tags for different package data, just ignore them **/
+    {STATE_START, "patterns", STATE_START, 0},
+    {STATE_START, "products", STATE_START, 0},
+    {STATE_START, "metadata", STATE_START, 0},
+    {STATE_START, "otherdata", STATE_START, 0},
+    {STATE_START, "filelists", STATE_START, 0},
+    {STATE_START, "diskusagedata", STATE_START, 0},
+    {STATE_START, "susedata", STATE_START, 0},
 
-  { STATE_START,       "product",         STATE_SOLVABLE, 0 },
-  { STATE_START,       "pattern",         STATE_SOLVABLE, 0 },
-  { STATE_START,       "patch",           STATE_SOLVABLE, 0 },
-  { STATE_START,       "package",         STATE_SOLVABLE, 0 },
+    {STATE_START, "product", STATE_SOLVABLE, 0},
+    {STATE_START, "pattern", STATE_SOLVABLE, 0},
+    {STATE_START, "patch", STATE_SOLVABLE, 0},
+    {STATE_START, "package", STATE_SOLVABLE, 0},
 
-  { STATE_SOLVABLE,    "format",          STATE_SOLVABLE, 0 },
+    {STATE_SOLVABLE, "format", STATE_SOLVABLE, 0},
 
-  { STATE_SOLVABLE,    "name",            STATE_NAME, 1 },
-  { STATE_SOLVABLE,    "arch",            STATE_ARCH, 1 },
-  { STATE_SOLVABLE,    "version",         STATE_VERSION, 0 },
+    {STATE_SOLVABLE, "name", STATE_NAME, 1},
+    {STATE_SOLVABLE, "arch", STATE_ARCH, 1},
+    {STATE_SOLVABLE, "version", STATE_VERSION, 0},
 
-  /* package attributes rpm-md */
-  { STATE_SOLVABLE,    "location",        STATE_LOCATION, 0 },
-  { STATE_SOLVABLE,    "checksum",        STATE_CHECKSUM, 1 },
+    /* package attributes rpm-md */
+    {STATE_SOLVABLE, "location", STATE_LOCATION, 0},
+    {STATE_SOLVABLE, "checksum", STATE_CHECKSUM, 1},
 
-  /* resobject attributes */
+    /* resobject attributes */
 
-  { STATE_SOLVABLE,    "summary",         STATE_SUMMARY,      1 },
-  { STATE_SOLVABLE,    "description",     STATE_DESCRIPTION,  1 },
-  { STATE_SOLVABLE,    "distribution",    STATE_DISTRIBUTION, 1 },
-  { STATE_SOLVABLE,    "url",             STATE_URL,          1 },
-  { STATE_SOLVABLE,    "packager",        STATE_PACKAGER,     1 },
-  { STATE_SOLVABLE,    "vendor",          STATE_VENDOR,       1 },
-  { STATE_SOLVABLE,    "size",            STATE_SIZE,         0 },
-  { STATE_SOLVABLE,    "archive-size",    STATE_DOWNLOADSIZE, 1 },
-  { STATE_SOLVABLE,    "install-time",    STATE_INSTALLTIME,  1 },
-  { STATE_SOLVABLE,    "install-only",    STATE_INSTALLONLY,  1 },
-  { STATE_SOLVABLE,    "time",            STATE_TIME,         0 },
+    {STATE_SOLVABLE, "summary", STATE_SUMMARY, 1},
+    {STATE_SOLVABLE, "description", STATE_DESCRIPTION, 1},
+    {STATE_SOLVABLE, "distribution", STATE_DISTRIBUTION, 1},
+    {STATE_SOLVABLE, "url", STATE_URL, 1},
+    {STATE_SOLVABLE, "packager", STATE_PACKAGER, 1},
+    {STATE_SOLVABLE, "vendor", STATE_VENDOR, 1},
+    {STATE_SOLVABLE, "size", STATE_SIZE, 0},
+    {STATE_SOLVABLE, "archive-size", STATE_DOWNLOADSIZE, 1},
+    {STATE_SOLVABLE, "install-time", STATE_INSTALLTIME, 1},
+    {STATE_SOLVABLE, "install-only", STATE_INSTALLONLY, 1},
+    {STATE_SOLVABLE, "time", STATE_TIME, 0},
 
-  /* extended Novell/SUSE attributes (susedata.xml) */
-  { STATE_SOLVABLE,    "eula",            STATE_EULA,         1 },
-  { STATE_SOLVABLE,    "keyword",         STATE_KEYWORD,      1 },
-  { STATE_SOLVABLE,    "diskusage",       STATE_DISKUSAGE,    0 },
+    /* extended Novell/SUSE attributes (susedata.xml) */
+    {STATE_SOLVABLE, "eula", STATE_EULA, 1},
+    {STATE_SOLVABLE, "keyword", STATE_KEYWORD, 1},
+    {STATE_SOLVABLE, "diskusage", STATE_DISKUSAGE, 0},
 
-  /* pattern attribute */
-  { STATE_SOLVABLE,    "script",          STATE_SCRIPT,        1 },
-  { STATE_SOLVABLE,    "icon",            STATE_ICON,          1 },
-  { STATE_SOLVABLE,    "uservisible",     STATE_USERVISIBLE,   1 },
-  { STATE_SOLVABLE,    "category",        STATE_CATEGORY,      1 },
-  { STATE_SOLVABLE,    "order",           STATE_ORDER,         1 },
-  { STATE_SOLVABLE,    "includes",        STATE_INCLUDES,      0 },
-  { STATE_SOLVABLE,    "extends",         STATE_EXTENDS,       0 },
-  { STATE_SOLVABLE,    "default",         STATE_DEFAULT,       1 },
-  { STATE_SOLVABLE,    "install-time",    STATE_INSTALL_TIME,  1 },
+    /* pattern attribute */
+    {STATE_SOLVABLE, "script", STATE_SCRIPT, 1},
+    {STATE_SOLVABLE, "icon", STATE_ICON, 1},
+    {STATE_SOLVABLE, "uservisible", STATE_USERVISIBLE, 1},
+    {STATE_SOLVABLE, "category", STATE_CATEGORY, 1},
+    {STATE_SOLVABLE, "order", STATE_ORDER, 1},
+    {STATE_SOLVABLE, "includes", STATE_INCLUDES, 0},
+    {STATE_SOLVABLE, "extends", STATE_EXTENDS, 0},
+    {STATE_SOLVABLE, "default", STATE_DEFAULT, 1},
+    {STATE_SOLVABLE, "install-time", STATE_INSTALL_TIME, 1},
 
-  /* product attributes */
-  /* note the product type is an attribute */
-  { STATE_SOLVABLE,    "release-notes-url", STATE_RELNOTESURL, 1 },
-  { STATE_SOLVABLE,    "update-url",      STATE_UPDATEURL,   1 },
-  { STATE_SOLVABLE,    "optional-url",    STATE_OPTIONALURL, 1 },
-  { STATE_SOLVABLE,    "flag",            STATE_FLAG,        1 },
+    /* product attributes */
+    /* note the product type is an attribute */
+    {STATE_SOLVABLE, "release-notes-url", STATE_RELNOTESURL, 1},
+    {STATE_SOLVABLE, "update-url", STATE_UPDATEURL, 1},
+    {STATE_SOLVABLE, "optional-url", STATE_OPTIONALURL, 1},
+    {STATE_SOLVABLE, "flag", STATE_FLAG, 1},
 
-  { STATE_SOLVABLE,    "rpm:vendor",      STATE_VENDOR,      1 },
-  { STATE_SOLVABLE,    "rpm:group",       STATE_RPM_GROUP,   1 },
-  { STATE_SOLVABLE,    "rpm:license",     STATE_RPM_LICENSE, 1 },
+    {STATE_SOLVABLE, "rpm:vendor", STATE_VENDOR, 1},
+    {STATE_SOLVABLE, "rpm:group", STATE_RPM_GROUP, 1},
+    {STATE_SOLVABLE, "rpm:license", STATE_RPM_LICENSE, 1},
 
-  /* rpm-md dependencies */
-  { STATE_SOLVABLE,    "rpm:provides",    STATE_PROVIDES,     0 },
-  { STATE_SOLVABLE,    "rpm:requires",    STATE_REQUIRES,     0 },
-  { STATE_SOLVABLE,    "rpm:obsoletes",   STATE_OBSOLETES,    0 },
-  { STATE_SOLVABLE,    "rpm:conflicts",   STATE_CONFLICTS,    0 },
-  { STATE_SOLVABLE,    "rpm:recommends",  STATE_RECOMMENDS ,  0 },
-  { STATE_SOLVABLE,    "rpm:supplements", STATE_SUPPLEMENTS,  0 },
-  { STATE_SOLVABLE,    "rpm:suggests",    STATE_SUGGESTS,     0 },
-  { STATE_SOLVABLE,    "rpm:enhances",    STATE_ENHANCES,     0 },
-  { STATE_SOLVABLE,    "rpm:freshens",    STATE_FRESHENS,     0 },
-  { STATE_SOLVABLE,    "rpm:sourcerpm",   STATE_SOURCERPM,    1 },
-  { STATE_SOLVABLE,    "rpm:header-range", STATE_HEADERRANGE, 0 },
-  { STATE_SOLVABLE,    "file",            STATE_FILE, 1 },
-  { STATE_SOLVABLE,    "changelog",       STATE_CHANGELOG, 1 },
+    /* rpm-md dependencies */
+    {STATE_SOLVABLE, "rpm:provides", STATE_PROVIDES, 0},
+    {STATE_SOLVABLE, "rpm:requires", STATE_REQUIRES, 0},
+    {STATE_SOLVABLE, "rpm:obsoletes", STATE_OBSOLETES, 0},
+    {STATE_SOLVABLE, "rpm:conflicts", STATE_CONFLICTS, 0},
+    {STATE_SOLVABLE, "rpm:recommends", STATE_RECOMMENDS, 0},
+    {STATE_SOLVABLE, "rpm:supplements", STATE_SUPPLEMENTS, 0},
+    {STATE_SOLVABLE, "rpm:suggests", STATE_SUGGESTS, 0},
+    {STATE_SOLVABLE, "rpm:enhances", STATE_ENHANCES, 0},
+    {STATE_SOLVABLE, "rpm:freshens", STATE_FRESHENS, 0},
+    {STATE_SOLVABLE, "rpm:sourcerpm", STATE_SOURCERPM, 1},
+    {STATE_SOLVABLE, "rpm:header-range", STATE_HEADERRANGE, 0},
+    {STATE_SOLVABLE, "file", STATE_FILE, 1},
+    {STATE_SOLVABLE, "changelog", STATE_CHANGELOG, 1},
 
-   /* extended Novell/SUSE diskusage attributes (susedata.xml) */
-  { STATE_DISKUSAGE,   "dirs",            STATE_DIRS,         0 },
-  { STATE_DIRS,        "dir",             STATE_DIR,          0 },
+    /* extended Novell/SUSE diskusage attributes (susedata.xml) */
+    {STATE_DISKUSAGE, "dirs", STATE_DIRS, 0},
+    {STATE_DIRS, "dir", STATE_DIR, 0},
 
-  { STATE_PROVIDES,    "rpm:entry",       STATE_PROVIDESENTRY, 0 },
-  { STATE_REQUIRES,    "rpm:entry",       STATE_REQUIRESENTRY, 0 },
-  { STATE_OBSOLETES,   "rpm:entry",       STATE_OBSOLETESENTRY, 0 },
-  { STATE_CONFLICTS,   "rpm:entry",       STATE_CONFLICTSENTRY, 0 },
-  { STATE_RECOMMENDS,  "rpm:entry",       STATE_RECOMMENDSENTRY, 0 },
-  { STATE_SUPPLEMENTS, "rpm:entry",       STATE_SUPPLEMENTSENTRY, 0 },
-  { STATE_SUGGESTS,    "rpm:entry",       STATE_SUGGESTSENTRY, 0 },
-  { STATE_ENHANCES,    "rpm:entry",       STATE_ENHANCESENTRY, 0 },
-  { STATE_FRESHENS,    "rpm:entry",       STATE_FRESHENSENTRY, 0 },
+    {STATE_PROVIDES, "rpm:entry", STATE_PROVIDESENTRY, 0},
+    {STATE_REQUIRES, "rpm:entry", STATE_REQUIRESENTRY, 0},
+    {STATE_OBSOLETES, "rpm:entry", STATE_OBSOLETESENTRY, 0},
+    {STATE_CONFLICTS, "rpm:entry", STATE_CONFLICTSENTRY, 0},
+    {STATE_RECOMMENDS, "rpm:entry", STATE_RECOMMENDSENTRY, 0},
+    {STATE_SUPPLEMENTS, "rpm:entry", STATE_SUPPLEMENTSENTRY, 0},
+    {STATE_SUGGESTS, "rpm:entry", STATE_SUGGESTSENTRY, 0},
+    {STATE_ENHANCES, "rpm:entry", STATE_ENHANCESENTRY, 0},
+    {STATE_FRESHENS, "rpm:entry", STATE_FRESHENSENTRY, 0},
 
-  { STATE_INCLUDES,    "item",            STATE_INCLUDESENTRY, 0 },
-  { STATE_EXTENDS,     "item",            STATE_EXTENDSENTRY,  0 },
+    {STATE_INCLUDES, "item", STATE_INCLUDESENTRY, 0},
+    {STATE_EXTENDS, "item", STATE_EXTENDSENTRY, 0},
 
-  { NUMSTATES}
-};
+    {NUMSTATES}};
 
 struct parsedata {
   int ret;
@@ -235,8 +234,8 @@ struct parsedata {
   Id chksumtype;
   Id handle;
   Queue diskusageq;
-  const char *language;			/* default language */
-  Id langcache[ID_NUM_INTERNAL];	/* cache for the default language */
+  const char *language;          /* default language */
+  Id langcache[ID_NUM_INTERNAL]; /* cache for the default language */
 
   Id lastdir;
   char *lastdirstr;
@@ -244,15 +243,15 @@ struct parsedata {
 
   Id changelog_handle;
 
-  int extending;			/* are we extending an existing solvable? */
-  int first;				/* first solvable we added */
-  int cshash_filled;			/* hash is filled with data */
+  int extending;     /* are we extending an existing solvable? */
+  int first;         /* first solvable we added */
+  int cshash_filled; /* hash is filled with data */
 
-  Hashtable cshash;			/* checksum hash -> offset into csdata */
-  Hashval cshashm;			/* hash mask */
-  int ncshash;				/* entries used */
-  unsigned char *csdata;		/* [len, checksum, id] */
-  int ncsdata;				/* used bytes */
+  Hashtable cshash;      /* checksum hash -> offset into csdata */
+  Hashval cshashm;       /* hash mask */
+  int ncshash;           /* entries used */
+  unsigned char *csdata; /* [len, checksum, id] */
+  int ncsdata;           /* used bytes */
 };
 
 static Id
@@ -261,7 +260,7 @@ langtag(struct parsedata *pd, Id tag, const char *language)
   if (language)
     {
       if (!language[0] || !strcmp(language, "en"))
-	return tag;
+        return tag;
       return pool_id2langid(pd->pool, tag, language, 1);
     }
   if (!pd->language)
@@ -290,11 +289,11 @@ makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
   for (; *atts; atts += 2)
     {
       if (!strcmp(*atts, "epoch"))
-	e = atts[1];
+        e = atts[1];
       else if (!strcmp(*atts, "ver"))
-	v = atts[1];
+        v = atts[1];
       else if (!strcmp(*atts, "rel"))
-	r = atts[1];
+        r = atts[1];
     }
   if (e && (!*e || !strcmp(e, "0")))
     e = 0;
@@ -303,7 +302,7 @@ makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
       for (v2 = v; *v2 >= '0' && *v2 <= '9'; v2++)
         ;
       if (v2 > v && *v2 == ':')
-	e = "0";
+        e = "0";
     }
   l = 1;
   if (e)
@@ -339,20 +338,17 @@ makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
   return pool_str2id(pool, space, 1);
 }
 
-
 /*
  * dependency relations
  */
 
 static char *flagtab[] = {
-  "GT",
-  "EQ",
-  "GE",
-  "LT",
-  "NE",
-  "LE"
-};
-
+    "GT",
+    "EQ",
+    "GE",
+    "LT",
+    "NE",
+    "LE"};
 
 /*
  * adddep
@@ -372,13 +368,13 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, const char **atts
   for (a = atts; *a; a += 2)
     {
       if (!strcmp(*a, "name"))
-	n = a[1];
+        n = a[1];
       else if (!strcmp(*a, "flags"))
-	f = a[1];
+        f = a[1];
       else if (!strcmp(*a, "kind"))
-	k = a[1];
+        k = a[1];
       else if (isreq && !strcmp(*a, "pre") && a[1][0] == '1')
-	marker = SOLVABLE_PREREQMARKER;
+        marker = SOLVABLE_PREREQMARKER;
     }
   if (!n)
     return olddeps;
@@ -396,7 +392,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, const char **atts
     {
       id = pool_parserpmrichdep(pool, n);
       if (!id)
-	return olddeps;
+        return olddeps;
     }
 #endif
   else
@@ -406,8 +402,8 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, const char **atts
       Id evr = makeevr_atts(pool, pd, atts);
       int flags;
       for (flags = 0; flags < 6; flags++)
-	if (!strcmp(f, flagtab[flags]))
-	  break;
+        if (!strcmp(f, flagtab[flags]))
+          break;
       flags = flags < 6 ? flags + 1 : 0;
       id = pool_rel2id(pool, id, evr, flags, 1);
     }
@@ -416,7 +412,6 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, const char **atts
 #endif
   return repo_addid_dep(pd->repo, olddeps, id, marker);
 }
-
 
 /*
  * set_description_author
@@ -438,34 +433,33 @@ set_description_author(Repodata *data, Id handle, char *str, struct parsedata *p
       int l = aut - str;
       str[l] = 0;
       while (l > 0 && str[l - 1] == '\n')
-	str[--l] = 0;
+        str[--l] = 0;
       if (l)
-	repodata_set_str(data, handle, langtag(pd, SOLVABLE_DESCRIPTION, pd->tmplang), str);
+        repodata_set_str(data, handle, langtag(pd, SOLVABLE_DESCRIPTION, pd->tmplang), str);
       p = aut + 19;
-      aut = str;        /* copy over */
+      aut = str; /* copy over */
       while (*p == ' ' || *p == '\n')
-	p++;
+        p++;
       while (*p)
-	{
-	  if (*p == '\n')
-	    {
-	      *aut++ = *p++;
-	      while (*p == ' ')
-		p++;
-	      continue;
-	    }
-	  *aut++ = *p++;
-	}
+        {
+          if (*p == '\n')
+            {
+              *aut++ = *p++;
+              while (*p == ' ')
+                p++;
+              continue;
+            }
+          *aut++ = *p++;
+        }
       while (aut != str && aut[-1] == '\n')
-	aut--;
+        aut--;
       *aut = 0;
       if (*str)
-	repodata_set_str(data, handle, SOLVABLE_AUTHORS, str);
+        repodata_set_str(data, handle, SOLVABLE_AUTHORS, str);
     }
   else if (*str)
     repodata_set_str(data, handle, langtag(pd, SOLVABLE_DESCRIPTION, pd->tmplang), str);
 }
-
 
 /*-----------------------------------------------*/
 /* checksum hash functions
@@ -515,7 +509,7 @@ rebuild_cshash(struct parsedata *pd)
       h = hashkey(d + 1, d[0] + 1) & hm;
       hh = HASHCHAIN_START;
       while (ht[h])
-	h = HASHCHAIN_NEXT(h, hh, hm);
+        h = HASHCHAIN_NEXT(h, hh, hm);
       ht[h] = d + 1 - pd->csdata;
       d += 2 + d[0] + sizeof(Id);
     }
@@ -537,12 +531,12 @@ put_in_cshash(struct parsedata *pd, const unsigned char *key, int keyl, Id id)
   if (ht)
     {
       while (ht[h])
-	{
-	  unsigned char *d = pd->csdata + ht[h];
-	  if (d[-1] == keyl - 1 && !memcmp(key, d, keyl))
-	    return;		/* XXX: first id wins... */
-	  h = HASHCHAIN_NEXT(h, hh, hm);
-	}
+        {
+          unsigned char *d = pd->csdata + ht[h];
+          if (d[-1] == keyl - 1 && !memcmp(key, d, keyl))
+            return; /* XXX: first id wins... */
+          h = HASHCHAIN_NEXT(h, hh, hm);
+        }
     }
   /* a new entry. put in csdata */
   pd->csdata = solv_extend(pd->csdata, pd->ncsdata, 1 + keyl + sizeof(Id), 1, 4095);
@@ -578,11 +572,11 @@ lookup_cshash(struct parsedata *pd, const unsigned char *key, int keyl)
     {
       unsigned char *d = pd->csdata + ht[h];
       if (d[-1] == keyl - 1 && !memcmp(key, d, keyl))
-	{
-	  Id id;
-	  memcpy(&id, d + keyl, sizeof(Id));
-	  return id;
-	}
+        {
+          Id id;
+          memcpy(&id, d + keyl, sizeof(Id));
+          return id;
+        }
       h = HASHCHAIN_NEXT(h, hh, hm);
     }
   return 0;
@@ -610,10 +604,10 @@ fill_cshash_from_new_solvables(struct parsedata *pd)
   for (i = pd->first; i < pool->nsolvables; i++)
     {
       if (pool->solvables[i].repo != pd->repo)
-	continue;
+        continue;
       cs = repodata_lookup_bin_checksum_uninternalized(pd->data, i, SOLVABLE_CHECKSUM, &cstype);
       if (cs)
-	put_in_cshash(pd, cs, solv_chksum_len(cstype), i);
+        put_in_cshash(pd, cs, solv_chksum_len(cstype), i);
     }
 }
 
@@ -637,7 +631,7 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
   if (!s && state != STATE_SOLVABLE)
     return;
 
-  switch(state)
+  switch (state)
     {
     case STATE_SOLVABLE:
       pd->kind = 0;
@@ -667,49 +661,49 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
       pd->extending = 0;
       if ((pkgid = solv_xmlparser_find_attr("pkgid", atts)) != NULL)
         {
-	  unsigned char chk[256];
-	  int l;
-	  const char *str = pkgid;
-	  if (!pd->cshash_filled)
-	    {
-	      pd->cshash_filled = 1;
-	      fill_cshash_from_new_solvables(pd);
-	    }
-	  handle = 0;
-	  /* convert into bin checksum */
-	  l = solv_hex2bin(&str, chk, sizeof(chk));
+          unsigned char chk[256];
+          int l;
+          const char *str = pkgid;
+          if (!pd->cshash_filled)
+            {
+              pd->cshash_filled = 1;
+              fill_cshash_from_new_solvables(pd);
+            }
+          handle = 0;
+          /* convert into bin checksum */
+          l = solv_hex2bin(&str, chk, sizeof(chk));
           /* look at the checksum cache */
-	  if (l >= 4 && !pkgid[2 * l])
-	    handle = lookup_cshash(pd, chk, l);
+          if (l >= 4 && !pkgid[2 * l])
+            handle = lookup_cshash(pd, chk, l);
 #if 0
 	  fprintf(stderr, "Lookup %s -> %d\n", pkgid, handle);
 #endif
-	  if (!handle)
-	    {
+          if (!handle)
+            {
               pool_debug(pool, SOLV_WARN, "the repository specifies extra information about package with checksum '%s', which does not exist in the repository.\n", pkgid);
-	      pd->handle = 0;
-	      pd->solvable = 0;
-	      break;
-	    }
-	  pd->extending = 1;
+              pd->handle = 0;
+              pd->solvable = 0;
+              break;
+            }
+          pd->extending = 1;
         }
       else
         {
           /* this is a new package */
-	  handle = repo_add_solvable(pd->repo);
-	  if (!pd->first)
-	    pd->first = handle;
+          handle = repo_add_solvable(pd->repo);
+          if (!pd->first)
+            pd->first = handle;
           pd->freshens = 0;
         }
       pd->handle = handle;
       pd->solvable = pool_id2solvable(pool, handle);
       if (pd->kind && pd->kind[1] == 'r')
-	{
-	  /* products can have a type */
-	  const char *type = solv_xmlparser_find_attr("type", atts);
-	  if (type && *type)
-	    repodata_set_str(pd->data, handle, PRODUCT_TYPE, type);
-	}
+        {
+          /* products can have a type */
+          const char *type = solv_xmlparser_find_attr("type", atts);
+          if (type && *type)
+            repodata_set_str(pd->data, handle, PRODUCT_TYPE, type);
+        }
 #if 0
       fprintf(stderr, "package #%d\n", pd->solvable - pool->solvables);
 #endif
@@ -717,7 +711,7 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
       break;
     case STATE_VERSION:
       if (pd->extending && s->evr)
-	break;		/* ignore version tag repetition in extend data */
+        break; /* ignore version tag repetition in extend data */
       s->evr = makeevr_atts(pool, pd, atts);
       break;
     case STATE_PROVIDES:
@@ -751,7 +745,7 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
       s->recommends = adddep(pool, pd, s->recommends, atts, 0);
       break;
     case STATE_SUPPLEMENTS:
-      s->supplements= 0;
+      s->supplements = 0;
       break;
     case STATE_SUPPLEMENTSENTRY:
       s->supplements = adddep(pool, pd, s->supplements, atts, 0);
@@ -786,38 +780,38 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
     case STATE_INCLUDESENTRY:
       str = solv_xmlparser_find_attr("pattern", atts);
       if (str)
-	repodata_add_poolstr_array(pd->data, handle, SOLVABLE_INCLUDES, join2(&pd->jd, "pattern", ":", str));
+        repodata_add_poolstr_array(pd->data, handle, SOLVABLE_INCLUDES, join2(&pd->jd, "pattern", ":", str));
       break;
     case STATE_EXTENDSENTRY:
       str = solv_xmlparser_find_attr("pattern", atts);
       if (str)
-	repodata_add_poolstr_array(pd->data, handle, SOLVABLE_EXTENDS, join2(&pd->jd, "pattern", ":", str));
+        repodata_add_poolstr_array(pd->data, handle, SOLVABLE_EXTENDS, join2(&pd->jd, "pattern", ":", str));
       break;
     case STATE_LOCATION:
       str = solv_xmlparser_find_attr("href", atts);
       if (str)
-	{
-	  int medianr = 0;
-	  const char *base = solv_xmlparser_find_attr("xml:base", atts);
-	  if (base  && !strncmp(base, "media:", 6))
-	    {
-	      /* check for the media number in the fragment */
-	      int l = strlen(base);
-	      while (l && base[l - 1] >= '0' && base[l - 1] <= '9')
-		l--;
-	      if (l && base[l - 1] == '#' && base[l])
-		medianr = atoi(base + l);
-	    }
-	  repodata_set_location(pd->data, handle, medianr, 0, str);
-	  if (base)
-	    repodata_set_poolstr(pd->data, handle, SOLVABLE_MEDIABASE, base);
-	}
+        {
+          int medianr = 0;
+          const char *base = solv_xmlparser_find_attr("xml:base", atts);
+          if (base && !strncmp(base, "media:", 6))
+            {
+              /* check for the media number in the fragment */
+              int l = strlen(base);
+              while (l && base[l - 1] >= '0' && base[l - 1] <= '9')
+                l--;
+              if (l && base[l - 1] == '#' && base[l])
+                medianr = atoi(base + l);
+            }
+          repodata_set_location(pd->data, handle, medianr, 0, str);
+          if (base)
+            repodata_set_poolstr(pd->data, handle, SOLVABLE_MEDIABASE, base);
+        }
       break;
     case STATE_CHECKSUM:
       str = solv_xmlparser_find_attr("type", atts);
       pd->chksumtype = str && *str ? solv_chksum_str2type(str) : 0;
       if (!pd->chksumtype)
-	pd->ret = pool_error(pool, -1, "line %d: unknown checksum type: %s", solv_xmlparser_lineno(xmlp), str ? str : "NULL");
+        pd->ret = pool_error(pool, -1, "line %d: unknown checksum type: %s", solv_xmlparser_lineno(xmlp), str ? str : "NULL");
       break;
     case STATE_TIME:
       {
@@ -825,21 +819,21 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
         str = solv_xmlparser_find_attr("build", atts);
         if (str && (t = atoi(str)) != 0)
           repodata_set_num(pd->data, handle, SOLVABLE_BUILDTIME, t);
-	break;
+        break;
       }
     case STATE_SIZE:
       if ((str = solv_xmlparser_find_attr("installed", atts)) != 0)
-	repodata_set_num(pd->data, handle, SOLVABLE_INSTALLSIZE, strtoull(str, 0, 10));
+        repodata_set_num(pd->data, handle, SOLVABLE_INSTALLSIZE, strtoull(str, 0, 10));
       if ((str = solv_xmlparser_find_attr("package", atts)) != 0)
-	repodata_set_num(pd->data, handle, SOLVABLE_DOWNLOADSIZE, strtoull(str, 0, 10));
+        repodata_set_num(pd->data, handle, SOLVABLE_DOWNLOADSIZE, strtoull(str, 0, 10));
       break;
     case STATE_HEADERRANGE:
       {
         unsigned int end;
         str = solv_xmlparser_find_attr("end", atts);
-	if (str && (end = atoi(str)) != 0)
-	  repodata_set_num(pd->data, handle, SOLVABLE_HEADEREND, end);
-	break;
+        if (str && (end = atoi(str)) != 0)
+          repodata_set_num(pd->data, handle, SOLVABLE_HEADEREND, end);
+        break;
       }
       /*
         <diskusage>
@@ -863,23 +857,23 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
         Id did;
 
         if ((str = solv_xmlparser_find_attr("name", atts)) == 0)
-	  {
-	    pd->ret = pool_error(pool, -1, "<dir .../> tag without 'name' attribute");
+          {
+            pd->ret = pool_error(pool, -1, "<dir .../> tag without 'name' attribute");
             break;
-	  }
-	if (*str != '/')
-	  {
-	    if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
-	      str = "/usr/src";
-	    else
-	      {
-		int l = strlen(str) + 2;
-		char *space = solv_xmlparser_contentspace(xmlp, l);
-		space[0] = '/';
-		memcpy(space + 1, str, l - 1);
-		str = space;
-	    }
-	  }
+          }
+        if (*str != '/')
+          {
+            if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
+              str = "/usr/src";
+            else
+              {
+                int l = strlen(str) + 2;
+                char *space = solv_xmlparser_contentspace(xmlp, l);
+                space[0] = '/';
+                memcpy(space + 1, str, l - 1);
+                str = space;
+              }
+          }
         did = repodata_str2dir(pd->data, str, 1);
         if ((str = solv_xmlparser_find_attr("size", atts)) != 0)
           filesz = strtol(str, 0, 0);
@@ -895,15 +889,14 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
     case STATE_CHANGELOG:
       pd->changelog_handle = repodata_new_handle(pd->data);
       if ((str = solv_xmlparser_find_attr("date", atts)) != 0)
-	repodata_set_num(pd->data, pd->changelog_handle, SOLVABLE_CHANGELOG_TIME, strtoull(str, 0, 10));
+        repodata_set_num(pd->data, pd->changelog_handle, SOLVABLE_CHANGELOG_TIME, strtoull(str, 0, 10));
       if ((str = solv_xmlparser_find_attr("author", atts)) != 0)
-	repodata_set_str(pd->data, pd->changelog_handle, SOLVABLE_CHANGELOG_AUTHOR, str);
+        repodata_set_str(pd->data, pd->changelog_handle, SOLVABLE_CHANGELOG_AUTHOR, str);
       break;
     default:
       break;
     }
 }
-
 
 /*
  * endElement
@@ -927,16 +920,16 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
     {
     case STATE_SOLVABLE:
       if (pd->extending)
-	{
-	  pd->solvable = 0;
-	  break;
-	}
+        {
+          pd->solvable = 0;
+          break;
+        }
       if (pd->kind && !s->name) /* add namespace in case of NULL name */
         s->name = pool_str2id(pool, join2(&pd->jd, pd->kind, ":", 0), 1);
       if (!s->arch)
         s->arch = ARCH_NOARCH;
       if (!s->evr)
-        s->evr = ID_EMPTY;	/* some patterns have this */
+        s->evr = ID_EMPTY; /* some patterns have this */
       if (s->name && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
         s->provides = repo_addid_dep(repo, s->provides, pool_rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
       repo_rewrite_suse_deps(s, pd->freshens);
@@ -964,55 +957,55 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
       break;
     case STATE_CHECKSUM:
       {
-	unsigned char chk[256];
-	int l = solv_chksum_len(pd->chksumtype);
-	const char *str = content;
-	if (!l || l > sizeof(chk))
-	  break;
-	if (solv_hex2bin(&str, chk, l) != l || content[2 * l])
+        unsigned char chk[256];
+        int l = solv_chksum_len(pd->chksumtype);
+        const char *str = content;
+        if (!l || l > sizeof(chk))
+          break;
+        if (solv_hex2bin(&str, chk, l) != l || content[2 * l])
           {
-	    pd->ret = pool_error(pool, -1, "line %u: invalid %s checksum", solv_xmlparser_lineno(xmlp), solv_chksum_type2str(pd->chksumtype));
-	    break;
+            pd->ret = pool_error(pool, -1, "line %u: invalid %s checksum", solv_xmlparser_lineno(xmlp), solv_chksum_type2str(pd->chksumtype));
+            break;
           }
         repodata_set_bin_checksum(pd->data, handle, SOLVABLE_CHECKSUM, pd->chksumtype, chk);
-	/* we save the checksum to solvable id relationship for extending metadata */
-	if (pd->cshash_filled)
-	  put_in_cshash(pd, chk, l, s - pool->solvables);
+        /* we save the checksum to solvable id relationship for extending metadata */
+        if (pd->cshash_filled)
+          put_in_cshash(pd, chk, l, s - pool->solvables);
         break;
       }
     case STATE_FILE:
       if ((p = strrchr(content, '/')) != 0)
-	{
-	  *p++ = 0;
-	  if (pd->lastdir && !strcmp(pd->lastdirstr, content))
-	    {
-	      id = pd->lastdir;
-	    }
-	  else
-	    {
-	      int l = p - content;
-	      if (l + 1 > pd->lastdirstrl)	/* + 1 for the possible leading / we need to insert */
-		{
-		  pd->lastdirstrl = l + 128;
-		  pd->lastdirstr = solv_realloc(pd->lastdirstr, pd->lastdirstrl);
-		}
-	      if (content[0] != '/')
-		{
-		  pd->lastdirstr[0] = '/';
-		  memcpy(pd->lastdirstr + 1, content, l);
-	          id = repodata_str2dir(pd->data, pd->lastdirstr, 1);
-		}
-	      else
-	        id = repodata_str2dir(pd->data, content, 1);
-	      pd->lastdir = id;
-	      memcpy(pd->lastdirstr, content, l);
-	    }
-	}
+        {
+          *p++ = 0;
+          if (pd->lastdir && !strcmp(pd->lastdirstr, content))
+            {
+              id = pd->lastdir;
+            }
+          else
+            {
+              int l = p - content;
+              if (l + 1 > pd->lastdirstrl) /* + 1 for the possible leading / we need to insert */
+                {
+                  pd->lastdirstrl = l + 128;
+                  pd->lastdirstr = solv_realloc(pd->lastdirstr, pd->lastdirstrl);
+                }
+              if (content[0] != '/')
+                {
+                  pd->lastdirstr[0] = '/';
+                  memcpy(pd->lastdirstr + 1, content, l);
+                  id = repodata_str2dir(pd->data, pd->lastdirstr, 1);
+                }
+              else
+                id = repodata_str2dir(pd->data, content, 1);
+              pd->lastdir = id;
+              memcpy(pd->lastdirstr, content, l);
+            }
+        }
       else
-	{
-	  p = content;
-	  id = repodata_str2dir(pd->data, "/", 1);
-	}
+        {
+          p = content;
+          id = repodata_str2dir(pd->data, "/", 1);
+        }
       repodata_add_dirstr(pd->data, handle, SOLVABLE_FILELIST, id, p);
       break;
     case STATE_SUMMARY:
@@ -1025,19 +1018,19 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
       repodata_set_str(pd->data, handle, langtag(pd, SOLVABLE_CATEGORY, pd->tmplang), content);
       break;
     case STATE_DISTRIBUTION:
-        repodata_set_poolstr(pd->data, handle, SOLVABLE_DISTRIBUTION, content);
-        break;
+      repodata_set_poolstr(pd->data, handle, SOLVABLE_DISTRIBUTION, content);
+      break;
     case STATE_URL:
       if (*content)
-	repodata_set_str(pd->data, handle, SOLVABLE_URL, content);
+        repodata_set_str(pd->data, handle, SOLVABLE_URL, content);
       break;
     case STATE_PACKAGER:
       if (*content)
-	repodata_set_poolstr(pd->data, handle, SOLVABLE_PACKAGER, content);
+        repodata_set_poolstr(pd->data, handle, SOLVABLE_PACKAGER, content);
       break;
     case STATE_SOURCERPM:
       if (*content)
-	repodata_set_sourcepkg(pd->data, handle, content);
+        repodata_set_sourcepkg(pd->data, handle, content);
       break;
     case STATE_RELNOTESURL:
       if (*content)
@@ -1066,7 +1059,7 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
       break;
     case STATE_EULA:
       if (*content)
-	repodata_set_str(pd->data, handle, langtag(pd, SOLVABLE_EULA, pd->tmplang), content);
+        repodata_set_str(pd->data, handle, langtag(pd, SOLVABLE_EULA, pd->tmplang), content);
       break;
     case STATE_KEYWORD:
       if (*content)
@@ -1096,7 +1089,6 @@ errorCallback(struct solv_xmlparser *xmlp, const char *errstr, unsigned int line
   struct parsedata *pd = xmlp->userdata;
   pd->ret = pool_error(pd->pool, -1, "repo_rpmmd: %s at line %u:%u", errstr, line, column);
 }
-
 
 /*-----------------------------------------------*/
 
@@ -1148,6 +1140,6 @@ repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags)
     repodata_internalize(data);
   POOL_DEBUG(SOLV_DEBUG_STATS, "repo_add_rpmmd took %d ms\n", solv_timems(now));
   POOL_DEBUG(SOLV_DEBUG_STATS, "repo size: %d solvables\n", repo->nsolvables);
-  POOL_DEBUG(SOLV_DEBUG_STATS, "repo memory used: %d K incore, %d K idarray\n", repodata_memused(data)/1024, repo->idarraysize / (int)(1024/sizeof(Id)));
+  POOL_DEBUG(SOLV_DEBUG_STATS, "repo memory used: %d K incore, %d K idarray\n", repodata_memused(data) / 1024, repo->idarraysize / (int)(1024 / sizeof(Id)));
   return pd.ret;
 }

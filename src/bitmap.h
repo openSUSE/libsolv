@@ -28,11 +28,11 @@ typedef struct _Map {
 /* set all bits */
 #define MAPSETALL(m) (memset((m)->map, 0xff, (m)->size))
 /* set bit */
-#define MAPSET(m, n) ((m)->map[(n) >> 3] |= 1 << ((n) & 7))
+#define MAPSET(m, n) ((m)->map[(n) >> 3] |= 1 << ((n)&7))
 /* clear bit */
-#define MAPCLR(m, n) ((m)->map[(n) >> 3] &= ~(1 << ((n) & 7)))
+#define MAPCLR(m, n) ((m)->map[(n) >> 3] &= ~(1 << ((n)&7)))
 /* test bit */
-#define MAPTST(m, n) ((m)->map[(n) >> 3] & (1 << ((n) & 7)))
+#define MAPTST(m, n) ((m)->map[(n) >> 3] & (1 << ((n)&7)))
 
 extern void map_init(Map *m, int n);
 extern void map_init_clone(Map *t, Map *s);
@@ -43,23 +43,28 @@ extern void map_or(Map *t, Map *s);
 extern void map_subtract(Map *t, Map *s);
 extern void map_invertall(Map *m);
 
-static inline void map_empty(Map *m)
+static inline void
+map_empty(Map *m)
 {
   MAPZERO(m);
 }
-static inline void map_set(Map *m, int n)
+static inline void
+map_set(Map *m, int n)
 {
   MAPSET(m, n);
 }
-static inline void map_setall(Map *m)
+static inline void
+map_setall(Map *m)
 {
   MAPSETALL(m);
 }
-static inline void map_clr(Map *m, int n)
+static inline void
+map_clr(Map *m, int n)
 {
   MAPCLR(m, n);
 }
-static inline int map_tst(Map *m, int n)
+static inline int
+map_tst(Map *m, int n)
 {
   return MAPTST(m, n);
 }

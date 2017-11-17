@@ -19,29 +19,29 @@ findmetalinkurl(FILE *fp, unsigned char *chksump, Id *chksumtypep)
 
   if (chksumtypep)
     *chksumtypep = 0;
-  while((bp = fgets(buf, sizeof(buf), fp)) != 0)
+  while ((bp = fgets(buf, sizeof(buf), fp)) != 0)
     {
       while (*bp == ' ' || *bp == '\t')
-	bp++;
+        bp++;
       if (chksumtypep && !*chksumtypep && !strncmp(bp, "<hash type=\"sha256\">", 20))
-	{
-	  bp += 20;
-	  if (solv_hex2bin((const char **)&bp, chksump, 32) == 32)
-	    *chksumtypep = REPOKEY_TYPE_SHA256;
-	  continue;
-	}
+        {
+          bp += 20;
+          if (solv_hex2bin((const char **)&bp, chksump, 32) == 32)
+            *chksumtypep = REPOKEY_TYPE_SHA256;
+          continue;
+        }
       if (strncmp(bp, "<url", 4))
-	continue;
+        continue;
       bp = strchr(bp, '>');
       if (!bp)
-	continue;
+        continue;
       bp++;
       ep = strstr(bp, "repodata/repomd.xml</url>");
       if (!ep)
-	continue;
+        continue;
       *ep = 0;
       if (strncmp(bp, "http", 4))
-	continue;
+        continue;
       urls = solv_extend(urls, nurls, 1, sizeof(*urls), 15);
       urls[nurls++] = strdup(bp);
     }
@@ -56,11 +56,11 @@ findmetalinkurl(FILE *fp, unsigned char *chksump, Id *chksumtypep)
       solv_free(urls);
       ep = strchr(bp, '/');
       if ((ep = strchr(ep + 2, '/')) != 0)
-	{
-	  *ep = 0;
-	  printf("[using mirror %s]\n", bp);
-	  *ep = '/';
-	}
+        {
+          *ep = 0;
+          printf("[using mirror %s]\n", bp);
+          *ep = '/';
+        }
       return bp;
     }
   return 0;
@@ -74,17 +74,17 @@ findmirrorlisturl(FILE *fp)
   char **urls = 0;
   int nurls = 0;
 
-  while((bp = fgets(buf, sizeof(buf), fp)) != 0)
+  while ((bp = fgets(buf, sizeof(buf), fp)) != 0)
     {
       while (*bp == ' ' || *bp == '\t')
-	bp++;
+        bp++;
       if (!*bp || *bp == '#')
-	continue;
+        continue;
       l = strlen(bp);
       while (l > 0 && (bp[l - 1] == ' ' || bp[l - 1] == '\t' || bp[l - 1] == '\n'))
-	bp[--l] = 0;
+        bp[--l] = 0;
       if ((ep = strstr(bp, "url=")) != 0)
-	bp = ep + 4;
+        bp = ep + 4;
       urls = solv_extend(urls, nurls, 1, sizeof(*urls), 15);
       urls[nurls++] = strdup(bp);
     }
@@ -99,11 +99,11 @@ findmirrorlisturl(FILE *fp)
       solv_free(urls);
       ep = strchr(bp, '/');
       if ((ep = strchr(ep + 2, '/')) != 0)
-	{
-	  *ep = 0;
-	  printf("[using mirror %s]\n", bp);
-	  *ep = '/';
-	}
+        {
+          *ep = 0;
+          printf("[using mirror %s]\n", bp);
+          *ep = '/';
+        }
       return bp;
     }
   return 0;

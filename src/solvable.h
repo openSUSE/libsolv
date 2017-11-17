@@ -28,13 +28,13 @@ struct _Repo;
 typedef struct _Solvable {
   Id name;
   Id arch;
-  Id evr;			/* epoch:version-release */
+  Id evr; /* epoch:version-release */
   Id vendor;
 
-  struct _Repo *repo;		/* repo we belong to */
+  struct _Repo *repo; /* repo we belong to */
 
   /* dependencies are offsets into repo->idarraydata */
-  Offset provides;		/* terminated with Id 0 */
+  Offset provides; /* terminated with Id 0 */
   Offset obsoletes;
   Offset conflicts;
 
@@ -57,7 +57,7 @@ const char *solvable_lookup_str_poollang(Solvable *s, Id keyname);
 const char *solvable_lookup_str_lang(Solvable *s, Id keyname, const char *lang, int usebase);
 int solvable_lookup_bool(Solvable *s, Id keyname);
 int solvable_lookup_void(Solvable *s, Id keyname);
-const char *solvable_get_location(Solvable *s, unsigned int *medianrp);	/* old name */
+const char *solvable_get_location(Solvable *s, unsigned int *medianrp); /* old name */
 const char *solvable_lookup_location(Solvable *s, unsigned int *medianrp);
 const char *solvable_lookup_sourcepkg(Solvable *s);
 const unsigned char *solvable_lookup_bin_checksum(Solvable *s, Id keyname, Id *typep);

@@ -14,18 +14,17 @@
 extern "C" {
 #endif
 
-#define STRID_NULL  0
+#define STRID_NULL 0
 #define STRID_EMPTY 1
 
-struct _Stringpool
-{
-  Offset *strings;            /* table of offsets into stringspace, indexed by Id: Id -> Offset */
-  int nstrings;               /* number of ids in strings table */
-  char *stringspace;          /* space for all unique strings: stringspace + Offset = string */
-  Offset sstrings;            /* size of used stringspace */
+struct _Stringpool {
+  Offset *strings;   /* table of offsets into stringspace, indexed by Id: Id -> Offset */
+  int nstrings;      /* number of ids in strings table */
+  char *stringspace; /* space for all unique strings: stringspace + Offset = string */
+  Offset sstrings;   /* size of used stringspace */
 
-  Hashtable stringhashtbl;    /* hash table: (string ->) Hash -> Id */
-  Hashval stringhashmask;     /* modulo value for hash table (size of table - 1) */
+  Hashtable stringhashtbl; /* hash table: (string ->) Hash -> Id */
+  Hashval stringhashmask;  /* modulo value for hash table (size of table - 1) */
 };
 
 void stringpool_init(Stringpool *ss, const char *strs[]);
@@ -38,7 +37,6 @@ Id stringpool_str2id(Stringpool *ss, const char *str, int create);
 Id stringpool_strn2id(Stringpool *ss, const char *str, unsigned int len, int create);
 
 void stringpool_shrink(Stringpool *ss);
-
 
 static inline const char *
 stringpool_id2str(Stringpool *ss, Id id)

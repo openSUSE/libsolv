@@ -24,13 +24,13 @@ mdk_find(const char *md5sums, const char *what, unsigned char *chksum)
     {
       int l = ep - sp;
       if (l <= 34)
-	continue;
+        continue;
       if (sp[32] != ' ' || sp[33] != ' ')
-	continue;
+        continue;
       if (wl != l - 34 || strncmp(what, sp + 34, wl) != 0)
-	continue;
+        continue;
       if (solv_hex2bin(&sp, chksum, 16) != 16)
-	continue;
+        continue;
       return 1;
     }
   return 0;
@@ -43,7 +43,7 @@ slurp(FILE *fp)
   char *buf = 0;
   int bufl = 0;
 
-  for (l = 0; ; l += ll)
+  for (l = 0;; l += ll)
     {
       if (bufl - l < 4096)
         {
@@ -83,16 +83,18 @@ mdk_load_ext(Repo *repo, Repodata *data)
   printf("[%s:%s", repo->name, ext);
   if (usecachedrepo(cinfo, ext, 0))
     {
-      printf(" cached]\n"); fflush(stdout);
+      printf(" cached]\n");
+      fflush(stdout);
       return 1;
     }
-  printf(" fetching]\n"); fflush(stdout);
+  printf(" fetching]\n");
+  fflush(stdout);
   filename = repodata_lookup_str(data, SOLVID_META, REPOSITORY_REPOMD_LOCATION);
   filechksumtype = 0;
   filechksum = repodata_lookup_bin_checksum(data, SOLVID_META, REPOSITORY_REPOMD_CHECKSUM, &filechksumtype);
   if ((fp = curlfopen(cinfo, filename, 1, filechksum, filechksumtype, 0)) == 0)
     return 0;
-  r = repo_add_mdk_info(repo, fp, REPO_USE_LOADING|REPO_EXTEND_SOLVABLES|REPO_LOCALPOOL);
+  r = repo_add_mdk_info(repo, fp, REPO_USE_LOADING | REPO_EXTEND_SOLVABLES | REPO_LOCALPOOL);
   fclose(fp);
   if (r)
     {
@@ -150,13 +152,13 @@ mdk_load(struct repoinfo *cinfo, Pool **sigpoolp)
     {
       solv_free(md5sums);
       cinfo->incomplete = 1;
-      return 0;	/* hopeless */
+      return 0; /* hopeless */
     }
   if ((fp = curlfopen(cinfo, "media_info/synthesis.hdlist.cz", 0, md5, REPOKEY_TYPE_MD5, 1)) == 0)
     {
       solv_free(md5sums);
       cinfo->incomplete = 1;
-      return 0;	/* hopeless */
+      return 0; /* hopeless */
     }
   /* probe compression */
   if (fread(probe, 5, 1, fp) != 1)
@@ -164,7 +166,7 @@ mdk_load(struct repoinfo *cinfo, Pool **sigpoolp)
       fclose(fp);
       solv_free(md5sums);
       cinfo->incomplete = 1;
-      return 0;	/* hopeless */
+      return 0; /* hopeless */
     }
   if (probe[0] == 0xfd && memcmp(probe + 1, "7zXZ", 4) == 0)
     compression = "synthesis.hdlist.xz";
@@ -178,7 +180,7 @@ mdk_load(struct repoinfo *cinfo, Pool **sigpoolp)
     {
       solv_free(md5sums);
       cinfo->incomplete = 1;
-      return 0;	/* hopeless */
+      return 0; /* hopeless */
     }
   if (repo_add_mdk(repo, fp, REPO_NO_INTERNALIZE))
     {
@@ -186,21 +188,21 @@ mdk_load(struct repoinfo *cinfo, Pool **sigpoolp)
       fclose(fp);
       solv_free(md5sums);
       cinfo->incomplete = 1;
-      return 0;	/* hopeless */
+      return 0; /* hopeless */
     }
   fclose(fp);
   /* add info, could do this on demand, but always having the summary is nice */
   if (mdk_find(md5sums, "info.xml.lzma", md5))
     {
       if ((fp = curlfopen(cinfo, "media_info/info.xml.lzma", 1, md5, REPOKEY_TYPE_MD5, 1)) != 0)
-	{
-	  if (repo_add_mdk_info(repo, fp, REPO_NO_INTERNALIZE|REPO_REUSE_REPODATA|REPO_EXTEND_SOLVABLES))
-	    {
-	      printf("info.xml.lzma: %s\n", pool_errstr(pool));
-	      cinfo->incomplete = 1;
-	    }
-	  fclose(fp);
-	}
+        {
+          if (repo_add_mdk_info(repo, fp, REPO_NO_INTERNALIZE | REPO_REUSE_REPODATA | REPO_EXTEND_SOLVABLES))
+            {
+              printf("info.xml.lzma: %s\n", pool_errstr(pool));
+              cinfo->incomplete = 1;
+            }
+          fclose(fp);
+        }
     }
   repo_internalize(repo);
   data = repo_add_repodata(repo, 0);

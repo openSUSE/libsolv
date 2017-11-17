@@ -33,14 +33,14 @@ fgets0(char *s, int size, FILE *stream)
     {
       c = getc(stream);
       if (c == EOF)
-	{
-	  if (p == s)
-	    return 0;
-	  c = 0;
-	}
+        {
+          if (p == s)
+            return 0;
+          c = 0;
+        }
       *p++ = c;
       if (!c)
-	return s;
+        return s;
     }
   *p = 0;
   return s;
@@ -62,50 +62,50 @@ main(int argc, char **argv)
 
   while ((c = getopt(argc, argv, "0b:m:r")) >= 0)
     {
-      switch(c)
-	{
-	case 'b':
-	  basefile = optarg;
-	  break;
-	case 'm':
-	  manifest = optarg;
-	  break;
-	case 'r':
-	  is_repo = 1;
-	  break;
-	case '0':
-	  manifest0 = 1;
-	  break;
-	default:
-	  exit(1);
-	}
+      switch (c)
+        {
+        case 'b':
+          basefile = optarg;
+          break;
+        case 'm':
+          manifest = optarg;
+          break;
+        case 'r':
+          is_repo = 1;
+          break;
+        case '0':
+          manifest0 = 1;
+          break;
+        default:
+          exit(1);
+        }
     }
   if (manifest)
     {
       if (!strcmp(manifest, "-"))
         fp = stdin;
       else if ((fp = fopen(manifest, "r")) == 0)
-	{
-	  perror(manifest);
-	  exit(1);
-	}
+        {
+          perror(manifest);
+          exit(1);
+        }
       for (;;)
-	{
-	  if (manifest0)
-	    {
-	      if (!fgets0(buf, sizeof(buf), fp))
-		break;
-	    }
-	  else
-	    {
-	      if (!fgets(buf, sizeof(buf), fp))
-		break;
-	      if ((p = strchr(buf, '\n')) != 0)
-		*p = 0;
-	    }
+        {
+          if (manifest0)
+            {
+              if (!fgets0(buf, sizeof(buf), fp))
+                break;
+            }
+          else
+            {
+              if (!fgets(buf, sizeof(buf), fp))
+                break;
+              if ((p = strchr(buf, '\n')) != 0)
+                *p = 0;
+            }
           debs = solv_extend(debs, ndebs, 1, sizeof(char *), 15);
-	  debs[ndebs++] = strdup(buf);
-	}
+          debs[ndebs++] = strdup(buf);
+        }
       if (fp != stdin)
         fclose(fp);
     }
@@ -119,35 +119,35 @@ main(int argc, char **argv)
   res = 0;
   if (!ndebs && !manifest && is_repo)
     {
-      if (repo_add_debpackages(repo, stdin, REPO_REUSE_REPODATA|REPO_NO_INTERNALIZE))
-	{
-	  fprintf(stderr, "deb2solv: %s\n", pool_errstr(pool));
-	  res = 1;
-	}
+      if (repo_add_debpackages(repo, stdin, REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE))
+        {
+          fprintf(stderr, "deb2solv: %s\n", pool_errstr(pool));
+          res = 1;
+        }
     }
   for (i = 0; i < ndebs; i++)
     {
       if (is_repo)
-	{
-	  if ((fp = fopen(debs[i], "r")) == 0)
-	    {
-	      perror(debs[i]);
-	      res = 1;
-	      continue;
-	    }
-	  if (repo_add_debpackages(repo, fp, REPO_REUSE_REPODATA|REPO_NO_INTERNALIZE))
-	    {
-	      fprintf(stderr, "deb2solv: %s\n", pool_errstr(pool));
-	      res = 1;
-	    }
-	  fclose(fp);
-	  continue;
-	}
-      if (repo_add_deb(repo, debs[i], REPO_REUSE_REPODATA|REPO_NO_INTERNALIZE) == 0)
-	{
-	  fprintf(stderr, "deb2solv: %s\n", pool_errstr(pool));
-	  res = 1;
-	}
+        {
+          if ((fp = fopen(debs[i], "r")) == 0)
+            {
+              perror(debs[i]);
+              res = 1;
+              continue;
+            }
+          if (repo_add_debpackages(repo, fp, REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE))
+            {
+              fprintf(stderr, "deb2solv: %s\n", pool_errstr(pool));
+              res = 1;
+            }
+          fclose(fp);
+          continue;
+        }
+      if (repo_add_deb(repo, debs[i], REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE) == 0)
+        {
+          fprintf(stderr, "deb2solv: %s\n", pool_errstr(pool));
+          res = 1;
+        }
     }
   repo_internalize(repo);
   tool_write(repo, basefile, 0);
@@ -157,4 +157,3 @@ main(int argc, char **argv)
   solv_free(debs);
   exit(res);
 }
-

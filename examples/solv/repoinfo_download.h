@@ -4,4 +4,3 @@ FILE *curlfopen(struct repoinfo *cinfo, const char *file, int uncompress, const 
 
 FILE *downloadpackage(Solvable *s, const char *loc);
 int downloadchecksig(struct repoinfo *cinfo, FILE *fp, const char *sigurl, Pool **sigpool);
-

@@ -6,5 +6,3 @@
  */
 
 extern void repodata_add_diskusage(Repodata *data, Id handle, Queue *q);
-
-

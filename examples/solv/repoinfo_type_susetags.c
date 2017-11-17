@@ -64,22 +64,22 @@ susetags_add_ext(Repo *repo, Repodata *data)
   while (dataiterator_step(&di))
     {
       if (strncmp(di.kv.str, "packages.", 9) != 0)
-	continue;
+        continue;
       if (!strcmp(di.kv.str + 9, "gz"))
-	continue;
+        continue;
       if (!di.kv.str[9] || !di.kv.str[10] || (di.kv.str[11] && di.kv.str[11] != '.'))
-	continue;
+        continue;
       ext[0] = di.kv.str[9];
       ext[1] = di.kv.str[10];
       ext[2] = 0;
       if (!strcmp(ext, "en"))
-	continue;
+        continue;
       if (!susetags_find(repo, di.kv.str, &filechksum, &filechksumtype))
-	continue;
+        continue;
       handle = repodata_new_handle(data);
       repodata_set_str(data, handle, SUSETAGS_FILE_NAME, di.kv.str);
       if (filechksumtype)
-	repodata_set_bin_checksum(data, handle, SUSETAGS_FILE_CHECKSUM, filechksumtype, filechksum);
+        repodata_set_bin_checksum(data, handle, SUSETAGS_FILE_CHECKSUM, filechksumtype, filechksum);
       add_ext_keys(data, handle, ext);
       repodata_add_flexarray(data, SOLVID_META, REPOSITORY_EXTERNAL, handle);
     }
@@ -109,10 +109,12 @@ susetags_load_ext(Repo *repo, Repodata *data)
   printf("[%s:%s", repo->name, ext);
   if (usecachedrepo(cinfo, ext, 0))
     {
-      printf(" cached]\n"); fflush(stdout);
+      printf(" cached]\n");
+      fflush(stdout);
       return 1;
     }
-  printf(" fetching]\n"); fflush(stdout);
+  printf(" fetching]\n");
+  fflush(stdout);
   defvendor = repo_lookup_id(repo, SOLVID_META, SUSETAGS_DEFAULTVENDOR);
   descrdir = repo_lookup_str(repo, SOLVID_META, SUSETAGS_DESCRDIR);
   if (!descrdir)
@@ -121,7 +123,7 @@ susetags_load_ext(Repo *repo, Repodata *data)
   filechksum = repodata_lookup_bin_checksum(data, SOLVID_META, SUSETAGS_FILE_CHECKSUM, &filechksumtype);
   if ((fp = curlfopen(cinfo, pool_tmpjoin(repo->pool, descrdir, "/", filename), 1, filechksum, filechksumtype, 0)) == 0)
     return 0;
-  flags = REPO_USE_LOADING|REPO_EXTEND_SOLVABLES;
+  flags = REPO_USE_LOADING | REPO_EXTEND_SOLVABLES;
   if (strcmp(ext, "DL") != 0)
     flags |= REPO_LOCALPOOL;
   if (repo_add_susetags(repo, fp, defvendor, ext, flags))
@@ -197,14 +199,14 @@ susetags_load(struct repoinfo *cinfo, Pool **sigpoolp)
   if ((fp = curlfopen(cinfo, pool_tmpjoin(pool, descrdir, "/", filename), 1, filechksum, filechksumtype, 1)) == 0)
     {
       cinfo->incomplete = 1;
-      return 0;	/* hopeless */
+      return 0; /* hopeless */
     }
-  if (repo_add_susetags(repo, fp, defvendor, 0, REPO_NO_INTERNALIZE|SUSETAGS_RECORD_SHARES))
+  if (repo_add_susetags(repo, fp, defvendor, 0, REPO_NO_INTERNALIZE | SUSETAGS_RECORD_SHARES))
     {
       printf("packages: %s\n", pool_errstr(pool));
       fclose(fp);
       cinfo->incomplete = 1;
-      return 0;	/* hopeless */
+      return 0; /* hopeless */
     }
   fclose(fp);
   /* add default language */
@@ -214,42 +216,42 @@ susetags_load(struct repoinfo *cinfo, Pool **sigpoolp)
   if (filename)
     {
       if ((fp = curlfopen(cinfo, pool_tmpjoin(pool, descrdir, "/", filename), 1, filechksum, filechksumtype, 1)) != 0)
-	{
-	  if (repo_add_susetags(repo, fp, defvendor, 0, REPO_NO_INTERNALIZE|REPO_REUSE_REPODATA|REPO_EXTEND_SOLVABLES))
-	    {
-	      printf("packages.en: %s\n", pool_errstr(pool));
-	      cinfo->incomplete = 1;
-	    }
-	  fclose(fp);
-	}
+        {
+          if (repo_add_susetags(repo, fp, defvendor, 0, REPO_NO_INTERNALIZE | REPO_REUSE_REPODATA | REPO_EXTEND_SOLVABLES))
+            {
+              printf("packages.en: %s\n", pool_errstr(pool));
+              cinfo->incomplete = 1;
+            }
+          fclose(fp);
+        }
     }
   filename = susetags_find(repo, "patterns", &filechksum, &filechksumtype);
   if (filename)
     {
       if ((fp = curlfopen(cinfo, pool_tmpjoin(pool, descrdir, "/", filename), 1, filechksum, filechksumtype, 1)) != 0)
-	{
-	  char pbuf[256];
-	  while (fgets(pbuf, sizeof(pbuf), fp))
-	    {
-	      int l = strlen(pbuf);
-	      FILE *fp2;
-	      if (l && pbuf[l - 1] == '\n')
-		pbuf[--l] = 0;
-	      if (!*pbuf || *pbuf == '.' || strchr(pbuf, '/') != 0)
-		continue;
-	      filename = susetags_find(repo, pbuf, &filechksum, &filechksumtype);
-	      if (filename && (fp2 = curlfopen(cinfo, pool_tmpjoin(pool, descrdir, "/", filename), 1, filechksum, filechksumtype, 1)) != 0)
-		{
-		  if (repo_add_susetags(repo, fp2, defvendor, 0, REPO_NO_INTERNALIZE))
-		    {
-		      printf("%s: %s\n", pbuf, pool_errstr(pool));
-		      cinfo->incomplete = 1;
-		    }
-		  fclose(fp2);
-		}
-	    }
-	  fclose(fp);
-	}
+        {
+          char pbuf[256];
+          while (fgets(pbuf, sizeof(pbuf), fp))
+            {
+              int l = strlen(pbuf);
+              FILE *fp2;
+              if (l && pbuf[l - 1] == '\n')
+                pbuf[--l] = 0;
+              if (!*pbuf || *pbuf == '.' || strchr(pbuf, '/') != 0)
+                continue;
+              filename = susetags_find(repo, pbuf, &filechksum, &filechksumtype);
+              if (filename && (fp2 = curlfopen(cinfo, pool_tmpjoin(pool, descrdir, "/", filename), 1, filechksum, filechksumtype, 1)) != 0)
+                {
+                  if (repo_add_susetags(repo, fp2, defvendor, 0, REPO_NO_INTERNALIZE))
+                    {
+                      printf("%s: %s\n", pbuf, pool_errstr(pool));
+                      cinfo->incomplete = 1;
+                    }
+                  fclose(fp2);
+                }
+            }
+          fclose(fp);
+        }
     }
 #ifdef ENABLE_APPDATA
   filename = susetags_find(repo, "appdata.xml.gz", &filechksum, &filechksumtype);
@@ -258,10 +260,10 @@ susetags_load(struct repoinfo *cinfo, Pool **sigpoolp)
   if (filename && (fp = curlfopen(cinfo, pool_tmpjoin(pool, descrdir, "/", filename), 1, filechksum, filechksumtype, 1)) != 0)
     {
       if (repo_add_appdata(repo, fp, 0))
-	{
-	  printf("appdata: %s\n", pool_errstr(pool));
-	  cinfo->incomplete = 1;
-	}
+        {
+          printf("appdata: %s\n", pool_errstr(pool));
+          cinfo->incomplete = 1;
+        }
       fclose(fp);
     }
 #endif

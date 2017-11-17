@@ -23,7 +23,6 @@
 #include "poolarch.h"
 #include "util.h"
 
-
 /*-------------------------------------------------------------------
  * check if a installed package p is being updated
  */
@@ -35,9 +34,9 @@ solver_is_updating(Solver *solv, Id p)
   Rule *r;
   Id l, pp;
   if (solv->decisionmap[p] >= 0)
-    return 0;	/* old package stayed */
+    return 0; /* old package stayed */
   r = solv->rules + solv->updaterules + (p - solv->installed->start);
-  FOR_RULELITERALS(l, pp, r)
+  FOR_RULELITERALS (l, pp, r)
     if (l > 0 && l != p && solv->decisionmap[l] > 0)
       return 1;
   return 0;
@@ -85,10 +84,10 @@ solver_splitprovides(Solver *solv, Id dep, Map *m)
        * now do extra filtering */
       s = pool->solvables + p;
       if (s->repo != solv->installed || s->name != rd->name)
-	continue;
+        continue;
       /* check if the package is updated. if m is set, we're called from dep_possible */
       if (m || solver_is_updating(solv, p))
-	return 1;
+        return 1;
     }
   return 0;
 }
@@ -103,7 +102,7 @@ solver_dep_possible_slow(Solver *solv, Id dep, Map *m)
     {
       Reldep *rd = GETRELDEP(pool, dep);
       if (rd->flags >= 8)
-         {
+        {
           if (rd->flags == REL_COND || rd->flags == REL_UNLESS)
             return 1;
           if (rd->flags == REL_AND)
@@ -122,7 +121,7 @@ solver_dep_possible_slow(Solver *solv, Id dep, Map *m)
             return solver_splitprovides(solv, rd->evr, m);
         }
     }
-  FOR_PROVIDES(p, pp, dep)
+  FOR_PROVIDES (p, pp, dep)
     {
       if (MAPTST(m, p))
         return 1;
@@ -137,50 +136,49 @@ solver_dep_fulfilled_cplx(Solver *solv, Reldep *rd)
   if (rd->flags == REL_COND)
     {
       if (ISRELDEP(rd->evr))
-	{
-	  Reldep *rd2 = GETRELDEP(pool, rd->evr);
-	  if (rd2->flags == REL_ELSE)
-	    {
-	      if (solver_dep_fulfilled(solv, rd2->name))
-		return solver_dep_fulfilled(solv, rd->name);
-	      return solver_dep_fulfilled(solv, rd2->evr);
-	    }
-	}
+        {
+          Reldep *rd2 = GETRELDEP(pool, rd->evr);
+          if (rd2->flags == REL_ELSE)
+            {
+              if (solver_dep_fulfilled(solv, rd2->name))
+                return solver_dep_fulfilled(solv, rd->name);
+              return solver_dep_fulfilled(solv, rd2->evr);
+            }
+        }
       if (solver_dep_fulfilled(solv, rd->name))
-	return 1;
+        return 1;
       return !solver_dep_fulfilled(solv, rd->evr);
     }
   if (rd->flags == REL_UNLESS)
     {
       if (ISRELDEP(rd->evr))
-	{
-	  Reldep *rd2 = GETRELDEP(pool, rd->evr);
-	  if (rd2->flags == REL_ELSE)
-	    {
-	      if (!solver_dep_fulfilled(solv, rd2->name))
-		return solver_dep_fulfilled(solv, rd->name);
-	      return solver_dep_fulfilled(solv, rd2->evr);
-	    }
-	}
+        {
+          Reldep *rd2 = GETRELDEP(pool, rd->evr);
+          if (rd2->flags == REL_ELSE)
+            {
+              if (!solver_dep_fulfilled(solv, rd2->name))
+                return solver_dep_fulfilled(solv, rd->name);
+              return solver_dep_fulfilled(solv, rd2->evr);
+            }
+        }
       if (!solver_dep_fulfilled(solv, rd->name))
-	return 0;
+        return 0;
       return !solver_dep_fulfilled(solv, rd->evr);
     }
   if (rd->flags == REL_AND)
     {
       if (!solver_dep_fulfilled(solv, rd->name))
-	return 0;
+        return 0;
       return solver_dep_fulfilled(solv, rd->evr);
     }
   if (rd->flags == REL_OR)
     {
       if (solver_dep_fulfilled(solv, rd->name))
-	return 1;
+        return 1;
       return solver_dep_fulfilled(solv, rd->evr);
     }
   return 0;
 }
-
 
 /* mirrors solver_dep_fulfilled, but returns 2 if a new package
  * was involved */
@@ -195,88 +193,88 @@ solver_dep_fulfilled_alreadyinstalled(Solver *solv, Id dep)
     {
       Reldep *rd = GETRELDEP(pool, dep);
       if (rd->flags == REL_COND)
-	{
-	  int r1, r2;
-	  if (ISRELDEP(rd->evr))
-	    {
-	      Reldep *rd2 = GETRELDEP(pool, rd->evr);
-	      if (rd2->flags == REL_ELSE)
-		{
-		  r1 = solver_dep_fulfilled_alreadyinstalled(solv, rd2->name);
-		  if (r1)
-		    {
-		      r2 = solver_dep_fulfilled_alreadyinstalled(solv, rd->name);
-		      return r2 && r1 == 2 ? 2 : r2;
-		    }
-		  return solver_dep_fulfilled_alreadyinstalled(solv, rd2->evr);
-		}
-	    }
-	  r1 = solver_dep_fulfilled_alreadyinstalled(solv, rd->name);
-	  r2 = !solver_dep_fulfilled_alreadyinstalled(solv, rd->evr);
-	  if (!r1 && !r2)
-	    return 0;
+        {
+          int r1, r2;
+          if (ISRELDEP(rd->evr))
+            {
+              Reldep *rd2 = GETRELDEP(pool, rd->evr);
+              if (rd2->flags == REL_ELSE)
+                {
+                  r1 = solver_dep_fulfilled_alreadyinstalled(solv, rd2->name);
+                  if (r1)
+                    {
+                      r2 = solver_dep_fulfilled_alreadyinstalled(solv, rd->name);
+                      return r2 && r1 == 2 ? 2 : r2;
+                    }
+                  return solver_dep_fulfilled_alreadyinstalled(solv, rd2->evr);
+                }
+            }
+          r1 = solver_dep_fulfilled_alreadyinstalled(solv, rd->name);
+          r2 = !solver_dep_fulfilled_alreadyinstalled(solv, rd->evr);
+          if (!r1 && !r2)
+            return 0;
           return r1 == 2 ? 2 : 1;
-	}
+        }
       if (rd->flags == REL_UNLESS)
-	{
-	  int r1, r2;
-	  if (ISRELDEP(rd->evr))
-	    {
-	      Reldep *rd2 = GETRELDEP(pool, rd->evr);
-	      if (rd2->flags == REL_ELSE)
-		{
-		  r1 = solver_dep_fulfilled_alreadyinstalled(solv, rd2->name);
-		  if (r1)
-		    {
-		      r2 = solver_dep_fulfilled_alreadyinstalled(solv, rd2->evr);
-		      return r2 && r1 == 2 ? 2 : r2;
-		    }
-		  return solver_dep_fulfilled_alreadyinstalled(solv, rd->name);
-		}
-	    }
-	  /* A AND NOT(B) */
-	  r1 = solver_dep_fulfilled_alreadyinstalled(solv, rd->name);
-	  r2 = !solver_dep_fulfilled_alreadyinstalled(solv, rd->evr);
-	  if (!r1 || !r2)
-	    return 0;
+        {
+          int r1, r2;
+          if (ISRELDEP(rd->evr))
+            {
+              Reldep *rd2 = GETRELDEP(pool, rd->evr);
+              if (rd2->flags == REL_ELSE)
+                {
+                  r1 = solver_dep_fulfilled_alreadyinstalled(solv, rd2->name);
+                  if (r1)
+                    {
+                      r2 = solver_dep_fulfilled_alreadyinstalled(solv, rd2->evr);
+                      return r2 && r1 == 2 ? 2 : r2;
+                    }
+                  return solver_dep_fulfilled_alreadyinstalled(solv, rd->name);
+                }
+            }
+          /* A AND NOT(B) */
+          r1 = solver_dep_fulfilled_alreadyinstalled(solv, rd->name);
+          r2 = !solver_dep_fulfilled_alreadyinstalled(solv, rd->evr);
+          if (!r1 || !r2)
+            return 0;
           return r1 == 2 ? 2 : 1;
-	}
+        }
       if (rd->flags == REL_AND)
         {
-	  int r2, r1 = solver_dep_fulfilled_alreadyinstalled(solv, rd->name);
+          int r2, r1 = solver_dep_fulfilled_alreadyinstalled(solv, rd->name);
           if (!r1)
             return 0;
-	  r2 = solver_dep_fulfilled_alreadyinstalled(solv, rd->evr);
-	  if (!r2)
-	    return 0;
+          r2 = solver_dep_fulfilled_alreadyinstalled(solv, rd->evr);
+          if (!r2)
+            return 0;
           return r1 == 2 || r2 == 2 ? 2 : 1;
         }
       if (rd->flags == REL_OR)
-	{
-	  int r2, r1 = solver_dep_fulfilled_alreadyinstalled(solv, rd->name);
-	  r2 = solver_dep_fulfilled_alreadyinstalled(solv, rd->evr);
-	  if (!r1 && !r2)
-	    return 0;
+        {
+          int r2, r1 = solver_dep_fulfilled_alreadyinstalled(solv, rd->name);
+          r2 = solver_dep_fulfilled_alreadyinstalled(solv, rd->evr);
+          if (!r1 && !r2)
+            return 0;
           return r1 == 2 || r2 == 2 ? 2 : 1;
-	}
+        }
       if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_SPLITPROVIDES)
         return solver_splitprovides(solv, rd->evr, 0) ? 2 : 0;
       if (rd->flags == REL_NAMESPACE && solv->installsuppdepq)
-	{
-	  Queue *q = solv->installsuppdepq;
-	  int i;
-	  for (i = 0; i < q->count; i++)
-	    if (q->elements[i] == dep || q->elements[i] == rd->name)
-	      return 2;
-	}
+        {
+          Queue *q = solv->installsuppdepq;
+          int i;
+          for (i = 0; i < q->count; i++)
+            if (q->elements[i] == dep || q->elements[i] == rd->name)
+              return 2;
+        }
     }
   r = 0;
-  FOR_PROVIDES(p, pp, dep)
+  FOR_PROVIDES (p, pp, dep)
     if (solv->decisionmap[p] > 0)
       {
-	Solvable *s = pool->solvables + p;
-	if (s->repo && s->repo != solv->installed)
-	  return 2;
+        Solvable *s = pool->solvables + p;
+        if (s->repo && s->repo != solv->installed)
+          return 2;
         r = 1;
       }
   return r;
@@ -310,7 +308,7 @@ solver_add_obsoleted(Solver *solv, Id p, Queue *q)
 
   if (!solv->keepexplicitobsoletes || !(solv->multiversion.size && MAPTST(&solv->multiversion, p)))
     {
-      FOR_PROVIDES(p2, pp2, s->name)
+      FOR_PROVIDES (p2, pp2, s->name)
         {
           Solvable *ps = pool->solvables + p2;
           if (ps->repo != installed)
@@ -327,7 +325,7 @@ solver_add_obsoleted(Solver *solv, Id p, Queue *q)
     return;
   obsp = s->repo->idarraydata + s->obsoletes;
   while ((obs = *obsp++) != 0)
-    FOR_PROVIDES(p2, pp2, obs)
+    FOR_PROVIDES (p2, pp2, obs)
       {
         Solvable *ps = pool->solvables + p2;
         if (ps->repo != installed)
@@ -360,7 +358,7 @@ solver_intersect_obsoleted(Solver *solv, Id p, Queue *q, int qstart, Map *m)
 
   solver_add_obsoleted(solv, p, q);
   if (qcount == qstart)
-    return;     /* first call */
+    return; /* first call */
   if (qcount == q->count)
     j = qstart;
   else if (qcount == qstart + 1)
@@ -370,7 +368,7 @@ solver_intersect_obsoleted(Solver *solv, Id p, Queue *q, int qstart, Map *m)
       for (i = qcount; i < q->count; i++)
         if (q->elements[i] == q->elements[qstart])
           {
-            j++;        /* keep the element */
+            j++; /* keep the element */
             break;
           }
     }
@@ -406,4 +404,3 @@ solver_intersect_obsoleted(Solver *solv, Id p, Queue *q, int qstart, Map *m)
     }
   queue_truncate(q, j);
 }
-

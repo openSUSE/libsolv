@@ -25,8 +25,8 @@ extern "C" {
 extern int repo_write(Repo *repo, FILE *fp);
 extern int repo_write_filtered(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void *kfdata), void *kfdata, Queue *keyq);
 
-extern int repodata_write(Repodata *data , FILE *fp);
-extern int repodata_write_filtered(Repodata *data , FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void *kfdata), void *kfdata, Queue *keyq);
+extern int repodata_write(Repodata *data, FILE *fp);
+extern int repodata_write_filtered(Repodata *data, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void *kfdata), void *kfdata, Queue *keyq);
 
 extern int repo_write_stdkeyfilter(Repo *repo, Repokey *key, void *kfdata);
 

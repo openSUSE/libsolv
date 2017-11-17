@@ -21,12 +21,11 @@ static void
 usage(int status)
 {
   fprintf(stderr, "\nUsage:\n"
-          "repomdxml2solv [-q query]\n"
-	  "  reads a 'repomd.xml' file from <stdin> and writes a .solv file to <stdout>\n"
-	  "  -q : query a repomd data entry\n"
-	  "  -h : print help & exit\n"
-	 );
-   exit(status);
+                  "repomdxml2solv [-q query]\n"
+                  "  reads a 'repomd.xml' file from <stdin> and writes a .solv file to <stdout>\n"
+                  "  -q : query a repomd data entry\n"
+                  "  -h : print help & exit\n");
+  exit(status);
 }
 
 static void
@@ -42,7 +41,7 @@ doquery(Pool *pool, Repo *repo, const char *query)
     {
       type = pool_strn2id(pool, query, qp - query, 0);
       if (!type)
-	exit(0);
+        exit(0);
       qp++;
     }
   else
@@ -56,29 +55,29 @@ doquery(Pool *pool, Repo *repo, const char *query)
   while (dataiterator_step(&di))
     {
       if (type)
-	{
-	  dataiterator_setpos_parent(&di);
-	  if (pool_lookup_id(pool, SOLVID_POS, REPOSITORY_REPOMD_TYPE) != type)
-	    continue;
-	}
+        {
+          dataiterator_setpos_parent(&di);
+          if (pool_lookup_id(pool, SOLVID_POS, REPOSITORY_REPOMD_TYPE) != type)
+            continue;
+        }
       switch (di.key->type)
-	{
-	case REPOKEY_TYPE_ID:
-	case REPOKEY_TYPE_CONSTANTID:
-	  printf("%s\n", pool_id2str(pool, di.kv.id));
-	  break;
-	case REPOKEY_TYPE_STR:
-	  printf("%s\n", di.kv.str);
-	  break;
-	case REPOKEY_TYPE_NUM:
-	case REPOKEY_TYPE_CONSTANT:
-	  printf("%llu\n", SOLV_KV_NUM64(&di.kv));
-	  break;
-	default:
-	  if (solv_chksum_len(di.key->type))
-	    printf("%s:%s\n", solv_chksum_type2str(di.key->type), repodata_chk2str(di.data, di.key->type, (unsigned char *)di.kv.str));
-	  break;
-	}
+        {
+        case REPOKEY_TYPE_ID:
+        case REPOKEY_TYPE_CONSTANTID:
+          printf("%s\n", pool_id2str(pool, di.kv.id));
+          break;
+        case REPOKEY_TYPE_STR:
+          printf("%s\n", di.kv.str);
+          break;
+        case REPOKEY_TYPE_NUM:
+        case REPOKEY_TYPE_CONSTANT:
+          printf("%llu\n", SOLV_KV_NUM64(&di.kv));
+          break;
+        default:
+          if (solv_chksum_len(di.key->type))
+            printf("%s:%s\n", solv_chksum_type2str(di.key->type), repodata_chk2str(di.data, di.key->type, (unsigned char *)di.kv.str));
+          break;
+        }
     }
   dataiterator_free(&di);
 }
@@ -88,21 +87,21 @@ main(int argc, char **argv)
 {
   int c, flags = 0;
   const char *query = 0;
-  
+
   Pool *pool = pool_create();
   Repo *repo = repo_create(pool, "<stdin>");
 
-  while ((c = getopt (argc, argv, "hq:")) >= 0)
+  while ((c = getopt(argc, argv, "hq:")) >= 0)
     {
-      switch(c)
+      switch (c)
         {
         case 'h':
           usage(0);
           break;
         case 'q':
-	  query = optarg;
+          query = optarg;
           break;
-	default:
+        default:
           usage(1);
           break;
         }

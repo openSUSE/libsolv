@@ -1,0 +1,23 @@
+---
+Language: Cpp
+BasedOnStyle: LLVM
+BreakBeforeBraces: Custom # GNU
+BraceWrapping:
+  AfterControlStatement: true
+  AfterFunction: true
+  BeforeElse: true
+  IndentBraces: true
+AlwaysBreakAfterReturnType: AllDefinitions
+ColumnLimit: 0
+ForEachMacros:
+  - FOR_JOB_SELECT
+  - FOR_POOL_SOLVABLES
+  - FOR_PROVIDES
+  - FOR_REPODATAS
+  - FOR_REPOS
+  - FOR_REPO_SOLVABLES
+  - FOR_RULELITERALS
+AlignEscapedNewlines: Left
+NamespaceIndentation: All
+SortIncludes: false
+...

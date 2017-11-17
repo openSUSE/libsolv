@@ -107,37 +107,35 @@ enum state {
 };
 
 static struct solv_xmlparser_element stateswitches[] = {
-  /* suseinfo tags */
-  { STATE_START,       "repomd",          STATE_REPOMD, 0 },
-  { STATE_START,       "suseinfo",        STATE_SUSEINFO, 0 },
-  /* we support the tags element in suseinfo in case
+    /* suseinfo tags */
+    {STATE_START, "repomd", STATE_REPOMD, 0},
+    {STATE_START, "suseinfo", STATE_SUSEINFO, 0},
+    /* we support the tags element in suseinfo in case
      createrepo version does not support it yet */
-  { STATE_SUSEINFO,    "tags",            STATE_TAGS, 0 },
-  { STATE_SUSEINFO,    "expire",          STATE_EXPIRE, 1 },
-  { STATE_SUSEINFO,    "keywords",        STATE_KEYWORDS, 0 },
-  /* keywords is the suse extension equivalent of
+    {STATE_SUSEINFO, "tags", STATE_TAGS, 0},
+    {STATE_SUSEINFO, "expire", STATE_EXPIRE, 1},
+    {STATE_SUSEINFO, "keywords", STATE_KEYWORDS, 0},
+    /* keywords is the suse extension equivalent of
      tags/content when this one was not yet available.
      therefore we parse both */
-  { STATE_KEYWORDS,    "k",               STATE_KEYWORD, 1 },
-  /* standard tags */
-  { STATE_REPOMD,      "revision",        STATE_REVISION, 1 },
-  { STATE_REPOMD,      "tags",            STATE_TAGS,  0 },
-  { STATE_REPOMD,      "data",            STATE_DATA,  0 },
+    {STATE_KEYWORDS, "k", STATE_KEYWORD, 1},
+    /* standard tags */
+    {STATE_REPOMD, "revision", STATE_REVISION, 1},
+    {STATE_REPOMD, "tags", STATE_TAGS, 0},
+    {STATE_REPOMD, "data", STATE_DATA, 0},
 
-  { STATE_TAGS,        "repo",            STATE_REPO,    1 },
-  { STATE_TAGS,        "content",         STATE_CONTENT, 1 },
-  { STATE_TAGS,        "distro",          STATE_DISTRO,  1 },
-  /* this tag is only valid in suseinfo.xml for now */
-  { STATE_TAGS,        "updates",         STATE_UPDATES,  1 },
+    {STATE_TAGS, "repo", STATE_REPO, 1},
+    {STATE_TAGS, "content", STATE_CONTENT, 1},
+    {STATE_TAGS, "distro", STATE_DISTRO, 1},
+    /* this tag is only valid in suseinfo.xml for now */
+    {STATE_TAGS, "updates", STATE_UPDATES, 1},
 
-  { STATE_DATA,        "location",        STATE_LOCATION, 0 },
-  { STATE_DATA,        "checksum",        STATE_CHECKSUM, 1 },
-  { STATE_DATA,        "timestamp",       STATE_TIMESTAMP, 1 },
-  { STATE_DATA,        "open-checksum",   STATE_OPENCHECKSUM, 1 },
-  { STATE_DATA,        "size",            STATE_SIZE, 1 },
-  { NUMSTATES }
-};
-
+    {STATE_DATA, "location", STATE_LOCATION, 0},
+    {STATE_DATA, "checksum", STATE_CHECKSUM, 1},
+    {STATE_DATA, "timestamp", STATE_TIMESTAMP, 1},
+    {STATE_DATA, "open-checksum", STATE_OPENCHECKSUM, 1},
+    {STATE_DATA, "size", STATE_SIZE, 1},
+    {NUMSTATES}};
 
 struct parsedata {
   int ret;
@@ -160,13 +158,12 @@ struct parsedata {
   Id chksumtype;
 };
 
-
 static void
 startElement(struct solv_xmlparser *xmlp, int state, const char *name, const char **atts)
 {
   struct parsedata *pd = xmlp->userdata;
 
-  switch(state)
+  switch (state)
     {
     case STATE_REPOMD:
       {
@@ -179,15 +176,15 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
             char *value = solv_strdup(updstr);
             char *fvalue = value; /* save the first */
             while (value)
-	      {
-		char *p = strchr(value, ',');
-		if (*p)
-		  *p++ = 0;
-		if (*value)
-		  repodata_add_poolstr_array(pd->data, SOLVID_META, REPOSITORY_UPDATES, value);
-		value = p;
-	      }
-	    solv_free(fvalue);
+              {
+                char *p = strchr(value, ',');
+                if (*p)
+                  *p++ = 0;
+                if (*value)
+                  repodata_add_poolstr_array(pd->data, SOLVID_META, REPOSITORY_UPDATES, value);
+                value = p;
+              }
+            solv_free(fvalue);
           }
         break;
       }
@@ -217,25 +214,25 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
       }
     case STATE_DATA:
       {
-        const char *type= solv_xmlparser_find_attr("type", atts);
+        const char *type = solv_xmlparser_find_attr("type", atts);
         pd->rdhandle = repodata_new_handle(pd->data);
-	if (type)
+        if (type)
           repodata_set_poolstr(pd->data, pd->rdhandle, REPOSITORY_REPOMD_TYPE, type);
         break;
       }
     case STATE_LOCATION:
       {
         const char *href = solv_xmlparser_find_attr("href", atts);
-	if (href)
+        if (href)
           repodata_set_str(pd->data, pd->rdhandle, REPOSITORY_REPOMD_LOCATION, href);
         break;
       }
     case STATE_CHECKSUM:
     case STATE_OPENCHECKSUM:
       {
-        const char *type= solv_xmlparser_find_attr("type", atts);
+        const char *type = solv_xmlparser_find_attr("type", atts);
         pd->chksumtype = type && *type ? solv_chksum_str2type(type) : 0;
-	if (!pd->chksumtype)
+        if (!pd->chksumtype)
           pd->ret = pool_error(pd->pool, -1, "line %d: unknown checksum type: %s", solv_xmlparser_lineno(xmlp), type ? type : "NULL");
         break;
       }
@@ -264,7 +261,7 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
     case STATE_CHECKSUM:
     case STATE_OPENCHECKSUM:
       if (!pd->chksumtype)
-	break;
+        break;
       if (strlen(content) != 2 * solv_chksum_len(pd->chksumtype))
         pd->ret = pool_error(pd->pool, -1, "line %d: invalid checksum length for %s", solv_xmlparser_lineno(xmlp), solv_chksum_type2str(pd->chksumtype));
       else
@@ -279,7 +276,7 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
          * the metadata was generated
          */
         int timestamp = atoi(content);
-	if (timestamp)
+        if (timestamp)
           repodata_set_num(pd->data, pd->rdhandle, REPOSITORY_REPOMD_TIMESTAMP, timestamp);
         if (timestamp > pd->timestamp)
           pd->timestamp = timestamp;
@@ -288,19 +285,19 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
     case STATE_EXPIRE:
       {
         int expire = atoi(content);
-	if (expire > 0)
-	  repodata_set_num(pd->data, SOLVID_META, REPOSITORY_EXPIRE, expire);
+        if (expire > 0)
+          repodata_set_num(pd->data, SOLVID_META, REPOSITORY_EXPIRE, expire);
         break;
       }
       /* repomd.xml content and suseinfo.xml keywords are equivalent */
     case STATE_CONTENT:
     case STATE_KEYWORD:
       if (*content)
-	repodata_add_poolstr_array(pd->data, SOLVID_META, REPOSITORY_KEYWORDS, content);
+        repodata_add_poolstr_array(pd->data, SOLVID_META, REPOSITORY_KEYWORDS, content);
       break;
     case STATE_REVISION:
       if (*content)
-	repodata_set_str(pd->data, SOLVID_META, REPOSITORY_REVISION, content);
+        repodata_set_str(pd->data, SOLVID_META, REPOSITORY_REVISION, content);
       break;
     case STATE_DISTRO:
       /* distro tag is used in repomd.xml to say the product this repo is
@@ -318,11 +315,11 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
       break;
     case STATE_REPO:
       if (*content)
-	repodata_add_poolstr_array(pd->data, SOLVID_META, REPOSITORY_REPOID, content);
+        repodata_add_poolstr_array(pd->data, SOLVID_META, REPOSITORY_REPOID, content);
       break;
     case STATE_SIZE:
       if (*content)
-	repodata_set_num(pd->data, pd->rdhandle, REPOSITORY_REPOMD_SIZE, strtoull(content, 0, 10));
+        repodata_set_num(pd->data, pd->rdhandle, REPOSITORY_REPOMD_SIZE, strtoull(content, 0, 10));
       break;
     default:
       break;

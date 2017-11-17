@@ -22,26 +22,24 @@
 */
 
 static Id verticals[] = {
-  SOLVABLE_AUTHORS,
-  SOLVABLE_DESCRIPTION,
-  SOLVABLE_MESSAGEDEL,
-  SOLVABLE_MESSAGEINS,
-  SOLVABLE_EULA,
-  SOLVABLE_DISKUSAGE,
-  SOLVABLE_FILELIST,
-  SOLVABLE_CHANGELOG_AUTHOR,
-  SOLVABLE_CHANGELOG_TEXT,
-  0
-};
+    SOLVABLE_AUTHORS,
+    SOLVABLE_DESCRIPTION,
+    SOLVABLE_MESSAGEDEL,
+    SOLVABLE_MESSAGEINS,
+    SOLVABLE_EULA,
+    SOLVABLE_DISKUSAGE,
+    SOLVABLE_FILELIST,
+    SOLVABLE_CHANGELOG_AUTHOR,
+    SOLVABLE_CHANGELOG_TEXT,
+    0};
 
 static char *languagetags[] = {
-  "solvable:summary:",
-  "solvable:description:",
-  "solvable:messageins:",
-  "solvable:messagedel:",
-  "solvable:eula:",
-  0
-};
+    "solvable:summary:",
+    "solvable:description:",
+    "solvable:messageins:",
+    "solvable:messagedel:",
+    "solvable:eula:",
+    0};
 
 static int test_separate = 0;
 
@@ -111,7 +109,7 @@ keyfilter_language(Repo *repo, Repokey *key, void *kfdata)
     {
       const char *vname = pool_id2str(pool, verticals[i]);
       if (!strncmp(name, vname, p - name) && vname[p - name] == 0)
-	return KEY_STORAGE_VERTICAL_OFFSET;
+        return KEY_STORAGE_VERTICAL_OFFSET;
     }
   return KEY_STORAGE_INCORE;
 }
@@ -160,8 +158,8 @@ keyfilter_other(Repo *repo, Repokey *key, void *kfdata)
   if (p)
     {
       for (i = 0; i < kd->nlanguages; i++)
-	if (!strcmp(p + 1, kd->languages[i]))
-	  return KEY_STORAGE_DROPPED;
+        if (!strcmp(p + 1, kd->languages[i]))
+          return KEY_STORAGE_DROPPED;
     }
   for (i = 0; verticals[i]; i++)
     if (key->name == verticals[i])
@@ -169,7 +167,7 @@ keyfilter_other(Repo *repo, Repokey *key, void *kfdata)
   return KEY_STORAGE_INCORE;
 }
 
-/*
+  /*
  * Write <repo> to stdout
  * If <attrname> is given, write attributes to <attrname>
  * If <basename> is given, split attributes
@@ -221,7 +219,7 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
     }
   queue_free(&addedfileprovides);
 
-  pool_freeidhashes(repo->pool);	/* free some mem */
+  pool_freeidhashes(repo->pool); /* free some mem */
 
   if (basename)
     {
@@ -231,93 +229,93 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
       int has_FL = 0;
 
       /* find languages and other info */
-      FOR_REPODATAS(repo, i, data)
-	{
-	  for (j = 1, key = data->keys + j; j < data->nkeys; j++, key++)
-	    {
-	      const char *keyname = pool_id2str(repo->pool, key->name);
-	      if (key->name == SOLVABLE_DISKUSAGE)
-		has_DU = 1;
-	      if (key->name == SOLVABLE_FILELIST)
-		has_FL = 1;
-	      for (k = 0; languagetags[k] != 0; k++)
-		if (!strncmp(keyname, languagetags[k], strlen(languagetags[k])))
-		  break;
-	      if (!languagetags[k])
-		continue;
-	      l = strlen(languagetags[k]);
-	      if (strlen(keyname + l) > 5)
-		continue;
-	      for (k = 0; k < nlanguages; k++)
-		if (!strcmp(languages[k], keyname + l))
-		  break;
-	      if (k < nlanguages)
-		continue;
-	      languages = solv_realloc2(languages, nlanguages + 1, sizeof(char *));
-	      languages[nlanguages++] = strdup(keyname + l);
-	    }
-	}
+      FOR_REPODATAS (repo, i, data)
+        {
+          for (j = 1, key = data->keys + j; j < data->nkeys; j++, key++)
+            {
+              const char *keyname = pool_id2str(repo->pool, key->name);
+              if (key->name == SOLVABLE_DISKUSAGE)
+                has_DU = 1;
+              if (key->name == SOLVABLE_FILELIST)
+                has_FL = 1;
+              for (k = 0; languagetags[k] != 0; k++)
+                if (!strncmp(keyname, languagetags[k], strlen(languagetags[k])))
+                  break;
+              if (!languagetags[k])
+                continue;
+              l = strlen(languagetags[k]);
+              if (strlen(keyname + l) > 5)
+                continue;
+              for (k = 0; k < nlanguages; k++)
+                if (!strcmp(languages[k], keyname + l))
+                  break;
+              if (k < nlanguages)
+                continue;
+              languages = solv_realloc2(languages, nlanguages + 1, sizeof(char *));
+              languages[nlanguages++] = strdup(keyname + l);
+            }
+        }
       /* write language subfiles */
       for (i = 0; i < nlanguages; i++)
         {
-	  sprintf(fn, "%s.%s.solv", basename, languages[i]);
-	  if (!(fp = fopen(fn, "w")))
-	    {
-	      perror(fn);
-	      exit(1);
-	    }
-	  write_info(repo, fp, keyfilter_language, languages[i], info, fn);
-	  fclose(fp);
-	  kd.haveexternal = 1;
+          sprintf(fn, "%s.%s.solv", basename, languages[i]);
+          if (!(fp = fopen(fn, "w")))
+            {
+              perror(fn);
+              exit(1);
+            }
+          write_info(repo, fp, keyfilter_language, languages[i], info, fn);
+          fclose(fp);
+          kd.haveexternal = 1;
         }
       /* write DU subfile */
       if (has_DU)
-	{
-	  sprintf(fn, "%s.DU.solv", basename);
-	  if (!(fp = fopen(fn, "w")))
-	    {
-	      perror(fn);
-	      exit(1);
-	    }
-	  write_info(repo, fp, keyfilter_DU, 0, info, fn);
-	  fclose(fp);
-	  kd.haveexternal = 1;
-	}
+        {
+          sprintf(fn, "%s.DU.solv", basename);
+          if (!(fp = fopen(fn, "w")))
+            {
+              perror(fn);
+              exit(1);
+            }
+          write_info(repo, fp, keyfilter_DU, 0, info, fn);
+          fclose(fp);
+          kd.haveexternal = 1;
+        }
       /* write filelist */
       if (has_FL)
-	{
-	  sprintf(fn, "%s.FL.solv", basename);
-	  if (!(fp = fopen(fn, "w")))
-	    {
-	      perror(fn);
-	      exit(1);
-	    }
-	  write_info(repo, fp, keyfilter_FL, 0, info, fn);
-	  fclose(fp);
-	  kd.haveexternal = 1;
-	}
+        {
+          sprintf(fn, "%s.FL.solv", basename);
+          if (!(fp = fopen(fn, "w")))
+            {
+              perror(fn);
+              exit(1);
+            }
+          write_info(repo, fp, keyfilter_FL, 0, info, fn);
+          fclose(fp);
+          kd.haveexternal = 1;
+        }
       /* write everything else */
       sprintf(fn, "%s.solv", basename);
       if (!(fp = fopen(fn, "w")))
-	{
-	  perror(fn);
-	  exit(1);
-	}
+        {
+          perror(fn);
+          exit(1);
+        }
       kd.languages = languages;
       kd.nlanguages = nlanguages;
       repodata_internalize(info);
       if (repo_write_filtered(repo, fp, keyfilter_other, &kd, 0) != 0)
-	{
-	  fprintf(stderr, "repo_write failed\n");
-	  exit(1);
-	}
+        {
+          fprintf(stderr, "repo_write failed\n");
+          exit(1);
+        }
       if (fclose(fp) != 0)
-	{
-	  perror("fclose");
-	  exit(1);
-	}
+        {
+          perror("fclose");
+          exit(1);
+        }
       for (i = 0; i < nlanguages; i++)
-	free(languages[i]);
+        free(languages[i]);
       solv_free(languages);
       repodata_free(info);
     }

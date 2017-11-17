@@ -20,7 +20,6 @@
 #include "poolid_private.h"
 #include "util.h"
 
-
 /* intern string into pool, return id */
 
 Id
@@ -72,13 +71,13 @@ pool_rel2id(Pool *pool, Id name, Id evr, int flags, int create)
       pool->relhashtbl = hashtbl = solv_calloc(hashmask + 1, sizeof(Id));
       /* rehash all rels into new hashtable */
       for (i = 1; i < pool->nrels; i++)
-	{
-	  h = relhash(ran[i].name, ran[i].evr, ran[i].flags) & hashmask;
-	  hh = HASHCHAIN_START;
-	  while (hashtbl[h])
-	    h = HASHCHAIN_NEXT(h, hh, hashmask);
-	  hashtbl[h] = i;
-	}
+        {
+          h = relhash(ran[i].name, ran[i].evr, ran[i].flags) & hashmask;
+          hh = HASHCHAIN_START;
+          while (hashtbl[h])
+            h = HASHCHAIN_NEXT(h, hh, hashmask);
+          hashtbl[h] = i;
+        }
     }
 
   /* compute hash and check for match */
@@ -87,7 +86,7 @@ pool_rel2id(Pool *pool, Id name, Id evr, int flags, int create)
   while ((id = hashtbl[h]) != 0)
     {
       if (ran[id].name == name && ran[id].evr == evr && ran[id].flags == flags)
-	break;
+        break;
       h = HASHCHAIN_NEXT(h, hh, hashmask);
     }
   if (id)
@@ -114,7 +113,6 @@ pool_rel2id(Pool *pool, Id name, Id evr, int flags, int create)
   return MAKERELDEP(id);
 }
 
-
 /* Id -> String
  * for rels (returns name only) and strings
  */
@@ -130,16 +128,14 @@ pool_id2str(const Pool *pool, Id id)
 }
 
 static const char *rels[] = {
-  " ! ",
-  " > ",
-  " = ",
-  " >= ",
-  " < ",
-  " <> ",
-  " <= ",
-  " <=> "
-};
-
+    " ! ",
+    " > ",
+    " = ",
+    " >= ",
+    " < ",
+    " <> ",
+    " <= ",
+    " <=> "};
 
 /* get operator for RelId */
 const char *
@@ -153,10 +149,14 @@ pool_id2rel(const Pool *pool, Id id)
     {
     /* debian special cases < and > */
     /* haiku special cases <> (maybe we should use != for the others as well */
-    case 0: case REL_EQ: case REL_GT | REL_EQ:
-    case REL_LT | REL_EQ: case REL_LT | REL_EQ | REL_GT:
+    case 0:
+    case REL_EQ:
+    case REL_GT | REL_EQ:
+    case REL_LT | REL_EQ:
+    case REL_LT | REL_EQ | REL_GT:
 #if !defined(DEBIAN) && !defined(MULTI_SEMANTICS)
-    case REL_LT: case REL_GT:
+    case REL_LT:
+    case REL_GT:
 #endif
 #if !defined(HAIKU) && !defined(MULTI_SEMANTICS)
     case REL_LT | REL_GT:
@@ -181,7 +181,7 @@ pool_id2rel(const Pool *pool, Id id)
     case REL_WITHOUT:
       return pool->disttype == DISTTYPE_RPM ? " without " : " - ";
     case REL_NAMESPACE:
-      return " NAMESPACE ";	/* actually not used in dep2str */
+      return " NAMESPACE "; /* actually not used in dep2str */
     case REL_ARCH:
       return ".";
     case REL_MULTIARCH:
@@ -205,7 +205,6 @@ pool_id2rel(const Pool *pool, Id id)
     }
   return " ??? ";
 }
-
 
 /* get e:v.r for Id */
 const char *
@@ -243,41 +242,41 @@ dep2strcpy(const Pool *pool, char *p, Id id, int oldrel)
       Reldep *rd = GETRELDEP(pool, id);
       int rel = rd->flags;
       if (oldrel == REL_AND || oldrel == REL_OR || oldrel == REL_WITH || oldrel == REL_WITHOUT || oldrel == REL_COND || oldrel == REL_UNLESS || oldrel == REL_ELSE || oldrel == -1)
-	if (rel == REL_AND || rel == REL_OR || rel == REL_WITH || rel == REL_WITHOUT || rel == REL_COND || rel == REL_UNLESS || rel == REL_ELSE)
-	  if ((oldrel != rel || rel == REL_COND || rel == REL_UNLESS || rel == REL_ELSE) && !((oldrel == REL_COND || oldrel == REL_UNLESS) && rel == REL_ELSE))
-	    {
-	      *p++ = '(';
-	      dep2strcpy(pool, p, rd->name, rd->flags);
-	      p += strlen(p);
-	      strcpy(p, pool_id2rel(pool, id));
-	      p += strlen(p);
-	      dep2strcpy(pool, p, rd->evr, rd->flags);
-	      strcat(p, ")");
-	      return;
-	    }
+        if (rel == REL_AND || rel == REL_OR || rel == REL_WITH || rel == REL_WITHOUT || rel == REL_COND || rel == REL_UNLESS || rel == REL_ELSE)
+          if ((oldrel != rel || rel == REL_COND || rel == REL_UNLESS || rel == REL_ELSE) && !((oldrel == REL_COND || oldrel == REL_UNLESS) && rel == REL_ELSE))
+            {
+              *p++ = '(';
+              dep2strcpy(pool, p, rd->name, rd->flags);
+              p += strlen(p);
+              strcpy(p, pool_id2rel(pool, id));
+              p += strlen(p);
+              dep2strcpy(pool, p, rd->evr, rd->flags);
+              strcat(p, ")");
+              return;
+            }
       if (rd->flags == REL_KIND)
-	{
-	  dep2strcpy(pool, p, rd->evr, rd->flags);
-	  p += strlen(p);
-	  *p++ = ':';
-	  id = rd->name;
-	  oldrel = rd->flags;
-	  continue;
-	}
+        {
+          dep2strcpy(pool, p, rd->evr, rd->flags);
+          p += strlen(p);
+          *p++ = ':';
+          id = rd->name;
+          oldrel = rd->flags;
+          continue;
+        }
       dep2strcpy(pool, p, rd->name, rd->flags);
       p += strlen(p);
       if (rd->flags == REL_NAMESPACE)
-	{
-	  *p++ = '(';
-	  dep2strcpy(pool, p, rd->evr, rd->flags);
-	  strcat(p, ")");
-	  return;
-	}
+        {
+          *p++ = '(';
+          dep2strcpy(pool, p, rd->evr, rd->flags);
+          strcat(p, ")");
+          return;
+        }
       if (rd->flags == REL_FILECONFLICT)
-	{
-	  *p = 0;
-	  return;
-	}
+        {
+          *p = 0;
+          return;
+        }
       strcpy(p, pool_id2rel(pool, id));
       p += strlen(p);
       id = rd->evr;
