@@ -265,6 +265,8 @@ selection_filter_repo(Pool *pool, Queue *selection, Repo *repo)
   Queue q;
   int i, j;
 
+  if (!selection->count)
+    return;
   if (!repo)
     {
       queue_empty(selection);
@@ -346,7 +348,6 @@ matchprovides(Pool *pool, Solvable *s, Id dep)
 /* change a SOLVER_SOLVABLE_NAME/PROVIDES selection to something that also includes
  * extra packages.
  * extra packages are: src, badarch, disabled
- * used by selection_depglob and selection_depglob_id
  */
 static void
 selection_addextra(Pool *pool, Queue *selection, int flags)
@@ -386,18 +387,23 @@ selection_addextra(Pool *pool, Queue *selection, int flags)
       FOR_POOL_SOLVABLES(p)
 	{
 	  Solvable *s = pool->solvables + p;
-	  if (!doprovides && s->name != dep)
+	  if (!doprovides && !pool_match_nevr(pool, s, dep))
 	    continue;
 	  if ((flags & SELECTION_INSTALLED_ONLY) != 0 && s->repo != pool->installed)
 	    continue;
 	  isextra = 0;
 	  if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
 	    {
-	      if (!(flags & SELECTION_WITH_SOURCE))
+	      if (!(flags & SELECTION_WITH_SOURCE) && !(flags & SELECTION_SOURCE_ONLY))
 		continue;
-	      if (!(flags & SELECTION_WITH_DISABLED) && pool_disabled_solvable(pool, s))
-		continue;
-	      isextra = 1;
+	      if (!(flags & SELECTION_SOURCE_ONLY))
+		isextra = 1;
+	      if (pool_disabled_solvable(pool, s))
+		{
+		  if (!(flags & SELECTION_WITH_DISABLED))
+		    continue;
+		  isextra = 1;
+		}
 	    }
 	  else
 	    {
@@ -468,82 +474,22 @@ queue_pushunique2(Queue *q, Id id1, Id id2)
   queue_push2(q, id1, id2);
 }
 
-/* this is the fast path of selection_depglob: the id for the name
- * is known and thus we can quickly check the existance of a
- * package with that name or provides */
-static int
-selection_depglob_id(Pool *pool, Queue *selection, Id id, int flags)
-{
-  Id p, pp, matchid;
-  int match = 0;
 
-  matchid = id;
-  if ((flags & SELECTION_SOURCE_ONLY) != 0)
-    {
-      /* sources do not have provides */
-      if ((flags & SELECTION_NAME) == 0)
-	return 0;
-      if ((flags & SELECTION_INSTALLED_ONLY) != 0)
-	return 0;
-      /* add ARCH_SRC to match only sources */
-      matchid = pool_rel2id(pool, id, ARCH_SRC, REL_ARCH, 1);
-    }
-
-  FOR_PROVIDES(p, pp, matchid)
-    {
-      Solvable *s = pool->solvables + p;
-      if ((flags & SELECTION_INSTALLED_ONLY) != 0 && s->repo != pool->installed)
-	continue;
-      match = 1;
-      if (s->name == id && (flags & SELECTION_NAME) != 0)
-	{
-	  queue_push2(selection, SOLVER_SOLVABLE_NAME, matchid);
-	  if ((flags & SELECTION_WITH_SOURCE) != 0)
-	    selection_addextra(pool, selection, flags);
-	  return SELECTION_NAME;
-	}
-    }
-
-  if ((flags & SELECTION_NAME) != 0 && (flags & SELECTION_WITH_SOURCE) != 0 && (flags & SELECTION_INSTALLED_ONLY) == 0)
-    {
-      /* WITH_SOURCE case, but we had no match. try SOURCE_ONLY instead */
-      matchid = pool_rel2id(pool, id, ARCH_SRC, REL_ARCH, 1);
-      FOR_PROVIDES(p, pp, matchid)
-	{
-	  Solvable *s = pool->solvables + p;
-	  if (s->name == id)
-	    {
-	      queue_push2(selection, SOLVER_SOLVABLE_NAME, matchid);
-	      return SELECTION_NAME;
-	    }
-	}
-    }
-
-  if (match && (flags & SELECTION_PROVIDES) != 0)
-    {
-      queue_push2(selection, SOLVER_SOLVABLE_PROVIDES, id);
-      return SELECTION_PROVIDES;
-    }
-  return 0;
-}
+/*****  provides matching  *****/
 
 static int
-selection_depglob_extra(Pool *pool, Queue *selection, const char *name, int flags)
+selection_addextra_provides(Pool *pool, Queue *selection, const char *name, int flags)
 {
   Id p, id, *idp;
   int match = 0;
-  int doglob = 0;
-  int nocase = 0;
-  int globflags = 0;
+  int doglob, nocase, globflags;
 
   if ((flags & SELECTION_INSTALLED_ONLY) != 0)
     return 0;	/* neither disabled nor badarch nor src */
 
   nocase = flags & SELECTION_NOCASE;
-  if ((flags & SELECTION_GLOB) != 0 && strpbrk(name, "[*?") != 0)
-    doglob = 1;
-  if (doglob && nocase)
-    globflags = FNM_CASEFOLD;
+  doglob = (flags & SELECTION_GLOB) != 0 && strpbrk(name, "[*?") != 0;
+  globflags = doglob && nocase ? FNM_CASEFOLD : 0;
 
   FOR_POOL_SOLVABLES(p)
     {
@@ -579,153 +525,283 @@ selection_depglob_extra(Pool *pool, Queue *selection, const char *name, int flag
 	      id = rd->name;
 	    }
 	  if (pool->whatprovides[id] > 1)
-	    continue;
+	    continue;	/* we already did that one in the normal code path */
 	  n = pool_id2str(pool, id);
 	  if ((doglob ? fnmatch(name, n, globflags) : nocase ? strcasecmp(name, n) : strcmp(name, n)) == 0)
 	    {
 	      queue_pushunique2(selection, SOLVER_SOLVABLE_PROVIDES, id);
 	      match = 1;
+	      if (!doglob && !nocase)
+		break;	/* one is enough */
 	    }
 	}
     }
   return match;
 }
 
-/* match the name or a provides of a package */
-/* note that for SELECTION_INSTALLED_ONLY we do not filter the results
- * so that the selection can be modified later. */
+/* this is the fast path of selection_provides: the id for the name
+ * is known and thus we can quickly check the existance of a
+ * package with that provides */
 static int
-selection_depglob(Pool *pool, Queue *selection, const char *name, int flags)
+selection_provides_id(Pool *pool, Queue *selection, Id id, int flags)
 {
-  Id id, p, pp;
-  int match = 0;
-  int doglob = 0;
-  int nocase = 0;
-  int globflags = 0;
+  Id p, pp;
 
-  if ((flags & SELECTION_SOURCE_ONLY) != 0)
+  FOR_PROVIDES(p, pp, id)
     {
-      flags &= ~SELECTION_PROVIDES;	/* sources don't provide anything */
-      flags &= ~SELECTION_WITH_SOURCE;
+      Solvable *s = pool->solvables + p;
+      if ((flags & SELECTION_INSTALLED_ONLY) != 0 && s->repo != pool->installed)
+	continue;
+      break;
+    }
+  if (p)
+    {
+      queue_push2(selection, SOLVER_SOLVABLE_PROVIDES, id);
+      return SELECTION_PROVIDES;
     }
 
-  if (!(flags & (SELECTION_NAME|SELECTION_PROVIDES)))
-    return 0;
+  if ((flags & (SELECTION_WITH_BADARCH | SELECTION_WITH_DISABLED)) != 0)
+    {
+      queue_push2(selection, SOLVER_SOLVABLE_PROVIDES, id);
+      selection_addextra(pool, selection, flags);
+      if (selection->elements[0] == SOLVER_SOLVABLE_PROVIDES)
+	queue_empty(selection);
+      else
+	{
+          selection->elements[0] = SOLVER_SOLVABLE_PROVIDES;
+          selection->elements[1] = id;
+	}
+      return selection->count ? SELECTION_PROVIDES : 0;
+    }
 
-  if ((flags & SELECTION_INSTALLED_ONLY) != 0 && !pool->installed)
-    return 0;
+  return 0;
+}
+
+/* add missing provides matchers to the selection */
+/* match the provides of a package */
+/* note that we only return raw SOLVER_SOLVABLE_PROVIDES jobs
+ * so that the selection can be modified later. */
+static int
+selection_provides(Pool *pool, Queue *selection, const char *name, int flags)
+{
+  Id id, p, pp;
+  int match;
+  int doglob;
+  int nocase;
+  int globflags;
+  const char *n;
+
+  if ((flags & SELECTION_SOURCE_ONLY) != 0)
+    return 0;	/* sources do not have provides */
 
   nocase = flags & SELECTION_NOCASE;
-  if (!nocase && !(flags & (SELECTION_SKIP_KIND | SELECTION_WITH_BADARCH | SELECTION_WITH_DISABLED)))
+  if (!nocase)
     {
+      /* try the fast path first */
       id = pool_str2id(pool, name, 0);
       if (id)
 	{
-	  /* the id is know, do the fast id matching using the whatprovides lookup */
-	  int ret = selection_depglob_id(pool, selection, id, flags);
+	  /* the id is known, do the fast id matching */
+	  int ret = selection_provides_id(pool, selection, id, flags);
 	  if (ret)
 	    return ret;
 	}
     }
 
-  if ((flags & SELECTION_GLOB) != 0 && strpbrk(name, "[*?") != 0)
-    doglob = 1;
-
-  if (!nocase && !(flags & (SELECTION_SKIP_KIND | SELECTION_WITH_BADARCH | SELECTION_WITH_DISABLED)) && !doglob)
-    return 0;	/* all done above in depglob_id */
-
-  if (doglob && nocase)
-    globflags = FNM_CASEFOLD;
-
-  if ((flags & SELECTION_NAME) != 0)
+  doglob = (flags & SELECTION_GLOB) != 0 && strpbrk(name, "[*?") != 0;
+  if (!nocase && !doglob)
     {
-      const char *n;
-      /* looks like a name glob. hard work. */
-      FOR_POOL_SOLVABLES(p)
+      /* all done above in selection_provides_id */
+      return 0;
+    }
+
+  /* looks like a glob or nocase match. really hard work. */
+  match = 0;
+  globflags = doglob && nocase ? FNM_CASEFOLD : 0;
+  for (id = 1; id < pool->ss.nstrings; id++)
+    {
+      /* do we habe packages providing this id? */
+      if (!pool->whatprovides[id] || pool->whatprovides[id] == 1)
+	continue;
+      n = pool_id2str(pool, id);
+      if ((doglob ? fnmatch(name, n, globflags) : nocase ? strcasecmp(name, n) : strcmp(name, n)) == 0)
 	{
-	  Solvable *s = pool->solvables + p;
-	  if ((flags & SELECTION_INSTALLED_ONLY) != 0 && s->repo != pool->installed)
-	    continue;
-	  if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
+	  if ((flags & SELECTION_INSTALLED_ONLY) != 0)
 	    {
-	      if (!(flags & SELECTION_SOURCE_ONLY) && !(flags & SELECTION_WITH_SOURCE))
-		continue;
-	      if (!(flags & SELECTION_WITH_DISABLED) && pool_disabled_solvable(pool, s))
+	      FOR_PROVIDES(p, pp, id)
+		if (pool->solvables[p].repo == pool->installed)
+		  break;
+	      if (!p)
 		continue;
 	    }
-	  else if (s->repo != pool->installed)
-	    {
-	      if (!(flags & SELECTION_WITH_DISABLED) && pool_disabled_solvable(pool, s))
-		continue;
-	      if (!(flags & SELECTION_WITH_BADARCH) && pool_badarch_solvable(pool, s))
-		continue;
-	    }
-	  id = s->name;
-	  n = pool_id2str(pool, id);
-	  if (flags & SELECTION_SKIP_KIND)
-	    n = skipkind(n);
-	  if ((doglob ? fnmatch(name, n, globflags) : nocase ? strcasecmp(name, n) : strcmp(name, n)) == 0)
-	    {
-	      if ((flags & SELECTION_SOURCE_ONLY) != 0)
-		{
-		  if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
-		    continue;
-		  id = pool_rel2id(pool, id, ARCH_SRC, REL_ARCH, 1);
-		}
-	      queue_pushunique2(selection, SOLVER_SOLVABLE_NAME, id);
-	      match = 1;
-	    }
-	}
-      if (match)
-	{
-	  if ((flags & (SELECTION_WITH_SOURCE | SELECTION_WITH_BADARCH | SELECTION_WITH_DISABLED)) != 0)
-	    selection_addextra(pool, selection, flags);
-          return SELECTION_NAME;
+	  queue_push2(selection, SOLVER_SOLVABLE_PROVIDES, id);
+	  match = 1;
 	}
     }
 
-  if ((flags & SELECTION_PROVIDES))
+  if (flags & (SELECTION_WITH_BADARCH | SELECTION_WITH_DISABLED))
+    match |= selection_addextra_provides(pool, selection, name, flags);
+
+  return match ? SELECTION_PROVIDES : 0;
+}
+
+/*****  name matching  *****/
+
+/* this is the fast path of selection_name: the id for the name
+ * is known and thus we can quickly check the existance of a
+ * package with that name */
+static int
+selection_name_id(Pool *pool, Queue *selection, Id id, int flags)
+{
+  Id p, pp, matchid;
+
+  matchid = id;
+  if ((flags & SELECTION_SOURCE_ONLY) != 0)
     {
-      /* looks like a dep glob. really hard work. */
-      for (id = 1; id < pool->ss.nstrings; id++)
+      /* sources cannot be installed */
+      if ((flags & SELECTION_INSTALLED_ONLY) != 0)
+	return 0;
+      /* add ARCH_SRC to match only sources */
+      matchid = pool_rel2id(pool, id, ARCH_SRC, REL_ARCH, 1);
+      flags &= ~SELECTION_WITH_SOURCE;
+    }
+
+  FOR_PROVIDES(p, pp, matchid)
+    {
+      Solvable *s = pool->solvables + p;
+      if (s->name != id)
+	continue;
+      if ((flags & SELECTION_INSTALLED_ONLY) != 0 && s->repo != pool->installed)
+	continue;
+      /* one match is all we need */
+      queue_push2(selection, SOLVER_SOLVABLE_NAME, matchid);
+      /* add the requested extra packages */
+      if ((flags & (SELECTION_WITH_SOURCE | SELECTION_WITH_BADARCH | SELECTION_WITH_DISABLED)) != 0)
+	selection_addextra(pool, selection, flags);
+      return SELECTION_NAME;
+    }
+
+  if ((flags & (SELECTION_WITH_BADARCH | SELECTION_WITH_DISABLED)) != 0)
+    {
+      queue_push2(selection, SOLVER_SOLVABLE_NAME, matchid);
+      selection_addextra(pool, selection, flags);
+      if (selection->elements[0] == SOLVER_SOLVABLE_NAME)
+	queue_empty(selection);
+      return selection->count ? SELECTION_NAME : 0;
+    }
+
+  if ((flags & SELECTION_WITH_SOURCE) != 0 && (flags & SELECTION_INSTALLED_ONLY) == 0)
+    {
+      /* WITH_SOURCE case, but we had no match. try SOURCE_ONLY instead */
+      matchid = pool_rel2id(pool, id, ARCH_SRC, REL_ARCH, 1);
+      FOR_PROVIDES(p, pp, matchid)
 	{
-	  const char *n;
-	  /* do we habe packages providing this id? */
-	  if (!pool->whatprovides[id] || pool->whatprovides[id] == 1)
+	  Solvable *s = pool->solvables + p;
+	  if (s->name != id)
 	    continue;
-	  n = pool_id2str(pool, id);
-	  if ((doglob ? fnmatch(name, n, globflags) : nocase ? strcasecmp(name, n) : strcmp(name, n)) == 0)
-	    {
-	      if ((flags & SELECTION_INSTALLED_ONLY) != 0)
-		{
-		  FOR_PROVIDES(p, pp, id)
-		    if (pool->solvables[p].repo == pool->installed)
-		      break;
-		  if (!p)
-		    continue;
-		}
-	      queue_push2(selection, SOLVER_SOLVABLE_PROVIDES, id);
-	      match = 1;
-	    }
+	  queue_push2(selection, SOLVER_SOLVABLE_NAME, matchid);
+	  return SELECTION_NAME;
 	}
-      if (flags & (SELECTION_WITH_BADARCH | SELECTION_WITH_DISABLED))
-	match |= selection_depglob_extra(pool, selection, name, flags);
-      if (match)
-        return SELECTION_PROVIDES;
     }
   return 0;
 }
 
-/* like selection_depglob, but check for a .arch suffix if the depglob did
+/* match the name of a package */
+/* note that for SELECTION_INSTALLED_ONLY the result is not trimmed */
+static int
+selection_name(Pool *pool, Queue *selection, const char *name, int flags)
+{
+  Id id, p;
+  int match;
+  int doglob, nocase;
+  int globflags;
+  const char *n;
+
+  if ((flags & SELECTION_SOURCE_ONLY) != 0)
+    flags &= ~SELECTION_WITH_SOURCE;
+
+  nocase = flags & SELECTION_NOCASE;
+  if (!nocase && !(flags & SELECTION_SKIP_KIND))
+    {
+      /* try the fast path first */
+      id = pool_str2id(pool, name, 0);
+      if (id)
+	{
+	  int ret = selection_name_id(pool, selection, id, flags);
+	  if (ret)
+	    return ret;
+	}
+    }
+
+  doglob = (flags & SELECTION_GLOB) != 0 && strpbrk(name, "[*?") != 0;
+  if (!nocase && !(flags & SELECTION_SKIP_KIND) && !doglob)
+    return 0;	/* all done above in selection_name_id */
+
+  /* do a name match over all packages. hard work. */
+  match = 0;
+  globflags = doglob && nocase ? FNM_CASEFOLD : 0;
+  FOR_POOL_SOLVABLES(p)
+    {
+      Solvable *s = pool->solvables + p;
+      if ((flags & SELECTION_INSTALLED_ONLY) != 0 && s->repo != pool->installed)
+	continue;
+      if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
+	{
+	  if (!(flags & SELECTION_SOURCE_ONLY) && !(flags & SELECTION_WITH_SOURCE))
+	    continue;
+	  if (!(flags & SELECTION_WITH_DISABLED) && pool_disabled_solvable(pool, s))
+	    continue;
+	}
+      else if (s->repo != pool->installed)
+	{
+	  if (!(flags & SELECTION_WITH_DISABLED) && pool_disabled_solvable(pool, s))
+	    continue;
+	  if (!(flags & SELECTION_WITH_BADARCH) && pool_badarch_solvable(pool, s))
+	    continue;
+	}
+      id = s->name;
+      n = pool_id2str(pool, id);
+      if (flags & SELECTION_SKIP_KIND)
+	n = skipkind(n);
+      if ((doglob ? fnmatch(name, n, globflags) : nocase ? strcasecmp(name, n) : strcmp(name, n)) == 0)
+	{
+	  if ((flags & SELECTION_SOURCE_ONLY) != 0)
+	    {
+	      if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
+		continue;
+	      id = pool_rel2id(pool, id, ARCH_SRC, REL_ARCH, 1);
+	    }
+	  queue_pushunique2(selection, SOLVER_SOLVABLE_NAME, id);
+	  match = 1;
+	}
+    }
+  if (match)
+    {
+      /* if there was a match widen the selector to include all extra packages */
+      if ((flags & (SELECTION_WITH_SOURCE | SELECTION_WITH_BADARCH | SELECTION_WITH_DISABLED)) != 0)
+	selection_addextra(pool, selection, flags);
+      return SELECTION_NAME;
+    }
+  return 0;
+}
+
+
+/*****  SELECTION_DOTARCH and SELECTION_REL handling *****/
+
+/* like selection_name, but check for a .arch suffix if the match did
    not work and SELECTION_DOTARCH is used */
 static int
-selection_depglob_arch(Pool *pool, Queue *selection, const char *name, int flags, int noprune)
+selection_name_arch(Pool *pool, Queue *selection, const char *name, int flags, int doprovides, int noprune)
 {
   int ret;
   const char *r;
   Id archid;
 
-  if ((ret = selection_depglob(pool, selection, name, flags)) != 0)
+  if (doprovides)
+    ret = selection_provides(pool, selection, name, flags);
+  else
+    ret = selection_name(pool, selection, name, flags);
+  if (ret)
     return ret;
   if (!(flags & SELECTION_DOTARCH))
     return 0;
@@ -736,18 +812,113 @@ selection_depglob_arch(Pool *pool, Queue *selection, const char *name, int flags
       rname[r - name] = 0;
       if (archid == ARCH_SRC || archid == ARCH_NOSRC)
 	flags |= SELECTION_SOURCE_ONLY;
-      if ((ret = selection_depglob(pool, selection, rname, flags)) != 0)
+      if (doprovides)
+	ret = selection_provides(pool, selection, rname, flags);
+      else
+	ret = selection_name(pool, selection, rname, flags);
+      if (ret)
 	{
-	  if (noprune)
-	    selection_filter_rel_noprune(pool, selection, REL_ARCH, archid);
-	  else
-	    selection_filter_rel(pool, selection, REL_ARCH, archid);
-	  solv_free(rname);
-	  return selection->count ? ret | SELECTION_DOTARCH : 0;
+	  selection_filter_rel_noprune(pool, selection, REL_ARCH, archid);
+	  if (!noprune)
+	    selection_prune(pool, selection);
 	}
       solv_free(rname);
+      return ret && selection->count ? ret | SELECTION_DOTARCH : 0;
     }
   return 0;
+}
+
+static char *
+splitrel(char *rname, char *r, int *rflagsp)
+{
+  int nend = r - rname;
+  int rflags = 0;
+  if (nend && *r == '=' && r[-1] == '!')
+    {
+      nend--;
+      r++;
+      rflags = REL_LT|REL_GT;
+    }
+  for (; *r; r++)
+    {
+      if (*r == '<')
+	rflags |= REL_LT;
+      else if (*r == '=')
+	rflags |= REL_EQ;
+      else if (*r == '>')
+	rflags |= REL_GT;
+      else
+	break;
+    }
+  while (*r && (*r == ' ' || *r == '\t'))
+    r++;
+  while (nend && (rname[nend - 1] == ' ' || rname[nend - 1] == '\t'))
+    nend--;
+  if (nend <= 0 || !*r || !rflags)
+    return 0;
+  *rflagsp = rflags;
+  rname[nend] = 0;
+  return r;
+}
+
+/* match name/provides, support DOTARCH and REL modifiers
+ */
+static int
+selection_name_arch_rel(Pool *pool, Queue *selection, const char *name, int flags, int doprovides)
+{
+  int ret, rflags = 0, noprune;
+  char *r = 0, *rname = 0;
+
+  /* try to split off an relation part */
+  if ((flags & SELECTION_REL) != 0)
+    {
+      if ((r = strpbrk(name, "<=>")) != 0)
+	{
+	  rname = solv_strdup(name);
+	  r = rname + (r - name);
+	  if ((r = splitrel(rname, r, &rflags)) == 0)
+	    rname = solv_free(rname);
+	}
+    }
+
+  /* check if we need to call selection_addextra */
+  noprune = doprovides && (flags & (SELECTION_WITH_DISABLED | SELECTION_WITH_BADARCH));
+
+  if (!r)
+    {
+      /* could not split off relation */
+      ret = selection_name_arch(pool, selection, name, flags, doprovides, noprune);
+      if (ret && noprune)
+	{
+	  selection_addextra(pool, selection, flags);
+	  selection_prune(pool, selection);
+	}
+      return ret && selection->count ? ret : 0;
+    }
+
+  /* we could split of a relation. prune name and then filter rel */
+  ret = selection_name_arch(pool, selection, rname, flags, doprovides, noprune);
+  if (ret)
+    {
+      selection_filter_rel_noprune(pool, selection, rflags, pool_str2id(pool, r, 1));
+      if (noprune)
+        selection_addextra(pool, selection, flags);
+      selection_prune(pool, selection);
+    }
+  solv_free(rname);
+  return ret && selection->count ? ret | SELECTION_REL : 0;
+}
+
+/*****  filelist matching  *****/
+
+static int
+selection_filelist_sortcmp(const void *ap, const void *bp, void *dp)
+{
+  Pool *pool = dp;
+  const Id *a = ap, *b = bp;
+  if (a[0] != b[0])
+    return strcmp(pool_id2str(pool, a[0]), pool_id2str(pool, b[0]));
+  return a[1] - b[1];
 }
 
 static int
@@ -755,10 +926,10 @@ selection_filelist(Pool *pool, Queue *selection, const char *name, int flags)
 {
   Dataiterator di;
   Queue q;
+  Id id;
   int type;
+  int i, j, lastid;
 
-  if ((flags & SELECTION_INSTALLED_ONLY) != 0 && !pool->installed)
-    return 0;
   /* all files in the file list start with a '/' */
   if (*name != '/')
     {
@@ -796,85 +967,64 @@ selection_filelist(Pool *pool, Queue *selection, const char *name, int flags)
 		continue;
 	    }
 	}
-      queue_push(&q, di.solvid);
-      dataiterator_skip_solvable(&di);
+      if ((flags & SELECTION_FLAT) != 0)
+	{
+	  /* don't bother with the complex stuff */
+          queue_push2(selection, SOLVER_SOLVABLE | SOLVER_NOAUTOSET, di.solvid);
+	  dataiterator_skip_solvable(&di);
+	  continue;
+        }
+      id = pool_str2id(pool, di.kv.str, 1);
+      queue_push2(&q, id, di.solvid);
     }
   dataiterator_free(&di);
+  if ((flags & SELECTION_FLAT) != 0)
+    {
+      queue_free(&q);
+      return selection->count ? SELECTION_FILELIST : 0;
+    }
   if (!q.count)
-    return 0;
-  if (q.count > 1)
-    queue_push2(selection, SOLVER_SOLVABLE_ONE_OF, pool_queuetowhatprovides(pool, &q));
-  else
-    queue_push2(selection, SOLVER_SOLVABLE | SOLVER_NOAUTOSET, q.elements[0]);
+    {
+      queue_free(&q);
+      return 0;
+    }
+  solv_sort(q.elements, q.count / 2, 2 * sizeof(Id), selection_filelist_sortcmp, pool);
+  lastid = 0;
+  queue_push2(&q, 0, 0);
+  for (i = j = 0; i < q.count; i += 2)
+    {
+      if (q.elements[i] != lastid)
+	{
+	  if (j == 1)
+	    queue_pushunique2(selection, SOLVER_SOLVABLE | SOLVER_NOAUTOSET, q.elements[0]);
+	  else if (j > 1)
+	    {
+	      int k;
+	      Id *idp;
+	      /* check if we already have it */
+	      for (k = 0; k < selection->count; k += 2)
+		{
+		  if (selection->elements[k] != SOLVER_SOLVABLE_ONE_OF)
+		    continue;
+		  idp = pool->whatprovidesdata + selection->elements[k + 1];
+		  if (!memcmp(idp, q.elements, j * sizeof(Id)) && !idp[j])
+		    break;
+		}
+	      if (k == selection->count)
+	        queue_push2(selection, SOLVER_SOLVABLE_ONE_OF, pool_ids2whatprovides(pool, q.elements, j));
+	    }
+          lastid = q.elements[i];
+          j = 0;
+	}
+      if (!j || q.elements[j - 1] != q.elements[i])
+        q.elements[j++] = q.elements[i + 1];
+    }
   queue_free(&q);
   return SELECTION_FILELIST;
 }
 
-static char *
-splitrel(char *rname, char *r, int *rflagsp)
-{
-  int nend = r - rname;
-  int rflags = 0;
-  if (nend && *r == '=' && r[-1] == '!')
-    {
-      nend--;
-      r++;
-      rflags = REL_LT|REL_GT;
-    }
-  for (; *r; r++)
-    {
-      if (*r == '<')
-	rflags |= REL_LT;
-      else if (*r == '=')
-	rflags |= REL_EQ;
-      else if (*r == '>')
-	rflags |= REL_GT;
-      else
-	break;
-    }
-  while (*r && (*r == ' ' || *r == '\t'))
-    r++;
-  while (nend && (rname[nend - 1] == ' ' || rname[nend - 1] == '\t'))
-    nend--;
-  if (nend <= 0 || !*r || !rflags)
-    return 0;
-  *rflagsp = rflags;
-  rname[nend] = 0;
-  return r;
-}
 
-static int
-selection_rel(Pool *pool, Queue *selection, const char *name, int flags)
-{
-  int ret, rflags = 0;
-  char *r, *rname;
-
-  /* relation case, support:
-   * depglob rel
-   * depglob.arch rel
-   */
-  if ((r = strpbrk(name, "<=>")) == 0)
-    return 0;
-  rname = solv_strdup(name);
-  r = rname + (r - name);
-  if ((r = splitrel(rname, r, &rflags)) == 0)
-    {
-      solv_free(rname);
-      return 0;
-    }
-  if ((ret = selection_depglob_arch(pool, selection, rname, flags, 1)) == 0)
-    {
-      solv_free(rname);
-      return 0;
-    }
-  selection_filter_rel_noprune(pool, selection, rflags, pool_str2id(pool, r, 1));
-  /* this is why we did noprune: add extra packages */
-  if ((ret & SELECTION_PROVIDES) == SELECTION_PROVIDES && (flags & (SELECTION_WITH_DISABLED | SELECTION_WITH_BADARCH)) != 0)
-    selection_addextra(pool, selection, flags);
-  selection_prune(pool, selection);
-  solv_free(rname);
-  return selection->count ? ret | SELECTION_REL : 0;
-}
+/*****  canon name matching  *****/
 
 #if defined(MULTI_SEMANTICS)
 # define EVRCMP_DEPCMP (pool->disttype == DISTTYPE_DEB ? EVRCMP_COMPARE : EVRCMP_MATCH_RELEASE)
@@ -989,7 +1139,7 @@ selection_canon(Pool *pool, Queue *selection, const char *name, int flags)
       rname = solv_strdup(name);	/* so we can modify it */
       r = rname + (r - name);
       *r++ = 0;
-      if ((ret = selection_depglob(pool, selection, rname, flags)) == 0)
+      if ((ret = selection_name(pool, selection, rname, flags)) == 0)
 	{
 	  solv_free(rname);
 	  return 0;
@@ -1012,7 +1162,7 @@ selection_canon(Pool *pool, Queue *selection, const char *name, int flags)
       rname = solv_strdup(name);	/* so we can modify it */
       r = rname + (r - name);
       *r++ = 0;
-      if ((ret = selection_depglob(pool, selection, rname, flags)) == 0)
+      if ((ret = selection_name(pool, selection, rname, flags)) == 0)
 	{
 	  solv_free(rname);
 	  return 0;
@@ -1041,7 +1191,7 @@ selection_canon(Pool *pool, Queue *selection, const char *name, int flags)
     flags |= SELECTION_SOURCE_ONLY;
 
   /* try with just the version */
-  if ((ret = selection_depglob(pool, selection, rname, flags)) == 0)
+  if ((ret = selection_name(pool, selection, rname, flags)) == 0)
     {
       /* no luck, try with version-release */
       if ((r2 = strrchr(rname, '-')) == 0)
@@ -1052,7 +1202,7 @@ selection_canon(Pool *pool, Queue *selection, const char *name, int flags)
       *r = '-';
       *r2 = 0;
       r = r2;
-      if ((ret = selection_depglob(pool, selection, rname, flags)) == 0)
+      if ((ret = selection_name(pool, selection, rname, flags)) == 0)
 	{
 	  solv_free(rname);
 	  return 0;
@@ -1168,21 +1318,25 @@ selection_make(Pool *pool, Queue *selection, const char *name, int flags)
   queue_empty(selection);
   if ((flags & SELECTION_INSTALLED_ONLY) != 0 && !pool->installed)
     return 0;
+
+  /* here come our four selection modes */
   if ((flags & SELECTION_FILELIST) != 0)
     ret = selection_filelist(pool, selection, name, flags);
-  if (!ret && (flags & SELECTION_REL) != 0)
-    ret = selection_rel(pool, selection, name, flags);
-  if (!ret)
-    ret = selection_depglob_arch(pool, selection, name, flags, 0);
+  if (!ret && (flags & SELECTION_NAME) != 0)
+    ret = selection_name_arch_rel(pool, selection, name, flags, 0);
+  if (!ret && (flags & SELECTION_PROVIDES) != 0)
+    ret = selection_name_arch_rel(pool, selection, name, flags, 1);
   if (!ret && (flags & SELECTION_CANON) != 0)
     ret = selection_canon(pool, selection, name, flags);
-  if (selection->count && (flags & SELECTION_INSTALLED_ONLY) != 0)
+
+  /* now do result filtering */
+  if (ret && (flags & SELECTION_INSTALLED_ONLY) != 0)
     selection_filter_repo(pool, selection, pool->installed);
-  if (!selection->count)
-    return 0;	/* no match -> always return zero */
+
+  /* flatten if requested */
   if (ret && (flags & SELECTION_FLAT) != 0)
     selection_flatten(pool, selection);
-  return ret;
+  return selection->count ? ret : 0;
 }
 
 struct limiter {
