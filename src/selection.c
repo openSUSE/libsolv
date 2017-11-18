@@ -531,8 +531,6 @@ selection_addextra_provides(Pool *pool, Queue *selection, const char *name, int 
 	    {
 	      queue_pushunique2(selection, SOLVER_SOLVABLE_PROVIDES, id);
 	      match = 1;
-	      if (!doglob && !nocase)
-		break;	/* one is enough */
 	    }
 	}
     }
