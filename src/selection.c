@@ -1309,7 +1309,16 @@ selection_make(Pool *pool, Queue *selection, const char *name, int flags)
       else if ((flags & SELECTION_MODEBITS) == SELECTION_SUBTRACT)
 	selection_subtract(pool, selection, &q);
       else if (ret || !(flags & SELECTION_FILTER_KEEP_IFEMPTY))
-	selection_filter(pool, selection, &q);
+	{
+	  if ((flags & SELECTION_FILTER_SWAPPED) != 0)
+	    {
+	      selection_filter(pool, &q, selection);
+	      queue_free(selection);
+	      queue_init_clone(selection, &q);
+	    }
+	  else
+	    selection_filter(pool, selection, &q);
+	}
       queue_free(&q);
       return ret;
     }
@@ -1635,7 +1644,16 @@ selection_make_matchdeps_common(Pool *pool, Queue *selection, const char *name, 
       else if ((flags & SELECTION_MODEBITS) == SELECTION_FILTER)
 	{
           if (ret || !(flags & SELECTION_FILTER_KEEP_IFEMPTY))
-	    selection_filter(pool, selection, &q);
+	    {
+	      if ((flags & SELECTION_FILTER_SWAPPED) != 0)
+		{
+		  selection_filter(pool, &q, selection);
+		  queue_free(selection);
+		  queue_init_clone(selection, &q);
+		}
+	      else
+		selection_filter(pool, selection, &q);
+	    }
 	}
       else if (ret || !(flags & SELECTION_FILTER_KEEP_IFEMPTY))
 	{
@@ -1864,7 +1882,7 @@ selection_filter_int(Pool *pool, Queue *sel1, Queue *sel2, int invert)
   /* now filter sel1 with the map */
   if (invert)
     map_invertall(&m2);
-  if (sel2->count == 2)		/* XXX: AND all setmasks instead? */
+  if (sel2->count == 2)
     setflags = sel2->elements[0] & SOLVER_SETMASK & ~SOLVER_NOAUTOSET;
   selection_filter_map(pool, sel1, &m2, setflags);
   map_free(&m2);
@@ -1873,7 +1891,7 @@ selection_filter_int(Pool *pool, Queue *sel1, Queue *sel2, int invert)
 void
 selection_filter(Pool *pool, Queue *sel1, Queue *sel2)
 {
-  return selection_filter_int(pool, sel1, sel2, 0);
+  selection_filter_int(pool, sel1, sel2, 0);
 }
 
 void
@@ -1886,7 +1904,7 @@ selection_add(Pool *pool, Queue *sel1, Queue *sel2)
 void
 selection_subtract(Pool *pool, Queue *sel1, Queue *sel2)
 {
-  return selection_filter_int(pool, sel1, sel2, 1);
+  selection_filter_int(pool, sel1, sel2, 1);
 }
 
 const char *

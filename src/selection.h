@@ -51,9 +51,12 @@ extern "C" {
 #define SELECTION_ADD			(1 << 28)
 #define SELECTION_SUBTRACT		(2 << 28)
 #define SELECTION_FILTER		(3 << 28)
+
 #define SELECTION_MODEBITS		(3 << 28)	/* internal */
 
+/* extra SELECTION_FILTER bits */
 #define SELECTION_FILTER_KEEP_IFEMPTY	(1 << 30)
+#define SELECTION_FILTER_SWAPPED	(1 << 31)
 
 
 extern int  selection_make(Pool *pool, Queue *selection, const char *name, int flags);

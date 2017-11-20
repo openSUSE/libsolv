@@ -1272,6 +1272,7 @@ typedef struct {
   static const Id SELECTION_SUBTRACT = SELECTION_SUBTRACT;
   static const Id SELECTION_FILTER = SELECTION_FILTER;
   static const Id SELECTION_FILTER_KEEP_IFEMPTY = SELECTION_FILTER_KEEP_IFEMPTY;
+  static const Id SELECTION_FILTER_SWAPPED = SELECTION_FILTER_SWAPPED;
 
   Selection(Pool *pool) {
     Selection *s;
