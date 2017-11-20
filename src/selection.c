@@ -1034,11 +1034,22 @@ selection_filelist(Pool *pool, Queue *selection, const char *name, int flags)
 
 /* magic epoch promotion code, works only for SELECTION_NAME selections */
 static void
-selection_filter_evr(Pool *pool, Queue *selection, char *evr)
+selection_filter_evr(Pool *pool, Queue *selection, const char *evr)
 {
   int i, j;
   Queue q;
   Id qbuf[10];
+  const char *sp;
+
+  /* do we already have an epoch? */
+  for (sp = evr; *sp >= '0' && *sp <= '9'; sp++)
+    ;
+  if (*sp == ':' && sp != evr)
+    {
+      /* yes, just add the rel filter */
+      selection_filter_rel(pool, selection, REL_EQ, pool_str2id(pool, evr, 1));
+      return;
+    }
 
   queue_init(&q);
   queue_init_buffer(&q, qbuf, sizeof(qbuf)/sizeof(*qbuf));
@@ -1055,7 +1066,6 @@ selection_filter_evr(Pool *pool, Queue *selection, char *evr)
 	{
 	  Solvable *s = pool->solvables + p;
 	  const char *sevr = pool_id2str(pool, s->evr);
-	  const char *sp;
 	  for (sp = sevr; *sp >= '0' && *sp <= '9'; sp++)
 	    ;
 	  if (*sp != ':')
