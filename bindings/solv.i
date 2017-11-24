@@ -1549,6 +1549,39 @@ typedef struct {
   }
 #if defined(SWIGPYTHON)
   %{
+  SWIGINTERN int nscallback(Pool *pool, void *d, Id name, Id evr) {
+    PyObject *args = Py_BuildValue("(ii)", name, evr);
+    PyObject *result = PyEval_CallObject((PyObject *)d, args);
+    int ecode = 0;
+    int vresult = 0;
+    Py_DECREF(args);
+    if (!result)
+      return 0; /* exception */
+    ecode = SWIG_AsVal_int(result, &vresult);
+    Py_DECREF(result);
+    return SWIG_IsOK(ecode) ? vresult : 0;
+  }
+  %}
+  void clr_namespacecallback() {
+    if ($self->nscallback == nscallback) {
+      PyObject *obj = $self->nscallback;
+      Py_DECREF(obj);
+      pool_setnamespacecallback($self, 0, 0);
+    }
+  }
+  void set_namespacecallback(PyObject *callable) {
+    Pool_clr_namespacecallback($self);
+    if (callable) {
+      Py_INCREF(callable);
+      pool_setnamespacecallback($self, nscallback, callable);
+    }
+  }
+#else
+#warning namespacecallback not implemented for this language
+#endif
+
+#if defined(SWIGPYTHON)
+  %{
   SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
     XRepodata *xd = new_XRepodata(data->repo, data->repodataid);
     PyObject *args = Py_BuildValue("(O)", SWIG_NewPointerObj(SWIG_as_voidptr(xd), SWIGTYPE_p_XRepodata, SWIG_POINTER_OWN | 0));
