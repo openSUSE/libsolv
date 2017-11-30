@@ -3359,6 +3359,13 @@ solver_solve(Solver *solv, Queue *job)
 		  MAPSET(&solv->fixmap, p - installed->start);
 		}
 	      break;
+	    case SOLVER_INSTALL:
+	      if ((solv->install_also_updates || (how & SOLVER_ORUPDATE)) && (how & SOLVER_CLEANDEPS))
+		{
+		  FOR_REPO_SOLVABLES(installed, p, s)
+		    add_cleandeps_updatepkg(solv, p);
+		}
+	      break;
 	    case SOLVER_UPDATE:
 	      if (select == SOLVER_SOLVABLE_ALL)
 		{
