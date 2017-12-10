@@ -2988,8 +2988,11 @@ rb_eval_string(
       return xs->pool->solvables[xs->id].vendor;
     }
   %}
-  Repo * const repo;
+  Repo *repo;
   %{
+    SWIGINTERN void XSolvable_repo_set(XSolvable *xs, Repo *repo) {
+      xs->pool->solvables[xs->id].repo = repo;
+    }
     SWIGINTERN Repo *XSolvable_repo_get(XSolvable *xs) {
       return xs->pool->solvables[xs->id].repo;
     }
