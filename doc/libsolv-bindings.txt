@@ -1251,7 +1251,7 @@ most cases solvables will get created by the repo_add methods.
 
 === ATTRIBUTES ===
 
-	Repo *repo;			/* read only */
+	Repo *repo;			/* read/write */
 	$solvable->{repo}
 	solvable.repo
 	solvable.repo
