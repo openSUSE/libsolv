@@ -382,8 +382,8 @@ solv_xfopen_fd(const char *fn, int fd, const char *mode)
   if (suf && !strcmp(suf, ".gz"))
     return mygzfdopen(fd, simplemode);
 #else
-    return 0;
   if (suf && !strcmp(suf, ".gz"))
+    return 0;
 #endif
 #ifdef ENABLE_LZMA_COMPRESSION
   if (suf && !strcmp(suf, ".xz"))
