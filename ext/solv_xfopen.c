@@ -328,10 +328,10 @@ solv_xfopen(const char *fn, const char *mode)
     mode = "r";
   suf = strrchr(fn, '.');
 #ifdef ENABLE_ZLIB_COMPRESSION
-  if (suf && !strcmp(suf, ".gz"))
+  if (suf && (!strcmp(suf, ".gz") || !strcmp(suf, ".cz")))
     return mygzfopen(fn, mode);
 #else
-  if (suf && !strcmp(suf, ".gz"))
+  if (suf && (!strcmp(suf, ".gz") || !strcmp(suf, ".cz")))
     return 0;
 #endif
 #ifdef ENABLE_LZMA_COMPRESSION
@@ -379,10 +379,10 @@ solv_xfopen_fd(const char *fn, int fd, const char *mode)
 	mode = simplemode = "r";
     }
 #ifdef ENABLE_ZLIB_COMPRESSION
-  if (suf && !strcmp(suf, ".gz"))
+  if (suf && (!strcmp(suf, ".gz") || !strcmp(suf, ".cz")))
     return mygzfdopen(fd, simplemode);
 #else
-  if (suf && !strcmp(suf, ".gz"))
+  if (suf && (!strcmp(suf, ".gz") || !strcmp(suf, ".cz")))
     return 0;
 #endif
 #ifdef ENABLE_LZMA_COMPRESSION
@@ -413,7 +413,7 @@ solv_xfopen_iscompressed(const char *fn)
   if (!suf)
     return 0;
 #ifdef ENABLE_ZLIB_COMPRESSION
-  if (!strcmp(suf, ".gz"))
+  if (!strcmp(suf, ".gz") || !strcmp(suf, ".cz"))
     return 1;
 #else
     return -1;
