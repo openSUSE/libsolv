@@ -17,7 +17,13 @@
 
 
 %define libname libsolv@LIBSOLV_SOVERSION@
-%if 0%{?leap_version} >= 420300 || 0%{?sle_version} >= 120300 || 0%{?suse_version} >= 1330 || !0%{?suse_version}
+# Helper macros for systems where not defined
+%if 0%{?fedora} || 0%{?rhel} || 0%{?mageia} || 0%{?suse_version} < 1310
+%global cmake_install make DESTDIR=%{buildroot} install
+%global ctest %{_bindir}/ctest %{?_smp_mflags}
+%global rb_vendorlibdir %{ruby_vendorarchdir}
+%endif
+%if 0%{?sle_version} >= 120300 || 0%{?suse_version} >= 1500 || 0%{?fedora} || 0%{?mageia} > 6 || 0%{?rhel} > 7
 %bcond_without bz2
 %bcond_without xz
 %else
@@ -29,12 +35,21 @@
 %else
 %bcond_with richdeps
 %endif
+%if 0%{?suse_version} >= 1310 || 0%{?fedora} || 0%{?rhel} > 7 || 0%{?mageia} >= 6
+%bcond_without python3
+%else
+%bcond_with python3
+%endif
+%if 0%{?rhel}
+%bcond_with ruby
+%bcond_with perl
+%else
+%bcond_without ruby
+%bcond_without perl
+%endif
 %bcond_without static
 %bcond_with shared
-%bcond_without perl
 %bcond_without python2
-%bcond_without python3
-%bcond_without ruby
 %bcond_with zypp
 Name:           libsolv
 Version:        @VERSION@
@@ -42,15 +57,14 @@ Release:        0
 Summary:        Package dependency solver using a satisfiability algorithm
 License:        BSD-3-Clause
 Group:          Development/Libraries/C and C++
-Url:            https://github.com/openSUSE/libsolv
+URL:            https://github.com/openSUSE/libsolv
 Source:         libsolv-%{version}.tar.bz2
 BuildRequires:  cmake
-BuildRequires:  fdupes
 BuildRequires:  gcc-c++
+BuildRequires:  libxml2-devel
 BuildRequires:  pkgconfig
-BuildRequires:  pkgconfig(libxml-2.0)
-BuildRequires:  pkgconfig(rpm)
-BuildRequires:  pkgconfig(zlib)
+BuildRequires:  rpm-devel
+BuildRequires:  zlib-devel
 %if %{with ruby}
 BuildRequires:  ruby
 BuildRequires:  ruby-devel
@@ -64,8 +78,8 @@ BuildRequires:  perl
 BuildRequires:  swig
 %endif
 %if %{with python2}
+BuildRequires:  python-devel
 BuildRequires:  swig
-BuildRequires:  pkgconfig(python2)
 %endif
 %if %{with python3}
 BuildRequires:  swig
@@ -98,7 +112,7 @@ dependencies.
 %package devel
 Summary:        Development files for libsolv, a package solver
 Group:          Development/Libraries/C and C++
-Requires:       pkgconfig(rpm)
+Requires:       rpm-devel
 Conflicts:      libsatsolver-devel
 %if %{with shared}
 Requires:       %{libname} = %{version}-%{release}
@@ -211,11 +225,13 @@ make %{?_smp_mflags}
 %install
 %cmake_install
 
+%if 0%{?suse_version}
 %if %{with python2}
 %py_compile %{buildroot}/%{python_sitearch}
 %endif
 %if %{with python3}
 %py3_compile %{buildroot}/%{python3_sitearch}
+%endif
 %endif
 %if %{with static}
 # we want to leave the .a file untouched

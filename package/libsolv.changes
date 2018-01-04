@@ -17,7 +17,6 @@ Thu Jan  4 11:02:29 UTC 2018 - tchvatal@suse.com
 - As fedora/rh uses its own package make sure we use our guidelines
   for cmake macro usage to get the most of the options for free
 - Make sure to execute tests
-- Convert deps to pkgconfig style
 - Remove obsolete syntax like declaring empty py_requires
 - Install license files using %license macro
 - In devel require %version-%release even tho we should be safeguarded
@@ -26,6 +25,7 @@ Thu Jan  4 11:02:29 UTC 2018 - tchvatal@suse.com
   other distribution builds
 - Drop perl-devel dependency on other distros as it builds with
   just perl
+- Make sure we can build on rhel, mageia, fedora
 
 -------------------------------------------------------------------
 Tue Oct 24 12:09:32 UTC 2017 - jengelh@inai.de
