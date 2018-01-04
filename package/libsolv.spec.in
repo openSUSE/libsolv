@@ -56,15 +56,12 @@ BuildRequires:  ruby
 BuildRequires:  ruby-devel
 BuildRequires:  swig
 %endif
-%if 0%{?fedora} || 0%{?rhel} >= 6 || 0%{?mageia}
-BuildRequires:  db-devel
+%if 0%{?fedora} || 0%{?rhel} || 0%{?mageia}
+BuildRequires:  libdb-devel
 %endif
 %if %{with perl}
 BuildRequires:  perl
 BuildRequires:  swig
-%if 0%{?fedora} || 0%{?rhel} >= 6 || 0%{?mageia}
-BuildRequires:  perl-devel
-%endif
 %endif
 %if %{with python2}
 BuildRequires:  swig
@@ -104,7 +101,7 @@ Group:          Development/Libraries/C and C++
 Requires:       pkgconfig(rpm)
 Conflicts:      libsatsolver-devel
 %if %{with shared}
-Requires:       %{libname} = %{version}
+Requires:       %{libname} = %{version}-%{release}
 %endif
 
 %description devel

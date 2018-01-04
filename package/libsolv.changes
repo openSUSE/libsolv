@@ -20,6 +20,12 @@ Thu Jan  4 11:02:29 UTC 2018 - tchvatal@suse.com
 - Convert deps to pkgconfig style
 - Remove obsolete syntax like declaring empty py_requires
 - Install license files using %license macro
+- In devel require %version-%release even tho we should be safeguarded
+  against this by zypper
+- Switch the db-devel to libdb-devel dependency to get further with
+  other distribution builds
+- Drop perl-devel dependency on other distros as it builds with
+  just perl
 
 -------------------------------------------------------------------
 Tue Oct 24 12:09:32 UTC 2017 - jengelh@inai.de
