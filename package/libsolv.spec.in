@@ -199,9 +199,9 @@ CMAKE_FLAGS="-DSUSE=1"
 	-DENABLE_APPDATA=1 \
 	-DENABLE_COMPS=1 \
 	%{?with_static:-DENABLE_STATIC=1} \
-	%{?with_shared:-DDISABLE_SHARED=1} \
+	%{!?with_shared:-DDISABLE_SHARED=1} \
 	%{?with_perl:-DENABLE_PERL=1} \
-	%{?with_python:-DENABLE_PYTHON=1} \
+	%{?with_python2:-DENABLE_PYTHON=1} \
 	%{?with_python3:-DENABLE_PYTHON3=1} \
 	%{?with_ruby:-DENABLE_RUBY=1} \
 	%{?with_bz2:-DENABLE_BZIP2_COMPRESSION=1} \
@@ -228,7 +228,7 @@ export NO_BRP_STRIP_DEBUG=true
 %check
 %ctest
 
-%if !%{with shared}
+%if %{with shared}
 %post -n %{libname} -p /sbin/ldconfig
 %postun -n %{libname} -p /sbin/ldconfig
 
