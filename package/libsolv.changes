@@ -19,6 +19,7 @@ Thu Jan  4 11:02:29 UTC 2018 - tchvatal@suse.com
 - Make sure to execute tests
 - Convert deps to pkgconfig style
 - Remove obsolete syntax like declaring empty py_requires
+- Install license files using %license macro
 
 -------------------------------------------------------------------
 Tue Oct 24 12:09:32 UTC 2017 - jengelh@inai.de
