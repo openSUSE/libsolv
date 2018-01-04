@@ -29,8 +29,8 @@
 %else
 %bcond_with richdeps
 %endif
-%bcond_without enable_static
-%bcond_without disable_shared
+%bcond_without static
+%bcond_with shared
 %bcond_without perl
 %bcond_without python2
 %bcond_without python3
@@ -85,7 +85,7 @@ BuildRequires:  pkgconfig(liblzma)
 libsolv is a library for solving packages and reading repositories.
 The solver uses a satisfiability algorithm.
 
-%if !%{with disable_shared}
+%if %{with shared}
 %package -n %{libname}
 Summary:        Package dependency solver using a satisfiability algorithm
 Group:          System/Libraries
@@ -103,7 +103,7 @@ Summary:        Development files for libsolv, a package solver
 Group:          Development/Libraries/C and C++
 Requires:       pkgconfig(rpm)
 Conflicts:      libsatsolver-devel
-%if !%{with disable_shared}
+%if %{with shared}
 Requires:       %{libname} = %{version}
 %endif
 
@@ -198,8 +198,8 @@ CMAKE_FLAGS="-DSUSE=1"
 	-DWITH_LIBXML2=1 \
 	-DENABLE_APPDATA=1 \
 	-DENABLE_COMPS=1 \
-	%{?with_enable_static:-DENABLE_STATIC=1} \
-	%{?with_disable_shared:-DDISABLE_SHARED=1} \
+	%{?with_static:-DENABLE_STATIC=1} \
+	%{?with_shared:-DDISABLE_SHARED=1} \
 	%{?with_perl:-DENABLE_PERL=1} \
 	%{?with_python:-DENABLE_PYTHON=1} \
 	%{?with_python3:-DENABLE_PYTHON3=1} \
@@ -220,7 +220,7 @@ make %{?_smp_mflags}
 %if %{with python3}
 %py3_compile %{buildroot}/%{python3_sitearch}
 %endif
-%if %{with disable_shared}
+%if %{with static}
 # we want to leave the .a file untouched
 export NO_BRP_STRIP_DEBUG=true
 %endif
@@ -228,7 +228,7 @@ export NO_BRP_STRIP_DEBUG=true
 %check
 %ctest
 
-%if !%{with disable_shared}
+%if !%{with shared}
 %post -n %{libname} -p /sbin/ldconfig
 %postun -n %{libname} -p /sbin/ldconfig
 
@@ -248,11 +248,11 @@ export NO_BRP_STRIP_DEBUG=true
 %{_mandir}/man1/*
 
 %files devel
-%if %{with enable_static}
+%if %{with static}
 %{_libdir}/libsolv.a
 %{_libdir}/libsolvext.a
 %endif
-%if !%{with disable_shared}
+%if %{with shared}
 %{_libdir}/libsolv.so
 %{_libdir}/libsolvext.so
 %endif
