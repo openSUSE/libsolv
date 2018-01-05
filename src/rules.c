@@ -1922,6 +1922,21 @@ solver_createdupmaps(Solver *solv)
     }
   if (solv->dupinvolvedmap.size)
     MAPCLR(&solv->dupinvolvedmap, SYSTEMSOLVABLE);
+  /* set update for all involved installed packages. We need to do
+   * this before creating the update rules */
+  if (solv->dupinvolvedmap_all)
+    solv->updatemap_all = 1;
+  if (installed && !solv->updatemap_all)
+    {
+      FOR_REPO_SOLVABLES(installed, p, s)
+	{
+	  if (!solv->dupinvolvedmap_all && !MAPTST(&solv->dupinvolvedmap, p))
+	    continue;
+	  if (!solv->updatemap.size)
+	    map_grow(&solv->updatemap, installed->end - installed->start);
+	  MAPSET(&solv->updatemap, p - installed->start);
+	}
+    }
 }
 
 void
@@ -1943,8 +1958,6 @@ solver_addduprules(Solver *solv, Map *addedmap)
   Rule *r;
 
   solv->duprules = solv->nrules;
-  if (solv->dupinvolvedmap_all)
-    solv->updatemap_all = 1;
   for (i = 1; i < pool->nsolvables; i++)
     {
       if (i == SYSTEMSOLVABLE || !MAPTST(addedmap, i))
@@ -1964,12 +1977,6 @@ solver_addduprules(Solver *solv, Map *addedmap)
 	    continue;
 	  if (installed && ps->repo == installed)
 	    {
-	      if (!solv->updatemap_all)
-		{
-		  if (!solv->updatemap.size)
-		    map_grow(&solv->updatemap, installed->end - installed->start);
-		  MAPSET(&solv->updatemap, p - installed->start);
-		}
 	      if (!MAPTST(&solv->dupmap, p))
 		{
 		  Id ip, ipp;
