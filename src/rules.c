@@ -1926,11 +1926,11 @@ solver_createdupmaps(Solver *solv)
    * this before creating the update rules */
   if (solv->dupinvolvedmap_all)
     solv->updatemap_all = 1;
-  if (installed && !solv->updatemap_all)
+  else if (installed && !solv->updatemap_all && solv->dupinvolvedmap.size)
     {
       FOR_REPO_SOLVABLES(installed, p, s)
 	{
-	  if (!solv->dupinvolvedmap_all && !MAPTST(&solv->dupinvolvedmap, p))
+	  if (!MAPTST(&solv->dupinvolvedmap, p))
 	    continue;
 	  if (!solv->updatemap.size)
 	    map_grow(&solv->updatemap, installed->end - installed->start);
