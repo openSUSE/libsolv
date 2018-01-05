@@ -19,7 +19,7 @@
 %define libname libsolv@LIBSOLV_SOVERSION@
 # Helper macros for systems where not defined
 %if ! %{defined _ctest}
-%if 0%{?suse_version}
+%if 0%{?suse_version} || 0%{?mageia}
 %global cmake_install cd build && make DESTDIR=%{buildroot} install
 %global ctest cd build && %{_bindir}/ctest %{?_smp_mflags}
 %else
@@ -27,6 +27,7 @@
 %global ctest %{_bindir}/ctest %{?_smp_mflags}
 %endif
 %endif
+%{!?python2_sitearch:%global python2_sitearch %{python_sitearch}}
 %{!?rb_vendorlibdir:%global rb_vendorlibdir %{ruby_vendorarchdir}}
 %if 0%{?sle_version} >= 120300 || 0%{?suse_version} >= 1500 || 0%{?fedora} || 0%{?mageia} > 6 || 0%{?rhel} > 7
 %bcond_without bz2
@@ -59,7 +60,11 @@
 %endif
 %bcond_without static
 %bcond_with shared
+%if 0%{?suse_version}
+%bcond_without zypp
+%else
 %bcond_with zypp
+%endif
 Name:           libsolv
 Version:        @VERSION@
 Release:        0
@@ -80,8 +85,11 @@ BuildRequires:  ruby
 BuildRequires:  ruby-devel
 BuildRequires:  swig
 %endif
-%if 0%{?fedora} || 0%{?rhel} || 0%{?mageia}
+%if 0%{?fedora} || 0%{?rhel}
 BuildRequires:  libdb-devel
+%endif
+%if 0%{?mageia}
+BuildRequires:  db-devel
 %endif
 %if %{with perl}
 BuildRequires:  perl
@@ -237,7 +245,7 @@ make %{?_smp_mflags}
 
 %if 0%{?suse_version}
 %if %{with python2}
-%py_compile %{buildroot}/%{python_sitearch}
+%py_compile %{buildroot}/%{python2_sitearch}
 %endif
 %if %{with python3}
 %py3_compile %{buildroot}/%{python3_sitearch}
@@ -262,36 +270,31 @@ export NO_BRP_STRIP_DEBUG=true
 %{_libdir}/libsolvext.so.*
 %endif
 
+# Some small macro to list tools with mans
+%global solv_tool() \
+%{_bindir}/%{1} \
+%{_mandir}/man1/%{1}.1* \
+%{nil}
+
 %files tools
 %defattr(-,root,root)
 %doc LICENSE*
-%{_bindir}/appdata2solv
-%{_bindir}/comps2solv
-%{_bindir}/deltainfoxml2solv
-%{_bindir}/dumpsolv
-%{_bindir}/installcheck
-%{_bindir}/mergesolv
-%{_bindir}/repomdxml2solv
+%solv_tool appdata2solv
+%solv_tool comps2solv
+%solv_tool deltainfoxml2solv
+%solv_tool dumpsolv
+%solv_tool installcheck
+%solv_tool mergesolv
+%solv_tool repomdxml2solv
+%solv_tool rpmdb2solv
+%solv_tool rpmmd2solv
+%solv_tool rpms2solv
+%solv_tool testsolv
+%solv_tool updateinfoxml2solv
+%if %{with zypp}
+  %solv_tool susetags2solv
+%endif
 %{_bindir}/repo2solv.sh
-%{_bindir}/rpmdb2solv
-%{_bindir}/rpmmd2solv
-%{_bindir}/rpms2solv
-%{_bindir}/susetags2solv
-%{_bindir}/testsolv
-%{_bindir}/updateinfoxml2solv
-%{_mandir}/man1/appdata2solv.1%{?ext_man}
-%{_mandir}/man1/comps2solv.1%{?ext_man}
-%{_mandir}/man1/deltainfoxml2solv.1%{?ext_man}
-%{_mandir}/man1/dumpsolv.1%{?ext_man}
-%{_mandir}/man1/installcheck.1%{?ext_man}
-%{_mandir}/man1/mergesolv.1%{?ext_man}
-%{_mandir}/man1/repomdxml2solv.1%{?ext_man}
-%{_mandir}/man1/rpmdb2solv.1%{?ext_man}
-%{_mandir}/man1/rpmmd2solv.1%{?ext_man}
-%{_mandir}/man1/rpms2solv.1%{?ext_man}
-%{_mandir}/man1/susetags2solv.1%{?ext_man}
-%{_mandir}/man1/testsolv.1%{?ext_man}
-%{_mandir}/man1/updateinfoxml2solv.1%{?ext_man}
 
 %files devel
 %defattr(-,root,root)
@@ -305,11 +308,12 @@ export NO_BRP_STRIP_DEBUG=true
 %{_libdir}/libsolvext.so
 %endif
 %{_includedir}/solv
-%{_bindir}/helix2solv
-%{_mandir}/man1/helix2solv.1%{?ext_man}
 %{_datadir}/cmake/Modules/*
 %{_libdir}/pkgconfig/libsolv*.pc
 %{_mandir}/man3/*
+%if %{with zypp}
+  %solv_tool helix2solv
+%endif
 
 %files demo
 %defattr(-,root,root)
@@ -330,7 +334,7 @@ export NO_BRP_STRIP_DEBUG=true
 %if %{with python2}
 %files -n python-solv
 %defattr(-,root,root)
-%{python_sitearch}/*
+%{python2_sitearch}/*
 %endif
 
 %if %{with python3}
