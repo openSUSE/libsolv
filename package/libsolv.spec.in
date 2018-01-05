@@ -18,11 +18,16 @@
 
 %define libname libsolv@LIBSOLV_SOVERSION@
 # Helper macros for systems where not defined
-%if 0%{?fedora} || 0%{?rhel} || 0%{?mageia} || 0%{?suse_version} < 1310
+%if ! %{defined _ctest}
+%if 0%{?suse_version}
+%global cmake_install cd build && make DESTDIR=%{buildroot} install
+%global ctest cd build && %{_bindir}/ctest %{?_smp_mflags}
+%else
 %global cmake_install make DESTDIR=%{buildroot} install
 %global ctest %{_bindir}/ctest %{?_smp_mflags}
-%global rb_vendorlibdir %{ruby_vendorarchdir}
 %endif
+%endif
+%{!?rb_vendorlibdir:%global rb_vendorlibdir %{ruby_vendorarchdir}}
 %if 0%{?sle_version} >= 120300 || 0%{?suse_version} >= 1500 || 0%{?fedora} || 0%{?mageia} > 6 || 0%{?rhel} > 7
 %bcond_without bz2
 %bcond_without xz
@@ -40,16 +45,20 @@
 %else
 %bcond_with python3
 %endif
-%if 0%{?rhel}
+%if 0%{?rhel} || 0%{?suse_version} < 1120
 %bcond_with ruby
 %bcond_with perl
 %else
 %bcond_without ruby
 %bcond_without perl
 %endif
+%if 0%{?suse_version} < 1120
+%bcond_with python2
+%else
+%bcond_without python2
+%endif
 %bcond_without static
 %bcond_with shared
-%bcond_without python2
 %bcond_with zypp
 Name:           libsolv
 Version:        @VERSION@
@@ -65,6 +74,7 @@ BuildRequires:  libxml2-devel
 BuildRequires:  pkgconfig
 BuildRequires:  rpm-devel
 BuildRequires:  zlib-devel
+BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 %if %{with ruby}
 BuildRequires:  ruby
 BuildRequires:  ruby-devel
@@ -246,23 +256,46 @@ export NO_BRP_STRIP_DEBUG=true
 %postun -n %{libname} -p /sbin/ldconfig
 
 %files -n %{libname}
-%license LICENSE*
+%defattr(-,root,root)
+%doc LICENSE*
 %{_libdir}/libsolv.so.*
 %{_libdir}/libsolvext.so.*
 %endif
 
 %files tools
-%license LICENSE*
-%if 0%{?suse_version}
-%exclude %{_bindir}/helix2solv
-%exclude %{_mandir}/man1/helix2solv*
-%endif
-%exclude %{_bindir}/solv
-%{_bindir}/*
-%{_mandir}/man1/*
+%defattr(-,root,root)
+%doc LICENSE*
+%{_bindir}/appdata2solv
+%{_bindir}/comps2solv
+%{_bindir}/deltainfoxml2solv
+%{_bindir}/dumpsolv
+%{_bindir}/installcheck
+%{_bindir}/mergesolv
+%{_bindir}/repomdxml2solv
+%{_bindir}/repo2solv.sh
+%{_bindir}/rpmdb2solv
+%{_bindir}/rpmmd2solv
+%{_bindir}/rpms2solv
+%{_bindir}/susetags2solv
+%{_bindir}/testsolv
+%{_bindir}/updateinfoxml2solv
+%{_mandir}/man1/appdata2solv.1%{?ext_man}
+%{_mandir}/man1/comps2solv.1%{?ext_man}
+%{_mandir}/man1/deltainfoxml2solv.1%{?ext_man}
+%{_mandir}/man1/dumpsolv.1%{?ext_man}
+%{_mandir}/man1/installcheck.1%{?ext_man}
+%{_mandir}/man1/mergesolv.1%{?ext_man}
+%{_mandir}/man1/repomdxml2solv.1%{?ext_man}
+%{_mandir}/man1/rpmdb2solv.1%{?ext_man}
+%{_mandir}/man1/rpmmd2solv.1%{?ext_man}
+%{_mandir}/man1/rpms2solv.1%{?ext_man}
+%{_mandir}/man1/susetags2solv.1%{?ext_man}
+%{_mandir}/man1/testsolv.1%{?ext_man}
+%{_mandir}/man1/updateinfoxml2solv.1%{?ext_man}
 
 %files devel
-%license LICENSE*
+%defattr(-,root,root)
+%doc LICENSE*
 %if %{with static}
 %{_libdir}/libsolv.a
 %{_libdir}/libsolvext.a
@@ -272,34 +305,37 @@ export NO_BRP_STRIP_DEBUG=true
 %{_libdir}/libsolvext.so
 %endif
 %{_includedir}/solv
-%if 0%{?suse_version}
 %{_bindir}/helix2solv
-%{_mandir}/man1/helix2solv*
-%endif
+%{_mandir}/man1/helix2solv.1%{?ext_man}
 %{_datadir}/cmake/Modules/*
 %{_libdir}/pkgconfig/libsolv*.pc
 %{_mandir}/man3/*
 
 %files demo
+%defattr(-,root,root)
 %{_bindir}/solv
 
 %if %{with perl}
 %files -n perl-solv
+%defattr(-,root,root)
 %{perl_vendorarch}/*
 %endif
 
 %if %{with ruby}
 %files -n ruby-solv
+%defattr(-,root,root)
 %{rb_vendorlibdir}/*
 %endif
 
 %if %{with python2}
 %files -n python-solv
+%defattr(-,root,root)
 %{python_sitearch}/*
 %endif
 
 %if %{with python3}
 %files -n python3-solv
+%defattr(-,root,root)
 %{python3_sitearch}/*
 %endif
 
