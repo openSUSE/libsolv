@@ -25,6 +25,7 @@
 #include <errno.h>
 
 #ifdef ENABLE_RPMDB
+#define ENABLE_RPMDB_LMDB
 
 #include <rpm/rpmio.h>
 #include <rpm/rpmpgp.h>
@@ -37,7 +38,11 @@
 # if defined(SUSE) || defined(HAVE_RPM_DB_H)
 #  include <rpm/db.h>
 # else
-#  include <db.h>
+#  ifdef ENABLE_RPMDB_LMDB
+#   include "db_lmdb.h"
+#  else
+#   include <db.h>
+#  endif
 # endif
 #endif
 
@@ -1304,6 +1309,11 @@ static int
 stat_database(struct rpmdbstate *state, char *dbname, struct stat *statbuf, int seterror)
 {
   char *dbpath;
+
+# ifdef ENABLE_RPMDB_LMDB
+  dbname = "data.mdb";
+# endif
+
   dbpath = solv_dupjoin(state->rootdir, state->is_ostree ? "/usr/share/rpm/" : "/var/lib/rpm/", dbname);
   if (stat(dbpath, statbuf))
     {

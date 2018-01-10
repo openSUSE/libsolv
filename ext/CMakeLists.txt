@@ -11,6 +11,13 @@ IF (ENABLE_RPMDB OR ENABLE_RPMPKG)
         pool_fileconflicts.h repo_rpmdb.h)
 ENDIF (ENABLE_RPMDB OR ENABLE_RPMPKG)
 
+IF (ENABLE_RPMDB_LMDB)
+    SET (libsolvext_SRCS ${libsolvext_SRCS}
+        db_lmdb.c)
+    SET (libsolvext_HEADERS ${libsolvext_HEADERS}
+        db_lmdb.h)
+ENDIF (ENABLE_RPMDB_LMDB)
+
 IF (ENABLE_PUBKEY)
     SET (libsolvext_SRCS ${libsolvext_SRCS}
 	repo_pubkey.c)
