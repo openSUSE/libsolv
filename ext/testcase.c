@@ -1381,12 +1381,13 @@ testcase_add_testtags(Repo *repo, FILE *fp, int flags)
       if (*line != '=' || !line[1] || !line[2] || !line[3] || line[4] != ':')
 	continue;
       tag = line[1] << 16 | line[2] << 8 | line[3];
+      /* tags that do not need a solvable */
       switch(tag)
-        {
+	{
 	case 'V' << 16 | 'e' << 8 | 'r':
 	  tagsversion = atoi(line + 6);
 	  addselfprovides = tagsversion < 3 || strstr(line + 6, "addselfprovides") != 0;
-	  break;
+	  continue;
 	case 'P' << 16 | 'k' << 8 | 'g':
 	  if (s)
 	    {
@@ -1405,7 +1406,15 @@ testcase_add_testtags(Repo *repo, FILE *fp, int flags)
 	    sp[2][-1] = '-';
 	  s->evr = makeevr(pool, sp[1]);
 	  s->arch = pool_str2id(pool, sp[3], 1);
+	  continue;
+	default:
 	  break;
+	}
+      if (!s)
+	continue;
+      /* tags that need a solvable */
+      switch(tag)
+	{
 	case 'S' << 16 | 'u' << 8 | 'm':
 	  repodata_set_str(data, s - pool->solvables, SOLVABLE_SUMMARY, line + 6);
 	  break;
