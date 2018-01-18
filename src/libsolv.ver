@@ -101,6 +101,7 @@ SOLV_1.0 {
 		pool_set_installed;
 		pool_set_languages;
 		pool_set_rootdir;
+		pool_set_whatprovides;
 		pool_setarch;
 		pool_setarchpolicy;
 		pool_setdebugcallback;

@@ -606,6 +606,16 @@ packages, _idqinst_ for the latter one. This information can be stored in
 the meta section of the repositories to speed up the next time the
 repository is loaded and addfileprovides is called
 
+	void pool_set_whatprovides(pool, Id id, Id offset);
+
+Manually set an entry in the whatprovides index. You'll never do this for
+package dependencies, as those entries are created by calling the
+pool_createwhatprovides() function. But this function is useful for
+namespace provides if you do not want to use a namespace callback to
+lazily set the provides. The offset argument is a offset in the
+whatprovides array, thus you can use ``1'' as a false value and ``2''
+as true value.
+
 	void pool_flush_namespaceproviders(Pool *pool, Id ns, Id evr);
 
 Clear the cache of the providers for namespace dependencies matching

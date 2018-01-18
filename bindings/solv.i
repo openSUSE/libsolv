@@ -1888,6 +1888,16 @@ typedef struct {
     return pool_queuetowhatprovides($self, &q);
   }
 
+  void set_namespaceproviders(DepId ns, DepId evr, bool value=1) {
+    Id dep = pool_rel2id($self, ns, evr, REL_NAMESPACE, 1);
+    pool_set_whatprovides($self, dep, value ? 2 : 1);
+  }
+
+  void flush_namespaceproviders(DepId ns, DepId evr) {
+    pool_flush_namespaceproviders($self, ns, evr);
+  }
+
+
   %typemap(out) Queue whatmatchesdep Queue2Array(XSolvable *, 1, new_XSolvable(arg1, id));
   %newobject whatmatchesdep;
   Queue whatmatchesdep(Id keyname, DepId dep, Id marker = -1) {

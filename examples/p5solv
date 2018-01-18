@@ -566,6 +566,7 @@ die("unknown command '$cmd'\n") unless defined $cmdactionmap{$cmd};
 
 $pool->addfileprovides();
 $pool->createwhatprovides();
+$pool->set_namespaceproviders($solv::NAMESPACE_LANGUAGE, $pool->Dep('de'), 1);
 
 my @jobs;
 for my $arg (@ARGV) {

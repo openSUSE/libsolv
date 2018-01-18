@@ -1,13 +1,13 @@
 '\" t
 .\"     Title: Libsolv-Pool
 .\"    Author: [see the "Author" section]
-.\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 09/04/2017
+.\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
+.\"      Date: 01/18/2018
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-POOL" "3" "09/04/2017" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-POOL" "3" "01/18/2018" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -951,6 +951,18 @@ Some package managers like rpm allow dependencies on files contained in other pa
 .\}
 .sp
 Same as pool_addfileprovides, but the added Ids are returned in two Queues, \fIidq\fR for all repositories except the one containing the \(lqinstalled\(rq packages, \fIidqinst\fR for the latter one\&. This information can be stored in the meta section of the repositories to speed up the next time the repository is loaded and addfileprovides is called
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid pool_set_whatprovides(\fR\fIpool\fR\fB, Id\fR \fIid\fR\fB, Id\fR \fIoffset\fR\fB)\fR;
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Manually set an entry in the whatprovides index\&. You\(cqll never do this for package dependencies, as those entries are created by calling the pool_createwhatprovides() function\&. But this function is useful for namespace provides if you do not want to use a namespace callback to lazily set the provides\&. The offset argument is a offset in the whatprovides array, thus you can use \(lq1\(rq as a false value and \(lq2\(rq as true value\&.
 .sp
 .if n \{\
 .RS 4

@@ -1410,7 +1410,8 @@ pool_flush_namespaceproviders(Pool *pool, Id ns, Id evr)
 	continue;
       if (evr && rd->evr != evr)
 	continue;
-      pool->whatprovides_rel[d] = 0;
+      if (pool->whatprovides_rel[d])
+        pool_set_whatprovides(pool, MAKERELDEP(d), 0);
     }
 }
 
@@ -1862,24 +1863,66 @@ pool_lookup_deltalocation(Pool *pool, Id entry, unsigned int *medianrp)
   return loc;
 }
 
+void
+pool_set_whatprovides(Pool *pool, Id id, Id providers)
+{
+  int d, nrels = pool->nrels;
+  Reldep *rd;
+  Map m;
+
+  /* set new entry */
+  if (ISRELDEP(id))
+    {
+      d = GETRELID(id);
+      pool->whatprovides_rel[d] = providers;
+      d++;
+    }
+  else
+    {
+      pool->whatprovides[id] = providers;
+      if (id < pool->whatprovidesauxoff)
+	pool->whatprovidesaux[id] = 0;	/* sorry */
+      d = 1;
+    }
+  if (!pool->whatprovides_rel)
+    return;
+  /* clear cache of all rels that use it */
+  map_init(&m, 0);
+  for (rd = pool->rels + d; d < nrels; d++, rd++)
+    {
+      if (rd->name == id || rd->evr == id ||
+	  (m.size && ISRELDEP(rd->name) && MAPTST(&m, GETRELID(rd->name))) || 
+	  (m.size && ISRELDEP(rd->evr)  && MAPTST(&m, GETRELID(rd->evr))))
+	{
+	  pool->whatprovides_rel[d] = 0;	/* clear cache */
+	  if (!m.size)
+	    map_init(&m, nrels);
+	  MAPSET(&m, d);
+	}
+    }
+  map_free(&m);
+}
+
 static void
 add_new_provider(Pool *pool, Id id, Id p)
 {
   Queue q;
   Id *pp;
 
+  /* find whatprovides entry */
   while (ISRELDEP(id))
     {
       Reldep *rd = GETRELDEP(pool, id);
       id = rd->name;
     }
 
+  /* add new provider to existing list keeping it sorted */
   queue_init(&q);
   for (pp = pool->whatprovidesdata + pool->whatprovides[id]; *pp; pp++)
     {
       if (*pp == p)
 	{
-	  queue_free(&q);
+	  queue_free(&q);	/* already have it */
 	  return;
 	}
       if (*pp > p)
@@ -1891,9 +1934,7 @@ add_new_provider(Pool *pool, Id id, Id p)
     }
   if (p)
     queue_push(&q, p);
-  pool->whatprovides[id] = pool_queuetowhatprovides(pool, &q);
-  if (id < pool->whatprovidesauxoff)
-    pool->whatprovidesaux[id] = 0;	/* sorry */
+  pool_set_whatprovides(pool, id, pool_queuetowhatprovides(pool, &q));
   queue_free(&q);
 }
 
@@ -1920,9 +1961,7 @@ pool_add_fileconflicts_deps(Pool *pool, Queue *conflicts)
 	continue;
       s->provides = repo_addid_dep(s->repo, s->provides, id, SOLVABLE_FILEMARKER);
       if (pool->whatprovides)
-	add_new_provider(pool, fn, p);
-      if (pool->whatprovides_rel)
-	pool->whatprovides_rel[GETRELID(id)] = 0;	/* clear cache */
+	add_new_provider(pool, id, p);
       s = pool->solvables + q;
       if (!s->repo)
 	continue;

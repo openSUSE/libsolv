@@ -504,6 +504,21 @@ string. See the Dataiterator class for the allowed flags.
 create solver jobs working on a specific set of packages. See the Solver class
 for more information.
 
+	void set_namespaceproviders(DepId ns, DepId evr, bool value = 1)
+	$pool->set_namespaceproviders($ns, $evr, 1);
+	pool.set_namespaceproviders(ns, evr, True)
+	pool.set_namespaceproviders(ns, evr, true)
+
+Manually set an namespace provides entry in the whatprovides index.
+
+	void flush_namespaceproviders(DepId ns, DepId evr)
+        $pool->flush_namespaceproviders($ns, $evr);
+        $pool.flush_namespaceproviders(ns, evr)
+        $pool.flush_namespaceproviders(ns, evr)
+
+Flush the cache of all namespacprovudes matching the specified namespace
+dependency. You can use zero as a wildcard argument.
+
 	bool isknownarch(DepId id)
 	my $bool = $pool->isknownarch($id);
 	bool = pool.isknownarch(id)
