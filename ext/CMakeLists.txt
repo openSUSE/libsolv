@@ -6,7 +6,14 @@ SET (libsolvext_HEADERS
 
 IF (ENABLE_RPMDB OR ENABLE_RPMPKG)
     SET (libsolvext_SRCS ${libsolvext_SRCS}
-        pool_fileconflicts.c repo_rpmdb.c)
+        pool_fileconflicts.c)
+    IF (ENABLE_RPMDB_BYRPMHEADER)
+        SET (libsolvext_SRCS ${libsolvext_SRCS}
+            repo_rpmdb_librpm.c)
+    ELSE (ENABLE_RPMDB_BYRPMHEADER)
+        SET (libsolvext_SRCS ${libsolvext_SRCS}
+           repo_rpmdb.c)
+    ENDIF (ENABLE_RPMDB_BYRPMHEADER)
     SET (libsolvext_HEADERS ${libsolvext_HEADERS}
         pool_fileconflicts.h repo_rpmdb.h)
 ENDIF (ENABLE_RPMDB OR ENABLE_RPMPKG)
