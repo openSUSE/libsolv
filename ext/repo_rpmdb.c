@@ -33,7 +33,12 @@
 #endif
 #include <rpm/rpmdb.h>
 
-#ifndef DB_CREATE
+#ifdef ENABLE_RPMDB_LIBRPM
+#include <rpm/rpmts.h>
+#include <rpm/rpmmacro.h>
+#endif
+
+#if !defined(DB_CREATE) && !defined(ENABLE_RPMDB_LIBRPM)
 # if defined(SUSE) || defined(HAVE_RPM_DB_H)
 #  include <rpm/db.h>
 # else
@@ -144,6 +149,7 @@
 #define	TAG_SIGBASE		256
 #define TAG_SIGMD5		(TAG_SIGBASE + 5)
 #define TAG_SHA1HEADER		(TAG_SIGBASE + 13)
+#define TAG_SHA256HEADER	(TAG_SIGBASE + 17)
 
 #define SIGTAG_SIZE		1000
 #define SIGTAG_PGP		1002	/* RSA signature */
@@ -157,7 +163,7 @@
 #define DEP_PRE_IN		((1 << 6) | (1 << 9) | (1 << 10))
 #define DEP_PRE_UN		((1 << 6) | (1 << 11) | (1 << 12))
 
-#define FILEFLAG_GHOST		(1 <<  6)
+#define FILEFLAG_GHOST		(1 << 6)
 
 
 #ifdef RPM5
@@ -173,6 +179,9 @@
 
 #define MAX_HDR_CNT		0x10000
 #define MAX_HDR_DSIZE		0x10000000
+
+
+#ifndef ENABLE_RPMPKG_LIBRPM
 
 typedef struct rpmhead {
   int cnt;
@@ -377,6 +386,125 @@ headissourceheuristic(RpmHead *h)
   i = d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
   return i == 1 && o < h->dcnt && !h->dp[o] ? 1 : 0;
 }
+
+static inline void
+headfree(RpmHead *h)
+{
+  solv_free(h);
+}
+
+#else
+
+typedef struct headerToken_s RpmHead;
+
+static int
+headexists(RpmHead *h, int tag)
+{
+  return headerIsEntry(h, tag);
+}
+
+static void *headget(RpmHead *h, int tag, int *cnt, int alloc)
+{
+  struct rpmtd_s td;
+  if (!headerGet(h, tag, &td, alloc ? HEADERGET_ALLOC : HEADERGET_MINMEM))
+    return 0;
+  if (cnt)
+    *cnt = td.count;
+  return td.data;
+}
+
+static unsigned int *
+headint32array(RpmHead *h, int tag, int *cnt)
+{
+  return headget(h, tag, cnt, 1);
+}
+
+static unsigned int
+headint32(RpmHead *h, int tag)
+{
+  unsigned int *arr = headget(h, tag, 0, 0);
+  return arr ? arr[0] : 0;
+}
+
+static unsigned long long *
+headint64array(RpmHead *h, int tag, int *cnt)
+{
+  return headget(h, tag, cnt, 1);
+}
+
+/* returns the first entry of an 64bit integer array */
+static unsigned long long
+headint64(RpmHead *h, int tag)
+{
+  unsigned long long * arr = headget(h, tag, 0, 0);
+  return arr ? arr[0] : 0;
+}
+
+static unsigned int *
+headint16array(RpmHead *h, int tag, int *cnt)
+{
+  int i, cnt2;
+  unsigned int *arr;
+  unsigned short *arr2 = headget(h, tag, &cnt2, 0);
+  if (!arr2)
+    return 0;
+  arr = solv_calloc(cnt2 ? cnt2 : 1, sizeof(unsigned int));
+  for (i = 0; i < cnt2; i++)
+    arr[i] = arr2[i];
+  if (cnt)
+    *cnt = cnt2;
+  return arr;
+}
+
+static char *
+headstring(RpmHead *h, int tag)
+{
+  return headget(h, tag, 0, 0);
+}
+
+static char **
+headstringarray(RpmHead *h, int tag, int *cnt)
+{
+  return headget(h, tag, cnt, 1);
+}
+
+static unsigned char *
+headbinary(RpmHead *h, int tag, unsigned int *sizep)
+{
+  return headget(h, tag, (int *)sizep, 0);
+}
+
+static int
+headissourceheuristic(RpmHead *h)
+{
+  return headerIsSource(h);
+}
+
+RpmHead *
+headread(FILE *fp, unsigned char *lead, unsigned int dsize, Chksum *chk1, Chksum *chk2)
+{
+  char *buf = solv_malloc(8 + dsize);
+  Header h;
+  memcpy(buf, lead + 8, 8);
+  if (fread(buf + 8, dsize, 1, fp) != 1)
+    return 0;
+  if (chk1)
+    solv_chksum_add(chk1, buf + 8, dsize);
+  if (chk2)
+    solv_chksum_add(chk2, buf + 8, dsize);
+  h = headerImport(buf, 8 + dsize, HEADERIMPORT_FAST);
+  if (!h)
+    solv_free(buf);
+  return h;
+}
+
+static inline void
+headfree(RpmHead *h)
+{
+  headerFree(h);
+}
+
+#endif
 
 static char *headtoevr(RpmHead *h)
 {
@@ -1134,10 +1262,17 @@ struct rpmdbstate {
   int rpmheadsize;
 
 #ifdef ENABLE_RPMDB
-  int dbopened;
+# ifdef ENABLE_RPMDB_LIBRPM
+  int dbenv;		/* marker for rpmts ready */
+  rpmts ts;
+  rpmdbMatchIterator mi;	/* iterator over packages database */
+# else
   DB_ENV *dbenv;	/* database environment */
   DB *db;		/* packages database */
   int byteswapped;	/* endianess of packages database */
+  DBC *dbc;		/* iterator over packages database */
+#endif
+  int pkgdbopened;	/* package database openend */
   int is_ostree;	/* read-only db that lives in /usr/share/rpm */
 #endif
 };
@@ -1152,6 +1287,25 @@ struct rpmdbentry {
 #define ENTRIES_BLOCK 255
 #define NAMEDATA_BLOCK 1023
 
+
+static int
+stat_database(struct rpmdbstate *state, char *dbname, struct stat *statbuf, int seterror)
+{
+  char *dbpath;
+  dbpath = solv_dupjoin(state->rootdir, state->is_ostree ? "/usr/share/rpm/" : "/var/lib/rpm/", dbname);
+  if (stat(dbpath, statbuf))
+    {
+      if (seterror)
+        pool_error(state->pool, -1, "%s: %s", dbpath, strerror(errno));
+      free(dbpath);
+      return -1;
+    }
+  free(dbpath);
+  return 0;
+}
+
+
+#ifndef ENABLE_RPMDB_LIBRPM
 
 static inline Id
 db2rpmdbid(unsigned char *db, int byteswapped)
@@ -1216,6 +1370,7 @@ serialize_dbenv_ops(struct rpmdbstate *state)
   close(fd);
   return -1;
 }
+
 #endif
 
 /* should look in /usr/lib/rpm/macros instead, but we want speed... */
@@ -1301,67 +1456,11 @@ closedbenv(struct rpmdbstate *state)
 }
 
 static int
-stat_database(struct rpmdbstate *state, char *dbname, struct stat *statbuf, int seterror)
-{
-  char *dbpath;
-  dbpath = solv_dupjoin(state->rootdir, state->is_ostree ? "/usr/share/rpm/" : "/var/lib/rpm/", dbname);
-  if (stat(dbpath, statbuf))
-    {
-      if (seterror)
-        pool_error(state->pool, -1, "%s: %s", dbpath, strerror(errno));
-      free(dbpath);
-      return -1;
-    }
-  free(dbpath);
-  return 0;
-}
-
-#endif
-
-static void
-freestate(struct rpmdbstate *state)
-{
-  /* close down */
-  if (!state)
-    return;
-#ifdef ENABLE_RPMDB
-  if (state->db)
-    state->db->close(state->db, 0);
-  if (state->dbenv)
-    closedbenv(state);
-#endif
-  if (state->rootdir)
-    solv_free(state->rootdir);
-  solv_free(state->rpmhead);
-}
-
-void *
-rpm_state_create(Pool *pool, const char *rootdir)
-{
-  struct rpmdbstate *state;
-  state = solv_calloc(1, sizeof(*state));
-  state->pool = pool;
-  if (rootdir)
-    state->rootdir = solv_strdup(rootdir);
-  return state;
-}
-
-void *
-rpm_state_free(void *state)
-{
-  freestate(state);
-  return solv_free(state);
-}
-
-
-#ifdef ENABLE_RPMDB
-
-static int
 openpkgdb(struct rpmdbstate *state)
 {
-  if (state->dbopened)
-    return state->dbopened > 0 ? 1 : 0;
-  state->dbopened = -1;
+  if (state->pkgdbopened)
+    return state->pkgdbopened > 0 ? 1 : 0;
+  state->pkgdbopened = -1;
   if (!state->dbenv && !opendbenv(state))
     return 0;
   if (db_create(&state->db, state->dbenv, 0))
@@ -1387,8 +1486,18 @@ openpkgdb(struct rpmdbstate *state)
       closedbenv(state);
       return 0;
     }
-  state->dbopened = 1;
+  state->pkgdbopened = 1;
   return 1;
+}
+
+static void
+closepkgdb(struct rpmdbstate *state)
+{
+  if (!state->db)
+    return;
+  state->db->close(state->db, 0);
+  state->db = 0;
+  state->pkgdbopened = 0;
 }
 
 /* get the rpmdbids of all installed packages from the Name index database.
@@ -1525,7 +1634,7 @@ getrpm_dbid(struct rpmdbstate *state, Id dbid)
 
   if (dbid <= 0)
     return pool_error(state->pool, -1, "illegal rpmdbid %d", dbid);
-  if (state->dbopened != 1 && !openpkgdb(state))
+  if (state->pkgdbopened != 1 && !openpkgdb(state))
     return -1;
   rpmdbid2db(buf, dbid, state->byteswapped);
   memset(&dbkey, 0, sizeof(dbkey));
@@ -1539,9 +1648,24 @@ getrpm_dbid(struct rpmdbstate *state, Id dbid)
   return getrpm_dbdata(state, &dbdata, dbid);
 }
 
+static int
+pkgdb_cursor_open(struct rpmdbstate *state)
+{
+  if (state->db->cursor(state->db, NULL, &state->dbc, 0))
+    return pool_error(state->pool, -1, "db->cursor failed");
+  return 0;
+}
+
+static void
+pkgdb_cursor_close(struct rpmdbstate *state)
+{
+  state->dbc->c_close(state->dbc);
+  state->dbc = 0;
+}
+
 /* retrive header by berkeleydb cursor, returns 0 on EOF, -1 on error */
 static Id
-getrpm_cursor(struct rpmdbstate *state, DBC *dbc)
+pkgdb_cursor_getrpm(struct rpmdbstate *state)
 {
   DBT dbkey;
   DBT dbdata;
@@ -1549,7 +1673,7 @@ getrpm_cursor(struct rpmdbstate *state, DBC *dbc)
 
   memset(&dbkey, 0, sizeof(dbkey));
   memset(&dbdata, 0, sizeof(dbdata));
-  while (dbc->c_get(dbc, &dbkey, &dbdata, DB_NEXT) == 0)
+  while (state->dbc->c_get(state->dbc, &dbkey, &dbdata, DB_NEXT) == 0)
     {
       if (dbkey.size != 4)
 	return pool_error(state->pool, -1, "corrupt Packages database (key size)");
@@ -1557,7 +1681,7 @@ getrpm_cursor(struct rpmdbstate *state, DBC *dbc)
       if (dbid)		/* ignore join key */
         return getrpm_dbdata(state, &dbdata, dbid);
     }
-  return 0;
+  return 0;	/* no more entries */
 }
 
 static int
@@ -1598,6 +1722,240 @@ count_headers(struct rpmdbstate *state)
   db->close(db, 0);
   return count;
 }
+
+#else   /* !ENABLE_RPMDB_LIBRPM */
+
+static int
+opendbenv(struct rpmdbstate *state)
+{
+  const char *rootdir = state->rootdir;
+  rpmts ts;
+  char *dbpath;
+  dbpath = solv_dupjoin(rootdir, "_dbpath /var/lib/rpm", 0);
+  if (access(dbpath + 8, W_OK) == -1)
+    {
+      free(dbpath);
+      dbpath = solv_dupjoin(rootdir, "/usr/share/rpm/Packages", 0);
+      if (access(dbpath, R_OK) == 0)
+	state->is_ostree = 1;
+      free(dbpath);
+      dbpath = solv_dupjoin(rootdir, state->is_ostree ? "_dbpath /usr/share/rpm" : "_dbpath /var/lib/rpm", 0);
+    }
+  rpmDefineMacro(NULL, dbpath, 0);
+  ts = rpmtsCreate();
+  if (!ts)
+    {
+      pool_error(state->pool, 0, "rpmtsCreate failed");
+      delMacro(NULL, "_dbpath");
+      return 0;
+    }
+  if (rpmtsOpenDB(ts, O_RDONLY))
+    {
+      pool_error(state->pool, 0, "rpmtsOpenDB failed: %s", strerror(errno));
+      rpmtsFree(ts);
+      delMacro(NULL, "_dbpath");
+      return 0;
+    }
+  delMacro(NULL, "_dbpath");
+  rpmtsSetVSFlags(ts, _RPMVSF_NODIGESTS | _RPMVSF_NOSIGNATURES | _RPMVSF_NOHEADER);
+  state->ts = ts;
+  state->dbenv = 1;
+  state->pkgdbopened = 1;
+  return 1;
+}
+
+static void
+closedbenv(struct rpmdbstate *state)
+{
+  if (!state->dbenv)
+    return;
+  rpmtsFree(state->ts);
+  state->ts = 0;
+  state->pkgdbopened = 0;
+  state->dbenv = 0;
+}
+
+static int
+openpkgdb(struct rpmdbstate *state)
+{
+  /* already done in opendbenv */
+  return 1;
+}
+
+static void
+closepkgdb(struct rpmdbstate *state)
+{
+}
+
+static int
+pkgdb_cursor_open(struct rpmdbstate *state)
+{
+  state->mi = rpmtsInitIterator(state->ts, RPMDBI_PACKAGES, NULL, 0);
+  return 0;
+}
+
+static void
+pkgdb_cursor_close(struct rpmdbstate *state)
+{
+  rpmdbFreeIterator(state->mi);
+  state->mi = 0;
+}
+
+static Id
+pkgdb_cursor_getrpm(struct rpmdbstate *state)
+{
+  Header h;
+  while ((h = rpmdbNextIterator(state->mi)))
+    {
+      Id dbid = rpmdbGetIteratorOffset(state->mi);
+      if (!rpm_byrpmh(state, h))
+	continue;
+      return dbid;
+    }
+  return 0;
+}
+
+
+/* get the rpmdbids of all installed packages from the Name index database.
+ * This is much faster then querying the big Packages database */
+static struct rpmdbentry *
+getinstalledrpmdbids(struct rpmdbstate *state, const char *index, const char *match, int *nentriesp, char **namedatap)
+{
+  const void * key;
+  size_t keylen;
+  Id nameoff;
+
+  char *namedata = 0;
+  int namedatal = 0;
+  struct rpmdbentry *entries = 0;
+  int nentries = 0;
+
+  rpmdbIndexIterator ii;
+  int i;
+
+  if (!state->dbenv && !opendbenv(state))
+    return 0;
+
+  ii = rpmdbIndexIteratorInit(rpmtsGetRdb(state->ts), RPMDBI_NAME);
+
+  *nentriesp = 0;
+  if (namedatap)
+    *namedatap = 0;
+
+  while (rpmdbIndexIteratorNext(ii, &key, &keylen) == 0)
+    {
+
+      if (keylen == 10 && !memcmp(key, "gpg-pubkey", 10))
+       continue;
+      nameoff = namedatal;
+      if (namedatap)
+       {
+         namedata = solv_extend(namedata, namedatal, keylen + 1, 1, NAMEDATA_BLOCK);
+         memcpy(namedata + namedatal, key, keylen);
+         namedata[namedatal + keylen] = 0;
+         namedatal += keylen + 1;
+       }
+      for (i = 0; i < rpmdbIndexIteratorNumPkgs(ii); i++)
+       {
+         entries = solv_extend(entries, nentries, 1, sizeof(*entries), ENTRIES_BLOCK);
+         entries[nentries].rpmdbid = rpmdbIndexIteratorPkgOffset(ii, i);
+         entries[nentries].nameoff = nameoff;
+         nentries++;
+       }
+    }
+  rpmdbIndexIteratorFree(ii);
+  /* make sure that enteries is != 0 if there was no error */
+  if (!entries)
+    entries = solv_extend(entries, 1, 1, sizeof(*entries), ENTRIES_BLOCK);
+  *nentriesp = nentries;
+  if (namedatap)
+    *namedatap = namedata;
+  return entries;
+}
+
+static int
+count_headers(struct rpmdbstate *state)
+{
+  int count;
+  rpmdbMatchIterator mi;
+
+  if (!state->dbenv && !opendbenv(state))
+    return 0;
+  mi = rpmtsInitIterator(state->ts, RPMDBI_NAME, NULL, 0);
+  count = rpmdbGetIteratorCount(mi);
+  rpmdbFreeIterator(mi);
+  return count;
+}
+
+/* retrive header by rpmdbid, returns 0 if not found, -1 on error */
+static int
+getrpm_dbid(struct rpmdbstate *state, Id rpmdbid)
+{
+  Header h;
+  rpmdbMatchIterator mi;
+  unsigned int offset = rpmdbid;
+
+  if (!state->dbenv && !opendbenv(state))
+    return -1;
+  mi = rpmtsInitIterator(state->ts, RPMDBI_PACKAGES, &offset, sizeof(offset));
+  h = rpmdbNextIterator(mi);
+  if (!h)
+    {
+      rpmdbFreeIterator(mi);
+      return 0;
+    }
+  if (!rpm_byrpmh(state, h))
+    {
+      rpmdbFreeIterator(mi);
+      return -1;
+    }
+  mi = rpmdbFreeIterator(mi);
+  return 1;
+}
+
+#endif	/* !ENABLE_RPMDB_LIBRPM */
+
+
+#endif	/* ENABLE_RPMDB */
+
+static void
+freestate(struct rpmdbstate *state)
+{
+  /* close down */
+  if (!state)
+    return;
+#ifdef ENABLE_RPMDB
+  if (state->pkgdbopened)
+    closepkgdb(state);
+  if (state->dbenv)
+    closedbenv(state);
+#endif
+  if (state->rootdir)
+    solv_free(state->rootdir);
+  headfree(state->rpmhead);
+}
+
+void *
+rpm_state_create(Pool *pool, const char *rootdir)
+{
+  struct rpmdbstate *state;
+  state = solv_calloc(1, sizeof(*state));
+  state->pool = pool;
+  if (rootdir)
+    state->rootdir = solv_strdup(rootdir);
+  return state;
+}
+
+void *
+rpm_state_free(void *state)
+{
+  freestate(state);
+  return solv_free(state);
+}
+
+
+#ifdef ENABLE_RPMDB
+
 
 /******************************************************************/
 
@@ -1911,7 +2269,6 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
     {
       int solvstart = 0, solvend = 0;
       Id dbid;
-      DBC *dbc = 0;
 
       if (ref && (flags & RPMDB_EMPTY_REFREPO) != 0)
 	repo_empty(ref, 1);	/* get it out of the way */
@@ -1922,18 +2279,18 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
 	  freestate(&state);
 	  return -1;
 	}
-      if (state.db->cursor(state.db, NULL, &dbc, 0))
+      if (pkgdb_cursor_open(&state))
 	{
 	  freestate(&state);
-	  return pool_error(pool, -1, "db->cursor failed");
+	  return -1;
 	}
       i = 0;
       s = 0;
-      while ((dbid = getrpm_cursor(&state, dbc)) != 0)
+      while ((dbid = pkgdb_cursor_getrpm(&state)) != 0)
 	{
 	  if (dbid == -1)
 	    {
-	      dbc->c_close(dbc);
+	      pkgdb_cursor_close(&state);
 	      freestate(&state);
 	      return -1;
 	    }
@@ -1967,7 +2324,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
 	        pool_debug(pool, SOLV_ERROR, "%%%% %d\n", done * 100 / count);
 	    }
 	}
-      dbc->c_close(dbc);
+      pkgdb_cursor_close(&state);
       if (s)
 	{
 	  /* oops, could not reuse. free it instead */
@@ -2158,7 +2515,9 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
   Pool *pool = repo->pool;
   Solvable *s;
   RpmHead *rpmhead = 0;
+#ifndef ENABLE_RPMPKG_LIBRPM
   int rpmheadsize = 0;
+#endif
   char *payloadformat;
   FILE *fp;
   unsigned char lead[4096];
@@ -2231,6 +2590,7 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
   pkgidtype = leadsigidtype = hdridtype = 0;
   if ((flags & (RPM_ADD_WITH_PKGID | RPM_ADD_WITH_HDRID)) != 0)
     {
+#ifndef ENABLE_RPMPKG_LIBRPM
       /* extract pkgid or hdrid from the signature header */
       if (sigdsize + 1 > rpmheadsize)
 	{
@@ -2251,6 +2611,15 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
       rpmhead->cnt = sigcnt;
       rpmhead->dcnt = sigdsize - sigcnt * 16;
       rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
+#else
+      rpmhead = headread(fp, lead + 96, sigdsize, chksumh, leadsigchksumh);
+      if (!rpmhead)
+	{
+	  pool_error(pool, -1, "%s: unexpected EOF", rpm);
+	  fclose(fp);
+	  return 0;
+	}
+#endif
       if ((flags & RPM_ADD_WITH_PKGID) != 0)
 	{
 	  unsigned char *chksum;
@@ -2276,6 +2645,10 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
 	        hdridtype = REPOKEY_TYPE_SHA256;
 	    }
 	}
+#ifdef ENABLE_RPMPKG_LIBRPM
+      headfree(rpmhead);
+      rpmhead = 0;
+#endif
     }
   else
     {
@@ -2325,6 +2698,8 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
     }
   l = sigdsize + sigcnt * 16;
   headerend = headerstart + 16 + l;
+
+#ifndef ENABLE_RPMPKG_LIBRPM
   if (l + 1 > rpmheadsize)
     {
       rpmheadsize = l + 128;
@@ -2342,13 +2717,22 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
   rpmhead->cnt = sigcnt;
   rpmhead->dcnt = sigdsize;
   rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
+#else
+  rpmhead = headread(fp, lead, l, chksumh, 0);
+  if (!rpmhead)
+    {
+      pool_error(pool, -1, "%s: unexpected EOF", rpm);
+      fclose(fp);
+      return 0;
+    }
+#endif
   if (headexists(rpmhead, TAG_PATCHESNAME))
     {
       /* this is a patch rpm, ignore */
       pool_error(pool, -1, "%s: is patch rpm", rpm);
       fclose(fp);
       solv_chksum_free(chksumh, 0);
-      solv_free(rpmhead);
+      headfree(rpmhead);
       return 0;
     }
   payloadformat = headstring(rpmhead, TAG_PAYLOADFORMAT);
@@ -2358,7 +2742,7 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
       pool_error(pool, -1, "%s: is delta rpm", rpm);
       fclose(fp);
       solv_chksum_free(chksumh, 0);
-      solv_free(rpmhead);
+      headfree(rpmhead);
       return 0;
     }
   if (chksumh)
@@ -2370,7 +2754,7 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
     {
       repo_free_solvable(repo, s - pool->solvables, 1);
       solv_chksum_free(chksumh, 0);
-      solv_free(rpmhead);
+      headfree(rpmhead);
       return 0;
     }
   if (!(flags & REPO_NO_LOCATION))
@@ -2389,7 +2773,7 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
       repodata_set_bin_checksum(data, s - pool->solvables, SOLVABLE_CHECKSUM, chksumtype, solv_chksum_get(chksumh, 0));
       chksumh = solv_chksum_free(chksumh, 0);
     }
-  solv_free(rpmhead);
+  headfree(rpmhead);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
   return s - pool->solvables;
@@ -2765,6 +3149,7 @@ rpm_byfp(void *rpmstate, FILE *fp, const char *name)
       return 0;
     }
   l = sigdsize + sigcnt * 16;
+#ifndef ENABLE_RPMPKG_LIBRPM
   /* headerend = headerstart + 16 + l; */
   if (l + 1 > state->rpmheadsize)
     {
@@ -2781,19 +3166,30 @@ rpm_byfp(void *rpmstate, FILE *fp, const char *name)
   rpmhead->cnt = sigcnt;
   rpmhead->dcnt = sigdsize;
   rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
+#else
+  rpmhead = headread(fp, lead, l, 0, 0);
+  if (!rpmhead)
+    {
+      pool_error(state->pool, 0, "%s: unexpected EOF", name);
+      return 0;
+    }
+#endif
   return rpmhead;
 }
 
-#ifdef ENABLE_RPMDB_BYRPMHEADER
+#if defined(ENABLE_RPMDB_BYRPMHEADER) || defined(ENABLE_RPMDB_LIBRPM)
 
 void *
 rpm_byrpmh(void *rpmstate, Header h)
 {
   struct rpmdbstate *state = rpmstate;
+  RpmHead *rpmhead;
+#ifndef ENABLE_RPMPKG_LIBRPM
   const unsigned char *uh;
   unsigned int sigdsize, sigcnt, l;
-  RpmHead *rpmhead;
 
+  if (!h)
+    return 0;
 #ifndef RPM5
   uh = headerUnload(h);
 #else
@@ -2818,6 +3214,11 @@ rpm_byrpmh(void *rpmstate, Header h)
   rpmhead->cnt = sigcnt;
   rpmhead->dcnt = sigdsize;
   rpmhead->dp = rpmhead->data + sigcnt * 16;
+#else
+  if (!h)
+    return 0;
+  rpmhead = state->rpmhead = headerLink(h);
+#endif
   return rpmhead;
 }
 
