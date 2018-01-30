@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2012, Novell Inc.
+ * Copyright (c) 2007-2018, SUSE Inc.
  *
  * This program is licensed under the BSD license, read LICENSE.BSD
  * for further information
@@ -478,24 +478,6 @@ static int
 headissourceheuristic(RpmHead *h)
 {
   return headerIsSource(h);
-}
-
-RpmHead *
-headread(FILE *fp, unsigned char *lead, unsigned int dsize, Chksum *chk1, Chksum *chk2)
-{
-  char *buf = solv_malloc(8 + dsize);
-  Header h;
-  memcpy(buf, lead + 8, 8);
-  if (fread(buf + 8, dsize, 1, fp) != 1)
-    return 0;
-  if (chk1)
-    solv_chksum_add(chk1, buf + 8, dsize);
-  if (chk2)
-    solv_chksum_add(chk2, buf + 8, dsize);
-  h = headerImport(buf, 8 + dsize, HEADERIMPORT_FAST);
-  if (!h)
-    solv_free(buf);
-  return h;
 }
 
 static inline void
@@ -1262,6 +1244,10 @@ struct rpmdbstate {
   int rpmheadsize;
 
 #ifdef ENABLE_RPMDB
+  int dbenvopened;	/* database environment opened */
+  int pkgdbopened;	/* package database openend */
+  int is_ostree;	/* read-only db that lives in /usr/share/rpm */
+
 # ifdef ENABLE_RPMDB_LIBRPM
   int dbenv;		/* marker for rpmts ready */
   rpmts ts;
@@ -1272,10 +1258,69 @@ struct rpmdbstate {
   int byteswapped;	/* endianess of packages database */
   DBC *dbc;		/* iterator over packages database */
 #endif
-  int pkgdbopened;	/* package database openend */
-  int is_ostree;	/* read-only db that lives in /usr/share/rpm */
 #endif
 };
+
+
+#ifndef ENABLE_RPMPKG_LIBRPM
+
+int
+headread(struct rpmdbstate *state, const char *name, FILE *fp, unsigned char *lead, unsigned int cnt, unsigned int dsize, unsigned int pad, Chksum *chk1, Chksum *chk2)
+{
+  unsigned int len = 16 * cnt + dsize + pad;
+  if (len + 1 > state->rpmheadsize)
+    {
+      state->rpmheadsize = len+ 128;
+      state->rpmhead = solv_realloc(state->rpmhead, sizeof(*state->rpmhead) + state->rpmheadsize);
+    }
+  if (fread(state->rpmhead->data, len, 1, fp) != 1)
+    {
+      fclose(fp);
+      return pool_error(state->pool, 0, "%s: unexpected EOF", name);
+    }
+  state->rpmhead->data[len] = 0;
+  if (chk1)
+    solv_chksum_add(chk1, state->rpmhead->data, len);
+  if (chk2)
+    solv_chksum_add(chk2, state->rpmhead->data, len);
+  state->rpmhead->cnt = cnt;
+  state->rpmhead->dcnt = dsize;
+  state->rpmhead->dp = state->rpmhead->data + cnt * 16;
+  return 1;
+}
+
+#else
+
+int
+headread(struct rpmdbstate *state, const char *name, FILE *fp, unsigned char *lead, unsigned int cnt, unsigned int dsize, unsigned int pad, Chksum *chk1, Chksum *chk2)
+{
+  unsigned int len = 16 * cnt + dsize + pad;
+  char *buf = solv_malloc(8 + len);
+  Header h;
+  memcpy(buf, lead + 8, 8);
+  if (fread(buf + 8, len, 1, fp) != 1)
+    {
+      solv_free(buf);
+      return pool_error(state->pool, 0, "%s: unexpected EOF", name);
+    }
+  if (chk1)
+    solv_chksum_add(chk1, buf + 8, len);
+  if (chk2)
+    solv_chksum_add(chk2, buf + 8, len);
+  h = headerImport(buf, 8 + len - pad, HEADERIMPORT_FAST);
+  if (!h)
+    {
+      solv_free(buf);
+      return pool_error(state->pool, 0, "%s: headerImport error", name);
+    }
+  if (state->rpmhead)
+    headfree(state->rpmhead);
+  state->rpmhead = h;
+  return 1;
+}
+
+#endif
+
 
 #ifdef ENABLE_RPMDB
 
@@ -2512,13 +2557,10 @@ repo_add_rpmdb_reffp(Repo *repo, FILE *fp, int flags)
 Id
 repo_add_rpm(Repo *repo, const char *rpm, int flags)
 {
-  unsigned int sigdsize, sigcnt, l;
+  unsigned int sigdsize, sigcnt, sigpad, l;
   Pool *pool = repo->pool;
   Solvable *s;
-  RpmHead *rpmhead = 0;
-#ifndef ENABLE_RPMPKG_LIBRPM
-  int rpmheadsize = 0;
-#endif
+  struct rpmdbstate state;
   char *payloadformat;
   FILE *fp;
   unsigned char lead[4096];
@@ -2540,6 +2582,7 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
   else if ((flags & RPM_ADD_WITH_SHA1SUM) != 0)
     chksumtype = REPOKEY_TYPE_SHA1;
 
+  /* open rpm */
   if ((fp = fopen(flags & REPO_USE_ROOTDIR ? pool_prepend_rootdir_tmp(pool, rpm) : rpm, "r")) == 0)
     {
       pool_error(pool, -1, "%s: %s", rpm, strerror(errno));
@@ -2551,6 +2594,12 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
       fclose(fp);
       return 0;
     }
+
+  /* setup state */
+  memset(&state, 0, sizeof(state));
+  state.pool = pool;
+
+  /* process lead */
   if (chksumtype)
     chksumh = solv_chksum_create(chksumtype);
   if ((flags & RPM_ADD_WITH_LEADSIGID) != 0)
@@ -2565,6 +2614,8 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
     solv_chksum_add(chksumh, lead, 96 + 16);
   if (leadsigchksumh)
     solv_chksum_add(leadsigchksumh, lead, 96 + 16);
+
+  /* process signature header */
   if (lead[78] != 0 || lead[79] != 5)
     {
       pool_error(pool, -1, "%s: not a rpm v5 header", rpm);
@@ -2585,47 +2636,21 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
       fclose(fp);
       return 0;
     }
-  sigdsize += sigcnt * 16;
-  sigdsize = (sigdsize + 7) & ~7;
-  headerstart = 96 + 16 + sigdsize;
+  sigpad = sigdsize & 7 ? 8 - (sigdsize & 7) : 0;
+  headerstart = 96 + 16 + sigcnt * 16 + sigdsize + sigpad;
   pkgidtype = leadsigidtype = hdridtype = 0;
   if ((flags & (RPM_ADD_WITH_PKGID | RPM_ADD_WITH_HDRID)) != 0)
     {
-#ifndef ENABLE_RPMPKG_LIBRPM
-      /* extract pkgid or hdrid from the signature header */
-      if (sigdsize + 1 > rpmheadsize)
+      if (!headread(&state, rpm, fp, lead + 96, sigcnt, sigdsize, sigpad, chksumh, leadsigchksumh))
 	{
-	  rpmheadsize = sigdsize + 128;
-	  rpmhead = solv_realloc(rpmhead, sizeof(*rpmhead) + rpmheadsize);
-	}
-      if (fread(rpmhead->data, sigdsize, 1, fp) != 1)
-	{
-	  pool_error(pool, -1, "%s: unexpected EOF", rpm);
 	  fclose(fp);
 	  return 0;
 	}
-      rpmhead->data[sigdsize] = 0;
-      if (chksumh)
-	solv_chksum_add(chksumh, rpmhead->data, sigdsize);
-      if (leadsigchksumh)
-	solv_chksum_add(leadsigchksumh, rpmhead->data, sigdsize);
-      rpmhead->cnt = sigcnt;
-      rpmhead->dcnt = sigdsize - sigcnt * 16;
-      rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
-#else
-      rpmhead = headread(fp, lead + 96, sigdsize, chksumh, leadsigchksumh);
-      if (!rpmhead)
-	{
-	  pool_error(pool, -1, "%s: unexpected EOF", rpm);
-	  fclose(fp);
-	  return 0;
-	}
-#endif
       if ((flags & RPM_ADD_WITH_PKGID) != 0)
 	{
 	  unsigned char *chksum;
 	  unsigned int chksumsize;
-	  chksum = headbinary(rpmhead, SIGTAG_MD5, &chksumsize);
+	  chksum = headbinary(state.rpmhead, SIGTAG_MD5, &chksumsize);
 	  if (chksum && chksumsize == 16)
 	    {
 	      pkgidtype = REPOKEY_TYPE_MD5;
@@ -2634,7 +2659,7 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
 	}
       if ((flags & RPM_ADD_WITH_HDRID) != 0)
 	{
-	  const char *str = headstring(rpmhead, TAG_SHA1HEADER);
+	  const char *str = headstring(state.rpmhead, TAG_SHA1HEADER);
 	  if (str && strlen(str) == 40)
 	    {
 	      if (solv_hex2bin(&str, hdrid, 20) == 20)
@@ -2646,17 +2671,14 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
 	        hdridtype = REPOKEY_TYPE_SHA256;
 	    }
 	}
-#ifdef ENABLE_RPMPKG_LIBRPM
-      headfree(rpmhead);
-      rpmhead = 0;
-#endif
     }
   else
     {
       /* just skip the signature header */
-      while (sigdsize)
+      unsigned int len = sigcnt * 16 + sigdsize + sigpad;
+      while (len)
 	{
-	  l = sigdsize > 4096 ? 4096 : sigdsize;
+	  l = len > 4096 ? 4096 : len;
 	  if (fread(lead, l, 1, fp) != 1)
 	    {
 	      pool_error(pool, -1, "%s: unexpected EOF", rpm);
@@ -2667,7 +2689,7 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
 	    solv_chksum_add(chksumh, lead, l);
 	  if (leadsigchksumh)
 	    solv_chksum_add(leadsigchksumh, lead, l);
-	  sigdsize -= l;
+	  len -= l;
 	}
     }
   if (leadsigchksumh)
@@ -2675,6 +2697,8 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
       leadsigchksumh = solv_chksum_free(leadsigchksumh, leadsigid);
       leadsigidtype = REPOKEY_TYPE_MD5;
     }
+
+  /* process main header */
   if (fread(lead, 16, 1, fp) != 1)
     {
       pool_error(pool, -1, "%s: unexpected EOF", rpm);
@@ -2697,53 +2721,30 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
       fclose(fp);
       return 0;
     }
-  l = sigdsize + sigcnt * 16;
-  headerend = headerstart + 16 + l;
+  headerend = headerstart + 16 + sigdsize + sigcnt * 16;
 
-#ifndef ENABLE_RPMPKG_LIBRPM
-  if (l + 1 > rpmheadsize)
+  if (!headread(&state, rpm, fp, lead, sigcnt, sigdsize, 0, chksumh, 0))
     {
-      rpmheadsize = l + 128;
-      rpmhead = solv_realloc(rpmhead, sizeof(*rpmhead) + rpmheadsize);
-    }
-  if (fread(rpmhead->data, l, 1, fp) != 1)
-    {
-      pool_error(pool, -1, "%s: unexpected EOF", rpm);
       fclose(fp);
       return 0;
     }
-  rpmhead->data[l] = 0;
-  if (chksumh)
-    solv_chksum_add(chksumh, rpmhead->data, l);
-  rpmhead->cnt = sigcnt;
-  rpmhead->dcnt = sigdsize;
-  rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
-#else
-  rpmhead = headread(fp, lead, l, chksumh, 0);
-  if (!rpmhead)
-    {
-      pool_error(pool, -1, "%s: unexpected EOF", rpm);
-      fclose(fp);
-      return 0;
-    }
-#endif
-  if (headexists(rpmhead, TAG_PATCHESNAME))
+  if (headexists(state.rpmhead, TAG_PATCHESNAME))
     {
       /* this is a patch rpm, ignore */
       pool_error(pool, -1, "%s: is patch rpm", rpm);
       fclose(fp);
       solv_chksum_free(chksumh, 0);
-      headfree(rpmhead);
+      headfree(state.rpmhead);
       return 0;
     }
-  payloadformat = headstring(rpmhead, TAG_PAYLOADFORMAT);
+  payloadformat = headstring(state.rpmhead, TAG_PAYLOADFORMAT);
   if (payloadformat && !strcmp(payloadformat, "drpm"))
     {
       /* this is a delta rpm */
       pool_error(pool, -1, "%s: is delta rpm", rpm);
       fclose(fp);
       solv_chksum_free(chksumh, 0);
-      headfree(rpmhead);
+      headfree(state.rpmhead);
       return 0;
     }
   if (chksumh)
@@ -2751,11 +2752,11 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
       solv_chksum_add(chksumh, lead, l);
   fclose(fp);
   s = pool_id2solvable(pool, repo_add_solvable(repo));
-  if (!rpmhead2solv(pool, repo, data, s, rpmhead, flags & ~(RPM_ADD_WITH_HDRID | RPM_ADD_WITH_PKGID)))
+  if (!rpmhead2solv(pool, repo, data, s, state.rpmhead, flags & ~(RPM_ADD_WITH_HDRID | RPM_ADD_WITH_PKGID)))
     {
       repo_free_solvable(repo, s - pool->solvables, 1);
       solv_chksum_free(chksumh, 0);
-      headfree(rpmhead);
+      headfree(state.rpmhead);
       return 0;
     }
   if (!(flags & REPO_NO_LOCATION))
@@ -2774,7 +2775,7 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
       repodata_set_bin_checksum(data, s - pool->solvables, SOLVABLE_CHECKSUM, chksumtype, solv_chksum_get(chksumh, 0));
       chksumh = solv_chksum_free(chksumh, 0);
     }
-  headfree(rpmhead);
+  headfree(state.rpmhead);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
   return s - pool->solvables;
@@ -3092,8 +3093,6 @@ void *
 rpm_byfp(void *rpmstate, FILE *fp, const char *name)
 {
   struct rpmdbstate *state = rpmstate;
-  /* int headerstart, headerend; */
-  RpmHead *rpmhead;
   unsigned int sigdsize, sigcnt, l;
   unsigned char lead[4096];
 
@@ -3107,6 +3106,8 @@ rpm_byfp(void *rpmstate, FILE *fp, const char *name)
       pool_error(state->pool, 0, "%s: not a V5 header", name);
       return 0;
     }
+
+  /* skip signature header */
   if (getu32(lead + 96) != 0x8eade801)
     {
       pool_error(state->pool, 0, "%s: bad signature header", name);
@@ -3121,7 +3122,6 @@ rpm_byfp(void *rpmstate, FILE *fp, const char *name)
     }
   sigdsize += sigcnt * 16;
   sigdsize = (sigdsize + 7) & ~7;
-  /* headerstart = 96 + 16 + sigdsize; */
   while (sigdsize)
     {
       l = sigdsize > 4096 ? 4096 : sigdsize;
@@ -3132,6 +3132,7 @@ rpm_byfp(void *rpmstate, FILE *fp, const char *name)
 	}
       sigdsize -= l;
     }
+
   if (fread(lead, 16, 1, fp) != 1)
     {
       pool_error(state->pool, 0, "%s: unexpected EOF", name);
@@ -3149,33 +3150,9 @@ rpm_byfp(void *rpmstate, FILE *fp, const char *name)
       pool_error(state->pool, 0, "%s: bad header", name);
       return 0;
     }
-  l = sigdsize + sigcnt * 16;
-#ifndef ENABLE_RPMPKG_LIBRPM
-  /* headerend = headerstart + 16 + l; */
-  if (l + 1 > state->rpmheadsize)
-    {
-      state->rpmheadsize = l + 128;
-      state->rpmhead = solv_realloc(state->rpmhead, sizeof(*state->rpmhead) + state->rpmheadsize);
-    }
-  rpmhead = state->rpmhead;
-  if (fread(rpmhead->data, l, 1, fp) != 1)
-    {
-      pool_error(state->pool, 0, "%s: unexpected EOF", name);
-      return 0;
-    }
-  rpmhead->data[l] = 0;
-  rpmhead->cnt = sigcnt;
-  rpmhead->dcnt = sigdsize;
-  rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
-#else
-  rpmhead = headread(fp, lead, l, 0, 0);
-  if (!rpmhead)
-    {
-      pool_error(state->pool, 0, "%s: unexpected EOF", name);
-      return 0;
-    }
-#endif
-  return rpmhead;
+  if (!headread(state, name, fp, lead, sigcnt, sigdsize, 0, 0, 0))
+    return 0;
+  return state->rpmhead;
 }
 
 #if defined(ENABLE_RPMDB_BYRPMHEADER) || defined(ENABLE_RPMDB_LIBRPM)
