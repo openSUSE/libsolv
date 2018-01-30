@@ -8,7 +8,7 @@
 /*
  * repo_rpmdb_librpm.h
  *
- * * Use BerkeleyDB to access the rpm database
+ * Use librpm to access the rpm database
  *
  */
 
