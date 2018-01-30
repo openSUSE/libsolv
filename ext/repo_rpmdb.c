@@ -1244,35 +1244,57 @@ struct rpmdbstate {
 
 #ifndef ENABLE_RPMPKG_LIBRPM
 
-int
-headread(struct rpmdbstate *state, const char *name, FILE *fp, unsigned char *lead, unsigned int cnt, unsigned int dsize, unsigned int pad, Chksum *chk1, Chksum *chk2)
+static int
+headfromfp(struct rpmdbstate *state, const char *name, FILE *fp, unsigned char *lead, unsigned int cnt, unsigned int dsize, unsigned int pad, Chksum *chk1, Chksum *chk2)
 {
+  RpmHead *rpmhead;
   unsigned int len = 16 * cnt + dsize + pad;
   if (len + 1 > state->rpmheadsize)
     {
-      state->rpmheadsize = len+ 128;
+      state->rpmheadsize = len + 128;
       state->rpmhead = solv_realloc(state->rpmhead, sizeof(*state->rpmhead) + state->rpmheadsize);
     }
-  if (fread(state->rpmhead->data, len, 1, fp) != 1)
+  rpmhead = state->rpmhead;
+  if (fread(rpmhead->data, len, 1, fp) != 1)
     {
       fclose(fp);
       return pool_error(state->pool, 0, "%s: unexpected EOF", name);
     }
-  state->rpmhead->data[len] = 0;
   if (chk1)
-    solv_chksum_add(chk1, state->rpmhead->data, len);
+    solv_chksum_add(chk1, rpmhead->data, len);
   if (chk2)
-    solv_chksum_add(chk2, state->rpmhead->data, len);
-  state->rpmhead->cnt = cnt;
-  state->rpmhead->dcnt = dsize;
-  state->rpmhead->dp = state->rpmhead->data + cnt * 16;
+    solv_chksum_add(chk2, rpmhead->data, len);
+  rpmhead->data[len] = 0;
+  rpmhead->cnt = cnt;
+  rpmhead->dcnt = dsize;
+  rpmhead->dp = rpmhead->data + cnt * 16;
   return 1;
 }
 
+#if defined(ENABLE_RPMDB_BYRPMHEADER)
+static void
+headfromblob(struct rpmdbstate *state, const unsigned char *blob, unsigned int cnt, unsigned int dsize)
+{
+  RpmHead *rpmhead;
+  unsigned int len = 16 * cnt + dsize;
+  if (len + 1 > state->rpmheadsize)
+    {
+      state->rpmheadsize = len + 128;
+      state->rpmhead = solv_realloc(state->rpmhead, sizeof(*state->rpmhead) + state->rpmheadsize);
+    }
+  rpmhead = state->rpmhead;
+  memcpy(rpmhead->data, blob, len);
+  rpmhead->data[len] = 0;
+  rpmhead->cnt = cnt;
+  rpmhead->dcnt = dsize;
+  rpmhead->dp = rpmhead->data + cnt * 16;
+}
+#endif
+
 #else
 
-int
-headread(struct rpmdbstate *state, const char *name, FILE *fp, unsigned char *lead, unsigned int cnt, unsigned int dsize, unsigned int pad, Chksum *chk1, Chksum *chk2)
+static int
+headfromfp(struct rpmdbstate *state, const char *name, FILE *fp, unsigned char *lead, unsigned int cnt, unsigned int dsize, unsigned int pad, Chksum *chk1, Chksum *chk2)
 {
   unsigned int len = 16 * cnt + dsize + pad;
   char *buf = solv_malloc(8 + len);
@@ -1305,8 +1327,6 @@ static void
 freestate(struct rpmdbstate *state)
 {
   /* close down */
-  if (!state)
-    return;
 #ifdef ENABLE_RPMDB
   if (state->pkgdbopened)
     closepkgdb(state);
@@ -1332,7 +1352,8 @@ rpm_state_create(Pool *pool, const char *rootdir)
 void *
 rpm_state_free(void *state)
 {
-  freestate(state);
+  if (state)
+    freestate(state);
   return solv_free(state);
 }
 
@@ -1978,7 +1999,7 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
   pkgidtype = leadsigidtype = hdridtype = 0;
   if ((flags & (RPM_ADD_WITH_PKGID | RPM_ADD_WITH_HDRID)) != 0)
     {
-      if (!headread(&state, rpm, fp, lead + 96, sigcnt, sigdsize, sigpad, chksumh, leadsigchksumh))
+      if (!headfromfp(&state, rpm, fp, lead + 96, sigcnt, sigdsize, sigpad, chksumh, leadsigchksumh))
 	{
 	  fclose(fp);
 	  return 0;
@@ -2060,7 +2081,7 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
     }
   headerend = headerstart + 16 + sigdsize + sigcnt * 16;
 
-  if (!headread(&state, rpm, fp, lead, sigcnt, sigdsize, 0, chksumh, 0))
+  if (!headfromfp(&state, rpm, fp, lead, sigcnt, sigdsize, 0, chksumh, 0))
     {
       fclose(fp);
       return 0;
@@ -2424,7 +2445,7 @@ rpm_byrpmdbid(void *rpmstate, Id rpmdbid)
   return r <= 0 ? 0 : state->rpmhead;
 }
 
-#endif
+#endif	/* ENABLE_RPMDB */
 
 void *
 rpm_byfp(void *rpmstate, FILE *fp, const char *name)
@@ -2487,7 +2508,7 @@ rpm_byfp(void *rpmstate, FILE *fp, const char *name)
       pool_error(state->pool, 0, "%s: bad header", name);
       return 0;
     }
-  if (!headread(state, name, fp, lead, sigcnt, sigdsize, 0, 0, 0))
+  if (!headfromfp(state, name, fp, lead, sigcnt, sigdsize, 0, 0, 0))
     return 0;
   return state->rpmhead;
 }
@@ -2498,10 +2519,9 @@ void *
 rpm_byrpmh(void *rpmstate, Header h)
 {
   struct rpmdbstate *state = rpmstate;
-  RpmHead *rpmhead;
 #ifndef ENABLE_RPMPKG_LIBRPM
   const unsigned char *uh;
-  unsigned int sigdsize, sigcnt, l;
+  unsigned int dsize, cnt;
 
   if (!h)
     return 0;
@@ -2512,31 +2532,23 @@ rpm_byrpmh(void *rpmstate, Header h)
 #endif
   if (!uh)
     return 0;
-  sigcnt = getu32(uh);
-  sigdsize = getu32(uh + 4);
-  if (sigcnt >= MAX_HDR_CNT || sigdsize >= MAX_HDR_DSIZE)
-    return 0;
-  l = sigdsize + sigcnt * 16;
-  if (l + 1 > state->rpmheadsize)
+  cnt = getu32(uh);
+  dsize = getu32(uh + 4);
+  if (cnt >= MAX_HDR_CNT || dsize >= MAX_HDR_DSIZE)
     {
-      state->rpmheadsize = l + 128;
-      state->rpmhead = solv_realloc(state->rpmhead, sizeof(*state->rpmhead) + state->rpmheadsize);
+      free((void *)uh);
+      return 0;
     }
-  rpmhead = state->rpmhead;
-  memcpy(rpmhead->data, uh + 8, l);
-  rpmhead->data[l] = 0;
+  headfromblob(state, uh + 8, cnt, dsize);
   free((void *)uh);
-  rpmhead->cnt = sigcnt;
-  rpmhead->dcnt = sigdsize;
-  rpmhead->dp = rpmhead->data + sigcnt * 16;
 #else
   if (!h)
     return 0;
   if (state->rpmhead)
     headfree(state->rpmhead);
-  rpmhead = state->rpmhead = headerLink(h);
+  state->rpmhead = headerLink(h);
 #endif
-  return rpmhead;
+  return state->rpmhead;
 }
 
 #endif	/* defined(ENABLE_RPMDB_BYRPMHEADER) || defined(ENABLE_RPMDB_LIBRPM) */
