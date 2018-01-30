@@ -1742,6 +1742,7 @@ opendbenv(struct rpmdbstate *state)
       dbpath = solv_dupjoin("_dbpath ", rootdir, state->is_ostree ? "/usr/share/rpm" : "/var/lib/rpm");
     }
   rpmDefineMacro(NULL, dbpath, 0);
+  solv_free(dbpath);
   ts = rpmtsCreate();
   if (!ts)
     {
@@ -3217,6 +3218,8 @@ rpm_byrpmh(void *rpmstate, Header h)
 #else
   if (!h)
     return 0;
+  if (state->rpmhead)
+    headfree(state->rpmhead);
   rpmhead = state->rpmhead = headerLink(h);
 #endif
   return rpmhead;
