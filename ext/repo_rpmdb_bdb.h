@@ -102,7 +102,7 @@ rpmdbid2db(unsigned char *db, Id id, int byteswapped)
 }
 
 #if defined(FEDORA) || defined(MAGEIA)
-int
+static int
 serialize_dbenv_ops(struct rpmdbstate *state)
 {
   char *lpath;
