@@ -1731,7 +1731,7 @@ opendbenv(struct rpmdbstate *state)
   const char *rootdir = state->rootdir;
   rpmts ts;
   char *dbpath;
-  dbpath = solv_dupjoin(rootdir, "_dbpath /var/lib/rpm", 0);
+  dbpath = solv_dupjoin("_dbpath ", rootdir, "/var/lib/rpm");
   if (access(dbpath + 8, W_OK) == -1)
     {
       free(dbpath);
@@ -1739,7 +1739,7 @@ opendbenv(struct rpmdbstate *state)
       if (access(dbpath, R_OK) == 0)
 	state->is_ostree = 1;
       free(dbpath);
-      dbpath = solv_dupjoin(rootdir, state->is_ostree ? "_dbpath /usr/share/rpm" : "_dbpath /var/lib/rpm", 0);
+      dbpath = solv_dupjoin("_dbpath ", rootdir, state->is_ostree ? "/usr/share/rpm" : "/var/lib/rpm");
     }
   rpmDefineMacro(NULL, dbpath, 0);
   ts = rpmtsCreate();
