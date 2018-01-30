@@ -1517,6 +1517,9 @@ pool_error(Pool *pool, int ret, const char *format, ...)
 {
   va_list args;
   int l;
+
+  if (!pool)
+    return ret;
   va_start(args, format);
   if (!pool->errstr)
     {
