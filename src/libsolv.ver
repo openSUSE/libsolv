@@ -334,8 +334,6 @@ SOLV_1.0 {
 		solver_create_transaction;
 		solver_describe_decision;
 		solver_describe_weakdep_decision;
-		solver_disableproblem;
-		solver_enableproblem;
 		solver_findallproblemrules;
 		solver_findproblemrule;
 		solver_free;
