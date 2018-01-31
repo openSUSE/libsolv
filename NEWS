@@ -2,6 +2,22 @@
 This file contains the major changes between
 libsolv versions:
 
+Version 0.6.31
+- new configuration options:
+  * ENABLE_RPMDB_LIBRPM: use librpm to read the package
+    database
+  * ENABLE_RPMPKG_LIBRPM: use librpm to access information
+    from package headers
+- new features:
+  * new pool_set_whatprovides function to manually change
+    the whatprovides data
+  * new selection_subtract function to remove packages of
+    one selection from another selection
+  * new selection flags SELECTION_FILTER,
+    SELECTION_WITH_DISABLED and SELECTION_WITH_BADARCH
+  * new map_invertall function to invert a bitmap
+  * new map_clr_at function to clear some bits
+
 Version 0.6.30
 - new features:
   * many fixes and extenstions for cleandeps, e.g.
