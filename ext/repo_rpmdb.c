@@ -194,10 +194,11 @@ headexists(RpmHead *h, int tag)
   return headfindtag(h, tag) ? 1 : 0;
 }
 
-static unsigned int *
+static uint32_t *
 headint32array(RpmHead *h, int tag, int *cnt)
 {
-  unsigned int i, o, *r;
+  uint32_t *r;
+  unsigned int i, o;
   unsigned char *d = headfindtag(h, tag);
 
   if (!d || d[4] != 0 || d[5] != 0 || d[6] != 0 || d[7] != 4)
@@ -207,7 +208,7 @@ headint32array(RpmHead *h, int tag, int *cnt)
   if (o > h->dcnt || i > h->dcnt || o + 4 * i > h->dcnt)
     return 0;
   d = h->dp + o;
-  r = solv_calloc(i ? i : 1, sizeof(unsigned int));
+  r = solv_calloc(i ? i : 1, sizeof(uint32_t));
   if (cnt)
     *cnt = i;
   for (o = 0; o < i; o++, d += 4)
@@ -216,7 +217,7 @@ headint32array(RpmHead *h, int tag, int *cnt)
 }
 
 /* returns the first entry of an integer array */
-static unsigned int
+static uint32_t
 headint32(RpmHead *h, int tag)
 {
   unsigned int i, o;
@@ -232,11 +233,11 @@ headint32(RpmHead *h, int tag)
   return d[0] << 24 | d[1] << 16 | d[2] << 8 | d[3];
 }
 
-static unsigned long long *
+static uint64_t *
 headint64array(RpmHead *h, int tag, int *cnt)
 {
+  uint64_t *r;
   unsigned int i, o;
-  unsigned long long *r;
   unsigned char *d = headfindtag(h, tag);
 
   if (!d || d[4] != 0 || d[5] != 0 || d[6] != 0 || d[7] != 5)
@@ -246,23 +247,25 @@ headint64array(RpmHead *h, int tag, int *cnt)
   if (o > h->dcnt || i > h->dcnt || o + 8 * i > h->dcnt)
     return 0;
   d = h->dp + o;
-  r = solv_calloc(i ? i : 1, sizeof(unsigned long long));
+  r = solv_calloc(i ? i : 1, sizeof(uint64_t));
   if (cnt)
     *cnt = i;
   for (o = 0; o < i; o++, d += 8)
     {
-      unsigned int x = d[0] << 24 | d[1] << 16 | d[2] << 8 | d[3];
-      r[o] = (unsigned long long)x << 32 | (unsigned int)(d[4] << 24 | d[5] << 16 | d[6] << 8 | d[7]);
+      uint32_t x = d[0] << 24 | d[1] << 16 | d[2] << 8 | d[3];
+      r[o] = (uint64_t)x << 32 | (uint32_t)(d[4] << 24 | d[5] << 16 | d[6] << 8 | d[7]);
     }
   return r;
 }
 
 /* returns the first entry of an 64bit integer array */
-static unsigned long long
+static uint64_t
 headint64(RpmHead *h, int tag)
 {
+  uint32_t x;
   unsigned int i, o;
   unsigned char *d = headfindtag(h, tag);
+
   if (!d || d[4] != 0 || d[5] != 0 || d[6] != 0 || d[7] != 5)
     return 0;
   o = d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
@@ -270,14 +273,15 @@ headint64(RpmHead *h, int tag)
   if (i == 0 || o > h->dcnt || i > h->dcnt || o + 8 * i > h->dcnt)
     return 0;
   d = h->dp + o;
-  i = d[0] << 24 | d[1] << 16 | d[2] << 8 | d[3];
-  return (unsigned long long)i << 32 | (unsigned int)(d[4] << 24 | d[5] << 16 | d[6] << 8 | d[7]);
+  x = d[0] << 24 | d[1] << 16 | d[2] << 8 | d[3];
+  return (uint64_t)x << 32 | (uint32_t)(d[4] << 24 | d[5] << 16 | d[6] << 8 | d[7]);
 }
 
-static unsigned int *
+static uint16_t *
 headint16array(RpmHead *h, int tag, int *cnt)
 {
-  unsigned int i, o, *r;
+  uint16_t *r;
+  unsigned int i, o;
   unsigned char *d = headfindtag(h, tag);
 
   if (!d || d[4] != 0 || d[5] != 0 || d[6] != 0 || d[7] != 3)
@@ -287,7 +291,7 @@ headint16array(RpmHead *h, int tag, int *cnt)
   if (o > h->dcnt || i > h->dcnt || o + 2 * i > h->dcnt)
     return 0;
   d = h->dp + o;
-  r = solv_calloc(i ? i : 1, sizeof(unsigned int));
+  r = solv_calloc(i ? i : 1, sizeof(uint16_t));
   if (cnt)
     *cnt = i;
   for (o = 0; o < i; o++, d += 2)
@@ -394,47 +398,37 @@ static void *headget(RpmHead *h, int tag, int *cnt, int alloc)
   return td.data;
 }
 
-static unsigned int *
+static uint32_t *
 headint32array(RpmHead *h, int tag, int *cnt)
 {
   return headget(h, tag, cnt, 1);
 }
 
-static unsigned int
+static uint32_t
 headint32(RpmHead *h, int tag)
 {
-  unsigned int *arr = headget(h, tag, 0, 0);
+  uint32_t *arr = headget(h, tag, 0, 0);
   return arr ? arr[0] : 0;
 }
 
-static unsigned long long *
+static uint64_t *
 headint64array(RpmHead *h, int tag, int *cnt)
 {
   return headget(h, tag, cnt, 1);
 }
 
 /* returns the first entry of an 64bit integer array */
-static unsigned long long
+static uint64_t
 headint64(RpmHead *h, int tag)
 {
-  unsigned long long * arr = headget(h, tag, 0, 0);
+  uint64_t *arr = headget(h, tag, 0, 0);
   return arr ? arr[0] : 0;
 }
 
-static unsigned int *
+static uint16_t *
 headint16array(RpmHead *h, int tag, int *cnt)
 {
-  int i, cnt2;
-  unsigned int *arr;
-  unsigned short *arr2 = headget(h, tag, &cnt2, 0);
-  if (!arr2)
-    return 0;
-  arr = solv_calloc(cnt2 ? cnt2 : 1, sizeof(unsigned int));
-  for (i = 0; i < cnt2; i++)
-    arr[i] = arr2[i];
-  if (cnt)
-    *cnt = cnt2;
-  return arr;
+  return headget(h, tag, cnt, 1);
 }
 
 static char *
@@ -542,7 +536,7 @@ static unsigned int
 makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf, int flags, Queue *ignq)
 {
   char **n, **v;
-  unsigned int *f;
+  uint32_t *f;
   int i, cc, nc, vc, fc;
   int haspre, premask, has_ign;
   unsigned int olddeps;
@@ -747,12 +741,14 @@ repodata_str2dir_rooted(Repodata *data, char *str, int create)
 }
 
 static void
-adddudata(Repodata *data, Id handle, RpmHead *rpmhead, char **dn, unsigned int *di, int fc, int dc)
+adddudata(Repodata *data, Id handle, RpmHead *rpmhead, char **dn, uint32_t *di, int fc, int dc)
 {
   Id did;
   int i, fszc;
-  unsigned int *fkb, *fn, *fsz, *fm, *fino;
-  unsigned long long *fsz64;
+  unsigned int *fkb, *fn;
+  uint64_t *fsz64;
+  uint32_t *fsz, *fino;
+  uint16_t *fm;
   unsigned int inotest[256], inotestok;
 
   if (!fc)
@@ -922,11 +918,11 @@ addfilelist(Repodata *data, Id handle, RpmHead *rpmhead, int flags)
 {
   char **bn;
   char **dn;
-  unsigned int *di;
+  uint32_t *di;
   int bnc, dnc, dic;
   int i;
   Id did;
-  unsigned int lastdii = -1;
+  uint32_t lastdii = -1;
   int lastfiltered = 0;
 
   if (!data)
@@ -995,7 +991,7 @@ addchangelog(Repodata *data, Id handle, RpmHead *rpmhead)
 {
   char **cn;
   char **cx;
-  unsigned int *ct;
+  uint32_t *ct;
   int i, cnc, cxc, ctc;
   Queue hq;
 
@@ -2193,12 +2189,12 @@ rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *
   char **dn;
   char **md = 0;
   char **lt = 0;
-  unsigned int *di, diidx;
-  unsigned int *co = 0;
-  unsigned int *ff = 0;
+  uint32_t *di, diidx;
+  uint32_t *co = 0;
+  uint32_t *ff = 0;
+  uint16_t *fm;
   unsigned int lastdir;
   int lastdirl;
-  unsigned int *fm;
   int cnt, dcnt, cnt2;
   int i, l1, l;
   char *space = 0;
