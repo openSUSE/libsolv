@@ -33,7 +33,6 @@ SOLV_1.0 {
 		map_grow;
 		map_init;
 		map_init_clone;
-		map_invertall;
 		map_or;
 		policy_filter_unwanted;
 		policy_findupdatepackages;
@@ -101,7 +100,6 @@ SOLV_1.0 {
 		pool_set_installed;
 		pool_set_languages;
 		pool_set_rootdir;
-		pool_set_whatprovides;
 		pool_setarch;
 		pool_setarchpolicy;
 		pool_setdebugcallback;
@@ -252,7 +250,6 @@ SOLV_1.0 {
 		selection_make_matchdepid;
 		selection_make_matchdeps;
 		selection_solvables;
-		selection_subtract;
 		solv_bin2hex;
 		solv_calloc;
 		solv_chksum_add;
@@ -430,3 +427,9 @@ SOLV_1.1 {
 		pool_best_solvables;
 		solver_get_cleandeps;
 } SOLV_1.0;
+
+SOLV_1.2 {
+		map_invertall;
+		pool_set_whatprovides;
+		selection_subtract;
+} SOLV_1.1;
