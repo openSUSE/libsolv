@@ -985,7 +985,7 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, in
   solv_sort(cbdata.lookat.elements, cbdata.lookat.count / 4, sizeof(Id) * 4, &lookat_hx_cmp, pool);
   for (i = j = 0; i < cbdata.lookat.count; )
     {
-      int first = 1;
+      int first = 1, jstart = j;
       Id hx = cbdata.lookat.elements[i];
       Id idx = cbdata.lookat.elements[i + 1];
       Id dhx = cbdata.lookat.elements[i + 2];
@@ -1004,6 +1004,8 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, in
 	      cbdata.lookat.elements[j++] = dhx;
 	      cbdata.lookat.elements[j++] = dirid;
 	      first = 0;
+	      if (jstart >= 0 && idx < cutoff)
+		jstart = -1;
 	    }
 	  idx = cbdata.lookat.elements[i + 1];
 	  dhx = cbdata.lookat.elements[i + 2];
@@ -1011,7 +1013,11 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, in
 	  cbdata.lookat.elements[j++] = idx;
 	  cbdata.lookat.elements[j++] = dhx;
 	  cbdata.lookat.elements[j++] = dirid;
+	  if (jstart >= 0 && idx < cutoff)
+	    jstart = -1;
 	}
+      if (jstart >= 0)	/* we need at least one new candidate */
+	j = jstart;
     }
   queue_truncate(&cbdata.lookat, j);
   POOL_DEBUG(SOLV_DEBUG_STATS, "candidates now: %d\n", cbdata.lookat.count / 4);
