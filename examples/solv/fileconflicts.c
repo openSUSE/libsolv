@@ -67,7 +67,12 @@ checkfileconflicts(Pool *pool, Queue *checkq, int newpkgs, FILE **newpkgsfps, Qu
     {
       printf("\n");
       for (i = 0; i < conflicts->count; i += 6)
-	printf("file %s of package %s conflicts with package %s\n", pool_id2str(pool, conflicts->elements[i]), pool_solvid2str(pool, conflicts->elements[i + 1]), pool_solvid2str(pool, conflicts->elements[i + 4]));
+	{
+	  if (conflicts->elements[i] == conflicts->elements[i + 3])
+	    printf("file %s of package %s conflicts with package %s\n", pool_id2str(pool, conflicts->elements[i]), pool_solvid2str(pool, conflicts->elements[i + 1]), pool_solvid2str(pool, conflicts->elements[i + 4]));
+	  else
+	    printf("file %s of package %s conflicts with file %s of package %s\n", pool_id2str(pool, conflicts->elements[i]), pool_solvid2str(pool, conflicts->elements[i + 1]), pool_id2str(pool, conflicts->elements[i + 3]), pool_solvid2str(pool, conflicts->elements[i + 4]));
+	}
       printf("\n");
     }
   return conflicts->count;

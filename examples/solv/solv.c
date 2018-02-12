@@ -661,10 +661,10 @@ main(int argc, char **argv)
         job.elements[i] |= SOLVER_FORCEBEST;
     }
 
+#if 0
   // multiversion test
-  // queue_push2(&job, SOLVER_MULTIVERSION|SOLVER_SOLVABLE_NAME, pool_str2id(pool, "kernel-pae", 1));
-  // queue_push2(&job, SOLVER_MULTIVERSION|SOLVER_SOLVABLE_NAME, pool_str2id(pool, "kernel-pae-base", 1));
-  // queue_push2(&job, SOLVER_MULTIVERSION|SOLVER_SOLVABLE_NAME, pool_str2id(pool, "kernel-pae-extra", 1));
+  queue_push2(&job, SOLVER_MULTIVERSION|SOLVER_SOLVABLE_PROVIDES, pool_str2id(pool, "multiversion(kernel)", 1));
+#endif
 #if 0
   queue_push2(&job, SOLVER_INSTALL|SOLVER_SOLVABLE_PROVIDES, pool_rel2id(pool, NAMESPACE_LANGUAGE, 0, REL_NAMESPACE, 1));
   queue_push2(&job, SOLVER_ERASE|SOLVER_CLEANDEPS|SOLVER_SOLVABLE_PROVIDES, pool_rel2id(pool, NAMESPACE_LANGUAGE, 0, REL_NAMESPACE, 1));
@@ -673,6 +673,9 @@ main(int argc, char **argv)
 rerunsolver:
   solv = solver_create(pool);
   solver_set_flag(solv, SOLVER_FLAG_SPLITPROVIDES, 1);
+#if 0
+  solver_set_flag(solv, SOLVER_FLAG_IGNORE_RECOMMENDED, 1);
+#endif
 #if defined(FEDORA) || defined(MAGEIA)
   solver_set_flag(solv, SOLVER_FLAG_ALLOW_VENDORCHANGE, 1);
 #endif
