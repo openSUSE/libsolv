@@ -2,6 +2,10 @@
 This file contains the major changes between
 libsolv versions:
 
+Version 0.6.32
+- fixed bug that could make fileconflict detection very slow
+  in some cases
+
 Version 0.6.31
 - new configuration options:
   * ENABLE_RPMDB_LIBRPM: use librpm to read the package
