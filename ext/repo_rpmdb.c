@@ -2005,7 +2005,7 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
 	  unsigned char *chksum;
 	  unsigned int chksumsize;
 	  chksum = headbinary(state.rpmhead, SIGTAG_MD5, &chksumsize);
-	  if (chksum && chksumsize == 16)
+	  if (chksum && chksumsize >= 16)
 	    {
 	      pkgidtype = REPOKEY_TYPE_MD5;
 	      memcpy(pkgid, chksum, 16);
