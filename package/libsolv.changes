@@ -3,6 +3,7 @@ Tue Feb 13 11:51:11 CET 2018 - mls@suse.de
 
 - fixed bug that could make fileconflict detection very slow
   in some cases [bnc#953130]
+- bump version to 0.6.32
 
 -------------------------------------------------------------------
 Wed Jan 31 11:41:51 CET 2018 - mls@suse.de
