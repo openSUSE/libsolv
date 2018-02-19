@@ -446,7 +446,12 @@ headstringarray(RpmHead *h, int tag, int *cnt)
 static unsigned char *
 headbinary(RpmHead *h, int tag, unsigned int *sizep)
 {
-  return headget(h, tag, (int *)sizep, 0);
+  unsigned char *b = headget(h, tag, (int *)sizep, 0);
+  if (b && sizep && (tag == TAG_SIGMD5 || tag == SIGTAG_MD5) && *sizep > 16) {
+    /* due to a bug in rpm the count may be bigger if HEADERIMPORT_FAST is used */
+    *sizep = 16;
+  }
+  return b;
 }
 
 static int
