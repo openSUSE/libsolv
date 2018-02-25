@@ -665,6 +665,9 @@ typedef int bool;
 #ifdef SUSE
 #include "repo_autopattern.h"
 #endif
+#ifdef ENABLE_COMPLEX_DEPS
+#include "pool_parserpmrichdep.h"
+#endif
 #include "solv_xfopen.h"
 #include "testcase.h"
 
@@ -1729,6 +1732,13 @@ typedef struct {
     Id id = pool_str2id($self, str, create);
     return new_Dep($self, id);
   }
+#ifdef ENABLE_COMPLEX_DEPS
+  %newobject Dep;
+  Dep *parserpmrichdep(const char *str) {
+    Id id = pool_parserpmrichdep($self, str);
+    return new_Dep($self, id);
+  }
+#endif
   const char *id2str(Id id) {
     return pool_id2str($self, id);
   }
