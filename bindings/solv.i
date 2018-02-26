@@ -665,7 +665,7 @@ typedef int bool;
 #ifdef SUSE
 #include "repo_autopattern.h"
 #endif
-#ifdef ENABLE_COMPLEX_DEPS
+#if defined(ENABLE_COMPLEX_DEPS) && (defined(ENABLE_SUSEREPO) || defined(ENABLE_RPMMD) || defined(ENABLE_RPMDB) || defined(ENABLE_RPMPKG))
 #include "pool_parserpmrichdep.h"
 #endif
 #include "solv_xfopen.h"
@@ -1732,7 +1732,7 @@ typedef struct {
     Id id = pool_str2id($self, str, create);
     return new_Dep($self, id);
   }
-#ifdef ENABLE_COMPLEX_DEPS
+#if defined(ENABLE_COMPLEX_DEPS) && (defined(ENABLE_SUSEREPO) || defined(ENABLE_RPMMD) || defined(ENABLE_RPMDB) || defined(ENABLE_RPMPKG))
   %newobject Dep;
   Dep *parserpmrichdep(const char *str) {
     Id id = pool_parserpmrichdep($self, str);
