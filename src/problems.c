@@ -773,7 +773,7 @@ create_solutions(Solver *solv, int probnr, int solidx)
   memset(&solv->problems, 0, sizeof(solv->problems));
 
   /* save branches queue */
-  branches_save = solv->problems;
+  branches_save = solv->branches;
   memset(&solv->branches, 0, sizeof(solv->branches));
 
   /* save decisionq_reason */
