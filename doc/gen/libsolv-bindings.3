@@ -7,7 +7,7 @@
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "01/18/2018" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "02/27/2018" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -3192,6 +3192,21 @@ Return the result flags of the selection\&. The flags are a subset of the ones u
 .\}
 .sp
 Return true if the selection is empty, i\&.e\&. no package could be matched\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSelection clone(int\fR \fIflags\fR \fB= 0)\fR;
+my \fI$cloned\fR \fB=\fR \fI$sel\fR\fB\->clone()\fR;
+\fIcloned\fR \fB=\fR \fIsel\fR\fB\&.clone()\fR
+\fIcloned\fR \fB=\fR \fIsel\fR\fB\&.clone()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Clone selection\&.
 .sp
 .if n \{\
 .RS 4

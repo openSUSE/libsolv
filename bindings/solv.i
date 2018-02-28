@@ -1298,12 +1298,12 @@ typedef struct {
     return $self->q.count == 0;
   }
   %newobject clone;
-  Selection *clone(Selection *from, int flags = 0) { 
+  Selection *clone(int flags = 0) {
     Selection *s;
     s = solv_calloc(1, sizeof(*s));
-    s->pool = from->pool;
-    s->flags = from->flags;
-    queue_init_clone(&s->q, &from->q);
+    s->pool = $self->pool;
+    s->flags = $self->flags;
+    queue_init_clone(&s>q, &$self>q);
     return s;
   }
   void filter(Selection *lsel) {
