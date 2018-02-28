@@ -2,6 +2,11 @@
 This file contains the major changes between
 libsolv versions:
 
+Version 0.6.33
+- new features:
+  * new Selection.clone() method in the bindings
+  * new pool.parserpmrichdep() method in the bindings
+
 Version 0.6.32
 - fixed bug that could make fileconflict detection very slow
   in some cases

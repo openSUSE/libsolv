@@ -1,4 +1,12 @@
 -------------------------------------------------------------------
+Wed Feb 28 16:29:55 CET 2018 - mls@suse.de
+
+- fix bad assignment in solution refinement that led
+  to a memory leak
+- use license tag instead of doc in the spec file [bnc#1082318]
+- bump version to 0.6.33
+
+-------------------------------------------------------------------
 Tue Feb 13 11:51:11 CET 2018 - mls@suse.de
 
 - fixed bug that could make fileconflict detection very slow
