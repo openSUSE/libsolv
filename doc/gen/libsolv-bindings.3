@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets v1.78.1 <http://docbook.sf.net/>
-.\"      Date: 01/18/2018
+.\"      Date: 02/28/2018
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "02/27/2018" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "02/28/2018" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -3167,7 +3167,7 @@ Back pointer to pool\&.
 .RS 4
 .\}
 .nf
-\fBint flags()\fR;
+\fBint flags()\fR
 my \fI$flags\fR \fB=\fR \fI$sel\fR\fB\->flags()\fR;
 \fIflags\fR \fB=\fR \fIsel\fR\fB\&.flags()\fR
 \fIflags\fR \fB=\fR \fIsel\fR\fB\&.flags()\fR
@@ -3182,7 +3182,7 @@ Return the result flags of the selection\&. The flags are a subset of the ones u
 .RS 4
 .\}
 .nf
-\fBbool isempty()\fR;
+\fBbool isempty()\fR
 \fI$sel\fR\fB\->isempty()\fR
 \fIsel\fR\fB\&.isempty()\fR
 \fIsel\fR\fB\&.isempty?\fR
@@ -3197,7 +3197,7 @@ Return true if the selection is empty, i\&.e\&. no package could be matched\&.
 .RS 4
 .\}
 .nf
-\fBSelection clone(int\fR \fIflags\fR \fB= 0)\fR;
+\fBSelection clone(int\fR \fIflags\fR \fB= 0)\fR
 my \fI$cloned\fR \fB=\fR \fI$sel\fR\fB\->clone()\fR;
 \fIcloned\fR \fB=\fR \fIsel\fR\fB\&.clone()\fR
 \fIcloned\fR \fB=\fR \fIsel\fR\fB\&.clone()\fR
@@ -3206,7 +3206,7 @@ my \fI$cloned\fR \fB=\fR \fI$sel\fR\fB\->clone()\fR;
 .RE
 .\}
 .sp
-Clone selection\&.
+Return a copy of a selection\&.
 .sp
 .if n \{\
 .RS 4

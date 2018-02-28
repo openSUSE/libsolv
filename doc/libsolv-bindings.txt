@@ -1782,7 +1782,7 @@ Back pointer to pool.
 
 === METHODS ===
 
-	int flags();
+	int flags()
 	my $flags = $sel->flags();
 	flags = sel.flags()
 	flags = sel.flags()
@@ -1795,12 +1795,19 @@ flags will either be SELECTION_NAME or SELECTION_PROVIDES depending
 if there was a package that matched the name or not. If there was
 no match at all, the flags will be zero.
 
-	bool isempty();
+	bool isempty()
 	$sel->isempty()
 	sel.isempty()
 	sel.isempty?
 
 Return true if the selection is empty, i.e. no package could be matched.
+
+	Selection clone(int flags = 0)
+	my $cloned = $sel->clone();
+	cloned = sel.clone()
+	cloned = sel.clone()
+
+Return a copy of a selection.
 
 	void filter(Selection *other)
 	$sel->filter($other);
