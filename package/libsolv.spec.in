@@ -260,7 +260,7 @@ export NO_BRP_STRIP_DEBUG=true
 
 %files -n libsolv@LIBSOLV_SOVERSION@
 %defattr(-,root,root)
-%doc LICENSE*
+%license LICENSE*
 %{_libdir}/libsolv.so.*
 %{_libdir}/libsolvext.so.*
 %endif
