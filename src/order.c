@@ -43,10 +43,11 @@ struct _TransactionOrderdata {
 #define TYPE_REQ_P    	(1<<2)
 #define TYPE_PREREQ_P 	(1<<3)
 
-#define TYPE_REC	(1<<4)
+#define TYPE_SUG	(1<<4)
+#define TYPE_REC	(1<<5)
 
-#define TYPE_REQ    	(1<<5)
-#define TYPE_PREREQ 	(1<<6)
+#define TYPE_REQ    	(1<<6)
+#define TYPE_PREREQ 	(1<<7)
 
 #define TYPE_CYCLETAIL  (1<<16)
 #define TYPE_CYCLEHEAD  (1<<17)
@@ -247,7 +248,6 @@ addsolvableedges(struct orderdata *od, Solvable *s)
 {
   Transaction *trans = od->trans;
   Pool *pool = trans->pool;
-  Id req, *reqp, con, *conp, rec, *recp;
   Id p, p2, pp2;
   int i, j, pre, numins;
   Repo *installed = pool->installed;
@@ -262,6 +262,7 @@ addsolvableedges(struct orderdata *od, Solvable *s)
   queue_init(&depq);
   if (s->requires)
     {
+      Id req, *reqp;
       reqp = s->repo->idarraydata + s->requires;
       pre = TYPE_REQ;
       while ((req = *reqp++) != 0)
@@ -385,6 +386,7 @@ addsolvableedges(struct orderdata *od, Solvable *s)
     }
   if (s->conflicts)
     {
+      Id con, *conp;
       conp = s->repo->idarraydata + s->conflicts;
       while ((con = *conp++) != 0)
 	{
@@ -423,6 +425,7 @@ addsolvableedges(struct orderdata *od, Solvable *s)
     }
   if (s->recommends && s->repo != installed)
     {
+      Id rec, *recp;
       recp = s->repo->idarraydata + s->recommends;
       while ((rec = *recp++) != 0)
 	{
@@ -451,6 +454,41 @@ addsolvableedges(struct orderdata *od, Solvable *s)
 		  printf("add recommends inst->inst edge (%s -> %s -> %s)\n", pool_solvid2str(pool, p), pool_dep2str(pool, rec), pool_solvid2str(pool, p2));
 #endif
 		  addedge(od, p, p2, TYPE_REC);
+		}
+	    }
+	}
+    }
+  if (s->suggests && s->repo != installed)
+    {
+      Id sug, *sugp;
+      sugp = s->repo->idarraydata + s->suggests;
+      while ((sug = *sugp++) != 0)
+	{
+	  queue_empty(&depq);
+	  FOR_PROVIDES(p2, pp2, sug)
+	    {
+	      s2 = pool->solvables + p2;
+	      if (p2 == p)
+		{
+		  depq.count = 0;	/* self provides */
+		  break;
+		}
+	      if (s2->repo == installed && !MAPTST(&trans->transactsmap, p2))
+		continue;
+	      if (s2->repo != installed && !MAPTST(&trans->transactsmap, p2))
+		continue;		/* package stays uninstalled */
+	      if (s2->repo != installed)
+	        queue_pushunique(&depq, p2);
+	    }
+          for (i = 0; i < depq.count; i++)
+	    {
+	      p2 = depq.elements[i];
+	      if (pool->solvables[p2].repo != installed)
+		{
+#if 0
+		  printf("add suggests inst->inst edge (%s -> %s -> %s)\n", pool_solvid2str(pool, p), pool_dep2str(pool, sug), pool_solvid2str(pool, p2));
+#endif
+		  addedge(od, p, p2, TYPE_SUG);
 		}
 	    }
 	}

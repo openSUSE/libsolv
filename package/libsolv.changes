@@ -1,8 +1,13 @@
 -------------------------------------------------------------------
+Thu Mar  1 10:52:23 CET 2018 - mls@suse.de
+
+- also use suggests for ordering packages [bnc#1077635]
+
+-------------------------------------------------------------------
 Wed Feb 28 16:29:55 CET 2018 - mls@suse.de
 
 - fix bad assignment in solution refinement that led
-  to a memory leak
+  to a memory leak [bnc#1075978]
 - use license tag instead of doc in the spec file [bnc#1082318]
 - bump version to 0.6.33
 
