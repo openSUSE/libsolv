@@ -1660,10 +1660,13 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
     }
 
   /* XXX: should get ro lock of Packages database! */
-  if (stat_database(&state, "Packages", &packagesstat, 1))
+  if (stat_database(&state, "data.mdb", &packagesstat, 1))
     {
-      freestate(&state);
-      return -1;
+      if (stat_database(&state, "Packages", &packagesstat, 1))
+        {
+          freestate(&state);
+          return -1;
+        }
     }
   mkrpmdbcookie(&packagesstat, newcookie, flags);
   repodata_set_bin_checksum(data, SOLVID_META, REPOSITORY_RPMDBCOOKIE, REPOKEY_TYPE_SHA256, newcookie);
