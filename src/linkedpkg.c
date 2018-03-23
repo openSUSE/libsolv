@@ -192,16 +192,25 @@ find_product_link(Pool *pool, Solvable *s, Id *reqidp, Queue *qr, Id *prvidp, Qu
       /* oh no! Look up reference file */
       Dataiterator di;
       const char *refbasename = solvable_lookup_str(s, PRODUCT_REFERENCEFILE);
-      dataiterator_init(&di, pool, s->repo, 0, SOLVABLE_FILELIST, refbasename, SEARCH_STRING);
-      while (dataiterator_step(&di))
-	queue_push(qr, di.solvid);
-      dataiterator_free(&di);
-      if (qp)
+      if (refbasename)
 	{
-	  dataiterator_init(&di, pool, s->repo, 0, PRODUCT_REFERENCEFILE, refbasename, SEARCH_STRING);
+	  dataiterator_init(&di, pool, s->repo, 0, SOLVABLE_FILELIST, refbasename, SEARCH_STRING);
 	  while (dataiterator_step(&di))
-	    queue_push(qp, di.solvid);
+	    {
+	      if (di.key->type != REPOKEY_TYPE_DIRSTRARRAY)
+		continue;
+	      if (strcmp(repodata_dir2str(di.data, di.kv.id, 0), "/etc/products.d") != 0)
+		continue;
+	      queue_push(qr, di.solvid);
+	    }
 	  dataiterator_free(&di);
+	  if (qp)
+	    {
+	      dataiterator_init(&di, pool, s->repo, 0, PRODUCT_REFERENCEFILE, refbasename, SEARCH_STRING);
+	      while (dataiterator_step(&di))
+		queue_push(qp, di.solvid);
+	      dataiterator_free(&di);
+	    }
 	}
     }
   else if (qp)
