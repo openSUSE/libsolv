@@ -2,6 +2,10 @@
 This file contains the major changes between
 libsolv versions:
 
+Version 0.6.34
+- new features:
+  * also look at suggests for package ordering
+
 Version 0.6.33
 - new features:
   * new Selection.clone() method in the bindings
