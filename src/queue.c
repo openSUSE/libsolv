@@ -36,21 +36,21 @@ queue_init(Queue *q)
 }
 
 void
-queue_init_clone(Queue *t, Queue *s)
+queue_init_clone(Queue *target, const Queue *source)
 {
   int extra_space;
-  if (!s->elements)
+  if (!source->elements)
     {
-      t->alloc = t->elements = 0;
-      t->count = t->left = 0;
+      target->alloc = target->elements = 0;
+      target->count = target->left = 0;
       return;
     }
-  extra_space = queue_extra_space(s->count);
-  t->alloc = t->elements = solv_malloc2(s->count + extra_space, sizeof(Id));
-  if (s->count)
-    memcpy(t->alloc, s->elements, s->count * sizeof(Id));
-  t->count = s->count;
-  t->left = extra_space;
+  extra_space = queue_extra_space(source->count);
+  target->alloc = target->elements = solv_malloc2(source->count + extra_space, sizeof(Id));
+  if (source->count)
+    memcpy(target->alloc, source->elements, source->count * sizeof(Id));
+  target->count = source->count;
+  target->left = extra_space;
 }
 
 void
@@ -168,7 +168,7 @@ queue_delete2(Queue *q, int pos)
 }
 
 void
-queue_insertn(Queue *q, int pos, int n, Id *elements)
+queue_insertn(Queue *q, int pos, int n, const Id *elements)
 {
   if (n <= 0)
     return;

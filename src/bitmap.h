@@ -37,12 +37,12 @@ typedef struct _Map {
 #define MAPCLR_AT(m, n) ((m)->map[(n) >> 3] = 0)
 
 extern void map_init(Map *m, int n);
-extern void map_init_clone(Map *t, Map *s);
+extern void map_init_clone(Map *target, const Map *source);
 extern void map_grow(Map *m, int n);
 extern void map_free(Map *m);
-extern void map_and(Map *t, Map *s);
-extern void map_or(Map *t, Map *s);
-extern void map_subtract(Map *t, Map *s);
+extern void map_and(Map *t, const Map *s);
+extern void map_or(Map *t, const Map *s);
+extern void map_subtract(Map *t, const Map *s);
 extern void map_invertall(Map *m);
 
 static inline void map_empty(Map *m)
