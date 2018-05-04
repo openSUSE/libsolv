@@ -2803,6 +2803,40 @@ repodata_add_flexarray(Repodata *data, Id solvid, Id keyname, Id ghandle)
   data->attriddata[data->attriddatalen++] = 0;
 }
 
+static void
+repodata_set_kv(Repodata *data, Id solvid, Id keyname, Id keytype, KeyValue *kv)
+{
+  switch (keytype)
+    {
+    case REPOKEY_TYPE_ID:
+      repodata_set_id(data, solvid, keyname, kv->id);
+      break;
+    case REPOKEY_TYPE_CONSTANTID:
+      repodata_set_constantid(data, solvid, keyname, kv->id);
+      break;
+    case REPOKEY_TYPE_IDARRAY:
+      repodata_add_idarray(data, solvid, keyname, kv->id);
+      break;
+    case REPOKEY_TYPE_STR:
+      repodata_set_str(data, solvid, keyname, kv->str);
+      break;
+    case REPOKEY_TYPE_VOID:
+      repodata_set_void(data, solvid, keyname);
+      break;
+    case REPOKEY_TYPE_NUM:
+      repodata_set_num(data, solvid, keyname, SOLV_KV_NUM64(kv));
+      break;
+    case REPOKEY_TYPE_CONSTANT:
+      repodata_set_constant(data, solvid, keyname, kv->num);
+      break;
+    case_CHKSUM_TYPES:
+      repodata_set_bin_checksum(data, solvid, keyname, keytype, (const unsigned char *)kv->str);
+      break;
+    default:
+      break;
+    }
+}
+
 void
 repodata_unset_uninternalized(Repodata *data, Id solvid, Id keyname)
 {
@@ -3639,44 +3673,19 @@ repodata_create_stubs(Repodata *data)
 	  xkeyname = 0;
 	  continue;
 	}
-      switch (di.key->type)
+      repodata_set_kv(sdata, SOLVID_META, di.key->name, di.key->type, &di.kv);
+      if (di.key->name == REPOSITORY_KEYS && di.key->type == REPOKEY_TYPE_IDARRAY)
 	{
-        case REPOKEY_TYPE_ID:
-	  repodata_set_id(sdata, SOLVID_META, di.key->name, di.kv.id);
-	  break;
-	case REPOKEY_TYPE_CONSTANTID:
-	  repodata_set_constantid(sdata, SOLVID_META, di.key->name, di.kv.id);
-	  break;
-	case REPOKEY_TYPE_STR:
-	  repodata_set_str(sdata, SOLVID_META, di.key->name, di.kv.str);
-	  break;
-	case REPOKEY_TYPE_VOID:
-	  repodata_set_void(sdata, SOLVID_META, di.key->name);
-	  break;
-	case REPOKEY_TYPE_NUM:
-	  repodata_set_num(sdata, SOLVID_META, di.key->name, SOLV_KV_NUM64(&di.kv));
-	  break;
-	case_CHKSUM_TYPES:
-	  repodata_set_bin_checksum(sdata, SOLVID_META, di.key->name, di.key->type, (const unsigned char *)di.kv.str);
-	  break;
-	case REPOKEY_TYPE_IDARRAY:
-	  repodata_add_idarray(sdata, SOLVID_META, di.key->name, di.kv.id);
-	  if (di.key->name == REPOSITORY_KEYS)
+	  if (!xkeyname)
 	    {
-	      if (!xkeyname)
-		{
-		  if (!di.kv.eof)
-		    xkeyname = di.kv.id;
-		}
-	      else
-		{
-		  repodata_add_stubkey(sdata, xkeyname, di.kv.id);
-		  xkeyname = 0;
-		}
+	      if (!di.kv.eof)
+		xkeyname = di.kv.id;
 	    }
-	  break;
-	default:
-	  break;
+	  else
+	    {
+	      repodata_add_stubkey(sdata, xkeyname, di.kv.id);
+	      xkeyname = 0;
+	    }
 	}
     }
   dataiterator_free(&di);
