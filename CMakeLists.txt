@@ -36,14 +36,6 @@ OPTION (ENABLE_BZIP2_COMPRESSION "Build with bzip2 compression support?" OFF)
 
 OPTION (WITH_LIBXML2  "Build with libxml2 instead of libexpat?" OFF)
 
-#IF(${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERISION} GREATER 2.4)
-#ENDIF(${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERISION} GREATER 2.4)
-
-IF (COMMAND cmake_policy)
-  # escape preprocessor, see -DVERSION below
-  CMAKE_POLICY (SET CMP0005 OLD)
-ENDIF (COMMAND cmake_policy)
-
 # Library
 IF (DEFINED LIB)
   SET (LIB_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/${LIB}")
@@ -305,7 +297,6 @@ SET (PACKAGE "libsolv")
 SET (VERSION "${LIBSOLV_MAJOR}.${LIBSOLV_MINOR}.${LIBSOLV_PATCH}")
 
 ADD_DEFINITIONS (-D_FILE_OFFSET_BITS=64)
-ADD_DEFINITIONS (-DVERSION=\\\"${VERSION}\\\")
 CONFIGURE_FILE (src/solvversion.h.in src/solvversion.h)
 
 SET (CPACK_PACKAGE_DESCRIPTION_SUMMARY "Package dependency solver library")
