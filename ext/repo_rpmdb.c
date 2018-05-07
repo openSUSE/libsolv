@@ -457,7 +457,15 @@ headbinary(RpmHead *h, int tag, unsigned int *sizep)
 static int
 headissourceheuristic(RpmHead *h)
 {
-  return headerIsSource(h);
+  int issource = 0;
+  char **dn;
+  int dcnt;
+  dn = headstringarray(h, TAG_DIRNAMES, &dcnt);
+  if (dn) {
+      issource = dcnt == 1 && dn[0] && !*dn[0];
+      solv_free(dn);
+  }
+  return issource;
 }
 
 static inline void
