@@ -457,14 +457,12 @@ headbinary(RpmHead *h, int tag, unsigned int *sizep)
 static int
 headissourceheuristic(RpmHead *h)
 {
-  int issource = 0;
-  char **dn;
-  int dcnt;
-  dn = headstringarray(h, TAG_DIRNAMES, &dcnt);
-  if (dn) {
-      issource = dcnt == 1 && dn[0] && !*dn[0];
-      solv_free(dn);
-  }
+  struct rpmtd_s td;
+  int issource;
+  if (!headerGet(h, TAG_DIRNAMES, &td, HEADERGET_MINMEM))
+    return 0;
+  issource = td.count == 1 && td.data && ((char **)td.data)[0] && !((char **)td.data)[0][0];
+  rpmtdFreeData(&td);
   return issource;
 }
 
@@ -488,10 +486,7 @@ static char *headtoevr(RpmHead *h)
   release  = headstring(h, TAG_RELEASE);
   epoch = headint32(h, TAG_EPOCH);
   if (!version || !release)
-    {
-      fprintf(stderr, "headtoevr: bad rpm header\n");
-      return 0;
-    }
+    return 0;
   for (v = version; *v >= '0' && *v <= '9'; v++)
     ;
   if (epoch || (v != version && *v == ':'))
@@ -1114,6 +1109,7 @@ rpmhead2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhe
     s->arch = ARCH_NOARCH;
   evr = headtoevr(rpmhead);
   s->evr = pool_str2id(pool, evr, 1);
+  solv_free(evr);
   s->vendor = pool_str2id(pool, headstring(rpmhead, TAG_VENDOR), 1);
 
   queue_init_buffer(&ignq, ignqbuf, sizeof(ignqbuf)/sizeof(*ignqbuf));
@@ -1211,7 +1207,6 @@ rpmhead2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhe
       if ((flags & RPM_ADD_WITH_CHANGELOG) != 0)
 	addchangelog(data, handle, rpmhead);
     }
-  solv_free(evr);
   return 1;
 }
 
@@ -2367,7 +2362,7 @@ rpm_query(void *rpmhandle, Id what)
   r = 0;
   switch (what)
     {
-    case 0:
+    case 0:	/* return canonical name of rpm */
       name = headstring(rpmhead, TAG_NAME);
       if (!name)
 	name = "";
