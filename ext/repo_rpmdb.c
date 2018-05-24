@@ -1092,8 +1092,10 @@ rpmhead2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhe
       pool_error(pool, 0, "package has no name");
       return 0;
     }
+#ifdef ENABLE_RPMDB_GPG_PUBKEY_REMOVAL
   if (!strcmp(name, "gpg-pubkey"))
     return 0;
+#endif
   s->name = pool_str2id(pool, name, 1);
   sourcerpm = headstring(rpmhead, TAG_SOURCERPM);
   if (sourcerpm || !(headexists(rpmhead, TAG_SOURCEPACKAGE) || headissourceheuristic(rpmhead)))
