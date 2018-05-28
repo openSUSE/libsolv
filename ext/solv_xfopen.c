@@ -504,15 +504,33 @@ static inline FILE *myzstdfdopen(int fd, const char *mode)
 
 #ifdef ENABLE_ZCHUNK_COMPRESSION
 
+#ifdef USE_SYSTEM_ZCHUNK
+#include <zck.h>
+
+static ssize_t cookie_zckread(void *cookie, char *buf, size_t nbytes)
+{
+  return zck_read((zckCtx *)cookie, buf, nbytes);
+}
+
+static ssize_t cookie_zckwrite(void *cookie, const char *buf, size_t nbytes)
+{
+  return zck_write((zckCtx *)cookie, buf, nbytes);
+}
+
+static int cookie_zckclose(void *cookie)
+{
+  zckCtx *zck = (zckCtx *)cookie;
+  zck_free(&zck);
+  return 0;
+}
+#else
 #include "solv_zchunk.h"
+#endif
 
 static void *zchunkopen(const char *path, const char *mode, int fd)
 {
   FILE *fp;
-  void *f;
   if (!path && fd < 0)
-    return 0;
-  if (strcmp(mode, "r") != 0)
     return 0;
   if (fd != -1)
     fp = fdopen(fd, mode);
@@ -520,10 +538,29 @@ static void *zchunkopen(const char *path, const char *mode, int fd)
     fp = fopen(path, mode);
   if (!fp)
     return 0;
+
+#ifdef USE_SYSTEM_ZCHUNK
+  zckCtx *f = zck_create();
+  if(!f)
+    return NULL;
+  if(strncmp(mode, "r", 2) == 0) {
+    if(!zck_init_read(f, fileno(fp)))
+      return NULL;
+  } else {
+    if(!zck_init_write(f, fileno(fp)))
+      return NULL;
+  }
+  return cookieopen(f, mode, cookie_zckread, cookie_zckwrite, cookie_zckclose);
+#else
+  if (strcmp(mode, "r") != 0)
+    return 0;
+
+  void *f;
   f = solv_zchunk_open(fp, 1);
   if (!f)
     fclose(fp);
   return cookieopen(f, mode, (ssize_t (*)(void *, char *, size_t))solv_zchunk_read, 0, (int (*)(void *))solv_zchunk_close);
+#endif
 }
 
 static inline FILE *myzchunkfopen(const char *fn, const char *mode)
@@ -535,7 +572,6 @@ static inline FILE *myzchunkfdopen(int fd, const char *mode)
 {
   return zchunkopen(0, mode, fd);
 }
-
 #endif
 
 FILE *
@@ -584,7 +620,7 @@ solv_xfopen(const char *fn, const char *mode)
   if (suf && !strcmp(suf, ".zck"))
     return myzchunkfopen(fn, mode);
 #else
-  if (suf && !strcmp(suf, ".zst"))
+  if (suf && !strcmp(suf, ".zck"))
     return 0;
 #endif
   return fopen(fn, mode);
@@ -649,7 +685,7 @@ solv_xfopen_fd(const char *fn, int fd, const char *mode)
   if (suf && !strcmp(suf, ".zck"))
     return myzchunkfdopen(fd, simplemode);
 #else
-  if (suf && !strcmp(suf, ".zst"))
+  if (suf && !strcmp(suf, ".zck"))
     return 0;
 #endif
   return fdopen(fd, mode);
