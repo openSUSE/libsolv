@@ -1543,7 +1543,7 @@ Allow the matching of checksum entries.
 Do a sub-search in the array stored in keyname.
 
 	void skip_solvable();
-	$di->kip_solvable();
+	$di->skip_solvable();
 	di.skip_solvable()
 	di.skip_solvable()
 
