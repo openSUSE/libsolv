@@ -32,18 +32,18 @@ map_free(Map *m)
   m->size = 0;
 }
 
-/* copy constructor t <- s */
+/* copy constructor target <- source */
 void
-map_init_clone(Map *t, Map *s)
+map_init_clone(Map *target, const Map *source)
 {
-  t->size = s->size;
-  if (s->size)
+  target->size = source->size;
+  if (source->size)
     {
-      t->map = solv_malloc(s->size);
-      memcpy(t->map, s->map, s->size);
+      target->map = solv_malloc(source->size);
+      memcpy(target->map, source->map, source->size);
     }
   else
-    t->map = 0;
+    target->map = 0;
 }
 
 /* grow a map */
@@ -61,7 +61,7 @@ map_grow(Map *m, int n)
 
 /* bitwise-ands maps t and s, stores the result in t. */
 void
-map_and(Map *t, Map *s)
+map_and(Map *t, const Map *s)
 {
   unsigned char *ti, *si, *end;
   ti = t->map;
@@ -73,7 +73,7 @@ map_and(Map *t, Map *s)
 
 /* bitwise-ors maps t and s, stores the result in t. */
 void
-map_or(Map *t, Map *s)
+map_or(Map *t, const Map *s)
 {
   unsigned char *ti, *si, *end;
   if (t->size < s->size)
@@ -87,7 +87,7 @@ map_or(Map *t, Map *s)
 
 /* remove all set bits in s from t. */
 void
-map_subtract(Map *t, Map *s)
+map_subtract(Map *t, const Map *s)
 {
   unsigned char *ti, *si, *end;
   ti = t->map;
