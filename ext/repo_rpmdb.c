@@ -1092,7 +1092,7 @@ rpmhead2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhe
       pool_error(pool, 0, "package has no name");
       return 0;
     }
-  if (!strcmp(name, "gpg-pubkey"))
+  if (!(flags & RPMDB_KEEP_GPG_PUBKEY) && !strcmp(name, "gpg-pubkey"))
     return 0;
   s->name = pool_str2id(pool, name, 1);
   sourcerpm = headstring(rpmhead, TAG_SOURCERPM);
