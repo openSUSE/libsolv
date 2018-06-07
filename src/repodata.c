@@ -3546,7 +3546,6 @@ entrydone:
   data->incoredatalen = newincore.len;
   data->incoredatafree = 0;
 
-  solv_free(data->vincore);
   data->vincore = newvincore.buf;
   data->vincorelen = newvincore.len;
 
