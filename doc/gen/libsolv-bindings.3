@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 05/11/2018
+.\"      Date: 06/15/2018
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "05/11/2018" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "06/15/2018" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -5617,6 +5617,49 @@ Internalize newly added data\&. The lookup functions will only see the new data 
 .\}
 .sp
 Write the contents of the repodata area as solv file\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId str2dir(const char *\fR\fIdir\fR\fB, bool\fR \fIcreate\fR \fB= 1)\fR
+my \fI$did\fR \fB=\fR \fIdata\fR\fB\->str2dir(\fR\fI$dir\fR\fB)\fR;
+\fIdid\fR \fB=\fR \fIdata\fR\fB\&.str2dir(\fR\fIdir\fR\fB)\fR
+\fIdid\fR \fB=\fR \fIdata\fR\fB\&.str2dir(\fR\fIdir\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBconst char *dir2str(Id\fR \fIdid\fR\fB, const char *\fR\fIsuffix\fR \fB= 0)\fR
+\fI$dir\fR \fB=\fR \fIpool\fR\fB\->dir2str(\fR\fI$did\fR\fB)\fR;
+\fIdir\fR \fB=\fR \fIpool\fR\fB\&.dir2str(\fR\fIdid\fR\fB)\fR
+\fIdir\fR \fB=\fR \fIpool\fR\fB\&.dir2str(\fR\fIdid\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Convert a string (directory) into an Id and back\&. If the string is currently not in the pool and \fIcreate\fR is false, zero is returned\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid add_dirstr(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, Id\fR \fIdir\fR\fB, const char *\fR\fIstr\fR\fB)\fR
+\fI$data\fR\fB\->add_dirstr(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB,\fR \fI$dir\fR\fB,\fR \fI$string\fR\fB)\fR
+\fIdata\fR\fB\&.add_dirstr(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fIdir\fR\fB,\fR \fIstring\fR\fB)\fR
+\fIdata\fR\fB\&.add_dirstr(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fIdir\fR\fB,\fR \fIstring\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Add a file provide\&.
 .sp
 .if n \{\
 .RS 4

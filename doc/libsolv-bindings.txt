@@ -3457,6 +3457,26 @@ after it has been internalized.
 
 Write the contents of the repodata area as solv file.
 
+	Id str2dir(const char *dir, bool create = 1)
+	my $did = data->str2dir($dir);
+	did = data.str2dir(dir)
+	did = data.str2dir(dir)
+
+	const char *dir2str(Id did, const char *suffix = 0)
+	$dir = pool->dir2str($did);
+	dir = pool.dir2str(did)
+	dir = pool.dir2str(did)
+
+Convert a string (directory) into an Id and back. If the string is currently not in the
+pool and _create_ is false, zero is returned.
+
+	void add_dirstr(Id solvid, Id keyname, Id dir, const char *str)
+	$data->add_dirstr($solvid, $keyname, $dir, $string)
+	data.add_dirstr(solvid, keyname, dir, string)
+	data.add_dirstr(solvid, keyname, dir, string)
+
+Add a file provide.
+
 	bool add_solv(FILE *fp, int flags = 0);
 	$data->add_solv($fp);
 	data.add_solv(fp)
