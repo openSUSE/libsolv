@@ -3475,7 +3475,7 @@ pool and _create_ is false, zero is returned.
 	data.add_dirstr(solvid, keyname, dir, string)
 	data.add_dirstr(solvid, keyname, dir, string)
 
-Add a file provide.
+Add a file path consisting of a dirname Id and a basename string.
 
 	bool add_solv(FILE *fp, int flags = 0);
 	$data->add_solv($fp);
