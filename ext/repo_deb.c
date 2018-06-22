@@ -599,8 +599,11 @@ repo_add_deb(Repo *repo, const char *deb, int flags)
       fclose(fp);
       return 0;
     }
+  /* dpkg has no actual maximum size for the control.tar member, so this
+   * just keeps from allocating arbitrarily large amounts of memory.
+   */
   clen = atoi((char *)buf + 8 + 60 + vlen + 48);
-  if (clen <= 0 || clen >= 0x100000)
+  if (clen <= 0 || clen >= 0x1000000)
     {
       pool_error(pool, -1, "%s: control.tar has illegal size", deb);
       fclose(fp);
