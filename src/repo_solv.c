@@ -612,7 +612,7 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
       unsigned int pfsize = read_u32(&data);
       char *prefix = solv_malloc(pfsize);
       char *pp = prefix;
-      char *old_str = 0;
+      char *old_str = strsp;
       char *dest = strsp;
       int freesp = sizeid;
 

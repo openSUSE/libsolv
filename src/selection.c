@@ -1444,6 +1444,8 @@ selection_make_matchdeps_common_limited(Pool *pool, Queue *selection, const char
     return 0;
   if (!name && !dep)
     return 0;
+  if (name && dep)
+    return 0;
 
   if ((flags & SELECTION_MATCH_DEPSTR) != 0)
     flags &= ~SELECTION_REL;

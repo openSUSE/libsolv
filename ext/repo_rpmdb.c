@@ -1260,10 +1260,7 @@ headfromfp(struct rpmdbstate *state, const char *name, FILE *fp, unsigned char *
     }
   rpmhead = state->rpmhead;
   if (fread(rpmhead->data, len, 1, fp) != 1)
-    {
-      fclose(fp);
-      return pool_error(state->pool, 0, "%s: unexpected EOF", name);
-    }
+    return pool_error(state->pool, 0, "%s: unexpected EOF", name);
   if (chk1)
     solv_chksum_add(chk1, rpmhead->data, len);
   if (chk2)
