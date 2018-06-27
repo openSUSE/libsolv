@@ -7,7 +7,7 @@
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-POOL" "3" "01/18/2018" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-POOL" "3" "06/27/2018" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -759,6 +759,18 @@ Free the hashes used to unify strings and relations\&. You can use this function
 .\}
 .sp
 Convert a solvable Id into a pointer to the solvable data\&. Note that the pointer may become invalid if new solvables are created or old solvables deleted, because the array storing all solvables may get reallocated\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId pool_solvable2id(const Pool *\fR\fIpool\fR\fB, Solvable *\fR\fIs\fR\fB)\fR;
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Convert a pointer to the solvable data into a solvable Id\&.
 .sp
 .if n \{\
 .RS 4

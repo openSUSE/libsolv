@@ -282,6 +282,10 @@ static inline Solvable *pool_id2solvable(const Pool *pool, Id p)
 {
   return pool->solvables + p;
 }
+static inline Id pool_solvable2id(const Pool *pool, Solvable *s)
+{
+  return s - pool->solvables;
+}
 
 extern const char *pool_solvable2str(Pool *pool, Solvable *s);
 static inline const char *pool_solvid2str(Pool *pool, Id p)
