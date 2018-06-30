@@ -1,7 +1,7 @@
 #
 # spec file for package libsolv
 #
-# Copyright (c) 2017 SUSE LINUX Products GmbH, Nuernberg, Germany.
+# Copyright (c) 2018 SUSE LINUX GmbH, Nuernberg, Germany.
 #
 # All modifications and additions to the file contributed by third parties
 # remain the property of their copyright owners, unless otherwise agreed
@@ -15,122 +15,126 @@
 # Please submit bugfixes or comments via http://bugs.opensuse.org/
 #
 
-Name:           libsolv
-Version:        @VERSION@
-Release:        0
-Url:            https://github.com/openSUSE/libsolv
-Source:         libsolv-%{version}.tar.bz2
-BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 
-%bcond_without enable_static
-%bcond_without disable_shared
-%bcond_without perl_binding
-%bcond_without python_binding
-%bcond_without python3_binding
-%bcond_without ruby_binding
-%bcond_with zypp
-
-%if 0%{?leap_version} >= 420300 || 0%{?sle_version} >= 120300 || 0%{?suse_version} >= 1330 || !0%{?suse_version}
+%define libname libsolv@LIBSOLV_SOVERSION@
+# Helper macros for systems where not defined
+%if ! %{defined _ctest}
+%if 0%{?suse_version} || 0%{?mageia}
+%global cmake_install cd build && make DESTDIR=%{buildroot} install
+%global ctest cd build && %{_bindir}/ctest %{?_smp_mflags}
+%else
+%global cmake_install make DESTDIR=%{buildroot} install
+%global ctest %{_bindir}/ctest %{?_smp_mflags}
+%endif
+%endif
+%{!?python2_sitearch:%global python2_sitearch %{python_sitearch}}
+%{!?rb_vendorlibdir:%global rb_vendorlibdir %{ruby_vendorarchdir}}
+%if 0%{?sle_version} >= 120300 || 0%{?suse_version} >= 1500 || 0%{?fedora} || 0%{?mageia} > 6 || 0%{?rhel} > 7
 %bcond_without bz2
 %bcond_without xz
 %else
 %bcond_with bz2
 %bcond_with xz
 %endif
-
 %if 0%{?fedora} || 0%{?rhel} >= 7 || 0%{?mageia} >= 6 || 0%{?suse_version} >= 1330
 %bcond_without richdeps
 %else
 %bcond_with richdeps
 %endif
-
-%if 0%{?mandriva_version}
-# force this version on mandriva
-BuildRequires:  libneon0.26-devel
+%if 0%{?suse_version} >= 1310 || 0%{?fedora} || 0%{?rhel} > 7 || 0%{?mageia} >= 6
+%bcond_without python3
+%else
+%bcond_with python3
 %endif
-%if 0%{?fedora} || 0%{?rhel} >= 6 || 0%{?mageia}
-BuildRequires:  db-devel
+%if 0%{?rhel} || 0%{?suse_version} < 1120
+%bcond_with ruby
+%bcond_with perl
+%else
+%bcond_without ruby
+%bcond_without perl
 %endif
-BuildRequires:  libxml2-devel
-%if 0%{?suse_version} && 0%{?suse_version} < 1100
-BuildRequires:  graphviz
+%if 0%{?suse_version} < 1120
+%bcond_with python2
+%else
+%bcond_without python2
 %endif
-%if 0%{?suse_version} > 1020 || 0%{?fedora} || 0%{?mageia}
-BuildRequires:  fdupes
+%bcond_without static
+%bcond_with shared
+%if 0%{?suse_version}
+%bcond_without zypp
+%else
+%bcond_with zypp
 %endif
+Name:           libsolv
+Version:        @VERSION@
+Release:        0
+Summary:        Package dependency solver using a satisfiability algorithm
+License:        BSD-3-Clause
+Group:          Development/Libraries/C and C++
+URL:            https://github.com/openSUSE/libsolv
+Source:         libsolv-%{version}.tar.bz2
 BuildRequires:  cmake
 BuildRequires:  gcc-c++
+BuildRequires:  libxml2-devel
+BuildRequires:  pkgconfig
 BuildRequires:  rpm-devel
 BuildRequires:  zlib-devel
-
-%if %{with perl_binding}
-BuildRequires:  perl
-%if 0%{?fedora} || 0%{?rhel} >= 6 || 0%{?mageia}
-BuildRequires:  perl-devel
-%endif
-BuildRequires:  swig
-%endif
-
-%if %{with ruby_binding}
-%global ruby_vendorarch %(ruby  -r rbconfig -e "puts RbConfig::CONFIG['vendorarchdir'].nil? ? RbConfig::CONFIG['sitearchdir'] : RbConfig::CONFIG['vendorarchdir']")
+BuildRoot:      %{_tmppath}/%{name}-%{version}-build
+%if %{with ruby}
 BuildRequires:  ruby
 BuildRequires:  ruby-devel
 BuildRequires:  swig
 %endif
-
-%if %{with python_binding}
-%global python_sitearch %(python -c "from distutils.sysconfig import get_python_lib; print(get_python_lib(True))")
+%if 0%{?fedora} || 0%{?rhel}
+BuildRequires:  libdb-devel
+%endif
+%if 0%{?mageia}
+BuildRequires:  db-devel
+%endif
+%if %{with perl}
+BuildRequires:  perl
+BuildRequires:  swig
+%endif
+%if %{with python2}
 BuildRequires:  python-devel
 BuildRequires:  swig
 %endif
-
-%if %{with python3_binding}
-%global python3_sitearch %(python3 -c "from distutils.sysconfig import get_python_lib; print(get_python_lib(True))")
-BuildRequires:  python3-devel
+%if %{with python3}
+BuildRequires:  swig
+BuildRequires:  pkgconfig(python3)
 %endif
-
 %if %{with bz2}
-%if 0%{?suse_version}
-BuildRequires:  libbz2-devel
-%else
-BuildRequires:  bzip2-devel
+BuildRequires:  pkgconfig(bzip2)
 %endif
-%endif
-
 %if %{with xz}
-BuildRequires:  xz-devel
+BuildRequires:  pkgconfig(liblzma)
 %endif
-
-
-Summary:        Package dependency solver using a satisfiability algorithm
-License:        BSD-3-Clause
-Group:          Development/Libraries/C and C++
 
 %description
 libsolv is a library for solving packages and reading repositories.
 The solver uses a satisfiability algorithm.
 
-%if !%{with disable_shared}
-%package -n libsolv@LIBSOLV_SOVERSION@
+%if %{with shared}
+%package -n %{libname}
 Summary:        Package dependency solver using a satisfiability algorithm
 Group:          System/Libraries
 
-%description -n libsolv@LIBSOLV_SOVERSION@
+%description -n %{libname}
 libsolv is a library for solving packages and reading repositories.
 It consists of two central blocks: Using a dictionary approach to
 store and retrieve package and dependency information, and, using a
 so-called satisfiability algorithm for resolving package
 dependencies.
-
 %endif
+
 %package devel
 Summary:        Development files for libsolv, a package solver
 Group:          Development/Libraries/C and C++
-%if !%{with disable_shared}
-Requires:       libsolv@LIBSOLV_SOVERSION@ = %version
-%endif
 Requires:       rpm-devel
 Conflicts:      libsatsolver-devel
+%if %{with shared}
+Requires:       %{libname} = %{version}-%{release}
+%endif
 
 %description devel
 Development files for libsolv, a library for solving packages and
@@ -139,10 +143,13 @@ reading repositories.
 %package tools
 Summary:        Utilities to work with .solv files
 Group:          System/Management
+Requires:       bzip2
+Requires:       coreutils
+Requires:       findutils
+Requires:       gzip
+Conflicts:      satsolver-tools-obsolete
 Obsoletes:      satsolver-tools < 0.18
 Provides:       satsolver-tools = 0.18
-Conflicts:      satsolver-tools-obsolete
-Requires:       gzip bzip2 coreutils findutils
 
 %description tools
 libsolv is a library for solving packages and reading repositories.
@@ -154,13 +161,13 @@ files used by libsolv.
 Summary:        Applications demoing the libsolv library
 Group:          System/Management
 Requires:       curl
+Conflicts:      libsatsolver-demo
 %if 0%{?fedora} || 0%{?rhel} >= 6 || 0%{?mageia}
 Requires:       gnupg2
 %endif
 %if 0%{?suse_version}
 Requires:       gpg2
 %endif
-Conflicts:      libsatsolver-demo
 
 %description demo
 Applications demoing the libsolv library.
@@ -173,9 +180,6 @@ Group:          Development/Languages/Ruby
 Ruby bindings for libsolv.
 
 %package -n python-solv
-%if 0%{?py_requires:1} && %{with python_binding}
-%py_requires
-%endif
 Summary:        Python bindings for the libsolv library
 Group:          Development/Languages/Python
 
@@ -190,139 +194,153 @@ Group:          Development/Languages/Python
 Python3 bindings for libsolv.
 
 %package -n perl-solv
-Requires:       perl = %{perl_version}
 Summary:        Perl bindings for the libsolv library
 Group:          Development/Languages/Perl
+Requires:       perl = %{perl_version}
 
 %description -n perl-solv
 Perl bindings for libsolv.
 
 %prep
-%setup -n libsolv-%{version}
+%setup -q
 
 %build
 export CFLAGS="%{optflags}"
 export CXXFLAGS="$CFLAGS"
 
 CMAKE_FLAGS=
-%if 0%{?fedora} || 0%{?rhel} >= 6
-CMAKE_FLAGS="-DFEDORA=1 -DENABLE_APPDATA=1 -DENABLE_COMPS=1"
+%if 0%{?fedora} || 0%{?rhel}
+CMAKE_FLAGS="-DFEDORA=1"
 %endif
 %if 0%{?mageia}
-CMAKE_FLAGS="-DMAGEIA=1 -DENABLE_APPDATA=1 -DENABLE_COMPS=1"
+CMAKE_FLAGS="-DMAGEIA=1"
 %endif
 %if 0%{?suse_version}
-CMAKE_FLAGS="-DSUSE=1 -DENABLE_APPDATA=1 -DENABLE_COMPS=1"
+CMAKE_FLAGS="-DSUSE=1"
 %endif
 
-cmake	$CMAKE_FLAGS \
-	-DCMAKE_INSTALL_PREFIX=%{_prefix} \
-	-DLIB=%{_lib} \
-	-DCMAKE_VERBOSE_MAKEFILE=TRUE \
-	-DCMAKE_BUILD_TYPE=RelWithDebInfo \
+# SHARE/MODULE flags in SUSE enforce no-undefined which is not applicable for
+# bindings here
+%cmake $CMAKE_FLAGS \
+	-DCMAKE_MODULE_LINKER_FLAGS="-Wl,--as-needed -Wl,-z,now" \
+	-DCMAKE_SHARED_LINKER_FLAGS="-Wl,--as-needed -Wl,-z,now" \
 	-DWITH_LIBXML2=1 \
-	%{?with_enable_static:-DENABLE_STATIC=1} \
-	%{?with_disable_shared:-DDISABLE_SHARED=1} \
-	%{?with_perl_binding:-DENABLE_PERL=1} \
-	%{?with_python_binding:-DENABLE_PYTHON=1} \
-	%{?with_python3_binding:-DENABLE_PYTHON3=1} \
-	%{?with_ruby_binding:-DENABLE_RUBY=1} \
+	-DENABLE_APPDATA=1 \
+	-DENABLE_COMPS=1 \
+	%{?with_static:-DENABLE_STATIC=1} \
+	%{!?with_shared:-DDISABLE_SHARED=1} \
+	%{?with_perl:-DENABLE_PERL=1} \
+	%{?with_python2:-DENABLE_PYTHON=1} \
+	%{?with_python3:-DENABLE_PYTHON3=1} \
+	%{?with_ruby:-DENABLE_RUBY=1} \
 	%{?with_bz2:-DENABLE_BZIP2_COMPRESSION=1} \
 	%{?with_xz:-DENABLE_LZMA_COMPRESSION=1} \
 	%{?with_richdeps:-DENABLE_COMPLEX_DEPS=1} \
 	%{?with_zypp:-DENABLE_SUSEREPO=1 -DENABLE_HELIXREPO=1} \
-	-DUSE_VENDORDIRS=1 \
-	-DCMAKE_SKIP_RPATH=1
+	-DUSE_VENDORDIRS=1
 make %{?_smp_mflags}
 
 %install
-make DESTDIR=%{buildroot} install
+%cmake_install
+
 %if 0%{?suse_version}
-%if %{with python_binding}
-pushd %{buildroot}/%{python_sitearch}
-python %py_libdir/py_compile.py *.py
-python -O %py_libdir/py_compile.py *.py
-popd
+%if %{with python2}
+%py_compile %{buildroot}/%{python2_sitearch}
 %endif
-%if %{with python3_binding}
+%if %{with python3}
 %py3_compile %{buildroot}/%{python3_sitearch}
 %endif
 %endif
-%if %{with disable_shared}
+%if %{with static}
 # we want to leave the .a file untouched
 export NO_BRP_STRIP_DEBUG=true
 %endif
 
-%if !%{with disable_shared}
-%post -n libsolv@LIBSOLV_SOVERSION@ -p /sbin/ldconfig
+%check
+%ctest
 
-%postun -n libsolv@LIBSOLV_SOVERSION@ -p /sbin/ldconfig
+%if %{with shared}
+%post -n %{libname} -p /sbin/ldconfig
+%postun -n %{libname} -p /sbin/ldconfig
 
-%files -n libsolv@LIBSOLV_SOVERSION@
+%files -n %{libname}
 %defattr(-,root,root)
 %license LICENSE*
 %{_libdir}/libsolv.so.*
 %{_libdir}/libsolvext.so.*
 %endif
 
+# Some small macro to list tools with mans
+%global solv_tool() \
+%{_bindir}/%{1} \
+%{_mandir}/man1/%{1}.1* \
+%{nil}
+
 %files tools
 %defattr(-,root,root)
-%if 0%{?suse_version}
-%exclude %{_bindir}/helix2solv
-%exclude %{_mandir}/man1/helix2solv*
+%doc LICENSE*
+%solv_tool appdata2solv
+%solv_tool comps2solv
+%solv_tool deltainfoxml2solv
+%solv_tool dumpsolv
+%solv_tool installcheck
+%solv_tool mergesolv
+%solv_tool repomdxml2solv
+%solv_tool rpmdb2solv
+%solv_tool rpmmd2solv
+%solv_tool rpms2solv
+%solv_tool testsolv
+%solv_tool updateinfoxml2solv
+%if %{with zypp}
+  %solv_tool susetags2solv
 %endif
-%exclude %{_bindir}/solv
-%{_bindir}/*
-%{_mandir}/man1/*
+%{_bindir}/repo2solv.sh
 
 %files devel
 %defattr(-,root,root)
-%if %{with enable_static}
+%doc LICENSE*
+%if %{with static}
 %{_libdir}/libsolv.a
 %{_libdir}/libsolvext.a
 %endif
-%if !%{with disable_shared}
+%if %{with shared}
 %{_libdir}/libsolv.so
 %{_libdir}/libsolvext.so
 %endif
 %{_includedir}/solv
-%if 0%{?suse_version}
-%{_bindir}/helix2solv
-%{_mandir}/man1/helix2solv*
-%endif
 %{_datadir}/cmake/Modules/*
 %{_libdir}/pkgconfig/libsolv*.pc
 %{_mandir}/man3/*
+%if %{with zypp}
+  %solv_tool helix2solv
+%endif
 
 %files demo
 %defattr(-,root,root)
 %{_bindir}/solv
 
-%if %{with perl_binding}
+%if %{with perl}
 %files -n perl-solv
 %defattr(-,root,root)
 %{perl_vendorarch}/*
 %endif
 
-%if %{with ruby_binding}
+%if %{with ruby}
 %files -n ruby-solv
 %defattr(-,root,root)
-%{ruby_vendorarch}/*
+%{rb_vendorlibdir}/*
 %endif
 
-%if %{with python_binding}
+%if %{with python2}
 %files -n python-solv
 %defattr(-,root,root)
-%{python_sitearch}/*
+%{python2_sitearch}/*
 %endif
 
-%if %{with python3_binding}
+%if %{with python3}
 %files -n python3-solv
 %defattr(-,root,root)
-%{python3_sitearch}/*solv*
-%if 0%{?suse_version}
-%{python3_sitearch}/*/*solv*
-%endif
+%{python3_sitearch}/*
 %endif
 
 %changelog

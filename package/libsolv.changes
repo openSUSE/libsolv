@@ -35,6 +35,34 @@ Wed Jan 31 11:41:51 CET 2018 - mls@suse.de
 - bump version to 0.6.31
 
 -------------------------------------------------------------------
+Fri Jan  5 14:32:37 UTC 2018 - ngompa13@gmail.com
+
+- Fix compatibility with Mageia and RH/Fedora
+
+-------------------------------------------------------------------
+Thu Jan  4 11:02:29 UTC 2018 - tchvatal@suse.com
+
+- Sort a bit with spec-cleaner
+- Use python/ruby/etc condition names to match what other packages do
+  in order to make sure we are enabling/disabling stuff within prjcfg
+- Silence the source unpacking
+- As fedora/rh uses its own package make sure we use our guidelines
+  for cmake macro usage to get the most of the options for free
+- Make sure to execute tests
+- Remove obsolete syntax like declaring empty py_requires
+- Install license files using %license macro
+- In devel require %version-%release even tho we should be safeguarded
+  against this by zypper
+- Switch the db-devel to libdb-devel dependency to get further with
+  other distribution builds
+- Drop perl-devel dependency on other distros as it builds with
+  just perl
+- Make sure we can build on rhel, mageia, fedora
+- Allow building on SLE_11 by disabling all the bidnings which fail
+  with swig errors
+- Explicitly state all tool binaries to avoid using glob functions
+
+-------------------------------------------------------------------
 Tue Oct 24 12:09:32 UTC 2017 - jengelh@inai.de
 
 - Update package descriptions and groups.
