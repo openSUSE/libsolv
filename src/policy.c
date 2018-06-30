@@ -908,11 +908,13 @@ move_installed_to_front(Pool *pool, Queue *plist)
  * return result through plist
  */
 void
-prune_to_best_version(Pool *pool, Queue *plist)
+prune_to_best_version(Solver *solv, Queue *plist)
 {
   int i, j, r;
   Solvable *s, *best;
+  enum {NEUTRAL, FAVORED, DISFAVORED} best_favor;
 
+  Pool *pool = solv->pool;
   if (plist->count < 2)		/* no need to prune for a single entry */
     return;
   POOL_DEBUG(SOLV_DEBUG_POLICY, "prune_to_best_version %d\n", plist->count);
@@ -925,6 +927,7 @@ prune_to_best_version(Pool *pool, Queue *plist)
   for (i = j = 0; i < plist->count; i++)
     {
       s = pool->solvables + plist->elements[i];
+      Id s_id = s - pool->solvables;
 
       POOL_DEBUG(SOLV_DEBUG_POLICY, "- %s[%s]\n",
 		 pool_solvable2str(pool, s),
@@ -933,6 +936,9 @@ prune_to_best_version(Pool *pool, Queue *plist)
       if (!best)		/* if no best yet, the current is best */
         {
           best = s;
+          best_favor = solv->isdisfavormap.size && MAPTST(&solv->isdisfavormap, s_id) ? DISFAVORED :
+                       solv->favormap.size && MAPTST(&solv->favormap, s_id) ? FAVORED : 
+                       NEUTRAL;
           continue;
         }
 
@@ -941,8 +947,24 @@ prune_to_best_version(Pool *pool, Queue *plist)
         {
           plist->elements[j++] = best - pool->solvables; /* move old best to front */
           best = s;		/* take current as new best */
+          best_favor = solv->isdisfavormap.size && MAPTST(&solv->isdisfavormap, s_id) ? DISFAVORED :
+                       solv->favormap.size && MAPTST(&solv->favormap, s_id) ? FAVORED : 
+                       NEUTRAL;
           continue;
         }
+   
+        if (solv->isdisfavormap.size && MAPTST(&solv->isdisfavormap, s_id))
+          {
+            if (best_favor != DISFAVORED)
+              continue;
+          }
+        else if (solv->favormap.size && MAPTST(&solv->favormap, s_id) && best_favor != FAVORED)
+          {
+            best = s;
+            best_favor = FAVORED;
+            continue;
+          }
+
       r = best->evr != s->evr ? pool_evrcmp(pool, best->evr, s->evr, EVRCMP_COMPARE) : 0;
 #ifdef ENABLE_LINKED_PKGS
       if (r == 0 && has_package_link(pool, s))
@@ -950,6 +972,9 @@ prune_to_best_version(Pool *pool, Queue *plist)
 #endif
       if (r < 0)
 	best = s;
+    best_favor = solv->isdisfavormap.size && MAPTST(&solv->isdisfavormap, s_id) ? DISFAVORED :
+                 solv->favormap.size && MAPTST(&solv->favormap, s_id) ? FAVORED : 
+                 NEUTRAL;
     }
   plist->elements[j++] = best - pool->solvables;	/* finish last group */
   plist->count = j;
@@ -1323,6 +1348,10 @@ policy_filter_unwanted(Solver *solv, Queue *plist, int mode)
       policy_prefer_favored(solv, plist);
       return;
     }
+  
+  Queue favlist;
+  queue_init(&favlist);
+  
   if (plist->count > 1)
     {
       if (mode != POLICY_MODE_SUGGEST)
@@ -1333,7 +1362,7 @@ policy_filter_unwanted(Solver *solv, Queue *plist, int mode)
   if (plist->count > 1)
     prune_to_best_arch(pool, plist);
   if (plist->count > 1)
-    prune_to_best_version(pool, plist);
+    prune_to_best_version(solv, plist);
   if (plist->count > 1 && (mode == POLICY_MODE_CHOOSE || mode == POLICY_MODE_CHOOSE_NOREORDER))
     {
       prune_to_recommended(solv, plist);
@@ -1351,17 +1380,20 @@ policy_filter_unwanted(Solver *solv, Queue *plist, int mode)
 	  policy_prefer_favored(solv, plist);
 	}
     }
+    
+  queue_free(&favlist);
 }
 
 void
-pool_best_solvables(Pool *pool, Queue *plist, int flags)
+pool_best_solvables(Solver *solv, Queue *plist, int flags)
 {
+  Pool *pool = solv->pool;
   if (plist->count > 1)
     prune_to_highest_prio(pool, plist);
   if (plist->count > 1)
     prune_to_best_arch(pool, plist);
   if (plist->count > 1)
-    prune_to_best_version(pool, plist);
+    prune_to_best_version(solv, plist);
   if (plist->count > 1)
     {
       dislike_old_versions(pool, plist);
