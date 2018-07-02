@@ -110,5 +110,4 @@ TARGET_LINK_LIBRARIES (testsolv libsolvext libsolv ${SYSTEM_LIBRARIES})
 ADD_EXECUTABLE (repo2solv repo2solv.c )
 TARGET_LINK_LIBRARIES (repo2solv toolstuff libsolvext libsolv ${SYSTEM_LIBRARIES})
 
-INSTALL (TARGETS ${tools_list} DESTINATION ${BIN_INSTALL_DIR})
-
+INSTALL (TARGETS ${tools_list} DESTINATION ${CMAKE_INSTALL_BINDIR})

@@ -1,6 +1,6 @@
 PROJECT (libsolv)
 
-CMAKE_MINIMUM_REQUIRED (VERSION 2.4)
+CMAKE_MINIMUM_REQUIRED (VERSION 2.8.5)
 
 OPTION (ENABLE_STATIC "Build a static version of the libraries?" OFF)
 OPTION (DISABLE_SHARED "Do not build a shared version of the libraries?" OFF)
@@ -38,34 +38,14 @@ OPTION (ENABLE_ZCHUNK_COMPRESSION "Build with zchunk compression support?" OFF)
 OPTION (WITH_SYSTEM_ZCHUNK "Use system zchunk library?" OFF)
 OPTION (WITH_LIBXML2  "Build with libxml2 instead of libexpat?" OFF)
 
-# Library
-IF (DEFINED LIB)
-  SET (LIB_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/${LIB}")
-ELSE (DEFINED  LIB)
-  IF (CMAKE_SIZEOF_VOID_P MATCHES "8")
-    SET (LIB_SUFFIX "64")
-  ENDIF (CMAKE_SIZEOF_VOID_P MATCHES "8")
-  SET (LIB_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/lib${LIB_SUFFIX}")
-ENDIF (DEFINED  LIB)
-MESSAGE (STATUS "Libraries will be installed in ${LIB_INSTALL_DIR}")
-# Library
-IF (DEFINED INCLUDE)
-  SET (INCLUDE_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/${INCLUDE}")
-else (DEFINED INCLUDE)
-  SET (INCLUDE_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/include")
-ENDIF (DEFINED  INCLUDE)
-MESSAGE (STATUS "Header files will be installed in ${INCLUDE_INSTALL_DIR}")
-SET (BIN_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/bin")
-IF (NOT MAN_INSTALL_DIR)
-SET (MAN_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/share/man")
-IF (IS_DIRECTORY "${CMAKE_INSTALL_PREFIX}/man"  AND NOT IS_DIRECTORY "${CMAKE_INSTALL_PREFIX}/share/man")
-  SET (MAN_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/man")
-ENDIF (IS_DIRECTORY "${CMAKE_INSTALL_PREFIX}/man"  AND NOT IS_DIRECTORY "${CMAKE_INSTALL_PREFIX}/share/man")
-ENDIF (NOT MAN_INSTALL_DIR)
-MESSAGE(STATUS "Man pages will be installed in ${MAN_INSTALL_DIR}")
+include (GNUInstallDirs)
+message (STATUS "Libraries will be installed in ${CMAKE_INSTALL_FULL_LIBDIR}")
+message (STATUS "Header files will be installed in ${CMAKE_INSTALL_FULL_INCLUDEDIR}")
+message (STATUS "Binaries will be installed in ${CMAKE_INSTALL_FULL_BINDIR}")
+message (STATUS "Man pages will be installed in ${CMAKE_INSTALL_FULL_MANDIR}")
 
 IF (NOT PKGCONFIG_INSTALL_DIR)
-  SET (PKGCONFIG_INSTALL_DIR ${LIB_INSTALL_DIR}/pkgconfig)
+  SET (PKGCONFIG_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 ENDIF (NOT PKGCONFIG_INSTALL_DIR)
 ####################################################################
 # CONFIGURATION                                                    #
