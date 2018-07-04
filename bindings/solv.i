@@ -3920,7 +3920,7 @@ rb_eval_string(
     Repodata *data = repo_id2repodata($self->repo, $self->id);
     return repodata_str2dir(data, dir, create);
   }
-  const char dir2str(Id did, const char *suf = 0) {
+  const char *dir2str(Id did, const char *suf = 0) {
     Repodata *data = repo_id2repodata($self->repo, $self->id);
     return repodata_dir2str(data, did, suf);
   }
