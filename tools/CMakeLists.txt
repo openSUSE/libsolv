@@ -94,6 +94,8 @@ TARGET_LINK_LIBRARIES (installcheck libsolvext libsolv ${SYSTEM_LIBRARIES})
 IF (SUSE)
 ADD_EXECUTABLE (patchcheck patchcheck.c)
 TARGET_LINK_LIBRARIES (patchcheck libsolvext libsolv ${SYSTEM_LIBRARIES})
+
+SET (tools_list ${tools_list} patchcheck)
 ENDIF (SUSE)
 
 IF (ENABLE_APPDATA)
