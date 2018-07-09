@@ -739,11 +739,6 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
 	  idmap[i] = id;       /* repo relative -> pool relative */
 	  sp += l;	       /* next string */
 	}
-      if (hashmask > mkmask(spool->nstrings + 8192))
-	{
-	  spool->stringhashtbl = solv_free(spool->stringhashtbl);
-	  spool->stringhashmask = 0;
-	}
       stringpool_shrink(spool);		/* vacuum */
     }
 
@@ -761,31 +756,13 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
       pool->rels = solv_realloc2(pool->rels, pool->nrels + numrel, sizeof(Reldep));
       ran = pool->rels;
 
-      /* grow hash if needed, otherwise reuse */
-      hashmask = mkmask(pool->nrels + numrel);
+      pool_resize_rels_hash(pool, numrel);
+      hashtbl = pool->relhashtbl;
+      hashmask = pool->relhashmask;
 #if 0
       POOL_DEBUG(SOLV_DEBUG_STATS, "read %d rels\n", numrel);
-      POOL_DEBUG(SOLV_DEBUG_STATS, "rel hash buckets: %d, old %d\n", hashmask + 1, pool->relhashmask + 1);
+      POOL_DEBUG(SOLV_DEBUG_STATS, "rel hash buckets: %d\n", hashmask + 1);
 #endif
-      if (hashmask > pool->relhashmask)
-	{
-	  pool->relhashtbl = solv_free(pool->relhashtbl);
-	  pool->relhashmask = hashmask;
-          pool->relhashtbl = hashtbl = solv_calloc(hashmask + 1, sizeof(Id));
-	  for (i = 1; i < pool->nrels; i++)
-	    {
-	      h = relhash(ran[i].name, ran[i].evr, ran[i].flags) & hashmask;
-	      hh = HASHCHAIN_START;
-	      while (hashtbl[h])
-		h = HASHCHAIN_NEXT(h, hh, hashmask);
-	      hashtbl[h] = i;
-	    }
-	}
-      else
-	{
-	  hashtbl = pool->relhashtbl;
-	  hashmask = pool->relhashmask;
-	}
 
       /*
        * read RelDeps from repo
@@ -817,11 +794,6 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
 	      ran[id].flags = relflags;
 	    }
 	  idmap[i + numid] = MAKERELDEP(id);   /* fill Id map */
-	}
-      if (hashmask > mkmask(pool->nrels + 4096))
-	{
-	  pool->relhashtbl = solv_free(pool->relhashtbl);
-	  pool->relhashmask = 0;
 	}
       pool_shrink_rels(pool);		/* vacuum */
     }

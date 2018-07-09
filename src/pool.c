@@ -44,7 +44,7 @@ pool_create(void)
 
   pool = (Pool *)solv_calloc(1, sizeof(*pool));
 
-  stringpool_init (&pool->ss, initpool_data);
+  stringpool_init(&pool->ss, initpool_data);
 
   /* alloc space for RelDep 0 */
   pool->rels = solv_extend_resize(0, 1, sizeof(Reldep), REL_BLOCK);
