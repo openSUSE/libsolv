@@ -76,11 +76,39 @@ stringpool_clone(Stringpool *ss, Stringpool *from)
   ss->sstrings = from->sstrings;
 }
 
+void
+stringpool_resize_hash(Stringpool *ss, int numnew)
+{
+  Hashval h, hh, hashmask;
+  Hashtable hashtbl;
+  int i;
+
+  if (numnew <= 0)
+    return;
+  hashmask = mkmask(ss->nstrings + numnew);
+  if (hashmask <= ss->stringhashmask)
+    return;	/* same as before */
+
+  /* realloc hash table */
+  ss->stringhashmask = hashmask;
+  solv_free(ss->stringhashtbl);
+  ss->stringhashtbl = hashtbl = (Hashtable)solv_calloc(hashmask + 1, sizeof(Id));
+  
+  /* rehash all strings into new hashtable */
+  for (i = 1; i < ss->nstrings; i++)
+    {
+      h = strhash(ss->stringspace + ss->strings[i]) & hashmask;
+      hh = HASHCHAIN_START;
+      while (hashtbl[h] != 0)
+	h = HASHCHAIN_NEXT(h, hh, hashmask);
+      hashtbl[h] = i;
+    }
+}
+
 Id
 stringpool_strn2id(Stringpool *ss, const char *str, unsigned int len, int create)
 {
   Hashval h, hh, hashmask, oldhashmask;
-  int i;
   Id id;
   Hashtable hashtbl;
 
@@ -90,27 +118,13 @@ stringpool_strn2id(Stringpool *ss, const char *str, unsigned int len, int create
     return STRID_EMPTY;
 
   hashmask = oldhashmask = ss->stringhashmask;
-  hashtbl = ss->stringhashtbl;
-
   /* expand hashtable if needed */
   if ((Hashval)ss->nstrings * 2 > hashmask)
     {
-      solv_free(hashtbl);
-
-      /* realloc hash table */
-      ss->stringhashmask = hashmask = mkmask(ss->nstrings + STRING_BLOCK);
-      ss->stringhashtbl = hashtbl = (Hashtable)solv_calloc(hashmask + 1, sizeof(Id));
-
-      /* rehash all strings into new hashtable */
-      for (i = 1; i < ss->nstrings; i++)
-	{
-	  h = strhash(ss->stringspace + ss->strings[i]) & hashmask;
-	  hh = HASHCHAIN_START;
-	  while (hashtbl[h] != 0)
-	    h = HASHCHAIN_NEXT(h, hh, hashmask);
-	  hashtbl[h] = i;
-	}
+      stringpool_resize_hash(ss, STRING_BLOCK);
+      hashmask = ss->stringhashmask;
     }
+  hashtbl = ss->stringhashtbl;
 
   /* compute hash and check for match */
   h = strnhash(str, len) & hashmask;

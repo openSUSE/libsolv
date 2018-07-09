@@ -33,6 +33,7 @@ void stringpool_init_empty(Stringpool *ss);
 void stringpool_clone(Stringpool *ss, Stringpool *from);
 void stringpool_free(Stringpool *ss);
 void stringpool_freehash(Stringpool *ss);
+void stringpool_resize_hash(Stringpool *ss, int numnew);
 
 Id stringpool_str2id(Stringpool *ss, const char *str, int create);
 Id stringpool_strn2id(Stringpool *ss, const char *str, unsigned int len, int create);

@@ -682,35 +682,16 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
       /* alloc id map for name and rel Ids. this maps ids in the solv files
        * to the ids in our pool */
       idmap = solv_calloc(numid + numrel, sizeof(Id));
-
-      /* grow hash if needed, otherwise reuse */
-      hashmask = mkmask(spool->nstrings + numid);
+      stringpool_resize_hash(spool, numid);
+      hashtbl = spool->stringhashtbl;
+      hashmask = spool->stringhashmask;
 #if 0
       POOL_DEBUG(SOLV_DEBUG_STATS, "read %d strings\n", numid);
-      POOL_DEBUG(SOLV_DEBUG_STATS, "string hash buckets: %d, old %d\n", hashmask + 1, spool->stringhashmask + 1);
+      POOL_DEBUG(SOLV_DEBUG_STATS, "string hash buckets: %d\n", hashmask + 1);
 #endif
-      if (hashmask > spool->stringhashmask)
-	{
-	  spool->stringhashtbl = solv_free(spool->stringhashtbl);
-	  spool->stringhashmask = hashmask;
-          spool->stringhashtbl = hashtbl = solv_calloc(hashmask + 1, sizeof(Id));
-	  for (i = 1; i < spool->nstrings; i++)
-	    {
-	      h = strhash(spool->stringspace + spool->strings[i]) & hashmask;
-	      hh = HASHCHAIN_START;
-	      while (hashtbl[h])
-		h = HASHCHAIN_NEXT(h, hh, hashmask);
-	      hashtbl[h] = i;
-	    }
-	}
-      else
-	{
-	  hashtbl = spool->stringhashtbl;
-	  hashmask = spool->stringhashmask;
-	}
-
       /*
        * run over strings and merge with pool.
+       * we could use stringpool_str2id, but this is faster.
        * also populate id map (maps solv Id -> pool Id)
        */
       for (i = 1; i < numid; i++)
