@@ -223,7 +223,7 @@ data_read_idarray(unsigned char *dp, Id **storep, Id *map, int max, Repodata *da
 	  data->error = SOLV_ERROR_ID_RANGE;
 	  break;
 	}
-      *store++ = x;
+      *store++ = map ? map[x] : x;
       if ((c & 64) == 0)
         break;
       x = 0;
