@@ -431,3 +431,7 @@ SOLV_1.2 {
 		pool_set_whatprovides;
 		selection_subtract;
 } SOLV_1.1;
+
+SOLV_1.3 {
+		repodata_set_kv;
+} SOLV_1.2;

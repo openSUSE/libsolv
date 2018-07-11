@@ -1387,18 +1387,18 @@ copydeps(Pool *pool, Repo *repo, Offset fromoff, Repo *fromrepo)
 
 #define COPYDIR_DIRCACHE_SIZE 512
 
-static Id copydir_complex(Pool *pool, Repodata *data, Repodata *fromdata, Id did, Id *cache);
+static Id copydir_complex(Repodata *data, Repodata *fromdata, Id did, Id *cache);
 
 static inline Id
-copydir(Pool *pool, Repodata *data, Repodata *fromdata, Id did, Id *cache)
+copydir(Repodata *data, Repodata *fromdata, Id did, Id *cache)
 {
   if (cache && did && cache[did & 255] == did)
     return cache[(did & 255) + 256];
-  return copydir_complex(pool, data, fromdata, did, cache);
+  return copydir_complex(data, fromdata, did, cache);
 }
 
 static Id
-copydir_complex(Pool *pool, Repodata *data, Repodata *fromdata, Id did, Id *cache)
+copydir_complex(Repodata *data, Repodata *fromdata, Id did, Id *cache)
 {
   Id parent, compid;
   if (!did)
@@ -1411,7 +1411,7 @@ copydir_complex(Pool *pool, Repodata *data, Repodata *fromdata, Id did, Id *cach
   parent = dirpool_parent(&fromdata->dirpool, did);
   compid = dirpool_compid(&fromdata->dirpool, did);
   if (parent)
-    parent = copydir(pool, data, fromdata, parent, cache);
+    parent = copydir(data, fromdata, parent, cache);
   if (data->localpool || fromdata->localpool)
     compid = repodata_translate_id(data, fromdata, compid, 1);
   compid = dirpool_add_dir(&data->dirpool, parent, compid, 1);
@@ -1434,50 +1434,20 @@ static int
 solvable_copy_cb(void *vcbdata, Solvable *r, Repodata *fromdata, Repokey *key, KeyValue *kv)
 {
   struct solvable_copy_cbdata *cbdata = vcbdata;
-  Id id, keyname;
   Repodata *data = cbdata->data;
   Id handle = cbdata->handle;
-  Pool *pool = data->repo->pool;
 
-  keyname = key->name;
-  switch(key->type)
+  switch (key->type)
     {
     case REPOKEY_TYPE_ID:
     case REPOKEY_TYPE_CONSTANTID:
     case REPOKEY_TYPE_IDARRAY:	/* used for triggers */
-      id = kv->id;
       if (data->localpool || fromdata->localpool)
-	id = repodata_translate_id(data, fromdata, id, 1);
-      if (key->type == REPOKEY_TYPE_ID)
-        repodata_set_id(data, handle, keyname, id);
-      else if (key->type == REPOKEY_TYPE_CONSTANTID)
-        repodata_set_constantid(data, handle, keyname, id);
-      else
-        repodata_add_idarray(data, handle, keyname, id);
-      break;
-    case REPOKEY_TYPE_STR:
-      repodata_set_str(data, handle, keyname, kv->str);
-      break;
-    case REPOKEY_TYPE_VOID:
-      repodata_set_void(data, handle, keyname);
-      break;
-    case REPOKEY_TYPE_NUM:
-      repodata_set_num(data, handle, keyname, SOLV_KV_NUM64(kv));
-      break;
-    case REPOKEY_TYPE_CONSTANT:
-      repodata_set_constant(data, handle, keyname, kv->num);
+	kv->id = repodata_translate_id(data, fromdata, kv->id, 1);
       break;
     case REPOKEY_TYPE_DIRNUMNUMARRAY:
-      id = kv->id;
-      id = copydir(pool, data, fromdata, id, cbdata->dircache);
-      if (id)
-        repodata_add_dirnumnum(data, handle, keyname, id, kv->num, kv->num2);
-      break;
     case REPOKEY_TYPE_DIRSTRARRAY:
-      id = kv->id;
-      id = copydir(pool, data, fromdata, id, cbdata->dircache);
-      if (id)
-        repodata_add_dirstr(data, handle, keyname, id, kv->str);
+      kv->id = copydir(data, fromdata, kv->id, cbdata->dircache);
       break;
     case REPOKEY_TYPE_FLEXARRAY:
       if (kv->eof == 2)
@@ -1493,16 +1463,12 @@ solvable_copy_cb(void *vcbdata, Solvable *r, Repodata *fromdata, Repokey *key, K
 	  cbdata->subhandle = cbdata->handle;
 	}
       cbdata->handle = repodata_new_handle(data);
-      repodata_add_flexarray(data, cbdata->subhandle, keyname, cbdata->handle);
-      break;
+      repodata_add_flexarray(data, cbdata->subhandle, key->name, cbdata->handle);
+      return 0;
     default:
-      if (solv_chksum_len(key->type))
-	{
-	  repodata_set_bin_checksum(data, handle, keyname, key->type, (const unsigned char *)kv->str);
-	  break;
-	}
       break;
     }
+  repodata_set_kv(data, handle, key->name, key->type, kv);
   return 0;
 }
 
@@ -1530,13 +1496,20 @@ solvable_copy(Solvable *s, Solvable *r, Repodata *data, Id *dircache)
   s->enhances  = copydeps(pool, repo, r->enhances, fromrepo);
 
   /* copy all attributes */
-  if (!data)
+  if (!data || fromrepo->nrepodata < 2)
     return;
   cbdata.data = data;
   cbdata.handle = s - pool->solvables;
   cbdata.subhandle = 0;
   cbdata.dircache = dircache;
   p = r - fromrepo->pool->solvables;
+  if (fromrepo->nrepodata == 2)
+    {
+      Repodata *fromdata = repo_id2repodata(fromrepo, 1);
+      if (p >= fromdata->start && p < fromdata->end)
+        repodata_search(fromdata, p, 0, SEARCH_SUB | SEARCH_ARRAYSENTINEL, solvable_copy_cb, &cbdata);
+      return;
+    }
 #if 0
   repo_search(fromrepo, p, 0, 0, SEARCH_NO_STORAGE_SOLVABLE | SEARCH_SUB | SEARCH_ARRAYSENTINEL, solvable_copy_cb, &cbdata);
 #else

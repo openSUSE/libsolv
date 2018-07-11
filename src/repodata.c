@@ -2803,7 +2803,7 @@ repodata_add_flexarray(Repodata *data, Id solvid, Id keyname, Id ghandle)
   data->attriddata[data->attriddatalen++] = 0;
 }
 
-static void
+void
 repodata_set_kv(Repodata *data, Id solvid, Id keyname, Id keytype, KeyValue *kv)
 {
   switch (keytype)
@@ -2828,6 +2828,13 @@ repodata_set_kv(Repodata *data, Id solvid, Id keyname, Id keytype, KeyValue *kv)
       break;
     case REPOKEY_TYPE_CONSTANT:
       repodata_set_constant(data, solvid, keyname, kv->num);
+      break;
+    case REPOKEY_TYPE_DIRNUMNUMARRAY:
+      if (kv->id)
+        repodata_add_dirnumnum(data, solvid, keyname, kv->id, kv->num, kv->num2);
+      break;
+    case REPOKEY_TYPE_DIRSTRARRAY:
+      repodata_add_dirstr(data, solvid, keyname, kv->id, kv->str);
       break;
     case_CHKSUM_TYPES:
       repodata_set_bin_checksum(data, solvid, keyname, keytype, (const unsigned char *)kv->str);

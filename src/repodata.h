@@ -258,7 +258,6 @@ void repodata_set_checksum(Repodata *data, Id solvid, Id keyname, Id type,
 			   const char *str);
 void repodata_set_idarray(Repodata *data, Id solvid, Id keyname, Queue *q);
 
-
 /* directory (for package file list) */
 void repodata_add_dirnumnum(Repodata *data, Id solvid, Id keyname, Id dir, Id num, Id num2);
 void repodata_add_dirstr(Repodata *data, Id solvid, Id keyname, Id dir, const char *str);
@@ -271,6 +270,8 @@ void repodata_add_poolstr_array(Repodata *data, Id solvid, Id keyname, const cha
 void repodata_add_fixarray(Repodata *data, Id solvid, Id keyname, Id ghandle);
 void repodata_add_flexarray(Repodata *data, Id solvid, Id keyname, Id ghandle);
 
+/* generic */
+void repodata_set_kv(Repodata *data, Id solvid, Id keyname, Id keytype, struct _KeyValue *kv);
 void repodata_unset(Repodata *data, Id solvid, Id keyname);
 void repodata_unset_uninternalized(Repodata *data, Id solvid, Id keyname);
 
