@@ -499,6 +499,10 @@ Convert a solvable Id into a pointer to the solvable data. Note that the
 pointer may become invalid if new solvables are created or old solvables
 deleted, because the array storing all solvables may get reallocated.
 
+	Id pool_solvable2id(const Pool *pool, Solvable *s);
+
+Convert a pointer to the solvable data into a solvable Id.
+
 	const char *pool_solvid2str(Pool *pool, Id p);
 
 Return a string representing the solvable with the Id _p_. The string will
