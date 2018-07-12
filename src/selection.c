@@ -1383,6 +1383,8 @@ setup_limiter(Pool *pool, int flags, struct limiter *limiter)
 static int
 matchdep_str(const char *pattern, const char *string, int flags)
 {
+  if (!pattern || !string)
+    return 0;
   if (flags & SELECTION_GLOB)
     {
       int globflags = (flags & SELECTION_NOCASE) != 0 ? FNM_CASEFOLD : 0;

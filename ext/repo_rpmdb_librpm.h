@@ -125,14 +125,14 @@ getinstalledrpmdbids(struct rpmdbstate *state, const char *index, const char *ma
   rpmdbIndexIterator ii;
   int i;
 
+  *nentriesp = 0;
+  if (namedatap)
+    *namedatap = 0;
+
   if (state->dbenvopened != 1 && !opendbenv(state))
     return 0;
 
   ii = rpmdbIndexIteratorInit(rpmtsGetRdb(state->ts), RPMDBI_NAME);
-
-  *nentriesp = 0;
-  if (namedatap)
-    *namedatap = 0;
 
   while (rpmdbIndexIteratorNext(ii, &key, &keylen) == 0)
     {
