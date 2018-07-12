@@ -355,7 +355,7 @@ ssize_t
 solv_zchunk_read(struct solv_zchunk *zck, char *buf, size_t len)
 {
   size_t n = 0;
-  int bite;
+  unsigned int bite;
   if (!zck || zck->eof == 2)
     return -1;
   if (!len || zck->eof)
@@ -386,7 +386,7 @@ solv_zchunk_read(struct solv_zchunk *zck, char *buf, size_t len)
       zck->buf_used += bite;
       zck->buf_avail -= bite;
       if (n == len)
-        return len;
+        return n;
     }
 }
 
