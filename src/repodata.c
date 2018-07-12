@@ -1016,7 +1016,11 @@ repodata_search(Repodata *data, Id solvid, Id keyname, int flags, int (*callback
       ddp = get_data(data, key, &dp, *keyp ? 1 : 0);
 
       if (key->type == REPOKEY_TYPE_DELETED)
-	continue;
+	{
+	  if (onekey)
+	    return;
+	  continue;
+	}
       if (key->type == REPOKEY_TYPE_FLEXARRAY || key->type == REPOKEY_TYPE_FIXARRAY)
 	{
 	  struct subschema_data subd;
