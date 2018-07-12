@@ -502,6 +502,42 @@ static inline FILE *myzstdfdopen(int fd, const char *mode)
 
 #endif
 
+#ifdef ENABLE_ZCHUNK_COMPRESSION
+
+#include "solv_zchunk.h"
+
+static void *zchunkopen(const char *path, const char *mode, int fd)
+{
+  FILE *fp;
+  void *f;
+  if (!path && fd < 0)
+    return 0;
+  if (strcmp(mode, "r") != 0)
+    return 0;
+  if (fd != -1)
+    fp = fdopen(fd, mode);
+  else
+    fp = fopen(path, mode);
+  if (!fp)
+    return 0;
+  f = solv_zchunk_open(fp);
+  if (!f)
+    fclose(fp);
+  return cookieopen(f, mode, (ssize_t (*)(void *, char *, size_t))solv_zchunk_read, 0, (int (*)(void *))solv_zchunk_close);
+}
+
+static inline FILE *myzchunkfopen(const char *fn, const char *mode)
+{
+  return zchunkopen(fn, mode, -1);
+}
+
+static inline FILE *myzchunkfdopen(int fd, const char *mode)
+{
+  return zchunkopen(0, mode, fd);
+}
+
+#endif
+
 FILE *
 solv_xfopen(const char *fn, const char *mode)
 {
@@ -540,6 +576,13 @@ solv_xfopen(const char *fn, const char *mode)
 #ifdef ENABLE_ZSTD_COMPRESSION
   if (suf && !strcmp(suf, ".zst"))
     return myzstdfopen(fn, mode);
+#else
+  if (suf && !strcmp(suf, ".zst"))
+    return 0;
+#endif
+#ifdef ENABLE_ZCHUNK_COMPRESSION
+  if (suf && !strcmp(suf, ".zck"))
+    return myzchunkfopen(fn, mode);
 #else
   if (suf && !strcmp(suf, ".zst"))
     return 0;
@@ -602,6 +645,13 @@ solv_xfopen_fd(const char *fn, int fd, const char *mode)
   if (suf && !strcmp(suf, ".zst"))
     return 0;
 #endif
+#ifdef ENABLE_ZCHUNK_COMPRESSION
+  if (suf && !strcmp(suf, ".zck"))
+    return myzchunkfdopen(fd, simplemode);
+#else
+  if (suf && !strcmp(suf, ".zst"))
+    return 0;
+#endif
   return fdopen(fd, mode);
 }
 
@@ -631,6 +681,12 @@ solv_xfopen_iscompressed(const char *fn)
 #endif
   if (!strcmp(suf, ".zst"))
 #ifdef ENABLE_ZSTD_COMPRESSION
+    return 1;
+#else
+    return -1;
+#endif
+  if (!strcmp(suf, ".zck"))
+#ifdef ENABLE_ZCHUNK_COMPRESSION
     return 1;
 #else
     return -1;
