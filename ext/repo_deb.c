@@ -12,20 +12,48 @@
 #include <string.h>
 #include <unistd.h>
 #include <zlib.h>
+#include <lzma.h>
 #include <errno.h>
 
 #include "pool.h"
 #include "repo.h"
 #include "util.h"
+#include "solver.h"	/* for GET_USERINSTALLED_ flags */
 #include "chksum.h"
 #include "repo_deb.h"
 
 static unsigned char *
-decompress(unsigned char *in, int inl, int *outlp)
+decompress_gz(unsigned char *in, int inl, int *outlp, int maxoutl)
 {
   z_stream strm;
   int outl, ret;
-  unsigned char *out;
+  unsigned char *bp, *out;
+
+  /* first skip the gz header */
+  if (inl <= 10 || in[0] != 0x1f || in[1] != 0x8b)
+    return 0;
+  if (in[2] != 8 || (in[3] & 0xe0) != 0)
+    return 0;
+  bp = in + 4;
+  bp += 6;	/* skip time, xflags and OS code */
+  if (in[3] & 0x04)
+    {
+      /* skip extra field */
+      int l = bp + 2 >= in + inl ? 0 : (bp[0] | bp[1] << 8);
+      bp += l + 2;
+    }
+  if (in[3] & 0x08)	/* orig filename */
+    while (bp < in + inl && *bp++)
+      ;
+  if (in[3] & 0x10)	/* file comment */
+    while (bp < in + inl && *bp++)
+      ;
+  if (in[3] & 0x02)	/* header crc */
+    bp += 2;
+  if (bp >= in + inl)
+    return 0;
+  inl -= bp - in;
+  in = bp;
 
   memset(&strm, 0, sizeof(strm));
   strm.next_in = in;
@@ -45,6 +73,12 @@ decompress(unsigned char *in, int inl, int *outlp)
       if (strm.avail_out == 0)
 	{
 	  outl += 4096;
+	  if (outl >= maxoutl)
+	    {
+	      inflateEnd(&strm);
+	      free(out);
+	      return 0;
+	    }
 	  out = solv_realloc(out, outl + 4096);
 	  strm.next_out = out + outl;
 	  strm.avail_out = 4096;
@@ -54,12 +88,65 @@ decompress(unsigned char *in, int inl, int *outlp)
 	break;
       if (ret != Z_OK)
 	{
+	  inflateEnd(&strm);
 	  free(out);
 	  return 0;
 	}
     }
   outl += 4096 - strm.avail_out;
   inflateEnd(&strm);
+  *outlp = outl;
+  return out;
+}
+
+static unsigned char *
+decompress_xz(unsigned char *in, int inl, int *outlp, int maxoutl)
+{
+  static lzma_stream stream_init = LZMA_STREAM_INIT;
+  lzma_stream strm;
+  int outl, ret;
+  unsigned char *out;
+
+  strm = stream_init;
+  strm.next_in = in;
+  strm.avail_in = inl;
+  out = solv_malloc(4096);
+  strm.next_out = out;
+  strm.avail_out = 4096;
+  outl = 0;
+  ret = lzma_auto_decoder(&strm, 100 << 20, 0);
+  if (ret != LZMA_OK)
+    {
+      free(out);
+      return 0;
+    }
+  for (;;)
+    {
+      if (strm.avail_out == 0)
+	{
+	  outl += 4096;
+	  if (outl >= maxoutl)
+	    {
+	      lzma_end(&strm);
+	      free(out);
+	      return 0;
+	    }
+	  out = solv_realloc(out, outl + 4096);
+	  strm.next_out = out + outl;
+	  strm.avail_out = 4096;
+	}
+      ret = lzma_code(&strm, LZMA_RUN);
+      if (ret == LZMA_STREAM_END)
+	break;
+      if (ret != LZMA_OK)
+	{
+	  lzma_end(&strm);
+	  free(out);
+	  return 0;
+	}
+    }
+  outl += 4096 - strm.avail_out;
+  lzma_end(&strm);
   *outlp = outl;
   return out;
 }
@@ -405,12 +492,10 @@ repo_add_debpackages(Repo *repo, FILE *fp, int flags)
       if (!(p = strchr(p, '\n')))
 	{
 	  int l3;
-	  if (l + 1024 >= bufl)
+	  while (l + 1024 >= bufl)
 	    {
 	      buf = solv_realloc(buf, bufl + 4096);
 	      bufl += 4096;
-	      p = buf + l;
-	      continue;
 	    }
 	  p = buf + l;
 	  ll = fread(p, 1, bufl - l - 1, fp);
@@ -420,6 +505,8 @@ repo_add_debpackages(Repo *repo, FILE *fp, int flags)
 	  while ((l3 = strlen(p)) < ll)
 	    p[l3] = '\n';
 	  l += ll;
+	  if (p != buf)
+	    p--;
 	  continue;
 	}
       p++;
@@ -464,6 +551,10 @@ repo_add_debdb(Repo *repo, int flags)
   return 0;
 }
 
+#define CONTROL_COMP_NONE	0
+#define CONTROL_COMP_GZIP	1
+#define CONTROL_COMP_XZ		2
+
 Id
 repo_add_deb(Repo *repo, const char *deb, int flags)
 {
@@ -471,6 +562,7 @@ repo_add_deb(Repo *repo, const char *deb, int flags)
   Repodata *data;
   unsigned char buf[4096], *bp;
   int l, l2, vlen, clen, ctarlen;
+  int control_comp;
   unsigned char *ctgz;
   unsigned char pkgid[16];
   unsigned char *ctar;
@@ -492,7 +584,7 @@ repo_add_deb(Repo *repo, const char *deb, int flags)
       return 0;
     }
   l = fread(buf, 1, sizeof(buf), fp);
-  if (l < 8 + 60 || strncmp((char *)buf, "!<arch>\ndebian-binary   ", 8 + 16) != 0)
+  if (l < 8 + 60 || (strncmp((char *)buf, "!<arch>\ndebian-binary   ", 8 + 16) != 0 && strncmp((char *)buf, "!<arch>\ndebian-binary/  ", 8 + 16) != 0))
     {
       pool_error(pool, -1, "%s: not a deb package", deb);
       fclose(fp);
@@ -512,16 +604,26 @@ repo_add_deb(Repo *repo, const char *deb, int flags)
       fclose(fp);
       return 0;
     }
-  if (strncmp((char *)buf + 8 + 60 + vlen, "control.tar.gz  ", 16) != 0)
+  control_comp = 0;
+  if (!strncmp((char *)buf + 8 + 60 + vlen, "control.tar.gz  ", 16) || !strncmp((char *)buf + 8 + 60 + vlen, "control.tar.gz/ ", 16))
+    control_comp = CONTROL_COMP_GZIP;
+  else if (!strncmp((char *)buf + 8 + 60 + vlen, "control.tar.xz  ", 16) || !strncmp((char *)buf + 8 + 60 + vlen, "control.tar.xz/ ", 16))
+    control_comp = CONTROL_COMP_XZ;
+  else if (!strncmp((char *)buf + 8 + 60 + vlen, "control.tar     ", 16) || !strncmp((char *)buf + 8 + 60 + vlen, "control.tar/    ", 16))
+    control_comp = CONTROL_COMP_NONE;
+  else
     {
-      pool_error(pool, -1, "%s: control.tar.gz is not second entry", deb);
+      pool_error(pool, -1, "%s: control.tar is not second entry", deb);
       fclose(fp);
       return 0;
     }
+  /* dpkg has no actual maximum size for the control.tar member, so this
+   * just keeps from allocating arbitrarily large amounts of memory.
+   */
   clen = atoi((char *)buf + 8 + 60 + vlen + 48);
-  if (clen <= 0 || clen >= 0x100000)
+  if (clen <= 0 || clen >= 0x1000000)
     {
-      pool_error(pool, -1, "%s: control.tar.gz has illegal size", deb);
+      pool_error(pool, -1, "%s: control.tar has illegal size", deb);
       fclose(fp);
       return 0;
     }
@@ -551,55 +653,25 @@ repo_add_deb(Repo *repo, const char *deb, int flags)
       solv_chksum_free(chk, pkgid);
       gotpkgid = 1;
     }
-  if (ctgz[0] != 0x1f || ctgz[1] != 0x8b)
+  ctar = 0;
+  if (control_comp == CONTROL_COMP_GZIP)
+    ctar = decompress_gz(ctgz, clen, &ctarlen, 0x1000000);
+  else if (control_comp == CONTROL_COMP_XZ)
+    ctar = decompress_xz(ctgz, clen, &ctarlen, 0x1000000);
+  else
     {
-      pool_error(pool, -1, "%s: control.tar.gz is not gzipped", deb);
-      solv_free(ctgz);
-      return 0;
+      ctarlen = clen;
+      ctar = solv_memdup(ctgz, clen);
     }
-  if (ctgz[2] != 8 || (ctgz[3] & 0xe0) != 0)
-    {
-      pool_error(pool, -1, "%s: control.tar.gz is compressed in a strange way", deb);
-      solv_free(ctgz);
-      return 0;
-    }
-  bp = ctgz + 4;
-  bp += 6;	/* skip time, xflags and OS code */
-  if (ctgz[3] & 0x04)
-    {
-      /* skip extra field */
-      l = bp[0] | bp[1] << 8;
-      bp += l + 2;
-      if (bp >= ctgz + clen)
-	{
-          pool_error(pool, -1, "%s: control.tar.gz is corrupt", deb);
-	  solv_free(ctgz);
-	  return 0;
-	}
-    }
-  if (ctgz[3] & 0x08)	/* orig filename */
-    while (*bp)
-      bp++;
-  if (ctgz[3] & 0x10)	/* file comment */
-    while (*bp)
-      bp++;
-  if (ctgz[3] & 0x02)	/* header crc */
-    bp += 2;
-  if (bp >= ctgz + clen)
-    {
-      pool_error(pool, -1, "%s: control.tar.gz is corrupt", deb);
-      solv_free(ctgz);
-      return 0;
-    }
-  ctar = decompress(bp, ctgz + clen - bp, &ctarlen);
   solv_free(ctgz);
   if (!ctar)
     {
-      pool_error(pool, -1, "%s: control.tar.gz is corrupt", deb);
+      pool_error(pool, -1, "%s: control.tar is corrupt", deb);
       return 0;
     }
   bp = ctar;
   l = ctarlen;
+  l2 = 0;
   while (l > 512)
     {
       int j;
@@ -607,6 +679,12 @@ repo_add_deb(Repo *repo, const char *deb, int flags)
       for (j = 124; j < 124 + 12; j++)
 	if (bp[j] >= '0' && bp[j] <= '7')
 	  l2 = l2 * 8 + (bp[j] - '0');
+      if (l2 < 0 || l2 > l)
+	{
+	  l2 = 0;
+	  break;
+	}
+      bp[124] = 0;
       if (!strcmp((char *)bp, "./control") || !strcmp((char *)bp, "control"))
 	break;
       l2 = 512 + ((l2 + 511) & ~511);
@@ -615,7 +693,7 @@ repo_add_deb(Repo *repo, const char *deb, int flags)
     }
   if (l <= 512 || l - 512 - l2 <= 0 || l2 <= 0)
     {
-      pool_error(pool, -1, "%s: control.tar.gz contains no control file", deb);
+      pool_error(pool, -1, "%s: control.tar contains no control file", deb);
       free(ctar);
       return 0;
     }
@@ -637,7 +715,7 @@ repo_add_deb(Repo *repo, const char *deb, int flags)
 }
 
 void
-pool_deb_get_autoinstalled(Pool *pool, FILE *fp, Queue *q)
+pool_deb_get_autoinstalled(Pool *pool, FILE *fp, Queue *q, int flags)
 {
   Id name = 0, arch = 0;
   int autoinstalled = -1;
@@ -672,14 +750,21 @@ pool_deb_get_autoinstalled(Pool *pool, FILE *fp, Queue *q)
 	  l = 0;
 	  if (name && autoinstalled > 0)
 	    {
-	      FOR_PROVIDES(p, pp, name)
+	      if ((flags & GET_USERINSTALLED_NAMEARCH) != 0)
+		queue_push2(q, name, arch);
+	      else if ((flags & GET_USERINSTALLED_NAMES) != 0)
+		queue_push(q, name);
+	      else
 		{
-		  Solvable *s = pool->solvables + p;
-		  if (s->name != name)
-		    continue;
-		  if (arch && s->arch != arch)
-		    continue;
-		  queue_push(q, p);
+		  FOR_PROVIDES(p, pp, name)
+		    {
+		      Solvable *s = pool->solvables + p;
+		      if (s->name != name)
+			continue;
+		      if (arch && s->arch != arch)
+			continue;
+		      queue_push(q, p);
+		    }
 		}
 	    }
 	  name = arch = 0;

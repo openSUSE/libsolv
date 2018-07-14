@@ -33,3 +33,7 @@ pacman(8)
 Author
 ------
 Michael Schroeder <mls@suse.de>
+
+////
+vim: syntax=asciidoc
+////

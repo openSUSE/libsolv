@@ -71,7 +71,7 @@ of the values stored in the attribute with the keyname.
 *SOLVABLE_RECOMMENDS "solvable:recommends"*::
   Stores an array of dependency Ids that describe the capabilities that
   also should be installed when this package is installed. It's not an
-  error if not all capabilites can be met.
+  error if not all capabilities can be met.
 
 *SOLVABLE_SUGGESTS "solvable:suggests"*::
   Stores an array of dependency Ids that describe the capabilities that
@@ -292,7 +292,7 @@ Special Solvable Attributes
   The basename of the product file in the package.
 
 *PRODUCT_SHORTLABEL "product:shortlabel"*::
-  A identification string of the product.
+  An identification string of the product.
 
 *PRODUCT_DISTPRODUCT "product:distproduct"*::
   Obsolete, do not use. Was a SUSE Code-10 product name.
@@ -316,10 +316,10 @@ Special Solvable Attributes
   A product line string used for product registering.
 
 *PRODUCT_REGISTER_TARGET "product:regtarget"*::
-  A target for prouduct registering.
+  A target for product registering.
 
 *PRODUCT_REGISTER_RELEASE "product:regrelease"*::
-  A release string for proudct registering.
+  A release string for product registering.
 
 *PUBKEY_KEYID "pubkey:keyid"*::
   The keyid of a pubkey, consisting of 8 bytes in hex.
@@ -400,16 +400,13 @@ custom namespaces work you have to implement a namespace callback function.
 The dependency markers partition the dependency array in two parts with
 different semantics.
 
-*NAMESPACE_INSTALLED "namespace:installed"*::
-  The dependency only selects installed packages.
-
 *NAMESPACE_MODALIAS "namespace:modalias"*::
   The dependency is a special modalias dependency that matches installed
   hardware.
 
 *NAMESPACE_SPLITPROVIDES "namespace:splitprovides"*::
   The dependency is a special splitprovides dependency used to implement
-  updates that include a package split. A splitprovoide dependency contains
+  updates that include a package split. A splitprovides dependency contains
   a filename and a package name, it is matched if a package with the
   provided package name is installed that contains the filename.
   This namespace is implemented in libsolv, so you do not need a callback.
@@ -482,11 +479,11 @@ know how to interpret the data. The following types are available:
   space.
 
 *REPOKEY_TYPE_DIRSTRARRAY "repokey:type:dirstrarray"*::
-  The data is an tuple consisting of a directory Id and a basename.
+  The data is a tuple consisting of a directory Id and a basename.
   Used to store file names.
 
 *REPOKEY_TYPE_DIRNUMNUMARRAY "repokey:type:dirnumnumarray"*::
-  The data is an triple consisting of a directory Id and two 32bit
+  The data is a triple consisting of a directory Id and two 32bit
   unsigned integers. Used to store disk usage information.
 
 *REPOKEY_TYPE_MD5 "repokey:type:md5"*::
@@ -664,7 +661,7 @@ Delta Package Attributes
   The checksum of the delta rpm file.
 
 *DELTA_BASE_EVR "delta:baseevr"*::
-  The version of the package the delta was build against.
+  The version of the package the delta was built against.
 
 *DELTA_SEQ_NAME "delta:seqname"*::
   The first part of the delta sequence, the base package name.
@@ -681,3 +678,6 @@ Author
 ------
 Michael Schroeder <mls@suse.de>
 
+////
+vim: syntax=asciidoc
+////

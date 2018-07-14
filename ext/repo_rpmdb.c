@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2012, Novell Inc.
+ * Copyright (c) 2007-2018, SUSE Inc.
  *
  * This program is licensed under the BSD license, read LICENSE.BSD
  * for further information
@@ -24,6 +24,8 @@
 #include <stdint.h>
 #include <errno.h>
 
+#ifdef ENABLE_RPMDB
+
 #include <rpm/rpmio.h>
 #include <rpm/rpmpgp.h>
 #ifndef RPM5
@@ -31,12 +33,6 @@
 #endif
 #include <rpm/rpmdb.h>
 
-#ifndef DB_CREATE
-# if defined(SUSE) || defined(HAVE_RPM_DB_H)
-#  include <rpm/db.h>
-# else
-#  include <db.h>
-# endif
 #endif
 
 #include "pool.h"
@@ -54,7 +50,9 @@
 /* 3: added triggers */
 /* 4: fixed triggers */
 /* 5: fixed checksum copying */
-#define RPMDB_COOKIE_VERSION 5
+/* 6: add SOLVABLE_PREREQ_IGNOREINST support */
+/* 7: fix bug in ignoreinst logic */
+#define RPMDB_COOKIE_VERSION 7
 
 #define TAG_NAME		1000
 #define TAG_VERSION		1001
@@ -138,6 +136,7 @@
 #define	TAG_SIGBASE		256
 #define TAG_SIGMD5		(TAG_SIGBASE + 5)
 #define TAG_SHA1HEADER		(TAG_SIGBASE + 13)
+#define TAG_SHA256HEADER	(TAG_SIGBASE + 17)
 
 #define SIGTAG_SIZE		1000
 #define SIGTAG_PGP		1002	/* RSA signature */
@@ -150,23 +149,25 @@
 #define DEP_STRONG		(1 << 27)
 #define DEP_PRE_IN		((1 << 6) | (1 << 9) | (1 << 10))
 #define DEP_PRE_UN		((1 << 6) | (1 << 11) | (1 << 12))
-#define DEP_RICH		(1 << 29)
 
-#define FILEFLAG_GHOST		(1 <<  6)
+#define FILEFLAG_GHOST		(1 << 6)
 
 
-#ifdef RPM5
-# define RPM_INDEX_SIZE 4	/* just the rpmdbid */
-#else
-# define RPM_INDEX_SIZE 8	/* rpmdbid + array index */
-#endif
+/* some limits to guard against corrupt rpms */
+/* dsize limits taken from rpm's lib/header.c */
+#define MAX_SIG_CNT		0x10000
+#define MAX_SIG_DSIZE		0x4000000
 
+#define MAX_HDR_CNT		0x10000
+#define MAX_HDR_DSIZE		0x10000000
+
+
+#ifndef ENABLE_RPMPKG_LIBRPM
 
 typedef struct rpmhead {
   int cnt;
-  int dcnt;
+  unsigned int dcnt;
   unsigned char *dp;
-  int forcebinary;		/* sigh, see rh#478907 */
   unsigned char data[1];
 } RpmHead;
 
@@ -193,20 +194,21 @@ headexists(RpmHead *h, int tag)
   return headfindtag(h, tag) ? 1 : 0;
 }
 
-static unsigned int *
+static uint32_t *
 headint32array(RpmHead *h, int tag, int *cnt)
 {
-  unsigned int i, o, *r;
+  uint32_t *r;
+  unsigned int i, o;
   unsigned char *d = headfindtag(h, tag);
 
   if (!d || d[4] != 0 || d[5] != 0 || d[6] != 0 || d[7] != 4)
     return 0;
   o = d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
   i = d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
-  if (o + 4 * i > h->dcnt)
+  if (o > h->dcnt || i > h->dcnt || o + 4 * i > h->dcnt)
     return 0;
   d = h->dp + o;
-  r = solv_calloc(i ? i : 1, sizeof(unsigned int));
+  r = solv_calloc(i ? i : 1, sizeof(uint32_t));
   if (cnt)
     *cnt = i;
   for (o = 0; o < i; o++, d += 4)
@@ -215,7 +217,7 @@ headint32array(RpmHead *h, int tag, int *cnt)
 }
 
 /* returns the first entry of an integer array */
-static unsigned int
+static uint32_t
 headint32(RpmHead *h, int tag)
 {
   unsigned int i, o;
@@ -225,68 +227,71 @@ headint32(RpmHead *h, int tag)
     return 0;
   o = d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
   i = d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
-  if (i == 0 || o + 4 * i > h->dcnt)
+  if (i == 0 || o > h->dcnt || i > h->dcnt || o + 4 * i > h->dcnt)
     return 0;
   d = h->dp + o;
   return d[0] << 24 | d[1] << 16 | d[2] << 8 | d[3];
 }
 
-static unsigned long long *
+static uint64_t *
 headint64array(RpmHead *h, int tag, int *cnt)
 {
+  uint64_t *r;
   unsigned int i, o;
-  unsigned long long *r;
   unsigned char *d = headfindtag(h, tag);
 
   if (!d || d[4] != 0 || d[5] != 0 || d[6] != 0 || d[7] != 5)
     return 0;
   o = d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
   i = d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
-  if (o + 8 * i > h->dcnt)
+  if (o > h->dcnt || i > h->dcnt || o + 8 * i > h->dcnt)
     return 0;
   d = h->dp + o;
-  r = solv_calloc(i ? i : 1, sizeof(unsigned long long));
+  r = solv_calloc(i ? i : 1, sizeof(uint64_t));
   if (cnt)
     *cnt = i;
   for (o = 0; o < i; o++, d += 8)
     {
-      unsigned int x = d[0] << 24 | d[1] << 16 | d[2] << 8 | d[3];
-      r[o] = (unsigned long long)x << 32 | (d[4] << 24 | d[5] << 16 | d[6] << 8 | d[7]);
+      uint32_t x = d[0] << 24 | d[1] << 16 | d[2] << 8 | d[3];
+      r[o] = (uint64_t)x << 32 | (uint32_t)(d[4] << 24 | d[5] << 16 | d[6] << 8 | d[7]);
     }
   return r;
 }
 
 /* returns the first entry of an 64bit integer array */
-static unsigned long long
+static uint64_t
 headint64(RpmHead *h, int tag)
 {
+  uint32_t x;
   unsigned int i, o;
   unsigned char *d = headfindtag(h, tag);
+
   if (!d || d[4] != 0 || d[5] != 0 || d[6] != 0 || d[7] != 5)
     return 0;
   o = d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
   i = d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
-  if (i == 0 || o + 8 * i > h->dcnt)
+  if (i == 0 || o > h->dcnt || i > h->dcnt || o + 8 * i > h->dcnt)
     return 0;
   d = h->dp + o;
-  i = d[0] << 24 | d[1] << 16 | d[2] << 8 | d[3];
-  return (unsigned long long)i << 32 | (d[4] << 24 | d[5] << 16 | d[6] << 8 | d[7]);
+  x = d[0] << 24 | d[1] << 16 | d[2] << 8 | d[3];
+  return (uint64_t)x << 32 | (uint32_t)(d[4] << 24 | d[5] << 16 | d[6] << 8 | d[7]);
 }
 
-static unsigned int *
+static uint16_t *
 headint16array(RpmHead *h, int tag, int *cnt)
 {
-  unsigned int i, o, *r;
+  uint16_t *r;
+  unsigned int i, o;
   unsigned char *d = headfindtag(h, tag);
 
   if (!d || d[4] != 0 || d[5] != 0 || d[6] != 0 || d[7] != 3)
     return 0;
   o = d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
   i = d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
-  if (o + 4 * i > h->dcnt)
+  if (o > h->dcnt || i > h->dcnt || o + 2 * i > h->dcnt)
     return 0;
   d = h->dp + o;
-  r = solv_calloc(i ? i : 1, sizeof(unsigned int));
+  r = solv_calloc(i ? i : 1, sizeof(uint16_t));
   if (cnt)
     *cnt = i;
   for (o = 0; o < i; o++, d += 2)
@@ -319,6 +324,8 @@ headstringarray(RpmHead *h, int tag, int *cnt)
     return 0;
   o = d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
   i = d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
+  if (o > h->dcnt || i > h->dcnt)
+    return 0;
   r = solv_calloc(i ? i : 1, sizeof(char *));
   if (cnt)
     *cnt = i;
@@ -346,12 +353,126 @@ headbinary(RpmHead *h, int tag, unsigned int *sizep)
     return 0;
   o = d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
   i = d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
-  if (o > h->dcnt || o + i < o || o + i > h->dcnt)
+  if (o > h->dcnt || i > h->dcnt || o + i > h->dcnt)
     return 0;
   if (sizep)
     *sizep = i;
   return h->dp + o;
 }
+
+static int
+headissourceheuristic(RpmHead *h)
+{
+  unsigned int i, o;
+  unsigned char *d = headfindtag(h, TAG_DIRNAMES);
+  if (!d || d[4] != 0 || d[5] != 0 || d[6] != 0 || d[7] != 8)
+    return 0;
+  o = d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
+  i = d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
+  return i == 1 && o < h->dcnt && !h->dp[o] ? 1 : 0;
+}
+
+static inline void
+headfree(RpmHead *h)
+{
+  solv_free(h);
+}
+
+#else
+
+typedef struct headerToken_s RpmHead;
+
+static int
+headexists(RpmHead *h, int tag)
+{
+  return headerIsEntry(h, tag);
+}
+
+static void *headget(RpmHead *h, int tag, int *cnt, int alloc)
+{
+  struct rpmtd_s td;
+  if (!headerGet(h, tag, &td, alloc ? HEADERGET_ALLOC : HEADERGET_MINMEM))
+    return 0;
+  if (cnt)
+    *cnt = td.count;
+  return td.data;
+}
+
+static uint32_t *
+headint32array(RpmHead *h, int tag, int *cnt)
+{
+  return headget(h, tag, cnt, 1);
+}
+
+static uint32_t
+headint32(RpmHead *h, int tag)
+{
+  uint32_t *arr = headget(h, tag, 0, 0);
+  return arr ? arr[0] : 0;
+}
+
+static uint64_t *
+headint64array(RpmHead *h, int tag, int *cnt)
+{
+  return headget(h, tag, cnt, 1);
+}
+
+/* returns the first entry of an 64bit integer array */
+static uint64_t
+headint64(RpmHead *h, int tag)
+{
+  uint64_t *arr = headget(h, tag, 0, 0);
+  return arr ? arr[0] : 0;
+}
+
+static uint16_t *
+headint16array(RpmHead *h, int tag, int *cnt)
+{
+  return headget(h, tag, cnt, 1);
+}
+
+static char *
+headstring(RpmHead *h, int tag)
+{
+  return headget(h, tag, 0, 0);
+}
+
+static char **
+headstringarray(RpmHead *h, int tag, int *cnt)
+{
+  return headget(h, tag, cnt, 1);
+}
+
+static unsigned char *
+headbinary(RpmHead *h, int tag, unsigned int *sizep)
+{
+  unsigned char *b = headget(h, tag, (int *)sizep, 0);
+  if (b && sizep && (tag == TAG_SIGMD5 || tag == SIGTAG_MD5) && *sizep > 16) {
+    /* due to a bug in rpm the count may be bigger if HEADERIMPORT_FAST is used */
+    *sizep = 16;
+  }
+  return b;
+}
+
+static int
+headissourceheuristic(RpmHead *h)
+{
+  struct rpmtd_s td;
+  int issource;
+  if (!headerGet(h, TAG_DIRNAMES, &td, HEADERGET_MINMEM))
+    return 0;
+  issource = td.count == 1 && td.data && ((char **)td.data)[0] && !((char **)td.data)[0][0];
+  rpmtdFreeData(&td);
+  return issource;
+}
+
+static inline void
+headfree(RpmHead *h)
+{
+  headerFree(h);
+}
+
+#endif
 
 static char *headtoevr(RpmHead *h)
 {
@@ -365,10 +486,7 @@ static char *headtoevr(RpmHead *h)
   release  = headstring(h, TAG_RELEASE);
   epoch = headint32(h, TAG_EPOCH);
   if (!version || !release)
-    {
-      fprintf(stderr, "headtoevr: bad rpm header\n");
-      return 0;
-    }
+    return 0;
   for (v = version; *v >= '0' && *v <= '9'; v++)
     ;
   if (epoch || (v != version && *v == ':'))
@@ -408,18 +526,27 @@ setutf8string(Repodata *repodata, Id handle, Id tag, const char *str)
     repodata_set_str(repodata, handle, tag, str);
 }
 
+static int
+ignq_sortcmp(const void *va, const void *vb, void *dp)
+{
+  int r = *(Id *)va - *(Id *)vb;
+  if (!r)
+    r = ((Id *)va)[1] - ((Id *)vb)[1];
+  return r;
+}
+
 /*
  * strong: 0: ignore strongness
  *         1: filter to strong
  *         2: filter to weak
  */
 static unsigned int
-makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf, int flags)
+makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf, int flags, Queue *ignq)
 {
   char **n, **v;
-  unsigned int *f;
+  uint32_t *f;
   int i, cc, nc, vc, fc;
-  int haspre, premask;
+  int haspre, premask, has_ign;
   unsigned int olddeps;
   Id *ida;
   int strong = 0;
@@ -513,6 +640,8 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
   cc += haspre;		/* add slot for the prereq marker */
   olddeps = repo_reserve_ids(repo, 0, cc);
   ida = repo->idarraydata + olddeps;
+
+  has_ign = 0;
   for (i = 0; ; i++)
     {
       Id id;
@@ -537,7 +666,7 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
 	if (!strncmp(n[i], "rpmlib(", 7))
 	  continue;
 #ifdef ENABLE_COMPLEX_DEPS
-      if ((f[i] & (DEP_RICH|DEP_LESS| DEP_EQUAL|DEP_GREATER)) == DEP_RICH && n[i][0] == '(')
+      if ((f[i] & (DEP_LESS|DEP_EQUAL|DEP_GREATER)) == 0 && n[i][0] == '(')
 	{
 	  id = pool_parserpmrichdep(pool, n[i]);
 	  if (id)
@@ -565,23 +694,69 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
 	  id = pool_rel2id(pool, id, evr, fl, 1);
 	}
       *ida++ = id;
+      if (haspre == 2 && ignq)
+	{
+	  int is_ign = (f[i] & DEP_PRE_IN) != 0 && (f[i] & DEP_PRE_UN) == 0 ? 1 : 0;
+	  has_ign |= is_ign;
+	  queue_push2(ignq, id, is_ign);
+	}
     }
   *ida++ = 0;
   repo->idarraysize += cc + 1;
   solv_free(n);
   solv_free(v);
   solv_free(f);
+  if (ignq && ignq->count)
+    {
+      int j = 0;
+      if (has_ign && ignq->count == 2)
+	j = 1;
+      else if (has_ign)
+	{
+	  Id id, lastid = 0;
+
+	  solv_sort(ignq->elements, ignq->count / 2, sizeof(Id) * 2, ignq_sortcmp, 0);
+	  for (i = j = 0; i < ignq->count; i += 2)
+	    {
+	      id = ignq->elements[i];
+	      if (id != lastid && ignq->elements[i + 1] > 0)
+		ignq->elements[j++] = id;
+	      lastid = id;
+	    }
+	}
+      queue_truncate(ignq, j);
+    }
   return olddeps;
 }
 
+static Id
+repodata_str2dir_rooted(Repodata *data, char *str, int create)
+{
+  char buf[256], *bp;
+  int l = strlen(str);
+  Id id;
+
+  if (l + 2 <= sizeof(buf))
+    bp = buf;
+  else
+    bp = solv_malloc(l + 2);
+  bp[0] = '/';
+  strcpy(bp + 1, str);
+  id = repodata_str2dir(data, bp, create);
+  if (bp != buf)
+    solv_free(bp);
+  return id;
+}
 
 static void
-adddudata(Repodata *data, Id handle, RpmHead *rpmhead, char **dn, unsigned int *di, int fc, int dc)
+adddudata(Repodata *data, Id handle, RpmHead *rpmhead, char **dn, uint32_t *di, int fc, int dc)
 {
   Id did;
   int i, fszc;
-  unsigned int *fkb, *fn, *fsz, *fm, *fino;
-  unsigned long long *fsz64;
+  unsigned int *fkb, *fn;
+  uint64_t *fsz64;
+  uint32_t *fsz, *fino;
+  uint16_t *fm;
   unsigned int inotest[256], inotestok;
 
   if (!fc)
@@ -715,13 +890,13 @@ adddudata(Repodata *data, Id handle, RpmHead *rpmhead, char **dn, unsigned int *
     {
       if (!fn[i])
 	continue;
-      if (!*dn[i])
+      if (dn[i][0] != '/')
 	{
-	  Solvable *s = data->repo->pool->solvables + handle;
+          Solvable *s = data->repo->pool->solvables + handle;
           if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
 	    did = repodata_str2dir(data, "/usr/src", 1);
 	  else
-	    continue;	/* work around rpm bug */
+	    did = repodata_str2dir_rooted(data, dn[i], 1);
 	}
       else
         did = repodata_str2dir(data, dn[i], 1);
@@ -751,11 +926,11 @@ addfilelist(Repodata *data, Id handle, RpmHead *rpmhead, int flags)
 {
   char **bn;
   char **dn;
-  unsigned int *di;
+  uint32_t *di;
   int bnc, dnc, dic;
   int i;
-  Id lastdid = 0;
-  unsigned int lastdii = -1;
+  Id did;
+  uint32_t lastdii = -1;
   int lastfiltered = 0;
 
   if (!data)
@@ -784,17 +959,16 @@ addfilelist(Repodata *data, Id handle, RpmHead *rpmhead, int flags)
 
   adddudata(data, handle, rpmhead, dn, di, bnc, dnc);
 
+  did = -1;
   for (i = 0; i < bnc; i++)
     {
-      Id did;
       char *b = bn[i];
 
-      if (di[i] == lastdii)
-	did = lastdid;
-      else
+      if (did < 0 || di[i] != lastdii)
 	{
 	  if (di[i] >= dnc)
 	    continue;	/* corrupt entry */
+	  did = 0;
 	  lastdii = di[i];
 	  if ((flags & RPM_ADD_FILTERED_FILELIST) != 0)
 	    {
@@ -802,18 +976,17 @@ addfilelist(Repodata *data, Id handle, RpmHead *rpmhead, int flags)
 	      if (lastfiltered == 1)
 		continue;
 	    }
-	  did = repodata_str2dir(data, dn[lastdii], 1);
-	  if (!did)
-	    did = repodata_str2dir(data, "/", 1);
-	  lastdid = did;
+	  if (dn[lastdii][0] != '/')
+	    did = repodata_str2dir_rooted(data, dn[lastdii], 1);
+	  else
+	    did = repodata_str2dir(data, dn[lastdii], 1);
 	}
-      if (b && *b == '/')	/* work around rpm bug */
+      if (!b)
+	continue;
+      if (*b == '/')	/* work around rpm bug */
 	b++;
-      if (lastfiltered)
-	{
-	  if (lastfiltered != 2 || strcmp(b, "sendmail"))
-	    continue;
-	}
+      if (lastfiltered && (lastfiltered != 2 || strcmp(b, "sendmail")))
+        continue;
       repodata_add_dirstr(data, handle, SOLVABLE_FILELIST, did, b);
     }
   solv_free(bn);
@@ -826,7 +999,7 @@ addchangelog(Repodata *data, Id handle, RpmHead *rpmhead)
 {
   char **cn;
   char **cx;
-  unsigned int *ct;
+  uint32_t *ct;
   int i, cnc, cxc, ctc;
   Queue hq;
 
@@ -905,11 +1078,13 @@ set_description_author(Repodata *data, Id handle, char *str)
 }
 
 static int
-rpm2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, int flags)
+rpmhead2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, int flags)
 {
   char *name;
   char *evr;
   char *sourcerpm;
+  Queue ignq;
+  Id ignqbuf[64];
 
   name = headstring(rpmhead, TAG_NAME);
   if (!name)
@@ -917,11 +1092,11 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, 
       pool_error(pool, 0, "package has no name");
       return 0;
     }
-  if (!strcmp(name, "gpg-pubkey"))
+  if (!(flags & RPMDB_KEEP_GPG_PUBKEY) && !strcmp(name, "gpg-pubkey"))
     return 0;
   s->name = pool_str2id(pool, name, 1);
   sourcerpm = headstring(rpmhead, TAG_SOURCERPM);
-  if (sourcerpm || (rpmhead->forcebinary && !headexists(rpmhead, TAG_SOURCEPACKAGE)))
+  if (sourcerpm || !(headexists(rpmhead, TAG_SOURCEPACKAGE) || headissourceheuristic(rpmhead)))
     s->arch = pool_str2id(pool, headstring(rpmhead, TAG_ARCH), 1);
   else
     {
@@ -934,22 +1109,28 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, 
     s->arch = ARCH_NOARCH;
   evr = headtoevr(rpmhead);
   s->evr = pool_str2id(pool, evr, 1);
+  solv_free(evr);
   s->vendor = pool_str2id(pool, headstring(rpmhead, TAG_VENDOR), 1);
 
-  s->provides = makedeps(pool, repo, rpmhead, TAG_PROVIDENAME, TAG_PROVIDEVERSION, TAG_PROVIDEFLAGS, 0);
+  queue_init_buffer(&ignq, ignqbuf, sizeof(ignqbuf)/sizeof(*ignqbuf));
+
+  s->provides = makedeps(pool, repo, rpmhead, TAG_PROVIDENAME, TAG_PROVIDEVERSION, TAG_PROVIDEFLAGS, 0, 0);
   if (s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
     s->provides = repo_addid_dep(repo, s->provides, pool_rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
-  s->requires = makedeps(pool, repo, rpmhead, TAG_REQUIRENAME, TAG_REQUIREVERSION, TAG_REQUIREFLAGS, flags);
-  s->conflicts = makedeps(pool, repo, rpmhead, TAG_CONFLICTNAME, TAG_CONFLICTVERSION, TAG_CONFLICTFLAGS, 0);
-  s->obsoletes = makedeps(pool, repo, rpmhead, TAG_OBSOLETENAME, TAG_OBSOLETEVERSION, TAG_OBSOLETEFLAGS, 0);
+  s->requires = makedeps(pool, repo, rpmhead, TAG_REQUIRENAME, TAG_REQUIREVERSION, TAG_REQUIREFLAGS, flags, &ignq);
+  s->conflicts = makedeps(pool, repo, rpmhead, TAG_CONFLICTNAME, TAG_CONFLICTVERSION, TAG_CONFLICTFLAGS, 0, 0);
+  s->obsoletes = makedeps(pool, repo, rpmhead, TAG_OBSOLETENAME, TAG_OBSOLETEVERSION, TAG_OBSOLETEFLAGS, 0, 0);
 
-  s->recommends = makedeps(pool, repo, rpmhead, TAG_RECOMMENDNAME, TAG_RECOMMENDVERSION, TAG_RECOMMENDFLAGS, 0);
-  s->suggests = makedeps(pool, repo, rpmhead, TAG_SUGGESTNAME, TAG_SUGGESTVERSION, TAG_SUGGESTFLAGS, 0);
-  s->supplements = makedeps(pool, repo, rpmhead, TAG_SUPPLEMENTNAME, TAG_SUPPLEMENTVERSION, TAG_SUPPLEMENTFLAGS, 0);
-  s->enhances  = makedeps(pool, repo, rpmhead, TAG_ENHANCENAME, TAG_ENHANCEVERSION, TAG_ENHANCEFLAGS, 0);
+  s->recommends = makedeps(pool, repo, rpmhead, TAG_RECOMMENDNAME, TAG_RECOMMENDVERSION, TAG_RECOMMENDFLAGS, 0, 0);
+  s->suggests = makedeps(pool, repo, rpmhead, TAG_SUGGESTNAME, TAG_SUGGESTVERSION, TAG_SUGGESTFLAGS, 0, 0);
+  s->supplements = makedeps(pool, repo, rpmhead, TAG_SUPPLEMENTNAME, TAG_SUPPLEMENTVERSION, TAG_SUPPLEMENTFLAGS, 0, 0);
+  s->enhances  = makedeps(pool, repo, rpmhead, TAG_ENHANCENAME, TAG_ENHANCEVERSION, TAG_ENHANCEFLAGS, 0, 0);
 
-  s->supplements = repo_fix_supplements(repo, s->provides, s->supplements, 0);
-  s->conflicts = repo_fix_conflicts(repo, s->conflicts);
+  repo_rewrite_suse_deps(s, 0);
+
+  if (data && ignq.count)
+    repodata_set_idarray(data, s - pool->solvables, SOLVABLE_PREREQ_IGNOREINST, &ignq);
+  queue_free(&ignq);
 
   if (data)
     {
@@ -1015,52 +1196,27 @@ rpm2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, 
 	repodata_set_sourcepkg(data, handle, sourcerpm);
       if ((flags & RPM_ADD_TRIGGERS) != 0)
 	{
-	  Id id, lastid;
-	  unsigned int ida = makedeps(pool, repo, rpmhead, TAG_TRIGGERNAME, TAG_TRIGGERVERSION, TAG_TRIGGERFLAGS, 0);
-
-	  lastid = 0;
-	  for (; (id = repo->idarraydata[ida]) != 0; ida++)
-	    {
-	      /* we currently do not support rel ids in incore data, so
-	       * strip off versioning information */
-	      while (ISRELDEP(id))
-		{
-		  Reldep *rd = GETRELDEP(pool, id);
-		  id = rd->name;
-		}
-	      if (id == lastid)
-		continue;
+	  unsigned int ida = makedeps(pool, repo, rpmhead, TAG_TRIGGERNAME, TAG_TRIGGERVERSION, TAG_TRIGGERFLAGS, 0, 0);
+	  Id id, lastid = 0;
+	  for (lastid = 0; (id = repo->idarraydata[ida]) != 0; ida++, lastid = id)
+	    if (id != lastid)
 	      repodata_add_idarray(data, handle, SOLVABLE_TRIGGERS, id);
-	      lastid = id;
-	    }
 	}
       if ((flags & RPM_ADD_NO_FILELIST) == 0)
 	addfilelist(data, handle, rpmhead, flags);
       if ((flags & RPM_ADD_WITH_CHANGELOG) != 0)
 	addchangelog(data, handle, rpmhead);
     }
-  solv_free(evr);
   return 1;
 }
 
+static inline unsigned int
+getu32(const unsigned char *dp)
+{
+  return dp[0] << 24 | dp[1] << 16 | dp[2] << 8 | dp[3];
+}
 
-/******************************************************************/
-/*  Rpm Database stuff
- */
-
-struct rpmdbstate {
-  Pool *pool;
-  char *rootdir;
-
-  RpmHead *rpmhead;	/* header storage space */
-  int rpmheadsize;
-
-  int dbopened;
-  DB_ENV *dbenv;	/* database environment */
-  DB *db;		/* packages database */
-  int byteswapped;	/* endianess of packages database */
-  int is_ostree;	/* read-only db that lives in /usr/share/rpm */
-};
+#ifdef ENABLE_RPMDB
 
 struct rpmdbentry {
   Id rpmdbid;
@@ -1070,371 +1226,117 @@ struct rpmdbentry {
 #define ENTRIES_BLOCK 255
 #define NAMEDATA_BLOCK 1023
 
-
-static inline Id db2rpmdbid(unsigned char *db, int byteswapped)
-{
-#ifdef RPM5
-  return db[0] << 24 | db[1] << 16 | db[2] << 8 | db[3];
-#else
-# if defined(WORDS_BIGENDIAN)
-  if (!byteswapped)
+# ifdef ENABLE_RPMDB_LIBRPM
+#  include "repo_rpmdb_librpm.h"
 # else
-  if (byteswapped)
+#  include "repo_rpmdb_bdb.h"
 # endif
-    return db[0] << 24 | db[1] << 16 | db[2] << 8 | db[3];
-  else
-    return db[3] << 24 | db[2] << 16 | db[1] << 8 | db[0];
-#endif
-}
 
-static inline void rpmdbid2db(unsigned char *db, Id id, int byteswapped)
-{
-#ifdef RPM5
-  db[0] = id >> 24, db[1] = id >> 16, db[2] = id >> 8, db[3] = id;
 #else
-# if defined(WORDS_BIGENDIAN)
-  if (!byteswapped)
-# else
-  if (byteswapped)
-# endif
-    db[0] = id >> 24, db[1] = id >> 16, db[2] = id >> 8, db[3] = id;
-  else
-    db[3] = id >> 24, db[2] = id >> 16, db[1] = id >> 8, db[0] = id;
-#endif
-}
 
-#ifdef FEDORA
-int
-serialize_dbenv_ops(struct rpmdbstate *state)
-{
-  char lpath[PATH_MAX];
-  mode_t oldmask;
-  int fd;
-  struct flock fl;
+/* dummy state just to store pool/rootdir and header data */
+struct rpmdbstate {
+  Pool *pool;
+  char *rootdir;
 
-  snprintf(lpath, PATH_MAX, "%s/var/lib/rpm/.dbenv.lock", state->rootdir ? state->rootdir : "");
-  oldmask = umask(022);
-  fd = open(lpath, (O_RDWR|O_CREAT), 0644);
-  umask(oldmask);
-  if (fd < 0)
-    return -1;
-  memset(&fl, 0, sizeof(fl));
-  fl.l_type = F_WRLCK;
-  fl.l_whence = SEEK_SET;
-  for (;;)
-    {
-      if (fcntl(fd, F_SETLKW, &fl) != -1)
-	return fd;
-      if (errno != EINTR)
-	break;
-    }
-  close(fd);
-  return -1;
-}
+  RpmHead *rpmhead;	/* header storage space */
+  int rpmheadsize;
+};
+
 #endif
 
-/* should look in /usr/lib/rpm/macros instead, but we want speed... */
-static int
-opendbenv(struct rpmdbstate *state)
-{
-  const char *rootdir = state->rootdir;
-  char dbpath[PATH_MAX];
-  DB_ENV *dbenv = 0;
-  int r;
 
-  if (db_env_create(&dbenv, 0))
-    return pool_error(state->pool, 0, "db_env_create: %s", strerror(errno));
-#if defined(FEDORA) && (DB_VERSION_MAJOR >= 5 || (DB_VERSION_MAJOR == 4 && DB_VERSION_MINOR >= 5))
-  dbenv->set_thread_count(dbenv, 8);
-#endif
-  snprintf(dbpath, PATH_MAX, "%s/var/lib/rpm", rootdir ? rootdir : "");
-  if (access(dbpath, W_OK) == -1)
-    {
-      snprintf(dbpath, PATH_MAX, "%s/usr/share/rpm/Packages", rootdir ? rootdir : "");
-      if (access(dbpath, R_OK) == 0)
-	state->is_ostree = 1;
-      snprintf(dbpath, PATH_MAX, "%s%s", rootdir ? rootdir : "", state->is_ostree ? "/usr/share/rpm" : "/var/lib/rpm");
-      r = dbenv->open(dbenv, dbpath, DB_CREATE|DB_PRIVATE|DB_INIT_MPOOL, 0);
-    }
-  else
-    {
-#ifdef FEDORA
-      int serialize_fd = serialize_dbenv_ops(state);
-      r = dbenv->open(dbenv, dbpath, DB_CREATE|DB_INIT_CDB|DB_INIT_MPOOL, 0644);
-      if (serialize_fd >= 0)
-	close(serialize_fd);
-#else
-      r = dbenv->open(dbenv, dbpath, DB_CREATE|DB_PRIVATE|DB_INIT_MPOOL, 0);
-#endif
-    }
-  if (r)
-    {
-      pool_error(state->pool, 0, "dbenv->open: %s", strerror(errno));
-      dbenv->close(dbenv, 0);
-      return 0;
-    }
-  state->dbenv = dbenv;
-  return 1;
-}
-
-static void
-closedbenv(struct rpmdbstate *state)
-{
-#ifdef FEDORA
-  uint32_t eflags = 0;
-#endif
-
-  if (!state->dbenv)
-    return;
-#ifdef FEDORA
-  (void)state->dbenv->get_open_flags(state->dbenv, &eflags);
-  if (!(eflags & DB_PRIVATE))
-    {
-      int serialize_fd = serialize_dbenv_ops(state);
-      state->dbenv->close(state->dbenv, 0);
-      if (serialize_fd >= 0)
-	close(serialize_fd);
-    }
-  else
-    state->dbenv->close(state->dbenv, 0);
-#else
-  state->dbenv->close(state->dbenv, 0);
-#endif
-  state->dbenv = 0;
-}
+#ifndef ENABLE_RPMPKG_LIBRPM
 
 static int
-openpkgdb(struct rpmdbstate *state)
+headfromfp(struct rpmdbstate *state, const char *name, FILE *fp, unsigned char *lead, unsigned int cnt, unsigned int dsize, unsigned int pad, Chksum *chk1, Chksum *chk2)
 {
-  if (state->dbopened)
-    return state->dbopened > 0 ? 1 : 0;
-  state->dbopened = -1;
-  if (!state->dbenv && !opendbenv(state))
-    return 0;
-  if (db_create(&state->db, state->dbenv, 0))
-    {
-      pool_error(state->pool, 0, "db_create: %s", strerror(errno));
-      state->db = 0;
-      closedbenv(state);
-      return 0;
-    }
-  if (state->db->open(state->db, 0, "Packages", 0, DB_UNKNOWN, DB_RDONLY, 0664))
-    {
-      pool_error(state->pool, 0, "db->open Packages: %s", strerror(errno));
-      state->db->close(state->db, 0);
-      state->db = 0;
-      closedbenv(state);
-      return 0;
-    }
-  if (state->db->get_byteswapped(state->db, &state->byteswapped))
-    {
-      pool_error(state->pool, 0, "db->get_byteswapped: %s", strerror(errno));
-      state->db->close(state->db, 0);
-      state->db = 0;
-      closedbenv(state);
-      return 0;
-    }
-  state->dbopened = 1;
-  return 1;
-}
-
-/* get the rpmdbids of all installed packages from the Name index database.
- * This is much faster then querying the big Packages database */
-static struct rpmdbentry *
-getinstalledrpmdbids(struct rpmdbstate *state, const char *index, const char *match, int *nentriesp, char **namedatap)
-{
-  DB_ENV *dbenv = 0;
-  DB *db = 0;
-  DBC *dbc = 0;
-  int byteswapped;
-  DBT dbkey;
-  DBT dbdata;
-  unsigned char *dp;
-  int dl;
-  Id nameoff;
-
-  char *namedata = 0;
-  int namedatal = 0;
-  struct rpmdbentry *entries = 0;
-  int nentries = 0;
-
-  *nentriesp = 0;
-  if (namedatap)
-    *namedatap = 0;
-
-  if (!state->dbenv && !opendbenv(state))
-    return 0;
-  dbenv = state->dbenv;
-  if (db_create(&db, dbenv, 0))
-    {
-      pool_error(state->pool, 0, "db_create: %s", strerror(errno));
-      return 0;
-    }
-  if (db->open(db, 0, index, 0, DB_UNKNOWN, DB_RDONLY, 0664))
-    {
-      pool_error(state->pool, 0, "db->open %s: %s", index, strerror(errno));
-      db->close(db, 0);
-      return 0;
-    }
-  if (db->get_byteswapped(db, &byteswapped))
-    {
-      pool_error(state->pool, 0, "db->get_byteswapped: %s", strerror(errno));
-      db->close(db, 0);
-      return 0;
-    }
-  if (db->cursor(db, NULL, &dbc, 0))
-    {
-      pool_error(state->pool, 0, "db->cursor: %s", strerror(errno));
-      db->close(db, 0);
-      return 0;
-    }
-  memset(&dbkey, 0, sizeof(dbkey));
-  memset(&dbdata, 0, sizeof(dbdata));
-  if (match)
-    {
-      dbkey.data = (void *)match;
-      dbkey.size = strlen(match);
-    }
-  while (dbc->c_get(dbc, &dbkey, &dbdata, match ? DB_SET : DB_NEXT) == 0)
-    {
-      if (!match && dbkey.size == 10 && !memcmp(dbkey.data, "gpg-pubkey", 10))
-	continue;
-      dl = dbdata.size;
-      dp = dbdata.data;
-      nameoff = namedatal;
-      if (namedatap)
-	{
-	  namedata = solv_extend(namedata, namedatal, dbkey.size + 1, 1, NAMEDATA_BLOCK);
-	  memcpy(namedata + namedatal, dbkey.data, dbkey.size);
-	  namedata[namedatal + dbkey.size] = 0;
-	  namedatal += dbkey.size + 1;
-	}
-      while(dl >= RPM_INDEX_SIZE)
-	{
-	  entries = solv_extend(entries, nentries, 1, sizeof(*entries), ENTRIES_BLOCK);
-	  entries[nentries].rpmdbid = db2rpmdbid(dp, byteswapped);
-	  entries[nentries].nameoff = nameoff;
-	  nentries++;
-	  dp += RPM_INDEX_SIZE;
-	  dl -= RPM_INDEX_SIZE;
-	}
-      if (match)
-	break;
-    }
-  dbc->c_close(dbc);
-  db->close(db, 0);
-  /* make sure that enteries is != 0 if there was no error */
-  if (!entries)
-    entries = solv_extend(entries, 1, 1, sizeof(*entries), ENTRIES_BLOCK);
-  *nentriesp = nentries;
-  if (namedatap)
-    *namedatap = namedata;
-  return entries;
-}
-
-/* retrive header by rpmdbid */
-static int
-getrpmdbid(struct rpmdbstate *state, Id rpmdbid)
-{
-  unsigned char buf[16];
-  DBT dbkey;
-  DBT dbdata;
   RpmHead *rpmhead;
-
-  if (!rpmdbid)
+  unsigned int len = 16 * cnt + dsize + pad;
+  if (len + 1 > state->rpmheadsize)
     {
-      pool_error(state->pool, 0, "illegal rpmdbid");
-      return -1;
-    }
-  if (state->dbopened != 1 && !openpkgdb(state))
-    return -1;
-  rpmdbid2db(buf, rpmdbid, state->byteswapped);
-  memset(&dbkey, 0, sizeof(dbkey));
-  memset(&dbdata, 0, sizeof(dbdata));
-  dbkey.data = buf;
-  dbkey.size = 4;
-  dbdata.data = 0;
-  dbdata.size = 0;
-  if (state->db->get(state->db, NULL, &dbkey, &dbdata, 0))
-    return 0;
-  if (dbdata.size < 8)
-    {
-      pool_error(state->pool, 0, "corrupt rpm database (size)");
-      return -1;
-    }
-  if (dbdata.size > state->rpmheadsize)
-    {
-      state->rpmheadsize = dbdata.size + 128;
-      state->rpmhead = solv_realloc(state->rpmhead, sizeof(*rpmhead) + state->rpmheadsize);
+      state->rpmheadsize = len + 128;
+      state->rpmhead = solv_realloc(state->rpmhead, sizeof(*state->rpmhead) + state->rpmheadsize);
     }
   rpmhead = state->rpmhead;
-  memcpy(buf, dbdata.data, 8);
-  rpmhead->forcebinary = 1;
-  rpmhead->cnt = buf[0] << 24  | buf[1] << 16  | buf[2] << 8 | buf[3];
-  rpmhead->dcnt = buf[4] << 24  | buf[5] << 16  | buf[6] << 8 | buf[7];
-  if (8 + rpmhead->cnt * 16 + rpmhead->dcnt > dbdata.size)
-    {
-      pool_error(state->pool, 0, "corrupt rpm database (data size)");
-      return -1;
-    }
-  memcpy(rpmhead->data, (unsigned char *)dbdata.data + 8, rpmhead->cnt * 16 + rpmhead->dcnt);
-  rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
+  if (fread(rpmhead->data, len, 1, fp) != 1)
+    return pool_error(state->pool, 0, "%s: unexpected EOF", name);
+  if (chk1)
+    solv_chksum_add(chk1, rpmhead->data, len);
+  if (chk2)
+    solv_chksum_add(chk2, rpmhead->data, len);
+  rpmhead->data[len] = 0;
+  rpmhead->cnt = cnt;
+  rpmhead->dcnt = dsize;
+  rpmhead->dp = rpmhead->data + cnt * 16;
   return 1;
 }
 
-/* retrive header by berkeleydb cursor */
-static Id
-getrpmcursor(struct rpmdbstate *state, DBC *dbc)
+#if defined(ENABLE_RPMDB_BYRPMHEADER)
+static void
+headfromblob(struct rpmdbstate *state, const unsigned char *blob, unsigned int cnt, unsigned int dsize)
 {
-  unsigned char buf[16];
-  DBT dbkey;
-  DBT dbdata;
   RpmHead *rpmhead;
-  Id dbid;
-
-  memset(&dbkey, 0, sizeof(dbkey));
-  memset(&dbdata, 0, sizeof(dbdata));
-  while (dbc->c_get(dbc, &dbkey, &dbdata, DB_NEXT) == 0)
+  unsigned int len = 16 * cnt + dsize;
+  if (len + 1 > state->rpmheadsize)
     {
-      if (dbkey.size != 4)
-	return pool_error(state->pool, -1, "corrupt Packages database (key size)");
-      dbid = db2rpmdbid(dbkey.data, state->byteswapped);
-      if (dbid == 0)		/* the join key */
-	continue;
-      if (dbdata.size < 8)
-	return pool_error(state->pool, -1, "corrupt rpm database (size %u)\n", dbdata.size);
-      if (dbdata.size > state->rpmheadsize)
-	{
-	  state->rpmheadsize = dbdata.size + 128;
-	  state->rpmhead = solv_realloc(state->rpmhead, sizeof(*state->rpmhead) + state->rpmheadsize);
-	}
-      rpmhead = state->rpmhead;
-      memcpy(buf, dbdata.data, 8);
-      rpmhead->forcebinary = 1;
-      rpmhead->cnt = buf[0] << 24  | buf[1] << 16  | buf[2] << 8 | buf[3];
-      rpmhead->dcnt = buf[4] << 24  | buf[5] << 16  | buf[6] << 8 | buf[7];
-      if (8 + rpmhead->cnt * 16 + rpmhead->dcnt > dbdata.size)
-	return pool_error(state->pool, -1, "corrupt rpm database (data size)\n");
-      memcpy(rpmhead->data, (unsigned char *)dbdata.data + 8, rpmhead->cnt * 16 + rpmhead->dcnt);
-      rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
-      return dbid;
+      state->rpmheadsize = len + 128;
+      state->rpmhead = solv_realloc(state->rpmhead, sizeof(*state->rpmhead) + state->rpmheadsize);
     }
-  return 0;
+  rpmhead = state->rpmhead;
+  memcpy(rpmhead->data, blob, len);
+  rpmhead->data[len] = 0;
+  rpmhead->cnt = cnt;
+  rpmhead->dcnt = dsize;
+  rpmhead->dp = rpmhead->data + cnt * 16;
 }
+#endif
+
+#else
+
+static int
+headfromfp(struct rpmdbstate *state, const char *name, FILE *fp, unsigned char *lead, unsigned int cnt, unsigned int dsize, unsigned int pad, Chksum *chk1, Chksum *chk2)
+{
+  unsigned int len = 16 * cnt + dsize + pad;
+  char *buf = solv_malloc(8 + len);
+  Header h;
+  memcpy(buf, lead + 8, 8);
+  if (fread(buf + 8, len, 1, fp) != 1)
+    {
+      solv_free(buf);
+      return pool_error(state->pool, 0, "%s: unexpected EOF", name);
+    }
+  if (chk1)
+    solv_chksum_add(chk1, buf + 8, len);
+  if (chk2)
+    solv_chksum_add(chk2, buf + 8, len);
+  h = headerImport(buf, 8 + len - pad, HEADERIMPORT_FAST);
+  if (!h)
+    {
+      solv_free(buf);
+      return pool_error(state->pool, 0, "%s: headerImport error", name);
+    }
+  if (state->rpmhead)
+    headfree(state->rpmhead);
+  state->rpmhead = h;
+  return 1;
+}
+
+#endif
 
 static void
 freestate(struct rpmdbstate *state)
 {
   /* close down */
-  if (!state)
-    return;
-  if (state->db)
-    state->db->close(state->db, 0);
-  if (state->dbenv)
+#ifdef ENABLE_RPMDB
+  if (state->pkgdbopened)
+    closepkgdb(state);
+  if (state->dbenvopened)
     closedbenv(state);
+#endif
   if (state->rootdir)
     solv_free(state->rootdir);
-  solv_free(state->rpmhead);
+  headfree(state->rpmhead);
 }
 
 void *
@@ -1451,50 +1353,14 @@ rpm_state_create(Pool *pool, const char *rootdir)
 void *
 rpm_state_free(void *state)
 {
-  freestate(state);
+  if (state)
+    freestate(state);
   return solv_free(state);
 }
 
-static int
-count_headers(struct rpmdbstate *state)
-{
-  Pool *pool = state->pool;
-  char dbpath[PATH_MAX];
-  struct stat statbuf;
-  DB *db = 0;
-  DBC *dbc = 0;
-  int count = 0;
-  DBT dbkey;
-  DBT dbdata;
 
-  snprintf(dbpath, PATH_MAX, "%s%s/Name", state->rootdir ? state->rootdir : "", state->is_ostree ? "/usr/share/rpm" : "/var/lib/rpm");
-  if (stat(dbpath, &statbuf))
-    return 0;
-  memset(&dbkey, 0, sizeof(dbkey));
-  memset(&dbdata, 0, sizeof(dbdata));
-  if (db_create(&db, state->dbenv, 0))
-    {
-      pool_error(pool, 0, "db_create: %s", strerror(errno));
-      return 0;
-    }
-  if (db->open(db, 0, "Name", 0, DB_UNKNOWN, DB_RDONLY, 0664))
-    {
-      pool_error(pool, 0, "db->open Name: %s", strerror(errno));
-      db->close(db, 0);
-      return 0;
-    }
-  if (db->cursor(db, NULL, &dbc, 0))
-    {
-      db->close(db, 0);
-      pool_error(pool, 0, "db->cursor: %s", strerror(errno));
-      return 0;
-    }
-  while (dbc->c_get(dbc, &dbkey, &dbdata, DB_NEXT) == 0)
-    count += dbdata.size / RPM_INDEX_SIZE;
-  dbc->c_close(dbc);
-  db->close(db, 0);
-  return count;
-}
+#ifdef ENABLE_RPMDB
+
 
 /******************************************************************/
 
@@ -1521,23 +1387,31 @@ copydeps(Pool *pool, Repo *repo, Offset fromoff, Repo *fromrepo)
 
 #define COPYDIR_DIRCACHE_SIZE 512
 
-static Id copydir_complex(Pool *pool, Repodata *data, Repodata *fromdata, Id did, Id *cache);
+static Id copydir_complex(Repodata *data, Repodata *fromdata, Id did, Id *cache);
 
 static inline Id
-copydir(Pool *pool, Repodata *data, Repodata *fromdata, Id did, Id *cache)
+copydir(Repodata *data, Repodata *fromdata, Id did, Id *cache)
 {
-  if (cache && cache[did & 255] == did)
+  if (cache && did && cache[did & 255] == did)
     return cache[(did & 255) + 256];
-  return copydir_complex(pool, data, fromdata, did, cache);
+  return copydir_complex(data, fromdata, did, cache);
 }
 
 static Id
-copydir_complex(Pool *pool, Repodata *data, Repodata *fromdata, Id did, Id *cache)
+copydir_complex(Repodata *data, Repodata *fromdata, Id did, Id *cache)
 {
-  Id parent = dirpool_parent(&fromdata->dirpool, did);
-  Id compid = dirpool_compid(&fromdata->dirpool, did);
+  Id parent, compid;
+  if (!did)
+    {
+      /* make sure that the dirpool has an entry */
+      if (!data->dirpool.ndirs)
+        dirpool_add_dir(&data->dirpool, 0, 0, 1);
+      return 0;
+    }
+  parent = dirpool_parent(&fromdata->dirpool, did);
+  compid = dirpool_compid(&fromdata->dirpool, did);
   if (parent)
-    parent = copydir(pool, data, fromdata, parent, cache);
+    parent = copydir(data, fromdata, parent, cache);
   if (data->localpool || fromdata->localpool)
     compid = repodata_translate_id(data, fromdata, compid, 1);
   compid = dirpool_add_dir(&data->dirpool, parent, compid, 1);
@@ -1560,48 +1434,20 @@ static int
 solvable_copy_cb(void *vcbdata, Solvable *r, Repodata *fromdata, Repokey *key, KeyValue *kv)
 {
   struct solvable_copy_cbdata *cbdata = vcbdata;
-  Id id, keyname;
   Repodata *data = cbdata->data;
   Id handle = cbdata->handle;
-  Pool *pool = data->repo->pool;
 
-  keyname = key->name;
-  switch(key->type)
+  switch (key->type)
     {
     case REPOKEY_TYPE_ID:
     case REPOKEY_TYPE_CONSTANTID:
     case REPOKEY_TYPE_IDARRAY:	/* used for triggers */
-      id = kv->id;
       if (data->localpool || fromdata->localpool)
-	id = repodata_translate_id(data, fromdata, id, 1);
-      if (key->type == REPOKEY_TYPE_ID)
-        repodata_set_id(data, handle, keyname, id);
-      else if (key->type == REPOKEY_TYPE_CONSTANTID)
-        repodata_set_constantid(data, handle, keyname, id);
-      else
-        repodata_add_idarray(data, handle, keyname, id);
-      break;
-    case REPOKEY_TYPE_STR:
-      repodata_set_str(data, handle, keyname, kv->str);
-      break;
-    case REPOKEY_TYPE_VOID:
-      repodata_set_void(data, handle, keyname);
-      break;
-    case REPOKEY_TYPE_NUM:
-      repodata_set_num(data, handle, keyname, SOLV_KV_NUM64(kv));
-      break;
-    case REPOKEY_TYPE_CONSTANT:
-      repodata_set_constant(data, handle, keyname, kv->num);
+	kv->id = repodata_translate_id(data, fromdata, kv->id, 1);
       break;
     case REPOKEY_TYPE_DIRNUMNUMARRAY:
-      id = kv->id;
-      id = copydir(pool, data, fromdata, id, cbdata->dircache);
-      repodata_add_dirnumnum(data, handle, keyname, id, kv->num, kv->num2);
-      break;
     case REPOKEY_TYPE_DIRSTRARRAY:
-      id = kv->id;
-      id = copydir(pool, data, fromdata, id, cbdata->dircache);
-      repodata_add_dirstr(data, handle, keyname, id, kv->str);
+      kv->id = copydir(data, fromdata, kv->id, cbdata->dircache);
       break;
     case REPOKEY_TYPE_FLEXARRAY:
       if (kv->eof == 2)
@@ -1617,16 +1463,12 @@ solvable_copy_cb(void *vcbdata, Solvable *r, Repodata *fromdata, Repokey *key, K
 	  cbdata->subhandle = cbdata->handle;
 	}
       cbdata->handle = repodata_new_handle(data);
-      repodata_add_flexarray(data, cbdata->subhandle, keyname, cbdata->handle);
-      break;
+      repodata_add_flexarray(data, cbdata->subhandle, key->name, cbdata->handle);
+      return 0;
     default:
-      if (solv_chksum_len(key->type))
-	{
-	  repodata_set_bin_checksum(data, handle, keyname, key->type, (const unsigned char *)kv->str);
-	  break;
-	}
       break;
     }
+  repodata_set_kv(data, handle, key->name, key->type, kv);
   return 0;
 }
 
@@ -1654,13 +1496,20 @@ solvable_copy(Solvable *s, Solvable *r, Repodata *data, Id *dircache)
   s->enhances  = copydeps(pool, repo, r->enhances, fromrepo);
 
   /* copy all attributes */
-  if (!data)
+  if (!data || fromrepo->nrepodata < 2)
     return;
   cbdata.data = data;
   cbdata.handle = s - pool->solvables;
   cbdata.subhandle = 0;
   cbdata.dircache = dircache;
   p = r - fromrepo->pool->solvables;
+  if (fromrepo->nrepodata == 2)
+    {
+      Repodata *fromdata = repo_id2repodata(fromrepo, 1);
+      if (p >= fromdata->start && p < fromdata->end)
+        repodata_search(fromdata, p, 0, SEARCH_SUB | SEARCH_ARRAYSENTINEL, solvable_copy_cb, &cbdata);
+      return;
+    }
 #if 0
   repo_search(fromrepo, p, 0, 0, SEARCH_NO_STORAGE_SOLVABLE | SEARCH_SUB | SEARCH_ARRAYSENTINEL, solvable_copy_cb, &cbdata);
 #else
@@ -1751,7 +1600,6 @@ int
 repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
 {
   Pool *pool = repo->pool;
-  char dbpath[PATH_MAX];
   struct stat packagesstat;
   unsigned char newcookie[32];
   const unsigned char *oldcookie = 0;
@@ -1785,10 +1633,8 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
     }
 
   /* XXX: should get ro lock of Packages database! */
-  snprintf(dbpath, PATH_MAX, "%s%s/Packages", state.rootdir ? state.rootdir : "", state.is_ostree ? "/usr/share/rpm" : "/var/lib/rpm");
-  if (stat(dbpath, &packagesstat))
+  if (stat_database(&state, "Packages", &packagesstat, 1))
     {
-      pool_error(pool, -1, "%s: %s", dbpath, strerror(errno));
       freestate(&state);
       return -1;
     }
@@ -1801,7 +1647,6 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
     {
       int solvstart = 0, solvend = 0;
       Id dbid;
-      DBC *dbc = 0;
 
       if (ref && (flags & RPMDB_EMPTY_REFREPO) != 0)
 	repo_empty(ref, 1);	/* get it out of the way */
@@ -1812,18 +1657,18 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
 	  freestate(&state);
 	  return -1;
 	}
-      if (state.db->cursor(state.db, NULL, &dbc, 0))
+      if (pkgdb_cursor_open(&state))
 	{
 	  freestate(&state);
-	  return pool_error(pool, -1, "db->cursor failed");
+	  return -1;
 	}
       i = 0;
       s = 0;
-      while ((dbid = getrpmcursor(&state, dbc)) != 0)
+      while ((dbid = pkgdb_cursor_getrpm(&state)) != 0)
 	{
 	  if (dbid == -1)
 	    {
-	      dbc->c_close(dbc);
+	      pkgdb_cursor_close(&state);
 	      freestate(&state);
 	      return -1;
 	    }
@@ -1837,7 +1682,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
 	  if (!repo->rpmdbid)
 	    repo->rpmdbid = repo_sidedata_create(repo, sizeof(Id));
 	  repo->rpmdbid[(s - pool->solvables) - repo->start] = dbid;
-	  if (rpm2solv(pool, repo, data, s, state.rpmhead, flags | RPM_ADD_TRIGGERS))
+	  if (rpmhead2solv(pool, repo, data, s, state.rpmhead, flags | RPM_ADD_TRIGGERS))
 	    {
 	      i++;
 	      s = 0;
@@ -1857,7 +1702,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
 	        pool_debug(pool, SOLV_ERROR, "%%%% %d\n", done * 100 / count);
 	    }
 	}
-      dbc->c_close(dbc);
+      pkgdb_cursor_close(&state);
       if (s)
 	{
 	  /* oops, could not reuse. free it instead */
@@ -1973,7 +1818,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
 		    }
 		}
 	    }
-	  res = getrpmdbid(&state, dbid);
+	  res = getrpm_dbid(&state, dbid);
 	  if (res <= 0)
 	    {
 	      if (!res)
@@ -1984,7 +1829,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
 	      solv_free(refhash);
 	      return -1;
 	    }
-	  rpm2solv(pool, repo, data, s, state.rpmhead, flags | RPM_ADD_TRIGGERS);
+	  rpmhead2solv(pool, repo, data, s, state.rpmhead, flags | RPM_ADD_TRIGGERS);
 	  if ((flags & RPMDB_REPORT_PROGRESS) != 0)
 	    {
 	      if (done < count)
@@ -2039,21 +1884,15 @@ repo_add_rpmdb_reffp(Repo *repo, FILE *fp, int flags)
   return res;
 }
 
-static inline unsigned int
-getu32(const unsigned char *dp)
-{
-  return dp[0] << 24 | dp[1] << 16 | dp[2] << 8 | dp[3];
-}
-
+#endif	/* ENABLE_RPMDB */
 
 Id
 repo_add_rpm(Repo *repo, const char *rpm, int flags)
 {
-  unsigned int sigdsize, sigcnt, l;
+  unsigned int sigdsize, sigcnt, sigpad, l;
   Pool *pool = repo->pool;
   Solvable *s;
-  RpmHead *rpmhead = 0;
-  int rpmheadsize = 0;
+  struct rpmdbstate state;
   char *payloadformat;
   FILE *fp;
   unsigned char lead[4096];
@@ -2067,7 +1906,6 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
   Id chksumtype = 0;
   Chksum *chksumh = 0;
   Chksum *leadsigchksumh = 0;
-  int forcebinary = 0;
 
   data = repo_add_repodata(repo, flags);
 
@@ -2076,6 +1914,7 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
   else if ((flags & RPM_ADD_WITH_SHA1SUM) != 0)
     chksumtype = REPOKEY_TYPE_SHA1;
 
+  /* open rpm */
   if ((fp = fopen(flags & REPO_USE_ROOTDIR ? pool_prepend_rootdir_tmp(pool, rpm) : rpm, "r")) == 0)
     {
       pool_error(pool, -1, "%s: %s", rpm, strerror(errno));
@@ -2087,6 +1926,12 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
       fclose(fp);
       return 0;
     }
+
+  /* setup state */
+  memset(&state, 0, sizeof(state));
+  state.pool = pool;
+
+  /* process lead */
   if (chksumtype)
     chksumh = solv_chksum_create(chksumtype);
   if ((flags & RPM_ADD_WITH_LEADSIGID) != 0)
@@ -2097,11 +1942,12 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
       fclose(fp);
       return 0;
     }
-  forcebinary = lead[6] != 0 || lead[7] != 1;
   if (chksumh)
     solv_chksum_add(chksumh, lead, 96 + 16);
   if (leadsigchksumh)
     solv_chksum_add(leadsigchksumh, lead, 96 + 16);
+
+  /* process signature header */
   if (lead[78] != 0 || lead[79] != 5)
     {
       pool_error(pool, -1, "%s: not a rpm v5 header", rpm);
@@ -2116,43 +1962,27 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
     }
   sigcnt = getu32(lead + 96 + 8);
   sigdsize = getu32(lead + 96 + 12);
-  if (sigcnt >= 0x100000 || sigdsize >= 0x100000)
+  if (sigcnt >= MAX_SIG_CNT || sigdsize >= MAX_SIG_DSIZE)
     {
       pool_error(pool, -1, "%s: bad signature header", rpm);
       fclose(fp);
       return 0;
     }
-  sigdsize += sigcnt * 16;
-  sigdsize = (sigdsize + 7) & ~7;
-  headerstart = 96 + 16 + sigdsize;
+  sigpad = sigdsize & 7 ? 8 - (sigdsize & 7) : 0;
+  headerstart = 96 + 16 + sigcnt * 16 + sigdsize + sigpad;
   pkgidtype = leadsigidtype = hdridtype = 0;
   if ((flags & (RPM_ADD_WITH_PKGID | RPM_ADD_WITH_HDRID)) != 0)
     {
-      /* extract pkgid or hdrid from the signature header */
-      if (sigdsize > rpmheadsize)
+      if (!headfromfp(&state, rpm, fp, lead + 96, sigcnt, sigdsize, sigpad, chksumh, leadsigchksumh))
 	{
-	  rpmheadsize = sigdsize + 128;
-	  rpmhead = solv_realloc(rpmhead, sizeof(*rpmhead) + rpmheadsize);
-	}
-      if (fread(rpmhead->data, sigdsize, 1, fp) != 1)
-	{
-	  pool_error(pool, -1, "%s: unexpected EOF", rpm);
 	  fclose(fp);
 	  return 0;
 	}
-      if (chksumh)
-	solv_chksum_add(chksumh, rpmhead->data, sigdsize);
-      if (leadsigchksumh)
-	solv_chksum_add(leadsigchksumh, rpmhead->data, sigdsize);
-      rpmhead->forcebinary = 0;
-      rpmhead->cnt = sigcnt;
-      rpmhead->dcnt = sigdsize - sigcnt * 16;
-      rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
       if ((flags & RPM_ADD_WITH_PKGID) != 0)
 	{
 	  unsigned char *chksum;
 	  unsigned int chksumsize;
-	  chksum = headbinary(rpmhead, SIGTAG_MD5, &chksumsize);
+	  chksum = headbinary(state.rpmhead, SIGTAG_MD5, &chksumsize);
 	  if (chksum && chksumsize == 16)
 	    {
 	      pkgidtype = REPOKEY_TYPE_MD5;
@@ -2161,7 +1991,7 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
 	}
       if ((flags & RPM_ADD_WITH_HDRID) != 0)
 	{
-	  const char *str = headstring(rpmhead, TAG_SHA1HEADER);
+	  const char *str = headstring(state.rpmhead, TAG_SHA1HEADER);
 	  if (str && strlen(str) == 40)
 	    {
 	      if (solv_hex2bin(&str, hdrid, 20) == 20)
@@ -2177,9 +2007,10 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
   else
     {
       /* just skip the signature header */
-      while (sigdsize)
+      unsigned int len = sigcnt * 16 + sigdsize + sigpad;
+      while (len)
 	{
-	  l = sigdsize > 4096 ? 4096 : sigdsize;
+	  l = len > 4096 ? 4096 : len;
 	  if (fread(lead, l, 1, fp) != 1)
 	    {
 	      pool_error(pool, -1, "%s: unexpected EOF", rpm);
@@ -2190,7 +2021,7 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
 	    solv_chksum_add(chksumh, lead, l);
 	  if (leadsigchksumh)
 	    solv_chksum_add(leadsigchksumh, lead, l);
-	  sigdsize -= l;
+	  len -= l;
 	}
     }
   if (leadsigchksumh)
@@ -2198,6 +2029,8 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
       leadsigchksumh = solv_chksum_free(leadsigchksumh, leadsigid);
       leadsigidtype = REPOKEY_TYPE_MD5;
     }
+
+  /* process main header */
   if (fread(lead, 16, 1, fp) != 1)
     {
       pool_error(pool, -1, "%s: unexpected EOF", rpm);
@@ -2214,48 +2047,36 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
     }
   sigcnt = getu32(lead + 8);
   sigdsize = getu32(lead + 12);
-  if (sigcnt >= 0x100000 || sigdsize >= 0x2000000)
+  if (sigcnt >= MAX_HDR_CNT || sigdsize >= MAX_HDR_DSIZE)
     {
       pool_error(pool, -1, "%s: bad header", rpm);
       fclose(fp);
       return 0;
     }
-  l = sigdsize + sigcnt * 16;
-  headerend = headerstart + 16 + l;
-  if (l > rpmheadsize)
+  headerend = headerstart + 16 + sigdsize + sigcnt * 16;
+
+  if (!headfromfp(&state, rpm, fp, lead, sigcnt, sigdsize, 0, chksumh, 0))
     {
-      rpmheadsize = l + 128;
-      rpmhead = solv_realloc(rpmhead, sizeof(*rpmhead) + rpmheadsize);
-    }
-  if (fread(rpmhead->data, l, 1, fp) != 1)
-    {
-      pool_error(pool, -1, "%s: unexpected EOF", rpm);
       fclose(fp);
       return 0;
     }
-  if (chksumh)
-    solv_chksum_add(chksumh, rpmhead->data, l);
-  rpmhead->forcebinary = forcebinary;
-  rpmhead->cnt = sigcnt;
-  rpmhead->dcnt = sigdsize;
-  rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
-  if (headexists(rpmhead, TAG_PATCHESNAME))
+  if (headexists(state.rpmhead, TAG_PATCHESNAME))
     {
       /* this is a patch rpm, ignore */
       pool_error(pool, -1, "%s: is patch rpm", rpm);
       fclose(fp);
       solv_chksum_free(chksumh, 0);
-      solv_free(rpmhead);
+      headfree(state.rpmhead);
       return 0;
     }
-  payloadformat = headstring(rpmhead, TAG_PAYLOADFORMAT);
+  payloadformat = headstring(state.rpmhead, TAG_PAYLOADFORMAT);
   if (payloadformat && !strcmp(payloadformat, "drpm"))
     {
       /* this is a delta rpm */
       pool_error(pool, -1, "%s: is delta rpm", rpm);
       fclose(fp);
       solv_chksum_free(chksumh, 0);
-      solv_free(rpmhead);
+      headfree(state.rpmhead);
       return 0;
     }
   if (chksumh)
@@ -2263,11 +2084,11 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
       solv_chksum_add(chksumh, lead, l);
   fclose(fp);
   s = pool_id2solvable(pool, repo_add_solvable(repo));
-  if (!rpm2solv(pool, repo, data, s, rpmhead, flags & ~(RPM_ADD_WITH_HDRID | RPM_ADD_WITH_PKGID)))
+  if (!rpmhead2solv(pool, repo, data, s, state.rpmhead, flags & ~(RPM_ADD_WITH_HDRID | RPM_ADD_WITH_PKGID)))
     {
       repo_free_solvable(repo, s - pool->solvables, 1);
       solv_chksum_free(chksumh, 0);
-      solv_free(rpmhead);
+      headfree(state.rpmhead);
       return 0;
     }
   if (!(flags & REPO_NO_LOCATION))
@@ -2286,7 +2107,7 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
       repodata_set_bin_checksum(data, s - pool->solvables, SOLVABLE_CHECKSUM, chksumtype, solv_chksum_get(chksumh, 0));
       chksumh = solv_chksum_free(chksumh, 0);
     }
-  solv_free(rpmhead);
+  headfree(state.rpmhead);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
   return s - pool->solvables;
@@ -2315,7 +2136,7 @@ repo_add_rpm_handle(Repo *repo, void *rpmhandle, int flags)
       return 0;
     }
   s = pool_id2solvable(pool, repo_add_solvable(repo));
-  if (!rpm2solv(pool, repo, data, s, rpmhead, flags))
+  if (!rpmhead2solv(pool, repo, data, s, rpmhead, flags))
     {
       repo_free_solvable(repo, s - pool->solvables, 1);
       return 0;
@@ -2346,12 +2167,12 @@ rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *
   char **dn;
   char **md = 0;
   char **lt = 0;
-  unsigned int *di, diidx;
-  unsigned int *co = 0;
-  unsigned int *ff = 0;
+  uint32_t *di, diidx;
+  uint32_t *co = 0;
+  uint32_t *ff = 0;
+  uint16_t *fm;
   unsigned int lastdir;
   int lastdirl;
-  unsigned int *fm;
   int cnt, dcnt, cnt2;
   int i, l1, l;
   char *space = 0;
@@ -2408,7 +2229,7 @@ rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *
   if ((flags & RPM_ITERATE_FILELIST_WITHCOL) != 0)
     {
       co = headint32array(rpmhead, TAG_FILECOLORS, &cnt2);
-      if (!co || cnt != cnt2)
+      if (co && cnt != cnt2)
 	{
 	  solv_free(co);
 	  solv_free(md);
@@ -2486,8 +2307,7 @@ rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *
 	      info.digest = md5;
 	    }
 	}
-      if (co)
-	info.color = co[i];
+      info.color = co ? co[i] : 0;
       (*cb)(cbdata, space, &info);
     }
   solv_free(space);
@@ -2512,12 +2332,12 @@ rpm_query(void *rpmhandle, Id what)
   r = 0;
   switch (what)
     {
-    case 0:
+    case 0:	/* return canonical name of rpm */
       name = headstring(rpmhead, TAG_NAME);
       if (!name)
 	name = "";
       sourcerpm = headstring(rpmhead, TAG_SOURCERPM);
-      if (sourcerpm || (rpmhead->forcebinary && !headexists(rpmhead, TAG_SOURCEPACKAGE)))
+      if (sourcerpm || !(headexists(rpmhead, TAG_SOURCEPACKAGE) || headissourceheuristic(rpmhead)))
 	arch = headstring(rpmhead, TAG_ARCH);
       else
 	{
@@ -2568,6 +2388,8 @@ rpm_query_num(void *rpmhandle, Id what, unsigned long long notfound)
   return notfound;
 }
 
+#ifdef ENABLE_RPMDB
+
 int
 rpm_installedrpmdbids(void *rpmstate, const char *index, const char *match, Queue *rpmdbidq)
 {
@@ -2591,33 +2413,33 @@ rpm_byrpmdbid(void *rpmstate, Id rpmdbid)
   struct rpmdbstate *state = rpmstate;
   int r;
 
-  r = getrpmdbid(state, rpmdbid);
+  r = getrpm_dbid(state, rpmdbid);
   if (!r)
     pool_error(state->pool, 0, "header #%d not in database", rpmdbid);
   return r <= 0 ? 0 : state->rpmhead;
 }
 
+#endif	/* ENABLE_RPMDB */
+
 void *
 rpm_byfp(void *rpmstate, FILE *fp, const char *name)
 {
   struct rpmdbstate *state = rpmstate;
-  /* int headerstart, headerend; */
-  RpmHead *rpmhead;
   unsigned int sigdsize, sigcnt, l;
   unsigned char lead[4096];
-  int forcebinary = 0;
 
   if (fread(lead, 96 + 16, 1, fp) != 1 || getu32(lead) != 0xedabeedb)
     {
       pool_error(state->pool, 0, "%s: not a rpm", name);
       return 0;
     }
-  forcebinary = lead[6] != 0 || lead[7] != 1;
   if (lead[78] != 0 || lead[79] != 5)
     {
       pool_error(state->pool, 0, "%s: not a V5 header", name);
       return 0;
     }
+
+  /* skip signature header */
   if (getu32(lead + 96) != 0x8eade801)
     {
       pool_error(state->pool, 0, "%s: bad signature header", name);
@@ -2625,14 +2447,13 @@ rpm_byfp(void *rpmstate, FILE *fp, const char *name)
     }
   sigcnt = getu32(lead + 96 + 8);
   sigdsize = getu32(lead + 96 + 12);
-  if (sigcnt >= 0x100000 || sigdsize >= 0x100000)
+  if (sigcnt >= MAX_SIG_CNT || sigdsize >= MAX_SIG_DSIZE)
     {
       pool_error(state->pool, 0, "%s: bad signature header", name);
       return 0;
     }
   sigdsize += sigcnt * 16;
   sigdsize = (sigdsize + 7) & ~7;
-  /* headerstart = 96 + 16 + sigdsize; */
   while (sigdsize)
     {
       l = sigdsize > 4096 ? 4096 : sigdsize;
@@ -2643,6 +2464,7 @@ rpm_byfp(void *rpmstate, FILE *fp, const char *name)
 	}
       sigdsize -= l;
     }
+
   if (fread(lead, 16, 1, fp) != 1)
     {
       pool_error(state->pool, 0, "%s: unexpected EOF", name);
@@ -2655,41 +2477,28 @@ rpm_byfp(void *rpmstate, FILE *fp, const char *name)
     }
   sigcnt = getu32(lead + 8);
   sigdsize = getu32(lead + 12);
-  if (sigcnt >= 0x100000 || sigdsize >= 0x2000000)
+  if (sigcnt >= MAX_HDR_CNT || sigdsize >= MAX_HDR_DSIZE)
     {
       pool_error(state->pool, 0, "%s: bad header", name);
       return 0;
     }
-  l = sigdsize + sigcnt * 16;
-  /* headerend = headerstart + 16 + l; */
-  if (l > state->rpmheadsize)
-    {
-      state->rpmheadsize = l + 128;
-      state->rpmhead = solv_realloc(state->rpmhead, sizeof(*state->rpmhead) + state->rpmheadsize);
-    }
-  rpmhead = state->rpmhead;
-  if (fread(rpmhead->data, l, 1, fp) != 1)
-    {
-      pool_error(state->pool, 0, "%s: unexpected EOF", name);
-      return 0;
-    }
-  rpmhead->forcebinary = forcebinary;
-  rpmhead->cnt = sigcnt;
-  rpmhead->dcnt = sigdsize;
-  rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
-  return rpmhead;
+  if (!headfromfp(state, name, fp, lead, sigcnt, sigdsize, 0, 0, 0))
+    return 0;
+  return state->rpmhead;
 }
 
-#ifdef ENABLE_RPMDB_BYRPMHEADER
+#if defined(ENABLE_RPMDB_BYRPMHEADER) || defined(ENABLE_RPMDB_LIBRPM)
 
 void *
 rpm_byrpmh(void *rpmstate, Header h)
 {
   struct rpmdbstate *state = rpmstate;
+#ifndef ENABLE_RPMPKG_LIBRPM
   const unsigned char *uh;
-  unsigned int sigdsize, sigcnt, l;
-  RpmHead *rpmhead;
+  unsigned int dsize, cnt;
 
+  if (!h)
+    return 0;
 #ifndef RPM5
   uh = headerUnload(h);
 #else
@@ -2697,23 +2506,24 @@ rpm_byrpmh(void *rpmstate, Header h)
 #endif
   if (!uh)
     return 0;
-  sigcnt = getu32(uh);
-  sigdsize = getu32(uh + 4);
-  l = sigdsize + sigcnt * 16;
-  if (l > state->rpmheadsize)
+  cnt = getu32(uh);
+  dsize = getu32(uh + 4);
+  if (cnt >= MAX_HDR_CNT || dsize >= MAX_HDR_DSIZE)
     {
-      state->rpmheadsize = l + 128;
-      state->rpmhead = solv_realloc(state->rpmhead, sizeof(*state->rpmhead) + state->rpmheadsize);
+      free((void *)uh);
+      return 0;
     }
-  rpmhead = state->rpmhead;
-  memcpy(rpmhead->data, uh + 8, l - 8);
+  headfromblob(state, uh + 8, cnt, dsize);
   free((void *)uh);
-  rpmhead->forcebinary = 0;
-  rpmhead->cnt = sigcnt;
-  rpmhead->dcnt = sigdsize;
-  rpmhead->dp = rpmhead->data + rpmhead->cnt * 16;
-  return rpmhead;
+#else
+  if (!h)
+    return 0;
+  if (state->rpmhead)
+    headfree(state->rpmhead);
+  state->rpmhead = headerLink(h);
+#endif
+  return state->rpmhead;
 }
 
-#endif
+#endif	/* defined(ENABLE_RPMDB_BYRPMHEADER) || defined(ENABLE_RPMDB_LIBRPM) */
 

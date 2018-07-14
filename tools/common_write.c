@@ -6,8 +6,6 @@
  */
 
 #include <sys/types.h>
-#include <limits.h>
-#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,8 +14,12 @@
 #include "repo.h"
 #include "repo_write.h"
 #include "common_write.h"
+#include "solvversion.h"
 
-#define LIBSOLV_TOOLVERSION "1.0"
+/* toolversion history
+ * 1.0: initial tool version
+ * 1.1: changed PRODUCT_ENDOFLIFE parsing
+*/
 
 static Id verticals[] = {
   SOLVABLE_AUTHORS,

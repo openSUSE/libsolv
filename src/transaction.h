@@ -85,12 +85,17 @@ typedef struct _Transaction {
 
 /* order flags */
 #define SOLVER_TRANSACTION_KEEP_ORDERDATA	(1 << 0)
+#define SOLVER_TRANSACTION_KEEP_ORDERCYCLES	(1 << 1)
+
+/* cycle severities */
+#define SOLVER_ORDERCYCLE_HARMLESS		0
+#define SOLVER_ORDERCYCLE_NORMAL		1
+#define SOLVER_ORDERCYCLE_CRITICAL		2
 
 extern Transaction *transaction_create(struct _Pool *pool);
 extern Transaction *transaction_create_decisionq(struct _Pool *pool, Queue *decisionq, Map *multiversionmap);
 extern Transaction *transaction_create_clone(Transaction *srctrans);
 extern void transaction_free(Transaction *trans);
-extern void transaction_free_orderdata(Transaction *trans);
 
 /* if p is installed, returns with pkg(s) obsolete p */
 /* if p is not installed, returns with pkg(s) we obsolete */
@@ -113,6 +118,8 @@ extern int transaction_installedresult(Transaction *trans, Queue *installedq);
 int transaction_calc_installsizechange(Transaction *trans);
 void transaction_calc_duchanges(Transaction *trans, struct _DUChanges *mps, int nmps);
 
+
+
 /* order a transaction */
 extern void transaction_order(Transaction *trans, int flags);
 
@@ -127,6 +134,12 @@ extern void transaction_add_obsoleted(Transaction *trans);
 /* debug function, report problems found in the order */
 extern void transaction_check_order(Transaction *trans);
 
+/* order cycle introspection */
+extern void transaction_order_get_cycleids(Transaction *trans, Queue *q, int minseverity);
+extern int transaction_order_get_cycle(Transaction *trans, Id cid, Queue *q);
+
+extern void transaction_free_orderdata(Transaction *trans);
+extern void transaction_clone_orderdata(Transaction *trans, Transaction *srctrans);
 
 #ifdef __cplusplus
 }

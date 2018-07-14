@@ -2,6 +2,7 @@ SOLV_1.0 {
 	global:
 		pool_deb_get_autoinstalled;
 		pool_findfileconflicts;
+		pool_parserpmrichdep;
 		repo_add_appdata;
 		repo_add_appdata_dir;
 		repo_add_arch_local;
@@ -65,6 +66,7 @@ SOLV_1.0 {
 		testcase_str2dep;
 		testcase_str2job;
 		testcase_str2repo;
+		testcase_str2solvid;
 		testcase_read;
 		testcase_resultdiff;
 		testcase_solverresult;

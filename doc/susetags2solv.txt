@@ -37,3 +37,7 @@ Autoexpand SUSE pattern and product provides into packages.
 Author
 ------
 Michael Schroeder <mls@suse.de>
+
+////
+vim: syntax=asciidoc
+////

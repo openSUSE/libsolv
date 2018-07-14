@@ -99,7 +99,7 @@ dirpool_make_dirtraverse(Dirpool *dp)
 Id
 dirpool_add_dir(Dirpool *dp, Id parent, Id comp, int create)
 {
-  Id did, d, ds, *dirtraverse;
+  Id did, d, ds;
 
   if (!dp->ndirs)
     {
@@ -110,14 +110,15 @@ dirpool_add_dir(Dirpool *dp, Id parent, Id comp, int create)
       dp->dirs[0] = 0;
       dp->dirs[1] = 1;	/* "" */
     }
+  if (comp <= 0)
+    return 0;
   if (parent == 0 && comp == 1)
     return 1;
   if (!dp->dirtraverse)
     dirpool_make_dirtraverse(dp);
   /* check all entries with this parent if we
    * already have this component */
-  dirtraverse = dp->dirtraverse;
-  ds = dirtraverse[parent];
+  ds = dp->dirtraverse[parent];
   while (ds)
     {
       /* ds: first component in this block

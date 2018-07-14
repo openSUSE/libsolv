@@ -1,8 +1,10 @@
 repo system 0 testtags <inline>
+#>=Ver: 2
 #>=Pkg: B 1 1 noarch
 #>=Prv: locale(en)
 #>=Pkg: C 1 1 noarch
 repo test 0 testtags <inline>
+#>=Ver: 2
 #>=Pkg: A 1 1 noarch
 #>=Prv: locale(de)
 #>=Pkg: C-de 1 1 noarch

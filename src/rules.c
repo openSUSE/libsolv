@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007-2009, Novell Inc.
+ * Copyright (c) 2007-2017, SUSE Inc.
  *
  * This program is licensed under the BSD license, read LICENSE.BSD
  * for further information
@@ -31,52 +31,7 @@
 
 #define RULES_BLOCK 63
 
-static void addpkgruleinfo(Solver *solv, Id p, Id d, int type, Id dep);
-static void solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded);
-
-/*-------------------------------------------------------------------
- * Check if dependency is possible
- *
- * mirrors solver_dep_fulfilled but uses map m instead of the decisionmap.
- * used in solver_addpkgrulesforweak and solver_createcleandepsmap.
- */
-
-static inline int
-dep_possible(Solver *solv, Id dep, Map *m)
-{
-  Pool *pool = solv->pool;
-  Id p, pp;
-
-  if (ISRELDEP(dep))
-    {
-      Reldep *rd = GETRELDEP(pool, dep);
-      if (rd->flags >= 8)
-	 {
-	  if (rd->flags == REL_AND || rd->flags == REL_COND)
-	    {
-	      if (!dep_possible(solv, rd->name, m))
-		return 0;
-	      return dep_possible(solv, rd->evr, m);
-	    }
-	  if (rd->flags == REL_OR)
-	    {
-	      if (dep_possible(solv, rd->name, m))
-		return 1;
-	      return dep_possible(solv, rd->evr, m);
-	    }
-	  if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_SPLITPROVIDES)
-	    return solver_splitprovides(solv, rd->evr);
-	  if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_INSTALLED)
-	    return solver_dep_installed(solv, rd->evr);
-	}
-    }
-  FOR_PROVIDES(p, pp, dep)
-    {
-      if (MAPTST(m, p))
-	return 1;
-    }
-  return 0;
-}
+static void addpkgruleinfo(Solver *solv, Id p, Id p2, Id d, int type, Id dep);
 
 static inline int
 is_otherproviders_dep(Pool *pool, Id dep)
@@ -114,23 +69,26 @@ unifyrules_sortcmp(const void *ap, const void *bp, void *dp)
 
   x = a->p - b->p;
   if (x)
-    return x;			       /* p differs */
+    return x;				/* p differs */
 
   /* identical p */
-  if (a->d == 0 && b->d == 0)
-    return a->w2 - b->w2;	       /* assertion: return w2 diff */
+  if (a->d == 0 && b->d == 0)		/* both assertions or binary */
+    return a->w2 - b->w2;
 
-  if (a->d == 0)		       /* a is assertion, b not */
+  if (a->d == 0)			/* a is assertion or binary, b not */
     {
       x = a->w2 - pool->whatprovidesdata[b->d];
       return x ? x : -1;
     }
 
-  if (b->d == 0)		       /* b is assertion, a not */
+  if (b->d == 0)			/* b is assertion or binary, a not */
     {
       x = pool->whatprovidesdata[a->d] - b->w2;
       return x ? x : 1;
     }
+
+  if (a->d == b->d)
+    return 0;
 
   /* compare whatprovidesdata */
   ad = pool->whatprovidesdata + a->d;
@@ -161,22 +119,31 @@ solver_unifyrules(Solver *solv)
   int i, j;
   Rule *ir, *jr;
 
-  if (solv->nrules <= 2)	       /* nothing to unify */
+  if (solv->nrules <= 2)		/* nothing to unify */
     return;
+
+  if (solv->recommendsruleq)
+    {
+      /* mis-use n2 as recommends rule marker */
+      for (i = 1, ir = solv->rules + i; i < solv->nrules; i++, ir++)
+	ir->n2 = 0;
+      for (i = 0; i < solv->recommendsruleq->count; i++)
+	solv->rules[solv->recommendsruleq->elements[i]].n2 = 1;
+    }
 
   /* sort rules first */
   solv_sort(solv->rules + 1, solv->nrules - 1, sizeof(Rule), unifyrules_sortcmp, solv->pool);
 
-  /* prune rules
-   * i = unpruned
-   * j = pruned
-   */
+  /* prune rules */
   jr = 0;
   for (i = j = 1, ir = solv->rules + i; i < solv->nrules; i++, ir++)
     {
       if (jr && !unifyrules_sortcmp(ir, jr, pool))
-	continue;		       /* prune! */
-      jr = solv->rules + j++;	       /* keep! */
+	{
+	  jr->n2 &= ir->n2;		/* bitwise-and recommends marker */
+	  continue;			/* prune! */
+	}
+      jr = solv->rules + j++;		/* keep! */
       if (ir != jr)
         *jr = *ir;
     }
@@ -185,8 +152,19 @@ solver_unifyrules(Solver *solv)
   POOL_DEBUG(SOLV_DEBUG_STATS, "pruned rules from %d to %d\n", solv->nrules, j);
 
   /* adapt rule buffer */
-  solv->nrules = j;
-  solv->rules = solv_extend_resize(solv->rules, solv->nrules, sizeof(Rule), RULES_BLOCK);
+  solver_shrinkrules(solv, j);
+
+  if (solv->recommendsruleq)
+    {
+      /* rebuild recommendsruleq */
+      queue_empty(solv->recommendsruleq);
+      for (i = 1, ir = solv->rules + i; i < solv->nrules; i++, ir++)
+	if (ir->n2)
+	  {
+	    ir->n2 = 0;
+	    queue_push(solv->recommendsruleq, i);
+	  }
+    }
 
   /*
    * debug: log rule statistics
@@ -243,27 +221,23 @@ hashrule(Solver *solv, Id p, Id d, int n)
 
 /*
  * add rule
- *  p = direct literal; always < 0 for installed pkg rules
- *  d, if < 0 direct literal, if > 0 offset into whatprovides, if == 0 rule is assertion (look at p only)
- *
  *
  * A requires b, b provided by B1,B2,B3 => (-A|B1|B2|B3)
  *
- * p < 0 : pkg id of A
- * d > 0 : Offset in whatprovidesdata (list of providers of b)
+ * p < 0  : pkg id of A
+ * d > 0  : Offset in whatprovidesdata (list of providers of b)
  *
  * A conflicts b, b provided by B1,B2,B3 => (-A|-B1), (-A|-B2), (-A|-B3)
- * p < 0 : pkg id of A
- * d < 0 : Id of solvable (e.g. B1)
+ * p < 0  : pkg id of A
+ * p2 < 0 : Id of solvable (e.g. B1)
  *
- * d == 0: unary rule, assertion => (A) or (-A)
+ * d == 0, p2 == 0: unary rule, assertion => (A) or (-A)
  *
  *   Install:    p > 0, d = 0   (A)             user requested install
  *   Remove:     p < 0, d = 0   (-A)            user requested remove (also: uninstallable)
  *   Requires:   p < 0, d > 0   (-A|B1|B2|...)  d: <list of providers for requirement of p>
- *   Requires:   p > 0, d < 0   (B|-A)		hack to save a whatprovides allocation, gets converted into (-A|B)
  *   Updates:    p > 0, d > 0   (A|B1|B2|...)   d: <list of updates for solvable p>
- *   Conflicts:  p < 0, d < 0   (-A|-B)         either p (conflict issuer) or d (conflict provider) (binary rule)
+ *   Conflicts:  p < 0, p2 < 0  (-A|-B)         either p (conflict issuer) or d (conflict provider) (binary rule)
  *                                              also used for obsoletes
  *   No-op ?:    p = 0, d = 0   (null)          (used as placeholder in update/feature rules)
  *
@@ -277,123 +251,94 @@ hashrule(Solver *solv, Id p, Id d, int n)
  */
 
 Rule *
-solver_addrule(Solver *solv, Id p, Id d)
+solver_addrule(Solver *solv, Id p, Id p2, Id d)
 {
   Pool *pool = solv->pool;
-  Rule *r = 0;
-  Id *dp = 0;
+  Rule *r;
 
-  int n = 0;			       /* number of literals in rule - 1
-					  0 = direct assertion (single literal)
-					  1 = binary rule
-					  >1 = multi-literal rule
-					*/
+  if (d)
+    {
+      assert(!p2 && d > 0);
+      if (!pool->whatprovidesdata[d])
+	d = 0;
+      else if (!pool->whatprovidesdata[d + 1])
+	{
+	  p2 = pool->whatprovidesdata[d];
+	  d = 0;
+	}
+    }
+
+  /* now we have two cases:
+   * 1 or 2 literals:    d = 0, p, p2 contain the literals
+   * 3 or more literals: d > 0, p2 == 0, d is offset into whatprovidesdata
+   */
 
   /* it often happenes that requires lead to adding the same pkg rule
    * multiple times, so we prune those duplicates right away to make
    * the work for unifyrules a bit easier */
-
   if (!solv->pkgrules_end)		/* we add pkg rules */
     {
-      r = solv->rules + solv->nrules - 1;	/* get the last added rule */
-      if (r->p == p && r->d == d && (d != 0 || !r->w2))
-	return r;
-    }
-
-  /* compute number of literals (n) in rule */
-  if (d < 0)
-    {
-      if (p == -d)
-	return 0;			/* rule is self-fulfilling */
-      if (p == d)
-	d = 0;				/* normalize to assertion */
-      else
-        n = 1;				/* binary rule */
-    }
-  else if (d > 0)
-    {
-      for (dp = pool->whatprovidesdata + d; *dp; dp++, n++)
-	if (*dp == -p)
-	  return 0;			/* rule is self-fulfilling */
-      if (n == 1) 			/* convert to binary rule */
-	d = dp[-1];
-    }
-
-  if (n == 1 && p > d && !solv->pkgrules_end)
-    {
-      /* put smallest literal first so we can find dups */
-      n = p; p = d; d = n;             /* p <-> d */
-      n = 1;			       /* re-set n, was used as temp var */
-    }
-
-  /*
-   * check for duplicate (r is only set if we're adding pkg rules)
-   */
-  if (r)
-    {
-      /* check if the last added rule (r) is exactly the same as what we're looking for. */
-      if (n == 1 && !r->d && r->p == p && r->w2 == d)
-	return r;
-      /* have n-ary rule with same first literal, check other literals */
-      if (n > 1 && r->d && r->p == p)
+      r = solv->rules + solv->lastpkgrule;
+      if (d)
 	{
-	  /* Rule where d is an offset in whatprovidesdata */
-	  Id *dp2;
-	  if (d == r->d)
-	    return r;
-	  dp2 = pool->whatprovidesdata + r->d;
-	  for (dp = pool->whatprovidesdata + d; *dp; dp++, dp2++)
-	    if (*dp != *dp2)
-	      break;
-	  if (*dp == *dp2)
-	    return r;
+	  Id *dp;
+	  /* check if rule is identical */
+	  if (r->p == p)
+	    {
+	      Id *dp2;
+	      if (r->d == d)
+		return r;
+	      dp2 = pool->whatprovidesdata + r->d;
+	      for (dp = pool->whatprovidesdata + d; *dp; dp++, dp2++)
+		if (*dp != *dp2)
+		  break;
+	      if (*dp == *dp2)
+		return r;
+	    }
+	  /* check if rule is self-fulfilling */
+	  for (dp = pool->whatprovidesdata + d; *dp; dp++)
+	    if (*dp == -p)
+	      return 0;			/* rule is self-fulfilling */
 	}
+      else
+	{
+	  if (p2 && p > p2)
+	    {
+	      Id o = p;			/* switch p1 and p2 */
+	      p = p2;
+	      p2 = o;
+	    }
+	  if (r->p == p && !r->d && r->w2 == p2)
+	    return r;
+	  if (p == -p2)
+	    return 0;			/* rule is self-fulfilling */
+	}
+      solv->lastpkgrule = solv->nrules;
     }
 
-  /*
-   * allocate new rule r
-   */
   solv->rules = solv_extend(solv->rules, solv->nrules, 1, sizeof(Rule), RULES_BLOCK);
   r = solv->rules + solv->nrules++;    /* point to rule space */
-
   r->p = p;
-  if (n == 0)
-    {
-      /* direct assertion, no watch needed */
-      r->d = 0;
-      r->w1 = p;
-      r->w2 = 0;
-    }
-  else if (n == 1)
-    {
-      /* binary rule */
-      r->d = 0;
-      r->w1 = p;
-      r->w2 = d;
-    }
-  else
-    {
-      r->d = d;
-      r->w1 = p;
-      r->w2 = pool->whatprovidesdata[d];
-    }
+  r->d = d;
+  r->w1 = p;
+  r->w2 = d ? pool->whatprovidesdata[d] : p2;
   r->n1 = 0;
   r->n2 = 0;
-
   IF_POOLDEBUG (SOLV_DEBUG_RULE_CREATION)
     {
       POOL_DEBUG(SOLV_DEBUG_RULE_CREATION, "  Add rule: ");
       solver_printrule(solv, SOLV_DEBUG_RULE_CREATION, r);
     }
-
   return r;
 }
+
 
 void
 solver_shrinkrules(Solver *solv, int nrules)
 {
   solv->nrules = nrules;
   solv->rules = solv_extend_resize(solv->rules, solv->nrules, sizeof(Rule), RULES_BLOCK);
+  solv->lastpkgrule = 0;
 }
 
 /******************************************************************************
@@ -434,7 +379,7 @@ makemultiversionconflict(Solver *solv, Id n, Id con)
       queue_push(&q, p);
     }
   if (q.count == 1)
-    n = -n;	/* no other package found, generate normal conflict */
+    n = 0;	/* no other package found, normal conflict handling */
   else
     n = pool_queuetowhatprovides(pool, &q);
   queue_free(&q);
@@ -442,15 +387,28 @@ makemultiversionconflict(Solver *solv, Id n, Id con)
 }
 
 static inline void
-addpkgrule(Solver *solv, Id p, Id d, int type, Id dep)
+addpkgrule(Solver *solv, Id p, Id p2, Id d, int type, Id dep)
 {
   if (!solv->ruleinfoq)
-    solver_addrule(solv, p, d);
+    solver_addrule(solv, p, p2, d);
   else
-    addpkgruleinfo(solv, p, d, type, dep);
+    addpkgruleinfo(solv, p, p2, d, type, dep);
 }
 
 #ifdef ENABLE_LINKED_PKGS
+
+static int
+addlinks_cmp(const void *ap, const void *bp, void *dp)
+{
+  Pool *pool = dp;
+  Id a = *(Id *)ap;
+  Id b = *(Id *)bp;
+  Solvable *sa = pool->solvables + a;
+  Solvable *sb = pool->solvables + b;
+  if (sa->name != sb->name)
+    return sa->name - sb->name;
+  return sa - sb;
+}
 
 static void
 addlinks(Solver *solv, Solvable *s, Id req, Queue *qr, Id prv, Queue *qp, Map *m, Queue *workq)
@@ -459,6 +417,8 @@ addlinks(Solver *solv, Solvable *s, Id req, Queue *qr, Id prv, Queue *qp, Map *m
   int i;
   if (!qr->count)
     return;
+  if (qp->count > 1)
+    solv_sort(qp->elements, qp->count, sizeof(Id), addlinks_cmp, pool);
 #if 0
   printf("ADDLINKS %s\n -> %s\n", pool_solvable2str(pool, s), pool_dep2str(pool, req));
   for (i = 0; i < qr->count; i++)
@@ -469,19 +429,27 @@ addlinks(Solver *solv, Solvable *s, Id req, Queue *qr, Id prv, Queue *qp, Map *m
 #endif
 
   if (qr->count == 1)
-    addpkgrule(solv, qr->elements[0], -(s - pool->solvables), SOLVER_RULE_PKG_REQUIRES, req);
+    addpkgrule(solv, -(s - pool->solvables), qr->elements[0], 0, SOLVER_RULE_PKG_REQUIRES, req);
   else
-    addpkgrule(solv, -(s - pool->solvables), pool_queuetowhatprovides(pool, qr), SOLVER_RULE_PKG_REQUIRES, req);
+    addpkgrule(solv, -(s - pool->solvables), 0, pool_queuetowhatprovides(pool, qr), SOLVER_RULE_PKG_REQUIRES, req);
   if (qp->count > 1)
     {
-      Id d = pool_queuetowhatprovides(pool, qp);
-      for (i = 0; i < qr->count; i++)
-	addpkgrule(solv, -qr->elements[i], d, SOLVER_RULE_PKG_REQUIRES, prv);
+      int j;
+      for (i = j = 0; i < qp->count; i = j)
+	{
+	  Id d = pool->solvables[qp->elements[i]].name;
+	  for (j = i + 1; j < qp->count; j++)
+	    if (d != pool->solvables[qp->elements[j]].name)
+	      break;
+	  d = pool_ids2whatprovides(pool, qp->elements + i, j - i);
+	  for (i = 0; i < qr->count; i++)
+	    addpkgrule(solv, -qr->elements[i], 0, d, SOLVER_RULE_PKG_REQUIRES, prv);
+	}
     }
   else if (qp->count)
     {
       for (i = 0; i < qr->count; i++)
-	addpkgrule(solv, qp->elements[0], -qr->elements[i], SOLVER_RULE_PKG_REQUIRES, prv);
+	addpkgrule(solv, -qr->elements[i], qp->elements[0], 0, SOLVER_RULE_PKG_REQUIRES, prv);
     }
   if (!m)
     return;	/* nothing more to do if called from getpkgruleinfos() */
@@ -535,13 +503,16 @@ add_complex_deprules(Solver *solv, Id p, Id dep, int type, int dontfix, Queue *w
 {
   Pool *pool = solv->pool;
   Repo *installed = solv->installed;
-  int i, j;
+  int i, j, flags;
   Queue bq;
 
   queue_init(&bq);
-
+  flags = dontfix ? CPLXDEPS_DONTFIX : 0;
   /* CNF expansion for requires, DNF + INVERT expansion for conflicts */
-  i = pool_normalize_complex_dep(pool, dep, &bq, type == SOLVER_RULE_PKG_REQUIRES ? 0 : (CPLXDEPS_TODNF | CPLXDEPS_EXPAND | CPLXDEPS_INVERT));
+  if (type == SOLVER_RULE_PKG_CONFLICTS)
+    flags |= CPLXDEPS_TODNF | CPLXDEPS_EXPAND | CPLXDEPS_INVERT;
+
+  i = pool_normalize_complex_dep(pool, dep, &bq, flags);
   /* handle special cases */
   if (i == 0)
     {
@@ -552,7 +523,7 @@ add_complex_deprules(Solver *solv, Id p, Id dep, int type, int dontfix, Queue *w
       else
 	{
 	  POOL_DEBUG(SOLV_DEBUG_RULE_CREATION, "package %s [%d] is not installable (%s)\n", pool_solvid2str(pool, p), p, pool_dep2str(pool, dep));
-	  addpkgrule(solv, -p, 0, type == SOLVER_RULE_PKG_REQUIRES ? SOLVER_RULE_PKG_NOTHING_PROVIDES_DEP : type, dep);
+	  addpkgrule(solv, -p, 0, 0, type == SOLVER_RULE_PKG_REQUIRES ? SOLVER_RULE_PKG_NOTHING_PROVIDES_DEP : type, dep);
 	}
       queue_free(&bq);
       return;
@@ -579,19 +550,17 @@ add_complex_deprules(Solver *solv, Id p, Id dep, int type, int dontfix, Queue *w
 		if (pool->solvables[dp[j]].repo == installed)
 		  break;		/* provider was installed */
 	      if (!dp[j])
-		{
-		  POOL_DEBUG(SOLV_DEBUG_RULE_CREATION, "ignoring broken requires %s of installed package %s\n", pool_dep2str(pool, dep), pool_solvid2str(pool, p));
-		  continue;
-		}
+	        continue;
 	    }
-	  if (!*dp)
-	    {
-	      /* nothing provides req! */
-	      POOL_DEBUG(SOLV_DEBUG_RULE_CREATION, "package %s [%d] is not installable (%s)\n", pool_solvid2str(pool, p), p, pool_dep2str(pool, dep));
-	      addpkgrule(solv, -p, 0, SOLVER_RULE_PKG_NOTHING_PROVIDES_DEP, dep);
-	      continue;
-	    }
-	  addpkgrule(solv, -p, dp - pool->whatprovidesdata, SOLVER_RULE_PKG_REQUIRES, dep);
+	  if (type == SOLVER_RULE_PKG_RECOMMENDS && !*dp)
+	    continue;
+	  /* check if the rule contains both p and -p */
+	  for (j = 0; dp[j] != 0; j++)
+	    if (dp[j] == p)
+	      break;
+	  if (dp[j])
+	    continue;
+	  addpkgrule(solv, -p, 0, dp - pool->whatprovidesdata, type, dep);
 	  /* push all non-visited providers on the work queue */
 	  if (m)
 	    for (; *dp; dp++)
@@ -601,29 +570,30 @@ add_complex_deprules(Solver *solv, Id p, Id dep, int type, int dontfix, Queue *w
 	}
       if (!bq.elements[i + 1])
 	{
-	  Id p2 = bq.elements[i];
-	  /* simple rule with just two literals */
-	  if (dontfix && p2 < 0 && pool->solvables[-p2].repo == installed)
-	    continue;
-	  if (dontfix && p2 > 0 && pool->solvables[p2].repo != installed)
-	    continue;
-	  if (p == p2)
-	    continue;
+	  Id p2 = bq.elements[i++];
+	  /* simple rule with just two literals, we'll add a (-p, p2) rule */
+	  if (dontfix)
+	    {
+	      if (p2 < 0 && pool->solvables[-p2].repo == installed)
+		continue;
+	      if (p2 > 0 && pool->solvables[p2].repo != installed)
+		continue;
+	    }
 	  if (-p == p2)
 	    {
 	      if (type == SOLVER_RULE_PKG_CONFLICTS)
 		{
 		  if (pool->forbidselfconflicts && !is_otherproviders_dep(pool, dep))
-		    addpkgrule(solv, -p, 0, SOLVER_RULE_PKG_SELF_CONFLICT, dep);
+		    addpkgrule(solv, -p, 0, 0, SOLVER_RULE_PKG_SELF_CONFLICT, dep);
 		  continue;
 		}
-	      addpkgrule(solv, -p, 0, type, dep);
+	      addpkgrule(solv, -p, 0, 0, type, dep);
 	      continue;
 	    }
-	  if (p2 > 0)
-	    addpkgrule(solv, p2, -p, type, dep);	/* hack so that we don't need pool_queuetowhatprovides */
-	  else
-	    addpkgrule(solv, -p, p2, type, dep);
+	  /* check if the rule contains both p and -p */
+	  if (p == p2)
+	    continue;
+	  addpkgrule(solv, -p, p2, 0, type, dep);
 	  if (m && p2 > 0 && !MAPTST(m, p2))
 	    queue_push(workq, p2);
 	}
@@ -667,19 +637,13 @@ add_complex_deprules(Solver *solv, Id p, Id dep, int type, int dontfix, Queue *w
 	  for (j = 0; j < qcnt; j++)
 	    if (qele[j] == p)
 	      break;
-	  if (j == qcnt)
-	    {
-	      /* hack: create fake queue 'q' so that we can call pool_queuetowhatprovides */
-	      Queue q;
-	      memset(&q, 0, sizeof(q));
-	      q.count = qcnt - 1;
-	      q.elements = qele + 1;
-	      addpkgrule(solv, qele[0], pool_queuetowhatprovides(pool, &q), type, dep);
-	      if (m)
-		for (j = 0; j < qcnt; j++)
-		  if (qele[j] > 0 && !MAPTST(m, qele[j]))
-		    queue_push(workq, qele[j]);
-	    }
+	  if (j < qcnt)
+	    continue;
+	  addpkgrule(solv, qele[0], 0, pool_ids2whatprovides(pool, qele + 1, qcnt - 1), type, dep);
+	  if (m)
+	    for (j = 0; j < qcnt; j++)
+	      if (qele[j] > 0 && !MAPTST(m, qele[j]))
+		queue_push(workq, qele[j]);
 	}
     }
   queue_free(&bq);
@@ -689,7 +653,7 @@ add_complex_deprules(Solver *solv, Id p, Id dep, int type, int dontfix, Queue *w
 
 /*-------------------------------------------------------------------
  *
- * add (install) rules for solvable
+ * add dependency rules for solvable
  *
  * s: Solvable for which to add rules
  * m: m[s] = 1 for solvables which have rules, prevent rule duplication
@@ -715,6 +679,8 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 
   Queue workq;	/* list of solvables we still have to work on */
   Id workqbuf[64];
+  Queue prereqq;	/* list of pre-req ids to ignore */
+  Id prereqbuf[16];
 
   int i;
   int dontfix;		/* ignore dependency errors for installed solvables */
@@ -729,6 +695,8 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 
   queue_init_buffer(&workq, workqbuf, sizeof(workqbuf)/sizeof(*workqbuf));
   queue_push(&workq, s - pool->solvables);	/* push solvable Id to work queue */
+
+  queue_init_buffer(&prereqq, prereqbuf, sizeof(prereqbuf)/sizeof(*prereqbuf));
 
   /* loop until there's no more work left */
   while (workq.count)
@@ -764,7 +732,7 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		: !pool_installable(pool, s))
 	    {
 	      POOL_DEBUG(SOLV_DEBUG_RULE_CREATION, "package %s [%d] is not installable\n", pool_solvid2str(pool, n), n);
-	      addpkgrule(solv, -n, 0, SOLVER_RULE_PKG_NOT_INSTALLABLE, 0);
+	      addpkgrule(solv, -n, 0, 0, SOLVER_RULE_PKG_NOT_INSTALLABLE, 0);
 	    }
 	}
 
@@ -780,11 +748,33 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 
       if (s->requires)
 	{
+	  int filterpre = 0;
 	  reqp = s->repo->idarraydata + s->requires;
 	  while ((req = *reqp++) != 0)            /* go through all requires */
 	    {
 	      if (req == SOLVABLE_PREREQMARKER)   /* skip the marker */
-		continue;
+		{
+		  if (installed && s->repo == installed)
+		    {
+		      if (prereqq.count)
+			queue_empty(&prereqq);
+		      solvable_lookup_idarray(s, SOLVABLE_PREREQ_IGNOREINST, &prereqq);
+		      filterpre = prereqq.count;
+		    }
+		  continue;
+		}
+	      if (filterpre)
+		{
+		  /* check if this id is filtered. assumes that prereqq.count is small */
+		  for (i = 0; i < prereqq.count; i++)
+		    if (req == prereqq.elements[i])
+		      break;
+		  if (i < prereqq.count)
+		    {
+		      POOL_DEBUG(SOLV_DEBUG_RULE_CREATION, "package %s: ignoring filtered pre-req dependency %s\n", pool_solvable2str(pool, s), pool_dep2str(pool, req));
+		      continue;
+		    }
+		}
 
 #ifdef ENABLE_COMPLEX_DEPS
 	      if (pool_is_complex_dep(pool, req))
@@ -821,9 +811,15 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	      if (!*dp)
 		{
 		  POOL_DEBUG(SOLV_DEBUG_RULE_CREATION, "package %s [%d] is not installable (%s)\n", pool_solvid2str(pool, n), n, pool_dep2str(pool, req));
-		  addpkgrule(solv, -n, 0, SOLVER_RULE_PKG_NOTHING_PROVIDES_DEP, req);
+		  addpkgrule(solv, -n, 0, 0, SOLVER_RULE_PKG_NOTHING_PROVIDES_DEP, req);
 		  continue;
 		}
+
+	      for (i = 0; dp[i] != 0; i++)
+	        if (n == dp[i])
+		  break;
+	      if (dp[i])
+		continue;		/* provided by itself, no need to add rule */
 
 	      IF_POOLDEBUG (SOLV_DEBUG_RULE_CREATION)
 	        {
@@ -834,13 +830,55 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 
 	      /* add 'requires' dependency */
               /* rule: (-requestor|provider1|provider2|...|providerN) */
-	      addpkgrule(solv, -n, dp - pool->whatprovidesdata, SOLVER_RULE_PKG_REQUIRES, req);
+	      addpkgrule(solv, -n, 0, dp - pool->whatprovidesdata, SOLVER_RULE_PKG_REQUIRES, req);
 
 	      /* push all non-visited providers on the work queue */
 	      if (m)
 	        for (; *dp; dp++)
 		  if (!MAPTST(m, *dp))
 		    queue_push(&workq, *dp);
+	    }
+	}
+
+      if (s->recommends && solv->strongrecommends)
+	{
+	  int start = solv->nrules;
+	  solv->lastpkgrule = 0;
+	  reqp = s->repo->idarraydata + s->recommends;
+	  while ((req = *reqp++) != 0)            /* go through all recommends */
+	    {
+#ifdef ENABLE_COMPLEX_DEPS
+	      if (pool_is_complex_dep(pool, req))
+		{
+		  /* we have AND/COND deps, normalize */
+		  add_complex_deprules(solv, n, req, SOLVER_RULE_PKG_RECOMMENDS, dontfix, &workq, m);
+		  continue;
+		}
+#endif
+	      dp = pool_whatprovides_ptr(pool, req);
+	      if (*dp == SYSTEMSOLVABLE || !*dp)	  /* always installed or not installable */
+		continue;
+	      for (i = 0; dp[i] != 0; i++)
+	        if (n == dp[i])
+		  break;
+	      if (dp[i])
+		continue;		/* provided by itself, no need to add rule */
+	      addpkgrule(solv, -n, 0, dp - pool->whatprovidesdata, SOLVER_RULE_PKG_RECOMMENDS, req);
+	      if (m)
+	        for (; *dp; dp++)
+		  if (!MAPTST(m, *dp))
+		    queue_push(&workq, *dp);
+	    }
+	  if (!solv->ruleinfoq && start < solv->nrules)
+	    {
+	      if (!solv->recommendsruleq)
+		{
+		  solv->recommendsruleq = solv_calloc(1, sizeof(Queue));
+		  queue_init(solv->recommendsruleq);
+		}
+	      for (i = start; i < solv->nrules; i++)
+		queue_push(solv->recommendsruleq, i);
+	      solv->lastpkgrule = 0;
 	    }
 	}
 
@@ -888,16 +926,23 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		    {
 		      if (!pool->forbidselfconflicts || is_otherproviders_dep(pool, con))
 			continue;
-		      addpkgrule(solv, -n, 0, SOLVER_RULE_PKG_SELF_CONFLICT, con);
+		      addpkgrule(solv, -n, 0, 0, SOLVER_RULE_PKG_SELF_CONFLICT, con);
 		      continue;
 		    }
 		  if (ispatch && solv->multiversion.size && MAPTST(&solv->multiversion, p) && ISRELDEP(con))
 		    {
 		      /* our patch conflicts with a multiversion package */
-		      p = -makemultiversionconflict(solv, p, con);
+		      Id d = makemultiversionconflict(solv, p, con);
+		      if (d)
+			{
+			  addpkgrule(solv, -n, 0, d, SOLVER_RULE_PKG_CONFLICTS, con);
+			  continue;
+			}
 		    }
+		  if (p == SYSTEMSOLVABLE)
+		    p = 0;
                   /* rule: -n|-p: either solvable _or_ provider of conflict */
-		  addpkgrule(solv, -n, p == SYSTEMSOLVABLE ? 0 : -p, SOLVER_RULE_PKG_CONFLICTS, con);
+		  addpkgrule(solv, -n, -p, 0, SOLVER_RULE_PKG_CONFLICTS, con);
 		}
 	    }
 	}
@@ -930,10 +975,12 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 			continue;
 		      if (pool->obsoleteusescolors && !pool_colormatch(pool, s, ps))
 			continue;
+		      if (p == SYSTEMSOLVABLE)
+			p = 0;
 		      if (!isinstalled)
-			addpkgrule(solv, -n, -p, SOLVER_RULE_PKG_OBSOLETES, obs);
+			addpkgrule(solv, -n, -p, 0, SOLVER_RULE_PKG_OBSOLETES, obs);
 		      else
-			addpkgrule(solv, -n, -p, SOLVER_RULE_PKG_INSTALLED_OBSOLETES, obs);
+			addpkgrule(solv, -n, -p, 0, SOLVER_RULE_PKG_INSTALLED_OBSOLETES, obs);
 		    }
 		}
 	    }
@@ -954,15 +1001,32 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		  /* we still obsolete packages with same nevra, like rpm does */
 		  /* (actually, rpm mixes those packages. yuck...) */
 		  if (multi && (s->name != ps->name || s->evr != ps->evr || s->arch != ps->arch))
-		    continue;
+		    {
+		      if (isinstalled || ps->repo != installed)
+		        continue;
+		      /* also check the installed package for multi-ness */
+		      if (MAPTST(&solv->multiversion, p))
+		        continue;
+		    }
 		  if (!pool->implicitobsoleteusesprovides && s->name != ps->name)
 		    continue;
 		  if (pool->implicitobsoleteusescolors && !pool_colormatch(pool, s, ps))
 		    continue;
+		  if (p == SYSTEMSOLVABLE)
+		    p = 0;
 		  if (s->name == ps->name)
-		    addpkgrule(solv, -n, -p, SOLVER_RULE_PKG_SAME_NAME, 0);
+		    {
+		      /* optimization: do not add the same-name conflict rule if it was
+		       * already added when we looked at the other package.
+		       * (this assumes pool_colormatch is symmetric) */
+		      if (p && m && ps->repo != installed && MAPTST(m, p) &&
+			  (ps->arch != ARCH_SRC && ps->arch != ARCH_NOSRC) &&
+			  !(solv->multiversion.size && MAPTST(&solv->multiversion, p)))
+			continue;
+		      addpkgrule(solv, -n, -p, 0, SOLVER_RULE_PKG_SAME_NAME, 0);
+		    }
 		  else
-		    addpkgrule(solv, -n, -p, SOLVER_RULE_PKG_IMPLICIT_OBSOLETES, s->name);
+		    addpkgrule(solv, -n, -p, 0, SOLVER_RULE_PKG_IMPLICIT_OBSOLETES, s->name);
 		}
 	    }
 	}
@@ -983,13 +1047,20 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	}
 
       /*-----------------------------------------
-       * add recommends to the work queue
+       * add recommends/suggests to the work queue
        */
       if (s->recommends && m)
 	{
 	  recp = s->repo->idarraydata + s->recommends;
 	  while ((rec = *recp++) != 0)
 	    {
+#ifdef ENABLE_COMPLEX_DEPS
+	      if (pool_is_complex_dep(pool, rec))
+		{
+		  pool_add_pos_literals_complex_dep(pool, rec, &workq, m, 0);
+		    continue;
+		}
+#endif
 	      FOR_PROVIDES(p, pp, rec)
 		if (!MAPTST(m, p))
 		  queue_push(&workq, p);
@@ -1000,12 +1071,20 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	  sugp = s->repo->idarraydata + s->suggests;
 	  while ((sug = *sugp++) != 0)
 	    {
+#ifdef ENABLE_COMPLEX_DEPS
+	      if (pool_is_complex_dep(pool, sug))
+		{
+		  pool_add_pos_literals_complex_dep(pool, sug, &workq, m, 0);
+		    continue;
+		}
+#endif
 	      FOR_PROVIDES(p, pp, sug)
 		if (!MAPTST(m, p))
 		  queue_push(&workq, p);
 	    }
 	}
     }
+  queue_free(&prereqq);
   queue_free(&workq);
 }
 
@@ -1081,7 +1160,7 @@ solver_addpkgrulesforweak(Solver *solv, Map *m)
 	  /* find possible supplements */
 	  supp = s->repo->idarraydata + s->supplements;
 	  while ((sup = *supp++) != 0)
-	    if (dep_possible(solv, sup, m))
+	    if (solver_dep_possible(solv, sup, m))
 	      break;
 	}
 
@@ -1090,7 +1169,7 @@ solver_addpkgrulesforweak(Solver *solv, Map *m)
 	{
 	  supp = s->repo->idarraydata + s->enhances;
 	  while ((sup = *supp++) != 0)
-	    if (dep_possible(solv, sup, m))
+	    if (solver_dep_possible(solv, sup, m))
 	      break;
 	}
       /* if nothing found, goto next solvables */
@@ -1142,59 +1221,110 @@ solver_addpkgrulesforupdaters(Solver *solv, Solvable *s, Map *m, int allow_all)
  ***
  ***/
 
-static Id
-finddistupgradepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
+static int
+dup_maykeepinstalled(Solver *solv, Solvable *s)
+{
+  Pool *pool = solv->pool;
+  Id ip, pp;
+
+  if (solv->dupmap.size && MAPTST(&solv->dupmap,  s - pool->solvables))
+    return 1;
+  /* is installed identical to a good one? */
+  FOR_PROVIDES(ip, pp, s->name)
+    {
+      Solvable *is = pool->solvables + ip;
+      if (is->evr != s->evr)
+	continue;
+      if (solv->dupmap.size)
+	{
+	  if (!MAPTST(&solv->dupmap, ip))
+	    continue;
+	}
+      else if (is->repo == pool->installed)
+	continue;
+      if (solvable_identical(s, is))
+	return 1;
+    }
+  return 0;
+}
+
+
+/* stash away the original updaters for multiversion packages. We do this so that
+ * we can update the package later */
+static inline void
+set_specialupdaters(Solver *solv, Solvable *s, Id d)
+{
+  Repo *installed = solv->installed;
+  if (!solv->specialupdaters)
+    solv->specialupdaters = solv_calloc(installed->end - installed->start, sizeof(Id));
+  solv->specialupdaters[s - solv->pool->solvables - installed->start] = d;
+}
+
+#ifdef ENABLE_LINKED_PKGS
+/* Check if this is a linked pseudo package. As it is linked, we do not need an update/feature rule */
+static inline int
+is_linked_pseudo_package(Solver *solv, Solvable *s)
+{
+  Pool *pool = solv->pool;
+  if (solv->instbuddy && solv->instbuddy[s - pool->solvables - solv->installed->start])
+    {
+      const char *name = pool_id2str(pool, s->name);
+      if (strncmp(name, "pattern:", 8) == 0 || strncmp(name, "application:", 12) == 0)
+	return 1;
+    }
+  return 0;
+}
+#endif
+
+void
+solver_addfeaturerule(Solver *solv, Solvable *s)
 {
   Pool *pool = solv->pool;
   int i;
+  Id p;
+  Queue qs;
+  Id qsbuf[64];
 
-  policy_findupdatepackages(solv, s, qs, allow_all ? allow_all : 2);
-  if (!qs->count)
+#ifdef ENABLE_LINKED_PKGS
+  if (is_linked_pseudo_package(solv, s))
     {
-      if (allow_all)
-        return 0;	/* orphaned, don't create feature rule */
-      /* check if this is an orphaned package */
-      policy_findupdatepackages(solv, s, qs, 1);
-      if (!qs->count)
-	return 0;	/* orphaned, don't create update rule */
-      qs->count = 0;
-      return -SYSTEMSOLVABLE;	/* supported but not installable */
+      solver_addrule(solv, 0, 0, 0);	/* no feature rules for those */
+      return;
     }
-  if (allow_all)
-    return s - pool->solvables;
-  /* check if it is ok to keep the installed package */
-  for (i = 0; i < qs->count; i++)
+#endif
+  queue_init_buffer(&qs, qsbuf, sizeof(qsbuf)/sizeof(*qsbuf));
+  p = s - pool->solvables;
+  policy_findupdatepackages(solv, s, &qs, 1);
+  if (solv->dupinvolvedmap_all || (solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, p)))
     {
-      Solvable *ns = pool->solvables + qs->elements[i];
-      if (s->evr == ns->evr && solvable_identical(s, ns))
-        return s - pool->solvables;
+      if (!dup_maykeepinstalled(solv, s))
+	{
+	  for (i = 0; i < qs.count; i++)
+	    {
+	      Solvable *ns = pool->solvables + qs.elements[i];
+	      if (ns->repo != pool->installed || dup_maykeepinstalled(solv, ns))
+		break;
+	    }
+	  if (i == qs.count)
+	    {
+	      solver_addrule(solv, 0, 0, 0);	/* this is an orphan */
+	      queue_free(&qs);
+	      return;
+	    }
+	}
     }
-  /* nope, it must be some other package */
-  return -SYSTEMSOLVABLE;
-}
-
-/* add packages from the dup repositories to the update candidates
- * this isn't needed for the global dup mode as all packages are
- * from dup repos in that case */
-static void
-addduppackages(Solver *solv, Solvable *s, Queue *qs)
-{
-  Queue dupqs;
-  Id p, dupqsbuf[64];
-  int i;
-  int oldnoupdateprovide = solv->noupdateprovide;
-
-  queue_init_buffer(&dupqs, dupqsbuf, sizeof(dupqsbuf)/sizeof(*dupqsbuf));
-  solv->noupdateprovide = 1;
-  policy_findupdatepackages(solv, s, &dupqs, 2);
-  solv->noupdateprovide = oldnoupdateprovide;
-  for (i = 0; i < dupqs.count; i++)
+  if (qs.count > 1)
     {
-      p = dupqs.elements[i];
-      if (MAPTST(&solv->dupmap, p))
-        queue_pushunique(qs, p);
+      Id d = pool_queuetowhatprovides(pool, &qs);
+      queue_free(&qs);
+      solver_addrule(solv, p, 0, d);	/* allow update of s */
     }
-  queue_free(&dupqs);
+  else
+    {
+      Id d = qs.count ? qs.elements[0] : 0;
+      queue_free(&qs);
+      solver_addrule(solv, p, d, 0);	/* allow update of s */
+    }
 }
 
 /*-------------------------------------------------------------------
@@ -1206,57 +1336,43 @@ addduppackages(Solver *solv, Solvable *s, Queue *qs)
  */
 
 void
-solver_addupdaterule(Solver *solv, Solvable *s, int allow_all)
+solver_addupdaterule(Solver *solv, Solvable *s)
 {
   /* installed packages get a special upgrade allowed rule */
   Pool *pool = solv->pool;
   Id p, d;
   Queue qs;
   Id qsbuf[64];
+  Rule *r;
+  int dupinvolved = 0;
 
-  queue_init_buffer(&qs, qsbuf, sizeof(qsbuf)/sizeof(*qsbuf));
   p = s - pool->solvables;
-  /* find update candidates for 's' */
-  if (solv->dupmap_all)
-    p = finddistupgradepackages(solv, s, &qs, allow_all);
-  else
+  /* Orphan detection. We cheat by looking at the feature rule, which
+   * we already calculated */
+  r = solv->rules + solv->featurerules + (p - solv->installed->start);
+  if (!r->p)
     {
-      policy_findupdatepackages(solv, s, &qs, allow_all);
-      if (!allow_all && solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, p))
-        addduppackages(solv, s, &qs);
-    }
-
 #ifdef ENABLE_LINKED_PKGS
-  if (solv->instbuddy && solv->instbuddy[s - pool->solvables - solv->installed->start])
-    {
-      const char *name = pool_id2str(pool, s->name);
-      if (strncmp(name, "pattern:", 8) == 0 || strncmp(name, "application:", 12) == 0)
+      if (is_linked_pseudo_package(solv, s))
 	{
-	  /* a linked pseudo package. As it is linked, we do not need an update rule */
-	  /* nevertheless we set specialupdaters so we can update */
-	  solver_addrule(solv, 0, 0);
-	  if (!allow_all && qs.count)
-	    {
-	      if (p != -SYSTEMSOLVABLE)
-	        queue_unshift(&qs, p);
-	      if (!solv->specialupdaters)
-		solv->specialupdaters = solv_calloc(solv->installed->end - solv->installed->start, sizeof(Id));
-	      solv->specialupdaters[s - pool->solvables - solv->installed->start] = pool_queuetowhatprovides(pool, &qs);
-	    }
-	  queue_free(&qs);
+	  solver_addrule(solv, 0, 0, 0);
 	  return;
 	}
-    }
 #endif
-
-  if (!allow_all && !p && solv->dupmap_all)
-    {
+      p = 0;
       queue_push(&solv->orphaned, s - pool->solvables);		/* an orphaned package */
       if (solv->keep_orphans && !(solv->droporphanedmap_all || (solv->droporphanedmap.size && MAPTST(&solv->droporphanedmap, s - pool->solvables - solv->installed->start))))
 	p = s - pool->solvables;	/* keep this orphaned package installed */
+      solver_addrule(solv, p, 0, 0);
+      return;
     }
 
-  if (!allow_all && qs.count && solv->multiversion.size)
+  /* find update candidates for 's' */
+  queue_init_buffer(&qs, qsbuf, sizeof(qsbuf)/sizeof(*qsbuf));
+  dupinvolved = solv->dupinvolvedmap_all || (solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, p));
+  policy_findupdatepackages(solv, s, &qs, dupinvolved ? 2 : 0);
+
+  if (qs.count && solv->multiversion.size)
     {
       int i, j;
 
@@ -1266,7 +1382,7 @@ solver_addupdaterule(Solver *solv, Solvable *s, int allow_all)
       if (i < qs.count)
 	{
 	  /* filter out all multiversion packages as they don't update */
-	  d = pool_queuetowhatprovides(pool, &qs);
+	  d = pool_queuetowhatprovides(pool, &qs);	/* save qs away */
 	  for (j = i; i < qs.count; i++)
 	     {
 	      if (MAPTST(&solv->multiversion, qs.elements[i]))
@@ -1285,36 +1401,53 @@ solver_addupdaterule(Solver *solv, Solvable *s, int allow_all)
 		}
 	      qs.elements[j++] = qs.elements[i];
 	    }
-	  if (j < qs.count)
+
+	  if (j == 0 && dupinvolved && !dup_maykeepinstalled(solv, s))
 	    {
-	      if (d && solv->installed && s->repo == solv->installed &&
-		  (solv->updatemap_all || (solv->updatemap.size && MAPTST(&solv->updatemap, s - pool->solvables - solv->installed->start))))
+	      /* this is a multiversion orphan */
+	      queue_push(&solv->orphaned, p);
+	      set_specialupdaters(solv, s, d);
+	      if (solv->keep_orphans && !(solv->droporphanedmap_all || (solv->droporphanedmap.size && MAPTST(&solv->droporphanedmap, p - solv->installed->start))))
 		{
-		  if (!solv->specialupdaters)
-		    solv->specialupdaters = solv_calloc(solv->installed->end - solv->installed->start, sizeof(Id));
-		  solv->specialupdaters[s - pool->solvables - solv->installed->start] = d;
+		  /* we need to keep the orphan */
+		  queue_free(&qs);
+		  solver_addrule(solv, p, 0, 0);
+		  return;
 		}
-	      if (j == 0 && p == -SYSTEMSOLVABLE && solv->dupmap_all)
+	      /* we can drop it as long as we update */
+	      j = qs.count;
+	    }
+
+	  if (j < qs.count)		/* filtered at least one package? */
+	    {
+	      if (d && (solv->updatemap_all || (solv->updatemap.size && MAPTST(&solv->updatemap, p - solv->installed->start))))
 		{
-		  queue_push(&solv->orphaned, s - pool->solvables);	/* also treat as orphaned */
-		  j = qs.count;
+		  /* non-orphan multiversion package, set special updaters if we want an update */
+		  set_specialupdaters(solv, s, d);
 		}
 	      qs.count = j;
 	    }
-	  else if (p != -SYSTEMSOLVABLE)
+	  else
 	    {
 	      /* could fallthrough, but then we would do pool_queuetowhatprovides twice */
 	      queue_free(&qs);
-	      solver_addrule(solv, p, d);	/* allow update of s */
+	      solver_addrule(solv, p, 0, d);	/* allow update of s */
 	      return;
 	    }
 	}
     }
-  if (qs.count && p == -SYSTEMSOLVABLE)
-    p = queue_shift(&qs);
-  d = qs.count ? pool_queuetowhatprovides(pool, &qs) : 0;
-  queue_free(&qs);
-  solver_addrule(solv, p, d);	/* allow update of s */
+  if (qs.count > 1)
+    {
+      d = pool_queuetowhatprovides(pool, &qs);
+      queue_free(&qs);
+      solver_addrule(solv, p, 0, d);	/* allow update of s */
+    }
+  else
+    {
+      d = qs.count ? qs.elements[0] : 0;
+      queue_free(&qs);
+      solver_addrule(solv, p, d, 0);	/* allow update of s */
+    }
 }
 
 static inline void
@@ -1333,7 +1466,7 @@ disableupdaterule(Solver *solv, Id p)
     {
       int i, ni;
       ni = solv->bestrules_end - solv->bestrules;
-      for (i = 0; i < ni; i++)
+      for (i = solv->bestrules_up - solv->bestrules; i < ni; i++)
 	if (solv->bestrules_pkg[i] == p)
 	  solver_disablerule(solv, solv->rules + solv->bestrules + i);
     }
@@ -1376,7 +1509,7 @@ reenableupdaterule(Solver *solv, Id p)
     {
       int i, ni;
       ni = solv->bestrules_end - solv->bestrules;
-      for (i = 0; i < ni; i++)
+      for (i = solv->bestrules_up - solv->bestrules; i < ni; i++)
 	if (solv->bestrules_pkg[i] == p)
 	  solver_enablerule(solv, solv->rules + solv->bestrules + i);
     }
@@ -1429,9 +1562,10 @@ solver_addinfarchrules(Solver *solv, Map *addedmap)
 	  a = (a <= pool->lastarch) ? pool->id2arch[a] : 0;
 	  if (a != 1 && installed && ps->repo == installed)
 	    {
-	      if (!solv->dupmap_all && !(solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, p)))
-	        queue_pushunique(&allowedarchs, ps->arch);	/* also ok to keep this architecture */
-	      continue;		/* ignore installed solvables when calculating the best arch */
+	      if (solv->dupinvolvedmap_all || (solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, p)))
+		continue;
+	      queue_pushunique(&allowedarchs, ps->arch);	/* also ok to keep this architecture */
+	      continue;		/* but ignore installed solvables when calculating the best arch */
 	    }
 	  if (a && a != 1 && (!bestarch || a < bestarch))
 	    {
@@ -1457,7 +1591,7 @@ solver_addinfarchrules(Solver *solv, Map *addedmap)
 	      ps = pool->solvables + p;
 	      if (ps->name != s->name || ps->repo != installed || !MAPTST(addedmap, p))
 		continue;
-	      if (solv->dupmap_all || (solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, p)))
+	      if (solv->dupinvolvedmap_all || (solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, p)))
 		continue;
 	      a = ps->arch;
 	      a = (a <= pool->lastarch) ? pool->id2arch[a] : 0;
@@ -1543,7 +1677,10 @@ solver_addinfarchrules(Solver *solv, Map *addedmap)
 	      if (installed && pool->solvables[p].repo == installed && !haveinstalled)
 		continue;	/* installed package not in lock-step */
 	    }
-	  solver_addrule(solv, -p, lsq.count ? pool_queuetowhatprovides(pool, &lsq) : 0);
+	  if (lsq.count < 2)
+	    solver_addrule(solv, -p, lsq.count ? lsq.elements[0] : 0, 0);
+	  else
+	    solver_addrule(solv, -p, 0, pool_queuetowhatprovides(pool, &lsq));
 	}
     }
   queue_free(&lsq);
@@ -1596,7 +1733,7 @@ reenableinfarchrule(Solver *solv, Id name)
  ***/
 
 static inline void
-add_cleandeps_package(Solver *solv, Id p)
+add_cleandeps_updatepkg(Solver *solv, Id p)
 {
   if (!solv->cleandeps_updatepkgs)
     {
@@ -1606,13 +1743,16 @@ add_cleandeps_package(Solver *solv, Id p)
   queue_pushunique(solv->cleandeps_updatepkgs, p);
 }
 
-static inline void
+static void
 solver_addtodupmaps(Solver *solv, Id p, Id how, int targeted)
 {
   Pool *pool = solv->pool;
   Solvable *ps, *s = pool->solvables + p;
   Repo *installed = solv->installed;
   Id pi, pip, obs, *obsp;
+
+  if (!solv->dupinvolvedmap.size)
+    map_grow(&solv->dupinvolvedmap, pool->nsolvables);
 
   MAPSET(&solv->dupinvolvedmap, p);
   if (targeted)
@@ -1630,14 +1770,14 @@ solver_addtodupmaps(Solver *solv, Id p, Id how, int targeted)
 	    if (pool->solvables[pi2].repo != installed)
 	      MAPSET(&solv->dupinvolvedmap, pi2);
 	}
-      if (ps->repo == installed && (how & SOLVER_FORCEBEST) != 0)
+      if (ps->repo == installed && (how & SOLVER_FORCEBEST) != 0 && !solv->bestupdatemap_all)
 	{
 	  if (!solv->bestupdatemap.size)
 	    map_grow(&solv->bestupdatemap, installed->end - installed->start);
 	  MAPSET(&solv->bestupdatemap, pi - installed->start);
 	}
       if (ps->repo == installed && (how & SOLVER_CLEANDEPS) != 0)
-	add_cleandeps_package(solv, pi);
+	add_cleandeps_updatepkg(solv, pi);
       if (!targeted && ps->repo != installed)
 	MAPSET(&solv->dupmap, pi);
     }
@@ -1675,19 +1815,23 @@ solver_addtodupmaps(Solver *solv, Id p, Id how, int targeted)
 		    if (pool->solvables[pi2].repo != installed)
 		      MAPSET(&solv->dupinvolvedmap, pi2);
 		}
-	      if (ps->repo == installed && (how & SOLVER_FORCEBEST) != 0)
+	      if (ps->repo == installed && (how & SOLVER_FORCEBEST) != 0 && !solv->bestupdatemap_all)
 		{
 		  if (!solv->bestupdatemap.size)
 		    map_grow(&solv->bestupdatemap, installed->end - installed->start);
 		  MAPSET(&solv->bestupdatemap, pi - installed->start);
 		}
 	      if (ps->repo == installed && (how & SOLVER_CLEANDEPS) != 0)
-		add_cleandeps_package(solv, pi);
+		add_cleandeps_updatepkg(solv, pi);
 	    }
 	}
     }
 }
 
+/* create the two dupmaps:
+ * - dupmap: packages in that map are good to install/keep
+ * - dupinvolvedmap: packages are subject to dup mode
+ */
 void
 solver_createdupmaps(Solver *solv)
 {
@@ -1699,7 +1843,8 @@ solver_createdupmaps(Solver *solv)
   int i, targeted;
 
   map_init(&solv->dupmap, pool->nsolvables);
-  map_init(&solv->dupinvolvedmap, pool->nsolvables);
+  solv->dupinvolvedmap_all = 0;
+  map_init(&solv->dupinvolvedmap, 0);
   for (i = 0; i < job->count; i += 2)
     {
       how = job->elements[i];
@@ -1724,6 +1869,26 @@ solver_createdupmaps(Solver *solv)
 		  if (repo != installed && !pool_installable(pool, s))
 		    continue;
 		  solver_addtodupmaps(solv, p, how, targeted);
+		}
+	    }
+	  else if (select == SOLVER_SOLVABLE_ALL)
+	    {
+	      solv->dupinvolvedmap_all = 1;
+	      FOR_POOL_SOLVABLES(p)
+		{
+		  Solvable *s = pool->solvables + p;
+		  if (!s->repo || s->repo == installed)
+		    continue;
+		  if (!pool_installable(pool, s))
+		    continue;
+		  MAPSET(&solv->dupmap, p);
+		}
+	      if ((how & SOLVER_FORCEBEST) != 0)
+		solv->bestupdatemap_all = 1;
+	      if ((how & SOLVER_CLEANDEPS) != 0 && installed)
+		{
+		  FOR_REPO_SOLVABLES(installed, p, s)
+		    add_cleandeps_updatepkg(solv, p);
 		}
 	    }
 	  else
@@ -1755,7 +1920,23 @@ solver_createdupmaps(Solver *solv)
 	  break;
 	}
     }
-  MAPCLR(&solv->dupinvolvedmap, SYSTEMSOLVABLE);
+  if (solv->dupinvolvedmap.size)
+    MAPCLR(&solv->dupinvolvedmap, SYSTEMSOLVABLE);
+  /* set update for all involved installed packages. We need to do
+   * this before creating the update rules */
+  if (solv->dupinvolvedmap_all)
+    solv->updatemap_all = 1;
+  else if (installed && !solv->updatemap_all && solv->dupinvolvedmap.size)
+    {
+      FOR_REPO_SOLVABLES(installed, p, s)
+	{
+	  if (!MAPTST(&solv->dupinvolvedmap, p))
+	    continue;
+	  if (!solv->updatemap.size)
+	    map_grow(&solv->updatemap, installed->end - installed->start);
+	  MAPSET(&solv->updatemap, p - installed->start);
+	}
+    }
 }
 
 void
@@ -1770,9 +1951,11 @@ void
 solver_addduprules(Solver *solv, Map *addedmap)
 {
   Pool *pool = solv->pool;
+  Repo *installed = solv->installed;
   Id p, pp;
   Solvable *s, *ps;
   int first, i;
+  Rule *r;
 
   solv->duprules = solv->nrules;
   for (i = 1; i < pool->nsolvables; i++)
@@ -1790,13 +1973,10 @@ solver_addduprules(Solver *solv, Map *addedmap)
 	    first = 0;
 	  if (first)
 	    break;
-	  if (!MAPTST(&solv->dupinvolvedmap, p))
+	  if (!solv->dupinvolvedmap_all && !MAPTST(&solv->dupinvolvedmap, p))
 	    continue;
-	  if (solv->installed && ps->repo == solv->installed)
+	  if (installed && ps->repo == installed)
 	    {
-	      if (!solv->updatemap.size)
-		map_grow(&solv->updatemap, solv->installed->end - solv->installed->start);
-	      MAPSET(&solv->updatemap, p - solv->installed->start);
 	      if (!MAPTST(&solv->dupmap, p))
 		{
 		  Id ip, ipp;
@@ -1809,14 +1989,43 @@ solver_addduprules(Solver *solv, Map *addedmap)
 		      if (is->evr == ps->evr && solvable_identical(ps, is))
 			break;
 		    }
-		  if (!ip)
-		    solver_addrule(solv, -p, 0);	/* no match, sorry */
-		  else
-		    MAPSET(&solv->dupmap, p);		/* for best rules processing */
+		  if (ip)
+		    {
+		      /* ok, identical to a good one. we may keep this package. */
+		      MAPSET(&solv->dupmap, p);		/* for best rules processing */
+		      continue;
+		    }
+		  /* check if it's orphaned. If yes, we may keep it */
+		  r = solv->rules + solv->updaterules + (p - installed->start);
+		  if (!r->p)
+		    r = solv->rules + solv->featurerules + (p - installed->start);
+		  if (!r->p)
+		    {
+		      /* no update/feature rule, this is an orphan */
+		      MAPSET(&solv->dupmap, p);		/* for best rules processing */
+		      continue;
+		    }
+		  if (solv->specialupdaters && solv->specialupdaters[p - installed->start])
+		    {
+		      /* this is a multiversion orphan, we're good if an update is installed */
+		      solver_addrule(solv, -p, 0, solv->specialupdaters[p - installed->start]);
+		      continue;
+		    }
+		  if (r->p == p && !r->d && !r->w2)
+		    {
+		      r = solv->rules + solv->featurerules + (p - installed->start);
+		      if (!r->p || (!r->d && !r->w2))
+			{
+			  /* this is an orphan */
+			  MAPSET(&solv->dupmap, p);		/* for best rules processing */
+			  continue;
+			}
+		    }
+		  solver_addrule(solv, -p, 0, 0);	/* no match, sorry */
 		}
 	    }
 	  else if (!MAPTST(&solv->dupmap, p))
-	    solver_addrule(solv, -p, 0);
+	    solver_addrule(solv, -p, 0, 0);
 	}
     }
   solv->duprules_end = solv->nrules;
@@ -1869,120 +2078,6 @@ reenableduprule(Solver *solv, Id name)
 #define DISABLE_UPDATE	1
 #define DISABLE_INFARCH	2
 #define DISABLE_DUP	3
-
-/*
- * add all installed packages that package p obsoletes to Queue q.
- * Package p is not installed. Also, we know that if
- * solv->keepexplicitobsoletes is not set, p is not in the multiversion map.
- * Entries may get added multiple times.
- */
-static void
-add_obsoletes(Solver *solv, Id p, Queue *q)
-{
-  Pool *pool = solv->pool;
-  Repo *installed = solv->installed;
-  Id p2, pp2;
-  Solvable *s = pool->solvables + p;
-  Id obs, *obsp;
-  Id lastp2 = 0;
-
-  if (!solv->keepexplicitobsoletes || !(solv->multiversion.size && MAPTST(&solv->multiversion, p)))
-    {
-      FOR_PROVIDES(p2, pp2, s->name)
-	{
-	  Solvable *ps = pool->solvables + p2;
-	  if (ps->repo != installed)
-	    continue;
-	  if (!pool->implicitobsoleteusesprovides && ps->name != s->name)
-	    continue;
-	  if (pool->implicitobsoleteusescolors && !pool_colormatch(pool, s, ps))
-	    continue;
-	  queue_push(q, p2);
-	  lastp2 = p2;
-	}
-    }
-  if (!s->obsoletes)
-    return;
-  obsp = s->repo->idarraydata + s->obsoletes;
-  while ((obs = *obsp++) != 0)
-    FOR_PROVIDES(p2, pp2, obs)
-      {
-	Solvable *ps = pool->solvables + p2;
-	if (ps->repo != installed)
-	  continue;
-	if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, ps, obs))
-	  continue;
-	if (pool->obsoleteusescolors && !pool_colormatch(pool, s, ps))
-	  continue;
-	if (p2 == lastp2)
-	  continue;
-	queue_push(q, p2);
-	lastp2 = p2;
-      }
-}
-
-/*
- * Call add_obsoletes and intersect the result with the
- * elements in Queue q starting at qstart.
- * Assumes that it's the first call if qstart == q->count.
- * May use auxillary map m for the intersection process, all
- * elements of q starting at qstart must have their bit cleared.
- * (This is also true after the function returns.)
- */
-static void
-intersect_obsoletes(Solver *solv, Id p, Queue *q, int qstart, Map *m)
-{
-  int i, j;
-  int qcount = q->count;
-
-  add_obsoletes(solv, p, q);
-  if (qcount == qstart)
-    return;	/* first call */
-  if (qcount == q->count)
-    j = qstart;	
-  else if (qcount == qstart + 1)
-    {
-      /* easy if there's just one element */
-      j = qstart;
-      for (i = qcount; i < q->count; i++)
-	if (q->elements[i] == q->elements[qstart])
-	  {
-	    j++;	/* keep the element */
-	    break;
-	  }
-    }
-  else if (!m->size && q->count - qstart <= 8)
-    {
-      /* faster than a map most of the time */
-      int k;
-      for (i = j = qstart; i < qcount; i++)
-	{
-	  Id ip = q->elements[i];
-	  for (k = qcount; k < q->count; k++)
-	    if (q->elements[k] == ip)
-	      {
-		q->elements[j++] = ip;
-		break;
-	      }
-	}
-    }
-  else
-    {
-      /* for the really pathologic cases we use the map */
-      Repo *installed = solv->installed;
-      if (!m->size)
-	map_init(m, installed->end - installed->start);
-      for (i = qcount; i < q->count; i++)
-	MAPSET(m, q->elements[i] - installed->start);
-      for (i = j = qstart; i < qcount; i++)
-	if (MAPTST(m, q->elements[i] - installed->start))
-	  {
-	    MAPCLR(m, q->elements[i] - installed->start);
-	    q->elements[j++] = q->elements[i];
-	  }
-    }
-  queue_truncate(q, j);
-}
 
 static void
 jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
@@ -2076,30 +2171,19 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
 	return;
       /* now the hard part: disable some update rules */
 
-      /* first check if we have multiversion or installed packages in the job */
-      i = j = 0;
+      /* first check if we have installed or multiversion packages in the job */
       FOR_JOB_SELECT(p, pp, select, what)
 	{
 	  if (pool->solvables[p].repo == installed)
-	    j = p;
-	  else if (solv->multiversion.size && MAPTST(&solv->multiversion, p) && !solv->keepexplicitobsoletes)
 	    return;
-	  i++;
+	  if (solv->multiversion.size && MAPTST(&solv->multiversion, p) && !solv->keepexplicitobsoletes)
+	    return;
 	}
-      if (j)	/* have installed packages */
-	{
-	  /* this is for dupmap_all jobs, it can go away if we create
-	   * duprules for them */
-	  if (i == 1 && (set & SOLVER_SETREPO) != 0)
-	    queue_push2(q, DISABLE_UPDATE, j);
-	  return;
-	}
-
       omap.size = 0;
       qstart = q->count;
       FOR_JOB_SELECT(p, pp, select, what)
 	{
-	  intersect_obsoletes(solv, p, q, qstart, &omap);
+	  solver_intersect_obsoleted(solv, p, q, qstart, &omap);
 	  if (q->count == qstart)
 	    break;
 	}
@@ -2163,8 +2247,10 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
       if (!installed)
 	break;
       if (select == SOLVER_SOLVABLE_ALL || (select == SOLVER_SOLVABLE_REPO && what == installed->repoid))
-	FOR_REPO_SOLVABLES(installed, p, s)
-	  queue_push2(q, DISABLE_UPDATE, p);
+	{
+	  FOR_REPO_SOLVABLES(installed, p, s)
+	    queue_push2(q, DISABLE_UPDATE, p);
+	}
       FOR_JOB_SELECT(p, pp, select, what)
 	if (pool->solvables[p].repo == installed)
 	  {
@@ -2374,34 +2460,30 @@ solver_reenablepolicyrules_cleandeps(Solver *solv, Id pkg)
  ***/
 
 static void
-addpkgruleinfo(Solver *solv, Id p, Id d, int type, Id dep)
+addpkgruleinfo(Solver *solv, Id p, Id p2, Id d, int type, Id dep)
 {
   Pool *pool = solv->pool;
   Rule *r;
-  Id w2, op, od, ow2;
+
+  if (d)
+    {
+      assert(!p2 && d > 0);
+      if (!pool->whatprovidesdata[d])
+	d = 0;
+      else if (!pool->whatprovidesdata[d + 1])
+	{
+	  p2 = pool->whatprovidesdata[d];
+	  d = 0;
+	}
+    }
 
   /* check if this creates the rule we're searching for */
   r = solv->rules + solv->ruleinfoq->elements[0];
-  op = r->p;
-  od = r->d < 0 ? -r->d - 1 : r->d;
-  ow2 = 0;
-
-  /* normalize */
-  w2 = d > 0 ? 0 : d;
-  if (p < 0 && d > 0 && (!pool->whatprovidesdata[d] || !pool->whatprovidesdata[d + 1]))
+  if (d)
     {
-      w2 = pool->whatprovidesdata[d];
-      d = 0;
-    }
-  if (p > 0 && d < 0)		/* this hack is used for package links and complex deps */
-    {
-      w2 = p;
-      p = d;
-    }
-
-  if (d > 0)
-    {
-      if (p != op && !od)
+      /* three or more literals */
+      Id od = r->d < 0 ? -r->d - 1 : r->d;
+      if (p != r->p && !od)
 	return;
       if (d != od)
 	{
@@ -2413,46 +2495,33 @@ addpkgruleinfo(Solver *solv, Id p, Id d, int type, Id dep)
 	  if (*odp)
 	    return;
 	}
-      w2 = 0;
-      /* handle multiversion conflict rules */
-      if (p < 0 && pool->whatprovidesdata[d] < 0)
-	{
-	  w2 = pool->whatprovidesdata[d];
-	  /* XXX: free memory */
-	}
+      if (p < 0 && pool->whatprovidesdata[d] < 0 && type == SOLVER_RULE_PKG_CONFLICTS)
+	p2 = pool->whatprovidesdata[d];
     }
   else
     {
-      if (od)
+      /* one or two literals */
+      Id op = p, op2 = p2;
+      if (op2 && op > op2)	/* normalize */
+	{
+	  Id o = op;
+	  op = op2;
+	  op2 = o;
+	}
+      if (r->p != op || r->w2 != op2 || (r->d && r->d != -1))
 	return;
-      ow2 = r->w2;
-      if (p > w2)
+      if (type == SOLVER_RULE_PKG_CONFLICTS && !p2)
+	p2 = -SYSTEMSOLVABLE;
+      if (type == SOLVER_RULE_PKG_SAME_NAME)
 	{
-	  if (w2 != op || p != ow2)
-	    return;
+	  p = op;	/* we normalize same name order */
+	  p2 = op2;
 	}
-      else
-	{
-	  if (p != op || w2 != ow2)
-	    return;
-	}
-      /* should use a different type instead */
-      if (type == SOLVER_RULE_PKG_CONFLICTS && !w2)
-	w2 = -SYSTEMSOLVABLE;
     }
   /* yep, rule matches. record info */
   queue_push(solv->ruleinfoq, type);
-  if (type == SOLVER_RULE_PKG_SAME_NAME)
-    {
-      /* we normalize same name order */
-      queue_push(solv->ruleinfoq, op < 0 ? -op : 0);
-      queue_push(solv->ruleinfoq, ow2 < 0 ? -ow2 : 0);
-    }
-  else
-    {
-      queue_push(solv->ruleinfoq, p < 0 ? -p : 0);
-      queue_push(solv->ruleinfoq, w2 < 0 ? -w2 : 0);
-    }
+  queue_push(solv->ruleinfoq, p < 0 ? -p : 0);
+  queue_push(solv->ruleinfoq, p2 < 0 ? -p2 : 0);
   queue_push(solv->ruleinfoq, dep);
 }
 
@@ -2706,7 +2775,7 @@ solver_ruleclass(Solver *solv, Id rid)
     return SOLVER_RULE_YUMOBS;
   if (rid >= solv->choicerules && rid < solv->choicerules_end)
     return SOLVER_RULE_CHOICE;
-  if (rid >= solv->learntrules)
+  if (rid >= solv->learntrules && rid < solv->nrules)
     return SOLVER_RULE_LEARNT;
   return SOLVER_RULE_UNKNOWN;
 }
@@ -2763,6 +2832,14 @@ solver_rule2solvable(Solver *solv, Id rid)
   return 0;
 }
 
+Id
+solver_rule2pkgrule(Solver *solv, Id rid)
+{
+  if (rid >= solv->choicerules && rid < solv->choicerules_end)
+    return solv->choicerules_ref[rid - solv->choicerules];
+  return 0;
+}
+
 static void
 solver_rule2rules_rec(Solver *solv, Id rid, Queue *q, Map *seen)
 {
@@ -2806,32 +2883,51 @@ solver_rule2rules(Solver *solv, Id rid, Queue *q, int recursive)
 
 /* check if the newest versions of pi still provides the dependency we're looking for */
 static int
-solver_choicerulecheck(Solver *solv, Id pi, Rule *r, Map *m)
+solver_choicerulecheck(Solver *solv, Id pi, Rule *r, Map *m, Queue *q)
 {
   Pool *pool = solv->pool;
   Rule *ur;
-  Queue q;
-  Id p, pp, qbuf[32];
+  Id p, pp;
   int i;
 
-  ur = solv->rules + solv->updaterules + (pi - pool->installed->start);
-  if (!ur->p)
-    ur = solv->rules + solv->featurerules + (pi - pool->installed->start);
-  if (!ur->p)
-    return 0;
-  queue_init_buffer(&q, qbuf, sizeof(qbuf)/sizeof(*qbuf));
-  FOR_RULELITERALS(p, pp, ur)
-    if (p > 0)
-      queue_push(&q, p);
-  if (q.count > 1)
-    policy_filter_unwanted(solv, &q, POLICY_MODE_CHOOSE);
-  for (i = 0; i < q.count; i++)
-    if (MAPTST(m, q.elements[i]))
-      break;
-  /* 1: none of the newest versions provide it */
-  i = i == q.count ? 1 : 0;
-  queue_free(&q);
-  return i;
+  if (!q->count || q->elements[0] != pi)
+    {
+      if (q->count)
+        queue_empty(q);
+      ur = solv->rules + solv->updaterules + (pi - pool->installed->start);
+      if (!ur->p)
+        ur = solv->rules + solv->featurerules + (pi - pool->installed->start);
+      if (!ur->p)
+	return 0;
+      queue_push2(q, pi, 0);
+      FOR_RULELITERALS(p, pp, ur)
+	if (p > 0)
+	  queue_push(q, p);
+    }
+  if (q->count == 2)
+    return 1;
+  if (q->count == 3)
+    {
+      p = q->elements[2];
+      return MAPTST(m, p) ? 0 : 1;
+    }
+  if (!q->elements[1])
+    {
+      for (i = 2; i < q->count; i++)
+	if (!MAPTST(m, q->elements[i]))
+	  break;
+      if (i == q->count)
+	return 0;	/* all provide it, no need to filter */
+      /* some don't provide it, have to filter */
+      queue_deleten(q, 0, 2);
+      policy_filter_unwanted(solv, q, POLICY_MODE_CHOOSE);
+      queue_unshift(q, 1);	/* filter mark */
+      queue_unshift(q, pi);
+    }
+  for (i = 2; i < q->count; i++)
+    if (MAPTST(m, q->elements[i]))
+      return 0;		/* at least one provides it */
+  return 1;	/* none of the new packages provided it */
 }
 
 static inline void
@@ -2856,7 +2952,7 @@ solver_addchoicerules(Solver *solv)
   Pool *pool = solv->pool;
   Map m, mneg;
   Rule *r;
-  Queue q, qi;
+  Queue q, qi, qcheck;
   int i, j, rid, havechoice;
   Id p, d, pp;
   Id p2, pp2;
@@ -2875,6 +2971,7 @@ solver_addchoicerules(Solver *solv)
   solv->choicerules_ref = solv_calloc(solv->pkgrules_end, sizeof(Id));
   queue_init(&q);
   queue_init(&qi);
+  queue_init(&qcheck);
   map_init(&m, pool->nsolvables);
   map_init(&mneg, pool->nsolvables);
   /* set up negative assertion map from infarch and dup rules */
@@ -2992,7 +3089,7 @@ solver_addchoicerules(Solver *solv)
 	  p2 = qi.elements[i];
 	  if (!p2)
 	    continue;
-	  if (solver_choicerulecheck(solv, p2, r, &m))
+	  if (solver_choicerulecheck(solv, p2, r, &m, &qcheck))
 	    {
 	      /* oops, remove element p from q */
 	      queue_removeelement(&q, qi.elements[i + 1]);
@@ -3001,6 +3098,7 @@ solver_addchoicerules(Solver *solv)
 	  qi.elements[j++] = p2;
 	}
       queue_truncate(&qi, j);
+
       if (!q.count || !qi.count)
 	{
 	  FOR_RULELITERALS(p, pp, r)
@@ -3060,7 +3158,7 @@ solver_addchoicerules(Solver *solv)
       lastaddedd = d;
       lastaddedcnt = q.count;
 
-      solver_addrule(solv, r->p, d);
+      solver_addrule(solv, r->p, 0, d);
       queue_push(&solv->weakruleq, solv->nrules - 1);
       solv->choicerules_ref[solv->nrules - 1 - solv->choicerules] = rid;
 #if 0
@@ -3072,6 +3170,7 @@ solver_addchoicerules(Solver *solv)
     }
   queue_free(&q);
   queue_free(&qi);
+  queue_free(&qcheck);
   map_free(&m);
   map_free(&mneg);
   solv->choicerules_end = solv->nrules;
@@ -3157,11 +3256,6 @@ solver_addbestrules(Solver *solv, int havebestinstalljobs)
   int i, oldcnt;
 
   solv->bestrules = solv->nrules;
-  if (!installed)
-    {
-      solv->bestrules_end = solv->nrules;
-      return;
-    }
   queue_init(&q);
   queue_init(&q2);
   queue_init(&r2pkg);
@@ -3170,36 +3264,56 @@ solver_addbestrules(Solver *solv, int havebestinstalljobs)
     {
       for (i = 0; i < solv->job.count; i += 2)
 	{
-	  if ((solv->job.elements[i] & (SOLVER_JOBMASK | SOLVER_FORCEBEST)) == (SOLVER_INSTALL | SOLVER_FORCEBEST))
+	  Id how = solv->job.elements[i];
+	  if ((how & (SOLVER_JOBMASK | SOLVER_FORCEBEST)) == (SOLVER_INSTALL | SOLVER_FORCEBEST))
 	    {
 	      int j;
 	      Id p2, pp2;
 	      for (j = 0; j < solv->ruletojob.count; j++)
-		if (solv->ruletojob.elements[j] == i)
-		  break;
-	      if (j == solv->ruletojob.count)
-		continue;
-	      r = solv->rules + solv->jobrules + j;
-	      queue_empty(&q);
-	      FOR_RULELITERALS(p2, pp2, r)
-		if (p2 > 0)
-		  queue_push(&q, p2);
-	      if (!q.count)
-		continue;	/* orphaned */
-	      /* select best packages, just look at prio and version */
-	      oldcnt = q.count;
-	      policy_filter_unwanted(solv, &q, POLICY_MODE_RECOMMEND);
-	      if (q.count == oldcnt)
-		continue;	/* nothing filtered */
-	      p2 = queue_shift(&q);
-	      solver_addrule(solv, p2, q.count ? pool_queuetowhatprovides(pool, &q) : 0);
-	      queue_push(&r2pkg, -(solv->jobrules + j));
+		{
+		  if (solv->ruletojob.elements[j] != i)
+		    continue;
+		  r = solv->rules + solv->jobrules + j;
+		  queue_empty(&q);
+		  queue_empty(&q2);
+		  FOR_RULELITERALS(p2, pp2, r)
+		    {
+		      if (p2 > 0)
+		        queue_push(&q, p2);
+		      else if (p2 < 0)
+		        queue_push(&q2, p2);
+		    }
+		  if (!q.count)
+		    continue;	/* orphaned */
+		  /* select best packages, just look at prio and version */
+		  oldcnt = q.count;
+		  policy_filter_unwanted(solv, &q, POLICY_MODE_RECOMMEND);
+		  if (q.count == oldcnt)
+		    continue;	/* nothing filtered */
+		  if (q2.count)
+		    queue_insertn(&q, 0, q2.count, q2.elements);
+		  p2 = queue_shift(&q);
+		  if (q.count < 2)
+		    solver_addrule(solv, p2, q.count ? q.elements[0] : 0, 0);
+		  else
+		    solver_addrule(solv, p2, 0, pool_queuetowhatprovides(pool, &q));
+		  if ((how & SOLVER_WEAK) != 0)
+		    queue_push(&solv->weakruleq, solv->nrules - 1);
+		  queue_push(&r2pkg, -(solv->jobrules + j));
+		}
 	    }
 	}
     }
+  solv->bestrules_up = solv->nrules;
 
-  if (solv->bestupdatemap_all || solv->bestupdatemap.size)
+  if (installed && (solv->bestupdatemap_all || solv->bestupdatemap.size))
     {
+      Map m;
+
+      if (solv->allowuninstall || solv->allowuninstall_all || solv->allowuninstallmap.size)
+	map_init(&m, pool->nsolvables);
+      else
+	map_init(&m, 0);
       FOR_REPO_SOLVABLES(installed, p, s)
 	{
 	  Id d, p2, pp2;
@@ -3258,10 +3372,37 @@ solver_addbestrules(Solver *solv, int havebestinstalljobs)
 		    queue_pushunique(&q, q2.elements[j]);
 		}
 	    }
+	  if (solv->allowuninstall || solv->allowuninstall_all || (solv->allowuninstallmap.size && MAPTST(&solv->allowuninstallmap, p - installed->start)))
+	    {
+	      /* package is flagged both for allowuninstall and best, add negative rules */
+	      d = q.count == 1 ? q.elements[0] : -pool_queuetowhatprovides(pool, &q);
+	      for (i = 0; i < q.count; i++)
+		MAPSET(&m, q.elements[i]);
+	      r = solv->rules + solv->featurerules + (p - installed->start);
+	      if (!r->p)	/* identical to update rule? */
+		r = solv->rules + solv->updaterules + (p - installed->start);
+	      FOR_RULELITERALS(p2, pp2, r)
+		{
+		  if (MAPTST(&m, p2))
+		    continue;
+		  if (d >= 0)
+		    solver_addrule(solv, -p2, d, 0);
+		  else
+		    solver_addrule(solv, -p2, 0, -d);
+		  queue_push(&r2pkg, p);
+		}
+	      for (i = 0; i < q.count; i++)
+		MAPCLR(&m, q.elements[i]);
+	      continue;
+	    }
 	  p2 = queue_shift(&q);
-	  solver_addrule(solv, p2, q.count ? pool_queuetowhatprovides(pool, &q) : 0);
+	  if (q.count < 2)
+	    solver_addrule(solv, p2, q.count ? q.elements[0] : 0, 0);
+	  else
+	    solver_addrule(solv, p2, 0, pool_queuetowhatprovides(pool, &q));
 	  queue_push(&r2pkg, p);
 	}
+      map_free(&m);
     }
   if (r2pkg.count)
     solv->bestrules_pkg = solv_memdup2(r2pkg.elements, r2pkg.count, sizeof(Id));
@@ -3275,6 +3416,8 @@ solver_addbestrules(Solver *solv, int havebestinstalljobs)
 
 
 /* yumobs rule handling */
+/* note that we use pool->obsoleteusescolors || pool->implicitobsoleteusescolors
+ * like in policy_findupdatepackages */
 
 static void
 find_obsolete_group(Solver *solv, Id obs, Queue *q)
@@ -3299,7 +3442,7 @@ find_obsolete_group(Solver *solv, Id obs, Queue *q)
 	  Id obs2, *obsp2;
 	  if (!os->obsoletes)
 	    continue;
-	  if (pool->obsoleteusescolors && !pool_colormatch(pool, s2, os))
+	  if ((pool->obsoleteusescolors || pool->implicitobsoleteusescolors) && !pool_colormatch(pool, s2, os))
 	    continue;
 	  obsp2 = os->repo->idarraydata + os->obsoletes; 
 	  while ((obs2 = *obsp2++) != 0)
@@ -3317,7 +3460,7 @@ find_obsolete_group(Solver *solv, Id obs, Queue *q)
 	    continue;
 	  if (!os->obsoletes)
 	    continue;
-	  if (pool->obsoleteusescolors && !pool_colormatch(pool, s2, os))
+	  if ((pool->obsoleteusescolors || pool->implicitobsoleteusescolors) && !pool_colormatch(pool, s2, os))
 	    continue;
 	  obsp2 = os->repo->idarraydata + os->obsoletes; 
 	  while ((obs2 = *obsp2++) != 0)
@@ -3402,7 +3545,6 @@ solver_addyumobsrules(Solver *solv)
 #if 0
 printf("checking yumobs for %s\n", pool_solvable2str(pool, s));
 #endif
-      queue_empty(&qo);
       for (opp = solv->obsoletes_data + solv->obsoletes[p - installed->start]; (op = *opp++) != 0;)
 	{
 	  Solvable *os = pool->solvables + op;
@@ -3417,7 +3559,7 @@ printf("checking yumobs for %s\n", pool_solvable2str(pool, s));
 		    continue;
 		  if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p2, obs))
 		    continue;
-		  if (pool->obsoleteusescolors && !pool_colormatch(pool, s, s2))
+		  if ((pool->obsoleteusescolors || pool->implicitobsoleteusescolors) && !pool_colormatch(pool, s, s2))
 		    continue;
 		  queue_pushunique(&qo, obs);
 		  break;
@@ -3473,11 +3615,10 @@ for (j = 0; j < qq.count; j++)
 	      if (group != groupk && k > groupstart)
 		{
 		  /* add the rule */
-		  Queue qhelper;
-		  memset(&qhelper, 0, sizeof(qhelper));
-		  qhelper.count = k - groupstart;
-		  qhelper.elements = qq.elements + groupstart;
-		  solver_addrule(solv, -p, pool_queuetowhatprovides(pool, &qhelper));
+		  if (k - groupstart == 1)
+		    solver_addrule(solv, -p, qq.elements[groupstart], 0);
+		  else
+		    solver_addrule(solv, -p, 0, pool_ids2whatprovides(pool, qq.elements + groupstart, k - groupstart));
 		  queue_push(&yumobsinfoq, qo.elements[i]);
 		}
 	      groupstart = k + 1;
@@ -3493,1088 +3634,6 @@ for (j = 0; j < qq.count; j++)
   solv->yumobsrules_end = solv->nrules;
   POOL_DEBUG(SOLV_DEBUG_STATS, "yumobs rule creation took %d ms\n", solv_timems(now));
 }
-
-#undef CLEANDEPSDEBUG
-
-/*
- * This functions collects all packages that are looked at
- * when a dependency is checked. We need it to "pin" installed
- * packages when removing a supplemented package in createcleandepsmap.
- * Here's an not uncommon example:
- *   A contains "Supplements: packageand(B, C)"
- *   B contains "Requires: A"
- * Now if we remove C, the supplements is no longer true,
- * thus we also remove A. Without the dep_pkgcheck function, we
- * would now also remove B, but this is wrong, as adding back
- * C doesn't make the supplements true again. Thus we "pin" B
- * when we remove A.
- * There's probably a better way to do this, but I haven't come
- * up with it yet ;)
- */
-static inline void
-dep_pkgcheck(Solver *solv, Id dep, Map *m, Queue *q)
-{
-  Pool *pool = solv->pool;
-  Id p, pp;
-
-  if (ISRELDEP(dep))
-    {
-      Reldep *rd = GETRELDEP(pool, dep);
-      if (rd->flags >= 8)
-	{
-	  if (rd->flags == REL_AND)
-	    {
-	      dep_pkgcheck(solv, rd->name, m, q);
-	      dep_pkgcheck(solv, rd->evr, m, q);
-	      return;
-	    }
-	  if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_SPLITPROVIDES)
-	    return;
-	  if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_INSTALLED)
-	    return;
-	}
-    }
-  FOR_PROVIDES(p, pp, dep)
-    if (!m || MAPTST(m, p))
-      queue_push(q, p);
-}
-
-static int
-check_xsupp(Solver *solv, Queue *depq, Id dep)
-{
-  Pool *pool = solv->pool;
-  Id p, pp;
-
-  if (ISRELDEP(dep))
-    {
-      Reldep *rd = GETRELDEP(pool, dep);
-      if (rd->flags >= 8)
-	{
-	  if (rd->flags == REL_AND)
-	    {
-	      if (!check_xsupp(solv, depq, rd->name))
-		return 0;
-	      return check_xsupp(solv, depq, rd->evr);
-	    }
-	  if (rd->flags == REL_OR)
-	    {
-	      if (check_xsupp(solv, depq, rd->name))
-		return 1;
-	      return check_xsupp(solv, depq, rd->evr);
-	    }
-	  if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_SPLITPROVIDES)
-	    return solver_splitprovides(solv, rd->evr);
-	  if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_INSTALLED)
-	    return solver_dep_installed(solv, rd->evr);
-	}
-      if (depq && rd->flags == REL_NAMESPACE)
-	{
-	  int i;
-	  for (i = 0; i < depq->count; i++)
-	    if (depq->elements[i] == dep || depq->elements[i] == rd->name)
-	     return 1;
-	}
-    }
-  FOR_PROVIDES(p, pp, dep)
-    if (p == SYSTEMSOLVABLE || pool->solvables[p].repo == solv->installed)
-      return 1;
-  return 0;
-}
-
-static inline int
-queue_contains(Queue *q, Id id)
-{
-  int i;
-  for (i = 0; i < q->count; i++)
-    if (q->elements[i] == id)
-      return 1;
-  return 0;
-}
-
-#ifdef ENABLE_COMPLEX_DEPS
-static void
-complex_cleandeps_remove(Pool *pool, Id ip, Id req, Map *im, Map *installedm, Queue *iq)
-{
-  int i;
-  Queue dq;
-  Id p;
-
-  queue_init(&dq);
-  i = pool_normalize_complex_dep(pool, req, &dq, CPLXDEPS_EXPAND);
-  if (i == 0 || i == 1)
-    {
-      queue_free(&dq);
-      return;
-    }
-  for (i = 0; i < dq.count; i++)
-    {
-      for (; (p = dq.elements[i]) != 0; i++)
-	{
-	  if (p < 0)
-	    {
-	      if (!MAPTST(installedm, -p))
-	        break;
-	      continue;
-	    }
-	  if (p != SYSTEMSOLVABLE && MAPTST(im, p))
-	    {
-#ifdef CLEANDEPSDEBUG
-	      printf("%s requires/recommends %s\n", pool_solvid2str(pool, ip), pool_solvid2str(pool, p));
-#endif
-	      queue_push(iq, p);
-	    }
-	}
-      while (dq.elements[i])
-	i++;
-    }
-  queue_free(&dq);
-}
-
-static void
-complex_cleandeps_addback(Pool *pool, Id ip, Id req, Map *im, Map *installedm, Queue *iq, Map *userinstalled)
-{
-  int i, blk;
-  Queue dq;
-  Id p;
-
-  queue_init(&dq);
-  i = pool_normalize_complex_dep(pool, req, &dq, CPLXDEPS_EXPAND);
-  if (i == 0 || i == 1)
-    {
-      queue_free(&dq);
-      return;
-    }
-  for (i = 0; i < dq.count; i++)
-    {
-      blk = i;
-      for (; (p = dq.elements[i]) != 0; i++)
-	{
-	  if (p < 0)
-	    {
-	      if (!MAPTST(installedm, -p))
-	        break;
-	      continue;
-	    }
-	  if (MAPTST(im, p))
-	    break;
-	}
-      if (!p)
-	{
-	  for (i = blk; (p = dq.elements[i]) != 0; i++)
-	    {
-	      if (p < 0)
-		continue;
-	      if (!MAPTST(installedm, p))
-		continue;
-	      if (p == ip || MAPTST(userinstalled, p - pool->installed->start))
-		continue;
-#ifdef CLEANDEPSDEBUG
-	      printf("%s requires/recommends %s\n", pool_solvid2str(pool, ip), pool_solvid2str(pool, p));
-#endif
-	      MAPSET(im, p);
-	      queue_push(iq, p);
-	    }
-	}
-      while (dq.elements[i])
-	i++;
-    }
-  queue_free(&dq);
-}
-
-#endif
-
-/*
- * Find all installed packages that are no longer
- * needed regarding the current solver job.
- *
- * The algorithm is:
- * - remove pass: remove all packages that could have
- *   been dragged in by the obsoleted packages.
- *   i.e. if package A is obsolete and contains "Requires: B",
- *   also remove B, as installing A will have pulled in B.
- *   after this pass, we have a set of still installed packages
- *   with broken dependencies.
- * - add back pass:
- *   now add back all packages that the still installed packages
- *   require.
- *
- * The cleandeps packages are the packages removed in the first
- * pass and not added back in the second pass.
- *
- * If we search for unneeded packages (unneeded is true), we
- * simply remove all packages except the userinstalled ones in
- * the first pass.
- */
-static void
-solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
-{
-  Pool *pool = solv->pool;
-  Repo *installed = solv->installed;
-  Queue *job = &solv->job;
-  Map userinstalled;
-  Map im;
-  Map installedm;
-  Rule *r;
-  Id rid, how, what, select;
-  Id p, pp, ip, jp;
-  Id req, *reqp, sup, *supp;
-  Solvable *s;
-  Queue iq, iqcopy, xsuppq;
-  int i;
-
-  map_empty(cleandepsmap);
-  if (!installed || installed->end == installed->start)
-    return;
-  map_init(&userinstalled, installed->end - installed->start);
-  map_init(&im, pool->nsolvables);
-  map_init(&installedm, pool->nsolvables);
-  queue_init(&iq);
-  queue_init(&xsuppq);
-
-  for (i = 0; i < job->count; i += 2)
-    {
-      how = job->elements[i];
-      if ((how & SOLVER_JOBMASK) == SOLVER_USERINSTALLED)
-	{
-	  what = job->elements[i + 1];
-	  select = how & SOLVER_SELECTMASK;
-	  if (select == SOLVER_SOLVABLE_ALL || (select == SOLVER_SOLVABLE_REPO && what == installed->repoid))
-	    FOR_REPO_SOLVABLES(installed, p, s)
-	      MAPSET(&userinstalled, p - installed->start);
-	  FOR_JOB_SELECT(p, pp, select, what)
-	    if (pool->solvables[p].repo == installed)
-	      MAPSET(&userinstalled, p - installed->start);
-	}
-      if ((how & (SOLVER_JOBMASK | SOLVER_SELECTMASK)) == (SOLVER_ERASE | SOLVER_SOLVABLE_PROVIDES))
-	{
-	  what = job->elements[i + 1];
-	  if (ISRELDEP(what))
-	    {
-	      Reldep *rd = GETRELDEP(pool, what);
-	      if (rd->flags != REL_NAMESPACE)
-		continue;
-	      if (rd->evr == 0)
-		{
-		  queue_pushunique(&iq, rd->name);
-		  continue;
-		}
-	      FOR_PROVIDES(p, pp, what)
-		if (p)
-		  break;
-	      if (p)
-		continue;
-	      queue_pushunique(&iq, what);
-	    }
-	}
-    }
-
-  /* have special namespace cleandeps erases */
-  if (iq.count)
-    {
-      for (ip = solv->installed->start; ip < solv->installed->end; ip++)
-	{
-	  s = pool->solvables + ip;
-	  if (s->repo != installed)
-	    continue;
-	  if (!s->supplements)
-	    continue;
-	  supp = s->repo->idarraydata + s->supplements;
-	  while ((sup = *supp++) != 0)
-	    if (check_xsupp(solv, &iq, sup) && !check_xsupp(solv, 0, sup))
-	      {
-#ifdef CLEANDEPSDEBUG
-		printf("xsupp %s from %s\n", pool_dep2str(pool, sup), pool_solvid2str(pool, ip));
-#endif
-	        queue_pushunique(&xsuppq, sup);
-	      }
-	}
-      queue_empty(&iq);
-    }
-
-  /* also add visible patterns to userinstalled for openSUSE */
-  if (1)
-    {
-      Dataiterator di;
-      dataiterator_init(&di, pool, 0, 0, SOLVABLE_ISVISIBLE, 0, 0);
-      while (dataiterator_step(&di))
-	{
-	  Id *dp;
-	  if (di.solvid <= 0)
-	    continue;
-	  s = pool->solvables + di.solvid;
-	  if (!s->repo || !s->requires)
-	    continue;
-	  if (s->repo != installed && !pool_installable(pool, s))
-	    continue;
-	  if (strncmp(pool_id2str(pool, s->name), "pattern:", 8) != 0)
-	    continue;
-	  dp = s->repo->idarraydata + s->requires;
-	  for (dp = s->repo->idarraydata + s->requires; *dp; dp++)
-	    FOR_PROVIDES(p, pp, *dp)
-	      if (pool->solvables[p].repo == installed)
-		{
-		  if (strncmp(pool_id2str(pool, pool->solvables[p].name), "pattern", 7) != 0)
-		    continue;
-		  MAPSET(&userinstalled, p - installed->start);
-		}
-	}
-      dataiterator_free(&di);
-    }
-  if (1)
-    {
-      /* all products and their buddies are userinstalled */
-      for (p = installed->start; p < installed->end; p++)
-	{
-	  Solvable *s = pool->solvables + p;
-	  if (s->repo != installed)
-	    continue;
-	  if (!strncmp("product:", pool_id2str(pool, s->name), 8))
-	    {
-	      MAPSET(&userinstalled, p - installed->start);
-#ifdef ENABLE_LINKED_PKGS
-	      if (solv->instbuddy && solv->instbuddy[p - installed->start] > 1)
-		{
-		  Id buddy = solv->instbuddy[p - installed->start];
-		  if (buddy >= installed->start && buddy < installed->end)
-		    MAPSET(&userinstalled, buddy - installed->start);
-		}
-#endif
-	    }
-	}
-    }
-
-  /* add all positive elements (e.g. locks) to "userinstalled" */
-  for (rid = solv->jobrules; rid < solv->jobrules_end; rid++)
-    {
-      r = solv->rules + rid;
-      if (r->d < 0)
-	continue;
-      i = solv->ruletojob.elements[rid - solv->jobrules];
-      if ((job->elements[i] & SOLVER_CLEANDEPS) == SOLVER_CLEANDEPS)
-	continue;
-      FOR_RULELITERALS(p, jp, r)
-	if (p > 0 && pool->solvables[p].repo == installed)
-	  MAPSET(&userinstalled, p - installed->start);
-    }
-
-  /* add all cleandeps candidates to iq */
-  for (rid = solv->jobrules; rid < solv->jobrules_end; rid++)
-    {
-      r = solv->rules + rid;
-      if (r->d < 0)				/* disabled? */
-	continue;
-      if (r->d == 0 && r->p < 0 && r->w2 == 0)	/* negative assertion (erase job)? */
-	{
-	  p = -r->p;
-	  if (pool->solvables[p].repo != installed)
-	    continue;
-	  MAPCLR(&userinstalled, p - installed->start);
-	  if (unneeded)
-	    continue;
-	  i = solv->ruletojob.elements[rid - solv->jobrules];
-	  how = job->elements[i];
-	  if ((how & (SOLVER_JOBMASK|SOLVER_CLEANDEPS)) == (SOLVER_ERASE|SOLVER_CLEANDEPS))
-	    queue_push(&iq, p);
-	}
-      else if (r->p > 0)			/* install job */
-	{
-	  if (unneeded)
-	    continue;
-	  i = solv->ruletojob.elements[rid - solv->jobrules];
-	  if ((job->elements[i] & SOLVER_CLEANDEPS) == SOLVER_CLEANDEPS)
-	    {
-	      /* check if the literals all obsolete some installed package */
-	      Map om;
-	      int iqstart;
-
-	      /* just one installed literal */
-	      if (r->d == 0 && r->w2 == 0 && pool->solvables[r->p].repo == installed)
-		continue;
-	      /* multiversion is bad */
-	      if (solv->multiversion.size && !solv->keepexplicitobsoletes)
-		{
-		  FOR_RULELITERALS(p, jp, r)
-		    if (MAPTST(&solv->multiversion, p))
-		      break;
-		  if (p)
-		    continue;
-		}
-
-	      om.size = 0;
-	      iqstart = iq.count;
-	      FOR_RULELITERALS(p, jp, r)
-		{
-		  if (p < 0)
-		    {
-		      queue_truncate(&iq, iqstart);	/* abort */
-		      break;
-		    }
-		  if (pool->solvables[p].repo == installed)
-		    {
-		      if (iq.count == iqstart)
-			queue_push(&iq, p);
-		      else
-			{
-			  for (i = iqstart; i < iq.count; i++)
-			    if (iq.elements[i] == p)
-			      break;
-			  queue_truncate(&iq, iqstart);
-			  if (i < iq.count)
-			    queue_push(&iq, p);
-			}
-		    }
-		  else
-		    intersect_obsoletes(solv, p, &iq, iqstart, &om);
-		  if (iq.count == iqstart)
-		    break;
-		}
-	      if (om.size)
-	        map_free(&om);
-	    }
-	}
-    }
-  queue_init_clone(&iqcopy, &iq);
-
-  if (!unneeded)
-    {
-      if (solv->cleandeps_updatepkgs)
-	for (i = 0; i < solv->cleandeps_updatepkgs->count; i++)
-	  queue_push(&iq, solv->cleandeps_updatepkgs->elements[i]);
-    }
-
-  if (unneeded)
-    queue_empty(&iq);	/* just in case... */
-
-  /* clear userinstalled bit for the packages we really want to delete/update */
-  for (i = 0; i < iq.count; i++)
-    {
-      p = iq.elements[i];
-      if (pool->solvables[p].repo != installed)
-	continue;
-      MAPCLR(&userinstalled, p - installed->start);
-    }
-
-  for (p = installed->start; p < installed->end; p++)
-    {
-      if (pool->solvables[p].repo != installed)
-	continue;
-      MAPSET(&installedm, p);
-      if (unneeded && !MAPTST(&userinstalled, p - installed->start))
-	continue;
-      MAPSET(&im, p);
-    }
-  MAPSET(&installedm, SYSTEMSOLVABLE);
-  MAPSET(&im, SYSTEMSOLVABLE);
-
-#ifdef CLEANDEPSDEBUG
-  printf("REMOVE PASS\n");
-#endif
-
-  for (;;)
-    {
-      if (!iq.count)
-	{
-	  if (unneeded)
-	    break;
-	  /* supplements pass */
-	  for (ip = installed->start; ip < installed->end; ip++)
-	    {
-	      if (!MAPTST(&installedm, ip))
-		continue;
-	      s = pool->solvables + ip;
-	      if (!s->supplements)
-		continue;
-	      if (!MAPTST(&im, ip))
-		continue;
-	      if (MAPTST(&userinstalled, ip - installed->start))
-		continue;
-	      supp = s->repo->idarraydata + s->supplements;
-	      while ((sup = *supp++) != 0)
-		if (dep_possible(solv, sup, &im))
-		  break;
-	      if (!sup)
-		{
-		  supp = s->repo->idarraydata + s->supplements;
-		  while ((sup = *supp++) != 0)
-		    if (dep_possible(solv, sup, &installedm) || (xsuppq.count && queue_contains(&xsuppq, sup)))
-		      {
-		        /* no longer supplemented, also erase */
-			int iqcount = iq.count;
-			/* pin packages, see comment above dep_pkgcheck */
-			dep_pkgcheck(solv, sup, &im, &iq);
-			for (i = iqcount; i < iq.count; i++)
-			  {
-			    Id pqp = iq.elements[i];
-			    if (pool->solvables[pqp].repo == installed)
-			      MAPSET(&userinstalled, pqp - installed->start);
-			  }
-			queue_truncate(&iq, iqcount);
-#ifdef CLEANDEPSDEBUG
-		        printf("%s supplemented [%s]\n", pool_solvid2str(pool, ip), pool_dep2str(pool, sup));
-#endif
-		        queue_push(&iq, ip);
-		      }
-		}
-	    }
-	  if (!iq.count)
-	    break;	/* no supplementing package found, we're done */
-	}
-      ip = queue_shift(&iq);
-      s = pool->solvables + ip;
-      if (!MAPTST(&im, ip))
-	continue;
-      if (!MAPTST(&installedm, ip))
-	continue;
-      if (s->repo == installed && MAPTST(&userinstalled, ip - installed->start))
-	continue;
-      MAPCLR(&im, ip);
-#ifdef CLEANDEPSDEBUG
-      printf("removing %s\n", pool_solvable2str(pool, s));
-#endif
-      if (s->requires)
-	{
-	  reqp = s->repo->idarraydata + s->requires;
-	  while ((req = *reqp++) != 0)
-	    {
-	      if (req == SOLVABLE_PREREQMARKER)
-		continue;
-#ifdef ENABLE_COMPLEX_DEPS
-	      if (pool_is_complex_dep(pool, req))
-		{
-		  complex_cleandeps_remove(pool, ip, req, &im, &installedm, &iq);
-		  continue;
-		}
-#endif
-	      FOR_PROVIDES(p, pp, req)
-		{
-		  if (p != SYSTEMSOLVABLE && MAPTST(&im, p))
-		    {
-#ifdef CLEANDEPSDEBUG
-		      printf("%s requires %s\n", pool_solvid2str(pool, ip), pool_solvid2str(pool, p));
-#endif
-		      queue_push(&iq, p);
-		    }
-		}
-	    }
-	}
-      if (s->recommends)
-	{
-	  reqp = s->repo->idarraydata + s->recommends;
-	  while ((req = *reqp++) != 0)
-	    {
-#ifdef ENABLE_COMPLEX_DEPS
-	      if (pool_is_complex_dep(pool, req))
-		{
-		  complex_cleandeps_remove(pool, ip, req, &im, &installedm, &iq);
-		  continue;
-		}
-#endif
-	      FOR_PROVIDES(p, pp, req)
-		{
-		  if (p != SYSTEMSOLVABLE && MAPTST(&im, p))
-		    {
-#ifdef CLEANDEPSDEBUG
-		      printf("%s recommends %s\n", pool_solvid2str(pool, ip), pool_solvid2str(pool, p));
-#endif
-		      queue_push(&iq, p);
-		    }
-		}
-	    }
-	}
-    }
-
-  /* turn userinstalled into remove set for pruning */
-  map_empty(&userinstalled);
-  for (rid = solv->jobrules; rid < solv->jobrules_end; rid++)
-    {
-      r = solv->rules + rid;
-      if (r->p >= 0 || r->d != 0 || r->w2 != 0)
-	continue;	/* disabled or not erase */
-      p = -r->p;
-      MAPCLR(&im, p);
-      if (pool->solvables[p].repo == installed)
-        MAPSET(&userinstalled, p - installed->start);
-    }
-  if (!unneeded && solv->cleandeps_updatepkgs)
-    {
-      for (i = 0; i < solv->cleandeps_updatepkgs->count; i++)
-	{
-	  p = solv->cleandeps_updatepkgs->elements[i];
-	  if (pool->solvables[p].repo == installed)
-	    MAPSET(&userinstalled, p - installed->start);
-	}
-    }
-  MAPSET(&im, SYSTEMSOLVABLE);	/* in case we cleared it above */
-  for (p = installed->start; p < installed->end; p++)
-    if (MAPTST(&im, p))
-      queue_push(&iq, p);
-  for (rid = solv->jobrules; rid < solv->jobrules_end; rid++)
-    {
-      r = solv->rules + rid;
-      if (r->d < 0)
-	continue;
-      FOR_RULELITERALS(p, jp, r)
-	if (p > 0)
-          queue_push(&iq, p);
-    }
-  /* also put directly addressed packages on the install queue
-   * so we can mark patterns as installed */
-  for (i = 0; i < job->count; i += 2)
-    {
-      how = job->elements[i];
-      if ((how & SOLVER_JOBMASK) == SOLVER_USERINSTALLED)
-	{
-	  what = job->elements[i + 1];
-	  select = how & SOLVER_SELECTMASK;
-	  if (select == SOLVER_SOLVABLE && pool->solvables[what].repo != installed)
-            queue_push(&iq, what);
-	}
-    }
-
-#ifdef CLEANDEPSDEBUG
-  printf("ADDBACK PASS\n");
-#endif
-  for (;;)
-    {
-      if (!iq.count)
-	{
-	  /* supplements pass */
-	  for (ip = installed->start; ip < installed->end; ip++)
-	    {
-	      if (!MAPTST(&installedm, ip))
-		continue;
-	      if (MAPTST(&userinstalled, ip - installed->start))
-	        continue;
-	      s = pool->solvables + ip;
-	      if (!s->supplements)
-		continue;
-	      if (MAPTST(&im, ip))
-		continue;
-	      supp = s->repo->idarraydata + s->supplements;
-	      while ((sup = *supp++) != 0)
-		if (dep_possible(solv, sup, &im))
-		  break;
-	      if (sup)
-		{
-#ifdef CLEANDEPSDEBUG
-		  printf("%s supplemented\n", pool_solvid2str(pool, ip));
-#endif
-		  MAPSET(&im, ip);
-		  queue_push(&iq, ip);
-		}
-	    }
-	  if (!iq.count)
-	    break;
-	}
-      ip = queue_shift(&iq);
-      s = pool->solvables + ip;
-#ifdef CLEANDEPSDEBUG
-      printf("adding back %s\n", pool_solvable2str(pool, s));
-#endif
-      if (s->requires)
-	{
-	  reqp = s->repo->idarraydata + s->requires;
-	  while ((req = *reqp++) != 0)
-	    {
-#ifdef ENABLE_COMPLEX_DEPS
-	      if (pool_is_complex_dep(pool, req))
-		{
-		  complex_cleandeps_addback(pool, ip, req, &im, &installedm, &iq, &userinstalled);
-		  continue;
-		}
-#endif
-	      FOR_PROVIDES(p, pp, req)
-		if (MAPTST(&im, p))
-		  break;
-	      if (p)
-		continue;
-	      FOR_PROVIDES(p, pp, req)
-		{
-		  if (MAPTST(&installedm, p))
-		    {
-		      if (p == ip)
-			continue;
-		      if (MAPTST(&userinstalled, p - installed->start))
-			continue;
-#ifdef CLEANDEPSDEBUG
-		      printf("%s requires %s\n", pool_solvid2str(pool, ip), pool_solvid2str(pool, p));
-#endif
-		      MAPSET(&im, p);
-		      queue_push(&iq, p);
-		    }
-		}
-	    }
-	}
-      if (s->recommends)
-	{
-	  reqp = s->repo->idarraydata + s->recommends;
-	  while ((req = *reqp++) != 0)
-	    {
-#ifdef ENABLE_COMPLEX_DEPS
-	      if (pool_is_complex_dep(pool, req))
-		{
-		  complex_cleandeps_addback(pool, ip, req, &im, &installedm, &iq, &userinstalled);
-		  continue;
-		}
-#endif
-	      FOR_PROVIDES(p, pp, req)
-		if (MAPTST(&im, p))
-		  break;
-	      if (p)
-		continue;
-	      FOR_PROVIDES(p, pp, req)
-		{
-		  if (MAPTST(&installedm, p))
-		    {
-		      if (p == ip)
-			continue;
-		      if (MAPTST(&userinstalled, p - installed->start))
-			continue;
-#ifdef CLEANDEPSDEBUG
-		      printf("%s recommends %s\n", pool_solvid2str(pool, ip), pool_solvid2str(pool, p));
-#endif
-		      MAPSET(&im, p);
-		      queue_push(&iq, p);
-		    }
-		}
-	    }
-	}
-    }
-
-  queue_free(&iq);
-  /* make sure the updatepkgs and mistakes are not in the cleandeps map */
-  if (solv->cleandeps_updatepkgs)
-    for (i = 0; i < solv->cleandeps_updatepkgs->count; i++)
-      MAPSET(&im, solv->cleandeps_updatepkgs->elements[i]);
-  if (solv->cleandeps_mistakes)
-    for (i = 0; i < solv->cleandeps_mistakes->count; i++)
-      MAPSET(&im, solv->cleandeps_mistakes->elements[i]);
-  /* also remove original iq packages */
-  for (i = 0; i < iqcopy.count; i++)
-    MAPSET(&im, iqcopy.elements[i]);
-  queue_free(&iqcopy);
-  for (p = installed->start; p < installed->end; p++)
-    {
-      if (pool->solvables[p].repo != installed)
-	continue;
-      if (!MAPTST(&im, p))
-        MAPSET(cleandepsmap, p - installed->start);
-    }
-  map_free(&im);
-  map_free(&installedm);
-  map_free(&userinstalled);
-  queue_free(&xsuppq);
-#ifdef CLEANDEPSDEBUG
-  printf("=== final cleandeps map:\n");
-  for (p = installed->start; p < installed->end; p++)
-    if (MAPTST(cleandepsmap, p - installed->start))
-      printf("  - %s\n", pool_solvid2str(pool, p));
-#endif
-}
-
-
-struct trj_data {
-  Queue *edges;
-  Id *low;
-  Id idx;
-  Id nstack;
-  Id firstidx;
-};
-
-/* Tarjan's SCC algorithm, slightly modifed */
-static void
-trj_visit(struct trj_data *trj, Id node)
-{
-  Id *low = trj->low;
-  Queue *edges = trj->edges;
-  Id nnode, myidx, stackstart;
-  int i;
-
-  low[node] = myidx = trj->idx++;
-  low[(stackstart = trj->nstack++)] = node;
-  for (i = edges->elements[node]; (nnode = edges->elements[i]) != 0; i++)
-    {
-      Id l = low[nnode];
-      if (!l)
-	{
-	  if (!edges->elements[edges->elements[nnode]])
-	    {
-	      trj->idx++;
-	      low[nnode] = -1;
-	      continue;
-	    }
-	  trj_visit(trj, nnode);
-	  l = low[nnode];
-	}
-      if (l < 0)
-	continue;
-      if (l < trj->firstidx)
-	{
-	  int k;
-	  for (k = l; low[low[k]] == l; k++)
-	    low[low[k]] = -1;
-	}
-      else if (l < low[node])
-	low[node] = l;
-    }
-  if (low[node] == myidx)
-    {
-      if (myidx != trj->firstidx)
-	myidx = -1;
-      for (i = stackstart; i < trj->nstack; i++)
-	low[low[i]] = myidx;
-      trj->nstack = stackstart;
-    }
-}
-
-#ifdef ENABLE_COMPLEX_DEPS
-static void
-complex_unneeded(Pool *pool, Id ip, Id req, Queue *edges, Map *cleandepsmap, Queue *unneededq)
-{
-  int i, j;
-  Queue dq;
-  Id p;
-
-  queue_init(&dq);
-  i = pool_normalize_complex_dep(pool, req, &dq, CPLXDEPS_EXPAND);
-  if (i == 0 || i == 1)
-    {
-      queue_free(&dq);
-      return;
-    }
-  for (i = 0; i < dq.count; i++)
-    {
-      for (; (p = dq.elements[i]) != 0; i++)
-	{
-	  if (p < 0)
-	    {
-	      if (pool->solvables[-p].repo != pool->installed)
-	        break;
-	      continue;
-	    }
-	  if (p == ip || pool->solvables[p].repo != pool->installed || !MAPTST(cleandepsmap, p - pool->installed->start))
-	    continue;
-	  for (j = 0; j < unneededq->count; j++)
-	    if (p == unneededq->elements[j])
-	      {
-		if (edges->elements[edges->count - 1] != j + 1)
-		  queue_push(edges, j + 1);
-	        break;
-	      }
-	}
-      while (dq.elements[i])
-	i++;
-    }
-  queue_free(&dq);
-}
-#endif
-
-void
-solver_get_unneeded(Solver *solv, Queue *unneededq, int filtered)
-{
-  Repo *installed = solv->installed;
-  int i;
-  Map cleandepsmap;
-
-  queue_empty(unneededq);
-  if (!installed || installed->end == installed->start)
-    return;
-
-  map_init(&cleandepsmap, installed->end - installed->start);
-  solver_createcleandepsmap(solv, &cleandepsmap, 1);
-  for (i = installed->start; i < installed->end; i++)
-    if (MAPTST(&cleandepsmap, i - installed->start))
-      queue_push(unneededq, i);
-
-  if (filtered && unneededq->count > 1)
-    {
-      Pool *pool = solv->pool;
-      Queue edges;
-      Id *nrequires;
-      Map installedm;
-      int j, pass, count = unneededq->count;
-      Id *low;
-
-      map_init(&installedm, pool->nsolvables);
-      for (i = installed->start; i < installed->end; i++)
-	if (pool->solvables[i].repo == installed)
-	  MAPSET(&installedm, i);
-
-      nrequires = solv_calloc(count, sizeof(Id));
-      queue_init(&edges);
-      queue_prealloc(&edges, count * 4 + 10);	/* pre-size */
-
-      /*
-       * Go through the solvables in the nodes queue and create edges for
-       * all requires/recommends/supplements between the nodes.
-       * The edges are stored in the edges queue, we add 1 to the node
-       * index so that nodes in the edges queue are != 0 and we can
-       * terminate the edge list with 0.
-       * Thus for node element 5, the edges are stored starting at
-       * edges.elements[6] and are 0-terminated.
-       */
-      /* leave first element zero to make things easier */
-      /* also add trailing zero */
-      queue_insertn(&edges, 0, 1 + count + 1, 0);
-
-      /* first requires and recommends */
-      for (i = 0; i < count; i++)
-	{
-	  Solvable *s = pool->solvables + unneededq->elements[i];
-	  int oldcount = edges.count;
-	  edges.elements[i + 1] = oldcount;
-	  for (pass = 0; pass < 2; pass++)
-	    {
-	      unsigned int off = pass == 0 ? s->requires : s->recommends;
-	      Id p, pp, dep, *dp;
-	      if (off)
-		for (dp = s->repo->idarraydata + off; (dep = *dp) != 0; dp++)
-		  {
-#ifdef ENABLE_COMPLEX_DEPS
-		    if (pool_is_complex_dep(pool, dep))
-		      {
-			complex_unneeded(pool, s - pool->solvables, dep, &edges, &cleandepsmap, unneededq);
-			continue;
-		      }
-#endif
-		    FOR_PROVIDES(p, pp, dep)
-		      {
-			Solvable *sp = pool->solvables + p;
-			if (s == sp || sp->repo != installed || !MAPTST(&cleandepsmap, p - installed->start))
-			  continue;
-			for (j = 0; j < count; j++)
-			  if (p == unneededq->elements[j])
-			    {
-			      if (edges.elements[edges.count - 1] != j + 1)
-			        queue_push(&edges, j + 1);
-			    }
-		      }
-		  }
-	      if (pass == 0)
-	        nrequires[i] = edges.count - oldcount;
-	    }
-	  queue_push(&edges, 0);
-	}
-#if 0
-      printf("requires + recommends\n");
-      for (i = 0; i < count; i++)
-	{
-	  int j;
-	  printf("  %s (%d requires):\n", pool_solvid2str(pool, unneededq->elements[i]), nrequires[i]);
-	  for (j = edges.elements[i + 1]; edges.elements[j]; j++)
-	    printf("    - %s\n", pool_solvid2str(pool, unneededq->elements[edges.elements[j] - 1]));
-	}
-#endif
-
-      /* then add supplements */
-      for (i = 0; i < count; i++)
-	{
-	  Solvable *s = pool->solvables + unneededq->elements[i];
-	  if (s->supplements)
-	    {
-	      Id *dp;
-	      int k;
-	      for (dp = s->repo->idarraydata + s->supplements; *dp; dp++)
-		if (dep_possible(solv, *dp, &installedm))
-		  {
-		    Queue iq;
-		    Id iqbuf[16];
-		    queue_init_buffer(&iq, iqbuf, sizeof(iqbuf)/sizeof(*iqbuf));
-		    dep_pkgcheck(solv, *dp, 0, &iq);
-		    for (k = 0; k < iq.count; k++)
-		      {
-			Id p = iq.elements[k];
-			Solvable *sp = pool->solvables + p;
-			if (p == unneededq->elements[i] || sp->repo != installed || !MAPTST(&cleandepsmap, p - installed->start))
-			  continue;
-			for (j = 0; j < count; j++)
-			  if (p == unneededq->elements[j])
-			    break;
-			/* now add edge from j + 1 to i + 1 */
-			queue_insert(&edges, edges.elements[j + 1] + nrequires[j], i + 1);
-			/* addapt following edge pointers */
-			for (j = j + 2; j < count + 1; j++)
-			  edges.elements[j]++;
-		      }
-		    queue_free(&iq);
-		  }
-	    }
-	}
-#if 0
-      /* print result */
-      printf("+ supplements\n");
-      for (i = 0; i < count; i++)
-	{
-	  int j;
-	  printf("  %s (%d requires):\n", pool_solvid2str(pool, unneededq->elements[i]), nrequires[i]);
-	  for (j = edges.elements[i + 1]; edges.elements[j]; j++)
-	    printf("    - %s\n", pool_solvid2str(pool, unneededq->elements[edges.elements[j] - 1]));
-        }
-#endif
-      map_free(&installedm);
-
-      /* now run SCC algo two times, first with requires+recommends+supplements,
-       * then again without the requires. We run it the second time to get rid
-       * of packages that got dragged in via recommends/supplements */
-      /*
-       * low will contain the result of the SCC search.
-       * it must be of at least size 2 * (count + 1) and
-       * must be zero initialized.
-       * The layout is:
-       *    0  low low ... low stack stack ...stack 0
-       *            count              count
-       */
-      low = solv_calloc(count + 1, 2 * sizeof(Id));
-      for (pass = 0; pass < 2; pass++)
-	{
-	  struct trj_data trj;
-	  if (pass)
-	    {
-	      memset(low, 0, (count + 1) * (2 * sizeof(Id)));
-	      for (i = 0; i < count; i++)
-		{
-	          edges.elements[i + 1] += nrequires[i];
-		  if (!unneededq->elements[i])
-		    low[i + 1] = -1;	/* ignore this node */
-		}
-	    }
-	  trj.edges = &edges;
-	  trj.low = low;
-	  trj.idx = count + 1;	/* stack starts here */
-	  for (i = 1; i <= count; i++)
-	    {
-	      if (low[i])
-		continue;
-	      if (edges.elements[edges.elements[i]])
-		{
-		  trj.firstidx = trj.nstack = trj.idx;
-		  trj_visit(&trj, i);
-		}
-	      else
-		{
-		  Id myidx = trj.idx++;
-		  low[i] = myidx;
-		  low[myidx] = i;
-		}
-	    }
-	  /* prune packages */
-	  for (i = 0; i < count; i++)
-	    if (low[i + 1] <= 0)
-	      unneededq->elements[i] = 0;
-	}
-      solv_free(low);
-      solv_free(nrequires);
-      queue_free(&edges);
-
-      /* finally remove all pruned entries from unneededq */
-      for (i = j = 0; i < count; i++)
-	if (unneededq->elements[i])
-	  unneededq->elements[j++] = unneededq->elements[i];
-      queue_truncate(unneededq, j);
-    }
-  map_free(&cleandepsmap);
-}
-
 
 void
 solver_breakorphans(Solver *solv)

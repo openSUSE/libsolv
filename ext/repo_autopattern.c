@@ -265,8 +265,13 @@ repo_add_autopattern(Repo *repo, int flags)
 	    repodata_set_str(data, s2 - pool->solvables, SOLVABLE_ICON, newname);
 	  else if (!strcmp(pn, "pattern-order()") && evr)
 	    repodata_set_str(data, s2 - pool->solvables, SOLVABLE_ORDER, newname);
-	  else if (!strcmp(pn, "pattern-visible()") && !evr)
-	    repodata_set_void(data, s2 - pool->solvables, SOLVABLE_ISVISIBLE);
+	  else if (!strcmp(pn, "pattern-visible()"))
+	    {
+	      if (!evr)
+	        repodata_set_void(data, s2 - pool->solvables, SOLVABLE_ISVISIBLE);
+	      else
+		repodata_set_str(data, s2 - pool->solvables, SOLVABLE_ISVISIBLE, newname);
+	    }
 	}
     }
   queue_free(&patq);
@@ -391,11 +396,10 @@ repo_add_autopattern(Repo *repo, int flags)
 	      repodata_set_str(data, h, PRODUCT_UPDATES_REPOID, newname);
 	      repodata_add_flexarray(data, s2 - pool->solvables, PRODUCT_UPDATES, h);
 	    }
-	  else if (!strcmp(pn, "product-endoflife()") && evr)
+	  else if (!strcmp(pn, "product-endoflife()"))
 	    {
-	      time_t t = datestr2timestamp(newname);
-	      if (t)
-		repodata_set_num(data, s2 - pool->solvables, PRODUCT_ENDOFLIFE, t);
+	      /* FATE#320699: Support tri-state product-endoflife (tag absent, present but nodate(0), present + date) */
+	      repodata_set_num(data, s2 - pool->solvables, PRODUCT_ENDOFLIFE,(evr ? datestr2timestamp(newname) : 0) );
 	    }
 	  else if (!strncmp(pn, "product-url(", 12) && evr && pn[12] && pn[13] && strlen(pn + 12) < 32)
 	    {

@@ -1,0 +1,1 @@
+void addfileprovides(Pool *pool);

@@ -19,7 +19,7 @@ ADD_CUSTOM_COMMAND (
 ADD_DEFINITIONS(-Wno-unused)
 INCLUDE_DIRECTORIES (${RUBY_INCLUDE_PATH})
 
-ADD_LIBRARY (bindings_ruby SHARED solv_ruby.c)
+ADD_LIBRARY (bindings_ruby MODULE solv_ruby.c)
 SET_TARGET_PROPERTIES (bindings_ruby PROPERTIES PREFIX "" OUTPUT_NAME "solv")
 TARGET_LINK_LIBRARIES (bindings_ruby libsolvext libsolv ${SYSTEM_LIBRARIES})
 

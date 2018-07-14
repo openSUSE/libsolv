@@ -72,8 +72,6 @@ extern Id repo_add_solvable_block_before(Repo *repo, int count, Repo *beforerepo
 extern Offset repo_addid(Repo *repo, Offset olddeps, Id id);
 extern Offset repo_addid_dep(Repo *repo, Offset olddeps, Id id, Id marker);
 extern Offset repo_reserve_ids(Repo *repo, Offset olddeps, int num);
-extern Offset repo_fix_supplements(Repo *repo, Offset provides, Offset supplements, Offset freshens);
-extern Offset repo_fix_conflicts(Repo *repo, Offset conflicts);
 
 static inline const char *repo_name(const Repo *repo)
 {
@@ -97,6 +95,15 @@ static inline int pool_disabled_solvable(const Pool *pool, Solvable *s)
       if (!MAPTST(pool->considered, id))
 	return 1;
     }
+  return 0;
+}
+
+static inline int pool_badarch_solvable(const Pool *pool, Solvable *s)
+{
+  if (!s->arch)
+    return 1;
+  if (pool->id2arch && (s->arch > pool->lastarch || !pool->id2arch[s->arch]))
+    return 1;
   return 0;
 }
 
@@ -180,6 +187,11 @@ void repo_disable_paging(Repo *repo);
 #define FOR_REPODATAS(repo, rdid, data)	\
 	for (rdid = 1; rdid < repo->nrepodata && (data = repo_id2repodata(repo, rdid)); rdid++)
 #endif
+
+/* weird suse stuff, do not use */
+extern Offset repo_fix_supplements(Repo *repo, Offset provides, Offset supplements, Offset freshens);
+extern Offset repo_fix_conflicts(Repo *repo, Offset conflicts);
+extern void repo_rewrite_suse_deps(Solvable *s, Offset freshens);
 
 #ifdef __cplusplus
 }

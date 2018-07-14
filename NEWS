@@ -2,6 +2,130 @@
 This file contains the major changes between
 libsolv versions:
 
+Version 0.6.34
+- new features:
+  * also look at suggests for package ordering
+
+Version 0.6.33
+- new features:
+  * new Selection.clone() method in the bindings
+  * new pool.parserpmrichdep() method in the bindings
+
+Version 0.6.32
+- fixed bug that could make fileconflict detection very slow
+  in some cases
+
+Version 0.6.31
+- new configuration options:
+  * ENABLE_RPMDB_LIBRPM: use librpm to read the package
+    database
+  * ENABLE_RPMPKG_LIBRPM: use librpm to access information
+    from package headers
+- new features:
+  * new pool_set_whatprovides function to manually change
+    the whatprovides data
+  * new selection_subtract function to remove packages of
+    one selection from another selection
+  * new selection flags SELECTION_FILTER,
+    SELECTION_WITH_DISABLED and SELECTION_WITH_BADARCH
+  * new map_invertall function to invert a bitmap
+  * new map_clr_at function to clear some bits
+
+Version 0.6.30
+- new features:
+  * many fixes and extenstions for cleandeps, e.g.
+    cleandeps now works for "update all packages"
+  * support debian packages with xz compressed control.tar
+  * always create dup rules for "distupgrade" jobs
+  * use recommends also for ordering packages
+
+Version 0.6.29
+- new features:
+  * support for REL_WITHOUT and REL_UNLESS dependencies
+  * solver_get_recommendations available in bindings
+
+Version 0.6.28
+- new features:
+  * new pool_best_solvables() function
+
+Version 0.6.27
+- new features:
+  * allow building with libxml2 instead of libexpat
+  * better handing of "forcebest with uninstall"
+  * speed improvements for "name = md5sum" dependencies
+
+Version 0.6.26
+- export solvable_matchesdep function, as we now
+  use it in the bindings
+
+Version 0.6.25
+- new features:
+  * new SOLVER_FLAG_STRONG_RECOMMENDS flag
+  * new SOLVER_FLAG_INSTALL_ALSO_UPDATES flag
+  * new matchesdep() method in bindings
+  * SOLVABLE_NAME selects nevr matching for
+    pool_whatmatchesdep and solvable_matchesdep
+ 
+Version 0.6.24
+- new features:
+  * new SOLVER_FLAG_FOCUS_BEST flag
+
+Version 0.6.22, 0.6.23
+- bug fix releases, no new features
+
+Version 0.6.21
+- new features:
+  * SOLVER_FAVOR and SOLVER_DISFAVOR job types
+- new functions:
+  * selection_make_matchdepid
+  * pool_whatcontainsdep
+  * pool_parserpmrichdep
+
+Version 0.6.20
+- new features:
+  * filter Requires(pre,post) for installed packages
+
+Version 0.6.13:
+- new features:
+  * SOLVER_ALLOWUNINSTALL job type
+  * ordercycle introspection
+- new functions:
+  * transaction_order_get_cycle
+  * transaction_order_get_cycleids
+
+Version 0.6.12:
+- new features:
+  * tcl bindings
+- new functions:
+  * solv_chksum_cmp
+
+Version 0.6.11:
+- new functions:
+  * pool_ids2whatprovides
+
+Version 0.6.9:
+- new features:
+  * much improved package choosing code
+  * new testcase dependency format
+  * alternatives introspection
+- new functions:
+  * pool_deb_get_autoinstalled
+  * solver_alternative2str
+  * solver_alternatives_count
+  * solver_get_alternative
+  * solver_rule2pkgrule
+  * testcase_dep2str
+
+Version 0.6.5:
+- new features:
+  * support yum style obsolete handling
+
+Version 0.6.1:
+- API change:
+  repodata_stringify() now returns the string
+- new features:
+  * add BREAK_ORPHANS and KEEP_ORPHANS solver flags
+
 Version 0.6.0:
 - ABI change: cleaned up and reordered knownid.h
 - added support for sha224/sha384/sha512

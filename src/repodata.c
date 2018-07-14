@@ -268,17 +268,13 @@ repodata_str2dir(Repodata *data, const char *dir, int create)
 #endif
   const char *dire;
 
-  parent = 0;
   if (!*dir)
-    return 0;
+    return data->dirpool.ndirs ? 0 : dirpool_add_dir(&data->dirpool, 0, 0, create);
   while (*dir == '/' && dir[1] == '/')
     dir++;
   if (*dir == '/' && !dir[1])
-    {
-      if (data->dirpool.ndirs)
-        return 1;
-      return dirpool_add_dir(&data->dirpool, 0, 1, create);
-    }
+    return data->dirpool.ndirs ? 1 : dirpool_add_dir(&data->dirpool, 0, 1, create);
+  parent = 0;
 #ifdef DIRCACHE_SIZE
   dirs = dir;
   if (data->dircache)
@@ -355,6 +351,8 @@ repodata_dir2str(Repodata *data, Id did, const char *suf)
 
   if (!did)
     return suf ? suf : "";
+  if (did == 1 && !suf)
+    return "/";
   parent = did;
   while (parent)
     {
@@ -849,6 +847,62 @@ repodata_lookup_id_uninternalized(Repodata *data, Id solvid, Id keyname, Id void
   return 0;
 }
 
+const char *
+repodata_lookup_dirstrarray_uninternalized(Repodata *data, Id solvid, Id keyname, Id *didp, Id *iterp)
+{
+  Id *ap, did;
+  Id iter = *iterp;
+  if (iter == 0)	/* find key data */
+    {
+      if (!data->attrs)
+	return 0;
+      ap = data->attrs[solvid - data->start];
+      if (!ap)
+	return 0;
+      for (; *ap; ap += 2)
+	if (data->keys[*ap].name == keyname && data->keys[*ap].type == REPOKEY_TYPE_DIRSTRARRAY)
+	  break;
+      if (!*ap)
+	return 0;
+      iter = ap[1];
+    }
+  did = *didp;
+  for (ap = data->attriddata + iter; *ap; ap += 2)
+    {
+      if (did && ap[0] != did)
+	continue;
+      *didp = ap[0];
+      *iterp = ap - data->attriddata + 2;
+      return (const char *)data->attrdata + ap[1];
+    }
+  *iterp = 0;
+  return 0;
+}
+
+const unsigned char *
+repodata_lookup_bin_checksum_uninternalized(Repodata *data, Id solvid, Id keyname, Id *typep)
+{
+  Id *ap;
+  if (!data->attrs)
+    return 0;
+  ap = data->attrs[solvid - data->start];
+  if (!ap)
+    return 0;
+  for (; *ap; ap += 2)
+    {
+      if (data->keys[*ap].name != keyname)
+	continue;
+      switch (data->keys[*ap].type)
+	{
+	  case_CHKSUM_TYPES:
+	    *typep = data->keys[*ap].type;
+	    return (const unsigned char *)data->attrdata + ap[1];
+	  default:
+	    break;
+	}
+    }
+  return 0;
+}
 
 /************************************************************************
  * data search
@@ -962,7 +1016,11 @@ repodata_search(Repodata *data, Id solvid, Id keyname, int flags, int (*callback
       ddp = get_data(data, key, &dp, *keyp ? 1 : 0);
 
       if (key->type == REPOKEY_TYPE_DELETED)
-	continue;
+	{
+	  if (onekey)
+	    return;
+	  continue;
+	}
       if (key->type == REPOKEY_TYPE_FLEXARRAY || key->type == REPOKEY_TYPE_FIXARRAY)
 	{
 	  struct subschema_data subd;
@@ -1927,19 +1985,19 @@ dataiterator_jump_to_solvid(Dataiterator *di, Id solvid)
 	  return;
 	}
       di->repoid = 0;
-      di->data = di->repo->repodata + di->pool->pos.repodataid;
-      di->repodataid = 0;
-      di->solvid = solvid;
-      di->state = di_enterrepo;
-      di->flags |= SEARCH_THISSOLVID;
-      return;
+      if (!di->pool->pos.repodataid && di->pool->pos.solvid == SOLVID_META) {
+	solvid = SOLVID_META;		/* META pos hack */
+      } else {
+        di->data = di->repo->repodata + di->pool->pos.repodataid;
+        di->repodataid = 0;
+      }
     }
-  if (solvid > 0)
+  else if (solvid > 0)
     {
       di->repo = di->pool->solvables[solvid].repo;
       di->repoid = 0;
     }
-  else if (di->repoid > 0)
+  if (di->repoid > 0)
     {
       if (!di->pool->urepos)
 	{
@@ -1949,7 +2007,8 @@ dataiterator_jump_to_solvid(Dataiterator *di, Id solvid)
       di->repoid = 1;
       di->repo = di->pool->repos[di->repoid];
     }
-  di->repodataid = 1;
+  if (solvid != SOLVID_POS)
+    di->repodataid = 1;
   di->solvid = solvid;
   if (solvid)
     di->flags |= SEARCH_THISSOLVID;
@@ -2781,6 +2840,47 @@ repodata_add_flexarray(Repodata *data, Id solvid, Id keyname, Id ghandle)
 }
 
 void
+repodata_set_kv(Repodata *data, Id solvid, Id keyname, Id keytype, KeyValue *kv)
+{
+  switch (keytype)
+    {
+    case REPOKEY_TYPE_ID:
+      repodata_set_id(data, solvid, keyname, kv->id);
+      break;
+    case REPOKEY_TYPE_CONSTANTID:
+      repodata_set_constantid(data, solvid, keyname, kv->id);
+      break;
+    case REPOKEY_TYPE_IDARRAY:
+      repodata_add_idarray(data, solvid, keyname, kv->id);
+      break;
+    case REPOKEY_TYPE_STR:
+      repodata_set_str(data, solvid, keyname, kv->str);
+      break;
+    case REPOKEY_TYPE_VOID:
+      repodata_set_void(data, solvid, keyname);
+      break;
+    case REPOKEY_TYPE_NUM:
+      repodata_set_num(data, solvid, keyname, SOLV_KV_NUM64(kv));
+      break;
+    case REPOKEY_TYPE_CONSTANT:
+      repodata_set_constant(data, solvid, keyname, kv->num);
+      break;
+    case REPOKEY_TYPE_DIRNUMNUMARRAY:
+      if (kv->id)
+        repodata_add_dirnumnum(data, solvid, keyname, kv->id, kv->num, kv->num2);
+      break;
+    case REPOKEY_TYPE_DIRSTRARRAY:
+      repodata_add_dirstr(data, solvid, keyname, kv->id, kv->str);
+      break;
+    case_CHKSUM_TYPES:
+      repodata_set_bin_checksum(data, solvid, keyname, keytype, (const unsigned char *)kv->str);
+      break;
+    default:
+      break;
+    }
+}
+
+void
 repodata_unset_uninternalized(Repodata *data, Id solvid, Id keyname)
 {
   Id *pp, *ap, **app;
@@ -3055,6 +3155,7 @@ repodata_serialize_key(Repodata *data, struct extdata *newincore,
     case REPOKEY_TYPE_VOID:
     case REPOKEY_TYPE_CONSTANT:
     case REPOKEY_TYPE_CONSTANTID:
+    case REPOKEY_TYPE_DELETED:
       break;
     case REPOKEY_TYPE_STR:
       data_addblob(xd, data->attrdata + val, strlen((char *)(data->attrdata + val)) + 1);
@@ -3132,29 +3233,30 @@ repodata_serialize_key(Repodata *data, struct extdata *newincore,
 	    sp = schema;
 	    kp = data->xattrs[-*ida];
 	    if (!kp)
-	      continue;
+	      continue;		/* ignore empty elements */
 	    num++;
-	    for (;*kp; kp += 2)
+	    for (; *kp; kp += 2)
 	      *sp++ = *kp;
 	    *sp = 0;
 	    if (!schemaid)
 	      schemaid = repodata_schema2id(data, schema, 1);
 	    else if (schemaid != repodata_schema2id(data, schema, 0))
 	      {
-	 	pool_debug(data->repo->pool, SOLV_FATAL, "fixarray substructs with different schemas\n");
-		exit(1);
+	 	pool_debug(data->repo->pool, SOLV_ERROR, "repodata_serialize_key: fixarray substructs with different schemas\n");
+		num = 0;
+		break;
 	      }
 	  }
+	data_addid(xd, num);
 	if (!num)
 	  break;
-	data_addid(xd, num);
 	data_addid(xd, schemaid);
 	for (ida = data->attriddata + val; *ida; ida++)
 	  {
 	    Id *kp = data->xattrs[-*ida];
 	    if (!kp)
 	      continue;
-	    for (;*kp; kp += 2)
+	    for (; *kp; kp += 2)
 	      repodata_serialize_key(data, newincore, newvincore, schema, data->keys + *kp, kp[1]);
 	  }
 	break;
@@ -3186,7 +3288,7 @@ repodata_serialize_key(Repodata *data, struct extdata *newincore,
 	break;
       }
     default:
-      pool_debug(data->repo->pool, SOLV_FATAL, "don't know how to handle type %d\n", key->type);
+      pool_debug(data->repo->pool, SOLV_FATAL, "repodata_serialize_key: don't know how to handle type %d\n", key->type);
       exit(1);
     }
   if (key->storage == KEY_STORAGE_VERTICAL_OFFSET)
@@ -3198,18 +3300,57 @@ repodata_serialize_key(Repodata *data, struct extdata *newincore,
     }
 }
 
+/* create a circular linked list of all keys that share
+ * the same keyname */
+static Id *
+calculate_keylink(Repodata *data)
+{
+  int i, j;
+  Id *link;
+  Id maxkeyname = 0, *keytable = 0;
+  link = solv_calloc(data->nkeys, sizeof(Id));
+  if (data->nkeys <= 2)
+    return link;
+  for (i = 1; i < data->nkeys; i++)
+    {
+      Id n = data->keys[i].name;
+      if (n >= maxkeyname)
+	{
+	  keytable = solv_realloc2(keytable, n + 128, sizeof(Id));
+	  memset(keytable + maxkeyname, 0, (n + 128 - maxkeyname) * sizeof(Id));
+	  maxkeyname = n + 128;
+	}
+      j = keytable[n];
+      if (j)
+	link[i] = link[j];
+      else
+	j = i;
+      link[j] = i;
+      keytable[n] = i;
+    }
+  /* remove links that just point to themselfs */
+  for (i = 1; i < data->nkeys; i++)
+    if (link[i] == i)
+      link[i] = 0;
+  solv_free(keytable);
+  return link;
+}
+
 void
 repodata_internalize(Repodata *data)
 {
   Repokey *key, solvkey;
   Id entry, nentry;
-  Id schemaid, keyid, *schema, *sp, oldschema, *keyp, *seen;
+  Id schemaid, keyid, *schema, *sp, oldschemaid, *keyp, *seen;
+  Offset *oldincoreoffs = 0;
   int schemaidx;
   unsigned char *dp, *ndp;
-  int newschema, oldcount;
+  int neednewschema;
   struct extdata newincore;
   struct extdata newvincore;
   Id solvkeyid;
+  Id *keylink;
+  int haveoldkl;
 
   if (!data->attrs && !data->xattrs)
     return;
@@ -3242,140 +3383,181 @@ repodata_internalize(Repodata *data)
   data->mainschema = 0;
   data->mainschemaoffsets = solv_free(data->mainschemaoffsets);
 
+  keylink = calculate_keylink(data);
   /* join entry data */
   /* we start with the meta data, entry -1 */
   for (entry = -1; entry < nentry; entry++)
     {
-      memset(seen, 0, data->nkeys * sizeof(Id));
-      oldschema = 0;
+      oldschemaid = 0;
       dp = data->incoredata;
       if (dp)
 	{
 	  dp += entry >= 0 ? data->incoreoffset[entry] : 1;
-          dp = data_read_id(dp, &oldschema);
+          dp = data_read_id(dp, &oldschemaid);
 	}
+      memset(seen, 0, data->nkeys * sizeof(Id));
 #if 0
-fprintf(stderr, "oldschema %d\n", oldschema);
-fprintf(stderr, "schemata %d\n", data->schemata[oldschema]);
+fprintf(stderr, "oldschemaid %d\n", oldschemaid);
+fprintf(stderr, "schemata %d\n", data->schemata[oldschemaid]);
 fprintf(stderr, "schemadata %p\n", data->schemadata);
 #endif
-      /* seen: -1: old data  0: skipped  >0: id + 1 */
-      newschema = 0;
-      oldcount = 0;
+
+      /* seen: -1: old data,  0: skipped,  >0: id + 1 */
+      neednewschema = 0;
       sp = schema;
-      for (keyp = data->schemadata + data->schemata[oldschema]; *keyp; keyp++)
+      haveoldkl = 0;
+      for (keyp = data->schemadata + data->schemata[oldschemaid]; *keyp; keyp++)
 	{
 	  if (seen[*keyp])
 	    {
-	      pool_debug(data->repo->pool, SOLV_FATAL, "Inconsistent old data (key occured twice).\n");
-	      exit(1);
+	      /* oops, should not happen */
+	      neednewschema = 1;
+	      continue;
 	    }
-	  seen[*keyp] = -1;
+	  seen[*keyp] = -1;	/* use old marker */
 	  *sp++ = *keyp;
-	  oldcount++;
+	  if (keylink[*keyp])
+	    haveoldkl = 1;	/* potential keylink conflict */
 	}
-      if (entry >= 0)
-	keyp = data->attrs ? data->attrs[entry] : 0;
-      else
+
+      /* strip solvables key */
+      if (entry < 0 && solvkeyid && seen[solvkeyid])
 	{
-	  /* strip solvables key */
 	  *sp = 0;
 	  for (sp = keyp = schema; *sp; sp++)
 	    if (*sp != solvkeyid)
 	      *keyp++ = *sp;
-	    else
-	      oldcount--;
 	  sp = keyp;
 	  seen[solvkeyid] = 0;
-	  keyp = data->xattrs ? data->xattrs[1] : 0;
+	  neednewschema = 1;
 	}
+
+      /* add new entries */
+      if (entry >= 0)
+	keyp = data->attrs ? data->attrs[entry] : 0;
+      else
+        keyp = data->xattrs ? data->xattrs[1] : 0;
       if (keyp)
         for (; *keyp; keyp += 2)
 	  {
 	    if (!seen[*keyp])
 	      {
-	        newschema = 1;
+	        neednewschema = 1;
 	        *sp++ = *keyp;
+		if (haveoldkl && keylink[*keyp])		/* this should be pretty rare */
+		  {
+		    Id kl;
+		    for (kl = keylink[*keyp]; kl != *keyp; kl = keylink[kl])
+		      if (seen[kl] == -1)
+		        {
+			  /* replacing old key kl, remove from schema and seen */
+			  Id *osp;
+			  for (osp = schema; osp < sp; osp++)
+			    if (*osp == kl)
+			      {
+			        memmove(osp, osp + 1, (sp - osp) * sizeof(Id));
+			        sp--;
+			        seen[kl] = 0;
+				break;
+			      }
+		        }
+		  }
 	      }
 	    seen[*keyp] = keyp[1] + 1;
 	  }
+
+      /* add solvables key if needed */
       if (entry < 0 && data->end != data->start)
 	{
-	  *sp++ = solvkeyid;
-	  newschema = 1;
+	  *sp++ = solvkeyid;	/* always last in schema */
+	  neednewschema = 1;
 	}
+
+      /* commit schema */
       *sp = 0;
-      if (newschema)
+      if (neednewschema)
         /* Ideally we'd like to sort the new schema here, to ensure
-	   schema equality independend of the ordering.  We can't do that
-	   yet.  For once see below (old ids need to come before new ids).
-	   An additional difficulty is that we also need to move
-	   the values with the keys.  */
+	   schema equality independend of the ordering. */
 	schemaid = repodata_schema2id(data, schema, 1);
       else
-	schemaid = oldschema;
+	schemaid = oldschemaid;
 
+      if (entry < 0)
+	{
+	  data->mainschemaoffsets = solv_calloc(sp - schema, sizeof(Id));
+	  data->mainschema = schemaid;
+	}
+
+      /* find offsets in old incore data */
+      if (oldschemaid)
+	{
+	  Id *lastneeded = 0;
+	  for (sp = data->schemadata + data->schemata[oldschemaid]; *sp; sp++)
+	    if (seen[*sp] == -1)
+	      lastneeded = sp + 1;
+	  if (lastneeded)
+	    {
+	      if (!oldincoreoffs)
+	        oldincoreoffs = solv_malloc2(data->nkeys, 2 * sizeof(Offset));
+	      for (sp = data->schemadata + data->schemata[oldschemaid]; sp != lastneeded; sp++)
+		{
+		  /* Skip the data associated with this old key.  */
+		  key = data->keys + *sp;
+		  ndp = dp;
+		  if (key->storage == KEY_STORAGE_VERTICAL_OFFSET)
+		    {
+		      ndp = data_skip(ndp, REPOKEY_TYPE_ID);
+		      ndp = data_skip(ndp, REPOKEY_TYPE_ID);
+		    }
+		  else if (key->storage == KEY_STORAGE_INCORE)
+		    ndp = data_skip_key(data, ndp, key);
+		  oldincoreoffs[*sp * 2] = dp - data->incoredata;
+		  oldincoreoffs[*sp * 2 + 1] = ndp - dp;
+		  dp = ndp;
+		}
+	    }
+	}
+
+      /* just copy over the complete old entry (including the schemaid) if there was no new data */
+      if (entry >= 0 && !neednewschema && oldschemaid && (!data->attrs || !data->attrs[entry]) && dp)
+	{
+	  ndp = data->incoredata + data->incoreoffset[entry];
+	  data->incoreoffset[entry] = newincore.len;
+	  data_addblob(&newincore, ndp, dp - ndp);
+	  goto entrydone;
+	}
 
       /* Now create data blob.  We walk through the (possibly new) schema
 	 and either copy over old data, or insert the new.  */
-      /* XXX Here we rely on the fact that the (new) schema has the form
-	 o1 o2 o3 o4 ... | n1 n2 n3 ...
-	 (oX being the old keyids (possibly overwritten), and nX being
-	  the new keyids).  This rules out sorting the keyids in order
-	 to ensure a small schema count.  */
       if (entry >= 0)
         data->incoreoffset[entry] = newincore.len;
       data_addid(&newincore, schemaid);
-      if (entry == -1)
-	{
-	  data->mainschema = schemaid;
-	  data->mainschemaoffsets = solv_calloc(sp - schema, sizeof(Id));
-	}
+
       /* we don't use a pointer to the schemadata here as repodata_serialize_key
        * may call repodata_schema2id() which might realloc our schemadata */
       for (schemaidx = data->schemata[schemaid]; (keyid = data->schemadata[schemaidx]) != 0; schemaidx++)
 	{
-	  if (entry == -1)
-	    data->mainschemaoffsets[schemaidx - data->schemata[schemaid]] = newincore.len;
-	  if (keyid == solvkeyid)
+	  if (entry < 0)
 	    {
-	      /* add flexarray entry count */
-	      data_addid(&newincore, data->end - data->start);
-	      break;
-	    }
-	  key = data->keys + keyid;
-#if 0
-	  fprintf(stderr, "internalize %d(%d):%s:%s\n", entry, entry + data->start, pool_id2str(data->repo->pool, key->name), pool_id2str(data->repo->pool, key->type));
-#endif
-	  ndp = dp;
-	  if (oldcount)
-	    {
-	      /* Skip the data associated with this old key.  */
-	      if (key->storage == KEY_STORAGE_VERTICAL_OFFSET)
+	      data->mainschemaoffsets[schemaidx - data->schemata[schemaid]] = newincore.len;
+	      if (keyid == solvkeyid)
 		{
-		  ndp = data_skip(dp, REPOKEY_TYPE_ID);
-		  ndp = data_skip(ndp, REPOKEY_TYPE_ID);
+		  /* add flexarray entry count */
+		  data_addid(&newincore, data->end - data->start);
+		  break;	/* always the last entry */
 		}
-	      else if (key->storage == KEY_STORAGE_INCORE)
-		ndp = data_skip_key(data, dp, key);
-	      oldcount--;
 	    }
 	  if (seen[keyid] == -1)
 	    {
-	      /* If this key was an old one _and_ was not overwritten with
-		 a different value copy over the old value (we skipped it
-		 above).  */
-	      if (dp != ndp)
-		data_addblob(&newincore, dp, ndp - dp);
-	      seen[keyid] = 0;
+	      if (oldincoreoffs[keyid * 2 + 1])
+		data_addblob(&newincore, data->incoredata + oldincoreoffs[keyid * 2], oldincoreoffs[keyid * 2 + 1]);
 	    }
 	  else if (seen[keyid])
-	    {
-	      /* Otherwise we have a new value.  Parse it into the internal form.  */
-	      repodata_serialize_key(data, &newincore, &newvincore, schema, key, seen[keyid] - 1);
-	    }
-	  dp = ndp;
+	    repodata_serialize_key(data, &newincore, &newvincore, schema, data->keys + keyid, seen[keyid] - 1);
 	}
+
+entrydone:
+      /* free memory */
       if (entry >= 0 && data->attrs)
 	{
 	  if (data->attrs[entry])
@@ -3405,6 +3587,8 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
   data->lastdatalen = 0;
   solv_free(schema);
   solv_free(seen);
+  solv_free(keylink);
+  solv_free(oldincoreoffs);
   repodata_free_schemahash(data);
 
   solv_free(data->incoredata);
@@ -3412,7 +3596,6 @@ fprintf(stderr, "schemadata %p\n", data->schemadata);
   data->incoredatalen = newincore.len;
   data->incoredatafree = 0;
 
-  solv_free(data->vincore);
   data->vincore = newvincore.buf;
   data->vincorelen = newvincore.len;
 
@@ -3539,44 +3722,19 @@ repodata_create_stubs(Repodata *data)
 	  xkeyname = 0;
 	  continue;
 	}
-      switch (di.key->type)
+      repodata_set_kv(sdata, SOLVID_META, di.key->name, di.key->type, &di.kv);
+      if (di.key->name == REPOSITORY_KEYS && di.key->type == REPOKEY_TYPE_IDARRAY)
 	{
-        case REPOKEY_TYPE_ID:
-	  repodata_set_id(sdata, SOLVID_META, di.key->name, di.kv.id);
-	  break;
-	case REPOKEY_TYPE_CONSTANTID:
-	  repodata_set_constantid(sdata, SOLVID_META, di.key->name, di.kv.id);
-	  break;
-	case REPOKEY_TYPE_STR:
-	  repodata_set_str(sdata, SOLVID_META, di.key->name, di.kv.str);
-	  break;
-	case REPOKEY_TYPE_VOID:
-	  repodata_set_void(sdata, SOLVID_META, di.key->name);
-	  break;
-	case REPOKEY_TYPE_NUM:
-	  repodata_set_num(sdata, SOLVID_META, di.key->name, SOLV_KV_NUM64(&di.kv));
-	  break;
-	case_CHKSUM_TYPES:
-	  repodata_set_bin_checksum(sdata, SOLVID_META, di.key->name, di.key->type, (const unsigned char *)di.kv.str);
-	  break;
-	case REPOKEY_TYPE_IDARRAY:
-	  repodata_add_idarray(sdata, SOLVID_META, di.key->name, di.kv.id);
-	  if (di.key->name == REPOSITORY_KEYS)
+	  if (!xkeyname)
 	    {
-	      if (!xkeyname)
-		{
-		  if (!di.kv.eof)
-		    xkeyname = di.kv.id;
-		}
-	      else
-		{
-		  repodata_add_stubkey(sdata, xkeyname, di.kv.id);
-		  xkeyname = 0;
-		}
+	      if (!di.kv.eof)
+		xkeyname = di.kv.id;
 	    }
-	  break;
-	default:
-	  break;
+	  else
+	    {
+	      repodata_add_stubkey(sdata, xkeyname, di.kv.id);
+	      xkeyname = 0;
+	    }
 	}
     }
   dataiterator_free(&di);

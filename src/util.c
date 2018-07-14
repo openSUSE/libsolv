@@ -76,6 +76,30 @@ solv_calloc(size_t num, size_t len)
   return r;
 }
 
+/* this was solv_realloc2(old, len, size), but we now overshoot
+ * for huge len sizes */
+void *
+solv_extend_realloc(void *old, size_t len, size_t size, size_t block)
+{
+  size_t xblock = (block + 1) << 5;
+  len = (len + block) & ~block;
+  if (len >= xblock && xblock)
+    {
+      xblock <<= 1;
+      while (len >= xblock && xblock)
+	xblock <<= 1;
+      if (xblock)
+	{
+	  size_t nlen;
+          xblock = (xblock >> 5) - 1;
+	  nlen = (len + xblock) & ~xblock;
+	  if (nlen > len)
+	    len = nlen;
+	}
+    }
+  return solv_realloc2(old, len, size);
+}
+
 void *
 solv_free(void *mem)
 {
@@ -115,7 +139,7 @@ solv_timems(unsigned int subtract)
 
    see also: http://sources.redhat.com/ml/libc-alpha/2008-12/msg00003.html
  */
-#if defined(__GLIBC__) && (defined(HAVE_QSORT_R) || defined(HAVE___QSORT_R))
+#if (defined(__GLIBC__) || defined(__NEWLIB__)) && (defined(HAVE_QSORT_R) || defined(HAVE___QSORT_R))
 
 void
 solv_sort(void *base, size_t nmemb, size_t size, int (*compar)(const void *, const void *, void *), void *compard)
@@ -211,7 +235,7 @@ solv_hex2bin(const char **strp, unsigned char *buf, int bufl)
         d = c - ('A' - 10);
       else
 	break;
-      c = *++str;
+      c = str[1];
       d <<= 4;
       if (c >= '0' && c <= '9')
         d |= c - '0';
@@ -222,7 +246,7 @@ solv_hex2bin(const char **strp, unsigned char *buf, int bufl)
       else
 	break;
       buf[i] = d;
-      ++str;
+      str += 2;
     }
   *strp = str;
   return i;

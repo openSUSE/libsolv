@@ -262,7 +262,6 @@ void repodata_add_file_checksum(Repodata *data, Id solvid, Id keyname, const cha
 				const char *chksum);
 void repodata_set_idarray(Repodata *data, Id solvid, Id keyname, Queue *q);
 
-
 /* directory (for package file list) */
 void repodata_add_dirnumnum(Repodata *data, Id solvid, Id keyname, Id dir, Id num, Id num2);
 void repodata_add_dirstr(Repodata *data, Id solvid, Id keyname, Id dir, const char *str);
@@ -275,6 +274,8 @@ void repodata_add_poolstr_array(Repodata *data, Id solvid, Id keyname, const cha
 void repodata_add_fixarray(Repodata *data, Id solvid, Id keyname, Id ghandle);
 void repodata_add_flexarray(Repodata *data, Id solvid, Id keyname, Id ghandle);
 
+/* generic */
+void repodata_set_kv(Repodata *data, Id solvid, Id keyname, Id keytype, struct _KeyValue *kv);
 void repodata_unset(Repodata *data, Id solvid, Id keyname);
 void repodata_unset_uninternalized(Repodata *data, Id solvid, Id keyname);
 
@@ -304,7 +305,11 @@ const char *repodata_chk2str(Repodata *data, Id type, const unsigned char *buf);
 void repodata_set_location(Repodata *data, Id solvid, int medianr, const char *dir, const char *file);
 void repodata_set_deltalocation(Repodata *data, Id handle, int medianr, const char *dir, const char *file);
 void repodata_set_sourcepkg(Repodata *data, Id solvid, const char *sourcepkg);
+
+/* uninternalized data lookup */
 Id repodata_lookup_id_uninternalized(Repodata *data, Id solvid, Id keyname, Id voidid);
+const char *repodata_lookup_dirstrarray_uninternalized(Repodata *data, Id solvid, Id keyname, Id *didp, Id *iterp);
+const unsigned char *repodata_lookup_bin_checksum_uninternalized(Repodata *data, Id solvid, Id keyname, Id *typep);
 
 /* stats */
 unsigned int repodata_memused(Repodata *data);

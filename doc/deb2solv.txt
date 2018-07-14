@@ -33,3 +33,7 @@ deb(5), dpkg-deb(1)
 Author
 ------
 Michael Schroeder <mls@suse.de>
+
+////
+vim: syntax=asciidoc
+////

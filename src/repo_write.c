@@ -260,106 +260,6 @@ write_idarray(Repodata *data, Pool *pool, NeedId *needid, Id *ids)
     }
 }
 
-static int
-cmp_ids(const void *pa, const void *pb, void *dp)
-{
-  Id a = *(Id *)pa;
-  Id b = *(Id *)pb;
-  return a - b;
-}
-
-#if 0
-static void
-write_idarray_sort(Repodata *data, Pool *pool, NeedId *needid, Id *ids, Id marker)
-{
-  int len, i;
-  Id lids[64], *sids;
-
-  if (!ids)
-    return;
-  if (!*ids)
-    {
-      write_u8(data, 0);
-      return;
-    }
-  for (len = 0; len < 64 && ids[len]; len++)
-    {
-      Id id = ids[len];
-      if (needid)
-        id = needid[ISRELDEP(id) ? RELOFF(id) : id].need;
-      lids[len] = id;
-    }
-  if (ids[len])
-    {
-      for (i = len + 1; ids[i]; i++)
-	;
-      sids = solv_malloc2(i, sizeof(Id));
-      memcpy(sids, lids, 64 * sizeof(Id));
-      for (; ids[len]; len++)
-	{
-	  Id id = ids[len];
-	  if (needid)
-            id = needid[ISRELDEP(id) ? RELOFF(id) : id].need;
-	  sids[len] = id;
-	}
-    }
-  else
-    sids = lids;
-
-  /* That bloody solvable:prereqmarker needs to stay in position :-(  */
-  if (needid)
-    marker = needid[marker].need;
-  for (i = 0; i < len; i++)
-    if (sids[i] == marker)
-      break;
-  if (i > 1)
-    solv_sort(sids, i, sizeof(Id), cmp_ids, 0);
-  if ((len - i) > 2)
-    solv_sort(sids + i + 1, len - i - 1, sizeof(Id), cmp_ids, 0);
-
-  Id id, old = 0;
-
-  /* The differencing above produces many runs of ones and twos.  I tried
-     fairly elaborate schemes to RLE those, but they give only very mediocre
-     improvements in compression, as coding the escapes costs quite some
-     space.  Even if they are coded only as bits in IDs.  The best improvement
-     was about 2.7% for the whole .solv file.  It's probably better to
-     invest some complexity into sharing idarrays, than RLEing.  */
-  for (i = 0; i < len - 1; i++)
-    {
-      id = sids[i];
-    /* Ugly PREREQ handling.  A "difference" of 0 is the prereq marker,
-       hence all real differences are offsetted by 1.  Otherwise we would
-       have to handle negative differences, which would cost code space for
-       the encoding of the sign.  We loose the exact mapping of prereq here,
-       but we know the result, so we can recover from that in the reader.  */
-      if (id == marker)
-	id = old = 0;
-      else
-	{
-          id = id - old + 1;
-	  old = sids[i];
-	}
-      /* XXX If difference is zero we have multiple equal elements,
-	 we might want to skip writing them out.  */
-      if (id >= 64)
-	id = (id & 63) | ((id & ~63) << 1);
-      write_id(data, id | 64);
-    }
-  id = sids[i];
-  if (id == marker)
-    id = 0;
-  else
-    id = id - old + 1;
-  if (id >= 64)
-    id = (id & 63) | ((id & ~63) << 1);
-  write_id(data, id);
-  if (sids != lids)
-    solv_free(sids);
-}
-#endif
-
-
 struct extdata {
   unsigned char *buf;
   int len;
@@ -482,8 +382,19 @@ data_addid64(struct extdata *xd, unsigned int x, unsigned int hx)
     data_addid(xd, (Id)x);
 }
 
+#define USE_REL_IDARRAY
+#ifdef USE_REL_IDARRAY
+
+static int
+cmp_ids(const void *pa, const void *pb, void *dp)
+{
+  Id a = *(Id *)pa;
+  Id b = *(Id *)pb;
+  return a - b;
+}
+
 static void
-data_addidarray_sort(struct extdata *xd, Pool *pool, NeedId *needid, Id *ids, Id marker)
+data_adddepids(struct extdata *xd, Pool *pool, NeedId *needid, Id *ids, Id marker)
 {
   int len, i;
   Id lids[64], *sids;
@@ -567,6 +478,27 @@ data_addidarray_sort(struct extdata *xd, Pool *pool, NeedId *needid, Id *ids, Id
   if (sids != lids)
     solv_free(sids);
 }
+
+#else
+
+static void
+data_adddepids(struct extdata *xd, Pool *pool, NeedId *needid, Id *ids, Id marker)
+{
+  Id id;
+  if (!ids || !*ids)
+    {
+      data_addid(xd, 0);
+      return;
+    }
+  while ((id = *ids++) != 0)
+    {
+      if (needid)
+        id = needid[ISRELDEP(id) ? RELOFF(id) : id].need;
+      data_addideof(xd, id, *ids ? 0 : 1);
+    }
+}
+
+#endif
 
 static inline void
 data_addblob(struct extdata *xd, unsigned char *blob, int len)
@@ -955,6 +887,10 @@ traverse_dirs(Dirpool *dp, Id *dirmap, Id n, Id dir, Id *used)
       dirmap[n++] = sib;
     }
 
+  /* check if our block has some content */
+  if (parent == n)
+    return n - 1;	/* nope, drop parent id again */
+
   /* now go through all the siblings we just added and
    * do recursive calls on them */
   lastn = n;
@@ -1165,7 +1101,11 @@ repo_write_filtered(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *
       if (i < SOLVABLE_PROVIDES)
         keyd.type = REPOKEY_TYPE_ID;
       else if (i < RPM_RPMDBID)
+#ifdef USE_REL_IDARRAY
         keyd.type = REPOKEY_TYPE_REL_IDARRAY;
+#else
+        keyd.type = REPOKEY_TYPE_IDARRAY;
+#endif
       else
         keyd.type = REPOKEY_TYPE_NUM;
       keyd.size = 0;
@@ -1803,21 +1743,21 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
 	  if (s->vendor && cbdata.keymap[SOLVABLE_VENDOR])
 	    data_addid(xd, needid[s->vendor].need);
 	  if (s->provides && cbdata.keymap[SOLVABLE_PROVIDES])
-	    data_addidarray_sort(xd, pool, needid, idarraydata + s->provides, SOLVABLE_FILEMARKER);
+	    data_adddepids(xd, pool, needid, idarraydata + s->provides, SOLVABLE_FILEMARKER);
 	  if (s->obsoletes && cbdata.keymap[SOLVABLE_OBSOLETES])
-	    data_addidarray_sort(xd, pool, needid, idarraydata + s->obsoletes, 0);
+	    data_adddepids(xd, pool, needid, idarraydata + s->obsoletes, 0);
 	  if (s->conflicts && cbdata.keymap[SOLVABLE_CONFLICTS])
-	    data_addidarray_sort(xd, pool, needid, idarraydata + s->conflicts, 0);
+	    data_adddepids(xd, pool, needid, idarraydata + s->conflicts, 0);
 	  if (s->requires && cbdata.keymap[SOLVABLE_REQUIRES])
-	    data_addidarray_sort(xd, pool, needid, idarraydata + s->requires, SOLVABLE_PREREQMARKER);
+	    data_adddepids(xd, pool, needid, idarraydata + s->requires, SOLVABLE_PREREQMARKER);
 	  if (s->recommends && cbdata.keymap[SOLVABLE_RECOMMENDS])
-	    data_addidarray_sort(xd, pool, needid, idarraydata + s->recommends, 0);
+	    data_adddepids(xd, pool, needid, idarraydata + s->recommends, 0);
 	  if (s->suggests && cbdata.keymap[SOLVABLE_SUGGESTS])
-	    data_addidarray_sort(xd, pool, needid, idarraydata + s->suggests, 0);
+	    data_adddepids(xd, pool, needid, idarraydata + s->suggests, 0);
 	  if (s->supplements && cbdata.keymap[SOLVABLE_SUPPLEMENTS])
-	    data_addidarray_sort(xd, pool, needid, idarraydata + s->supplements, 0);
+	    data_adddepids(xd, pool, needid, idarraydata + s->supplements, 0);
 	  if (s->enhances && cbdata.keymap[SOLVABLE_ENHANCES])
-	    data_addidarray_sort(xd, pool, needid, idarraydata + s->enhances, 0);
+	    data_adddepids(xd, pool, needid, idarraydata + s->enhances, 0);
 	  if (repo->rpmdbid && cbdata.keymap[RPM_RPMDBID])
 	    data_addid(xd, repo->rpmdbid[i - repo->start]);
 	  if (anyrepodataused)

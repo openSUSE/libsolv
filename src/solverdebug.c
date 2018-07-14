@@ -108,7 +108,7 @@ solver_printruleclass(Solver *solv, int type, Rule *r)
   Id p = r - solv->rules;
   assert(p >= 0);
   if (p < solv->learntrules)
-    if (MAPTST(&solv->weakrulemap, p))
+    if (solv->weakrulemap.size && MAPTST(&solv->weakrulemap, p))
       POOL_DEBUG(type, "WEAK ");
   if (solv->learntrules && p >= solv->learntrules)
     POOL_DEBUG(type, "LEARNT ");
@@ -566,38 +566,5 @@ solver_printallsolutions(Solver *solv)
           POOL_DEBUG(SOLV_DEBUG_RESULT, "\n");
         }
     }
-}
-
-void
-solver_printtrivial(Solver *solv)
-{
-  Pool *pool = solv->pool;
-  Queue in, out;
-  Id p;
-  const char *n;
-  Solvable *s;
-  int i;
-
-  queue_init(&in);
-  for (p = 1, s = pool->solvables + p; p < solv->pool->nsolvables; p++, s++)
-    {
-      n = pool_id2str(pool, s->name);
-      if (strncmp(n, "patch:", 6) != 0 && strncmp(n, "pattern:", 8) != 0)
-        continue;
-      queue_push(&in, p);
-    }
-  if (!in.count)
-    {
-      queue_free(&in);
-      return;
-    }
-  queue_init(&out);
-  solver_trivial_installable(solv, &in, &out);
-  POOL_DEBUG(SOLV_DEBUG_RESULT, "trivial installable status:\n");
-  for (i = 0; i < in.count; i++)
-    POOL_DEBUG(SOLV_DEBUG_RESULT, "  %s: %d\n", pool_solvid2str(pool, in.elements[i]), out.elements[i]);
-  POOL_DEBUG(SOLV_DEBUG_RESULT, "\n");
-  queue_free(&in);
-  queue_free(&out);
 }
 

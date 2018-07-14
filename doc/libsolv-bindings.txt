@@ -141,6 +141,52 @@ other ruby modules:
 	puts "empty" if repo.isempty?
 
 
+Tcl Specifics
+-------------
+Libsolv's tcl bindings can be loaded with the following statement:
+
+	TCL package require solv
+
+Objects are either created by calling class name prefixed with ``new_'',
+or they are returned by calling methods on other objects.
+
+	TCL set pool [solv::new_Pool]
+	TCL set repo [$pool add_repo "my_first_repo"]
+
+Swig provides a ``cget'' method to read object attributes, and a
+``configure'' method to write them:
+
+	TCL $pool configure -appdata 42
+	TCL puts "appdata is [$pool cget -appdata]"
+
+The tcl bindings provide a little helper to work with iterators in
+a foreach style:
+
+	TCL set iter [$pool solvables_iter]
+	TCL solv::iter s $iter { ... }
+
+libsolv's arrays are mapped to tcl's lists:
+
+	TCL set jobs [list $job1 $job2]
+	TCL set problems [$solver solve $jobs]
+	TCL puts "We have [llength $problems] problems..."
+
+Stringification is done by calling the object's ``str'' method.
+
+	TCL puts [$dep str]
+
+There is one exception: you have to use ``stringify'' for Datamatch
+objects, as swig reports a clash with the ``str'' attribute.
+Some objects also support a ``=='' method for equality tests, and a
+``!='' method.
+
+Swig implements all constants as numeric variables, constants belonging
+to a libsolv class are prefixed with the class name:
+
+	TCL $pool set_flag $solv::Pool_POOL_FLAG_OBSOLETEUSESCOLORS  1
+	TCL puts [$solvable lookup_str $solv::SOLVABLE_SUMMARY]
+	
+
 The Solv Class
 --------------
 This is the main namespace of the library, you cannot create objects of this
@@ -157,7 +203,7 @@ the ``less than'' bit
 the ``equals to'' bit
 
 *REL_GT*::
-the ``greater then'' bit
+the ``greater than'' bit
 
 *REL_ARCH*::
 used for relations that describe an extra architecture filter, the
@@ -303,7 +349,7 @@ obsoleted packages still get removed.
 Make the addfileprovides method only add files from the standard
 locations (i.e. the ``bin'' and ``etc'' directories). This is
 useful if you have only few packages that use non-standard file
-dependencies, but you still wand the fast speed that addfileprovides()
+dependencies, but you still want the fast speed that addfileprovides()
 generates.
 
 === METHODS ===
@@ -321,7 +367,7 @@ that still references the pool.
 	pool.disown()
 	pool.disown()
 
-Break the ownership relation betwen the binding object and the pool. After
+Break the ownership relation between the binding object and the pool. After
 this call, the pool will not get freed even if the object goes out of
 scope. This also means that you must manually call the free method to free
 the pool data.
@@ -415,7 +461,7 @@ not in the pool and _create_ is false, *undef*/*None*/*nil* is returned.
 Some package managers like rpm allow dependencies on files contained in other
 packages. To allow libsolv to deal with those dependencies in an efficient way,
 you need to call the addfileprovides method after creating and reading all
-repositories. This method will scan all dependency for file names and than scan
+repositories. This method will scan all dependency for file names and then scan
 all packages for matching files. If a filename has been matched, it will be
 added to the provides list of the corresponding package. The
 addfileprovides_queue variant works the same way but returns an array
@@ -439,7 +485,7 @@ the call to addfileprovides().
 	solvables = pool.whatprovides(dep)
 
 Return all solvables that provide the specified dependency. You can use either
-a Dep object or an simple Id as argument.
+a Dep object or a simple Id as argument.
 
 	Id *matchprovidingids(const char *match, int flags)
 	my @ids = $pool->matchprovidingids($match, $flags);
@@ -457,6 +503,21 @@ string. See the Dataiterator class for the allowed flags.
 ``Internalize'' an array containing Ids. The returned value can be used to
 create solver jobs working on a specific set of packages. See the Solver class
 for more information.
+
+	void set_namespaceproviders(DepId ns, DepId evr, bool value = 1)
+	$pool->set_namespaceproviders($ns, $evr, 1);
+	pool.set_namespaceproviders(ns, evr, True)
+	pool.set_namespaceproviders(ns, evr, true)
+
+Manually set an namespace provides entry in the whatprovides index.
+
+	void flush_namespaceproviders(DepId ns, DepId evr)
+        $pool->flush_namespaceproviders($ns, $evr);
+        $pool.flush_namespaceproviders(ns, evr)
+        $pool.flush_namespaceproviders(ns, evr)
+
+Flush the cache of all namespacprovudes matching the specified namespace
+dependency. You can use zero as a wildcard argument.
 
 	bool isknownarch(DepId id)
 	my $bool = $pool->isknownarch($id);
@@ -505,6 +566,24 @@ Create a selection by matching packages against the specified string. See the
 Selection class for a list of flags and how to create solver jobs from a
 selection.
 
+	Selection matchdeps(const char *name, int flags, Id keyname, Id marker = -1)
+	my $sel = $pool->matchdeps($name, $flags, $keyname);
+	sel = pool.matchdeps(name, flags, keyname)
+	sel = pool.matchdeps(name, flags, keyname)
+
+Create a selection by matching package dependencies against the specified string.
+This can be used if you want to match other dependency types than "provides".
+
+	Selection matchdepid(DepId dep, int flags, Id keyname, Id marker = -1)
+	my $sel = $pool->matchdepid(dep, $flags, $keyname);
+	sel = pool.matchdepid(dep, flags, keyname)
+	sel = pool.matchdepid(dep, flags, keyname)
+
+Create a selection by matching package dependencies against the specified
+dependency. This may be faster than matchdeps and also works with complex
+dependencies. The downside is that you cannot use globs or case insensitive
+matching.
+
 	void setpooljobs(Jobs *jobs)
 	$pool->setpooljobs(\@jobs);
 	pool.setpooljobs(jobs)
@@ -529,8 +608,18 @@ Set the callback function called when repository metadata needs to be loaded on
 demand. To make use of this feature, you need to create repodata stubs that
 tell the library which data is available but not loaded. If later on the data
 needs to be accessed, the callback function is called with a repodata argument.
-You can then load the data (maybe fetching it first from an remote server).
+You can then load the data (maybe fetching it first from a remote server).
 The callback should return true if the data has been made available.
+
+	/* bindings only */
+	$pool->appdata_disown()
+	pool.appdata_disown()
+	pool.appdata_disown()
+
+Decrement the reference count of the appdata object. This can be used to break
+circular references (e.g. if the pool's appdata value points to some meta data
+structure that contains a pool handle). If used incorrectly, this method can
+lead to application crashes, so beware. (This method is a no-op for ruby and tcl.)
 
 === DATA RETRIEVAL METHODS ===
 
@@ -853,7 +942,7 @@ in your code.
 Do not create stubs for repository parts that can be downloaded on demand.
 
 *SUSETAGS_RECORD_SHARES*::
-This is specific to the add_susetags() method. Susetags allows to refer to
+This is specific to the add_susetags() method. Susetags allows one to refer to
 already read packages to save disk space. If this data sharing needs to
 work over multiple calls to add_susetags, you need to specify this flag so
 that the share information is made available to subsequent calls.
@@ -1065,7 +1154,7 @@ parameter.
 
 Add the repomd.xml meta description from the "rpm-md" format to the repository.
 This file contains information about the repository like keywords, and also a
-list of all database files with checksums. The data is added the the "meta"
+list of all database files with checksums. The data is added to the "meta"
 section of the repository, i.e. no package gets created.
 
 	bool add_updateinfoxml(FILE *fp, int flags = 0)
@@ -1117,9 +1206,9 @@ Add the contents of the mageia/mandriva repository metadata (the
 "synthesis.hdlist" file) to the repository.
 
 	bool add_mdk_info(FILE *fp, int flags = 0)
-	$repo->add_mdk($fp);
-	repo.add_mdk(fp)
-	repo.add_mdk(fp)
+	$repo->add_mdk_info($fp);
+	repo.add_mdk_info(fp)
+	repo.add_mdk_info(fp)
 
 Extend the packages from the synthesis file with the info.xml and files.xml
 data. Do not forget to specify *REPO_EXTEND_SOLVABLES*.
@@ -1147,7 +1236,7 @@ The _dir_ parameter is usually set to "/var/lib/pacman/local".
 
 Add the ``content'' meta description from the susetags format to the repository.
 This file contains information about the repository like keywords, and also
-a list of all database files with checksums. The data is added the the "meta"
+a list of all database files with checksums. The data is added to the "meta"
 section of the repository, i.e. no package gets created.
 
 	bool add_susetags(FILE *fp, Id defvendor, const char *language, int flags = 0)
@@ -1301,6 +1390,13 @@ Return a tuple containing the on-media location and an optional
 media number for multi-part repositories (e.g. repositories
 spawning multiple DVDs).
 
+	const char *lookup_sourcepkg();
+	my $sourcepkg = $solvable->lookup_sourcepkg();
+	sourcepkg = solvable.lookup_sourcepkg()
+	sourcepkg = solvable.lookup_sourcepkg()
+
+Return a sourcepkg name associated with solvable.
+
 	Dataiterator Dataiterator(Id keyname, const char *match = 0, int flags = 0)
 	my $di = $solvable->Dataiterator($keyname, $match, $flags);
 	di = solvable.Dataiterator(keyname, match, flags)
@@ -1344,19 +1440,26 @@ Return true if the solvable is installed on the system.
 
 	bool identical(Solvable *other)
 	$solvable->identical($other)
-	$solvable.identical(other)
-	$solvable.identical?(other)
+	solvable.identical(other)
+	solvable.identical?(other)
 
 Return true if the two solvables are identical.
 
 	int evrcmp(Solvable *other)
-	$solvable->evrcmp(other)
-	$solvable.evrcmp(other)
-	$solvable.evrcmp(other)
+	$solvable->evrcmp($other)
+	solvable.evrcmp(other)
+	solvable.evrcmp(other)
 
-Returns -1 if the epoch/version/release of the solvable is less then the
+Returns -1 if the epoch/version/release of the solvable is less than the
 one from the other solvable, 1 if it is greater, and 0 if they are equal.
 Note that "equal" does not mean that the evr is identical.
+
+	int matchesdep(Id keyname, DepId id, Id marker = -1)
+	$solvable->matchesdep($keyname, $dep)
+	solvable.matchesdep(keyname, dep)
+	solvable.matchesdep?(keyname, dep)
+
+Return true if the dependencies stored in keyname match the specified dependency.
 
 	Selection Selection(int setflags = 0)
 	my $sel = $solvable->Selection();
@@ -1440,7 +1543,7 @@ Allow the matching of checksum entries.
 Do a sub-search in the array stored in keyname.
 
 	void skip_solvable();
-	$di->kip_solvable();
+	$di->skip_solvable();
 	di.skip_solvable()
 	di.skip_solvable()
 
@@ -1612,22 +1715,12 @@ of the package. This is normally a combination of the name,
 the version, and the architecture of a package.
 
 *SELECTION_DOTARCH*::
-Allow an ``.<architecture>'' suffix when matching names or
+Allow an ".<architecture>" suffix when matching names or
 provides.
  
 *SELECTION_REL*::
 Allow the specification of a relation when matching names
-or provides, e.g. "name >= 1.2".
-
-*SELECTION_INSTALLED_ONLY*::
-Limit the package search to installed packages.
-
-*SELECTION_SOURCE_ONLY*::
-Limit the package search to source packages only.
-
-*SELECTION_WITH_SOURCE*::
-Extend the package search to also match source packages. The default is
-only to match binary packages.
+or dependencies, e.g. "name >= 1.2".
 
 *SELECTION_GLOB*::
 Allow glob matching for package names, package provides, and file names.
@@ -1642,6 +1735,42 @@ Multiple elements are useful if you want to turn the selection into
 an install job, in that case you want an install job for every
 globbed package.
 
+*SELECTION_SKIP_KIND*::
+Remove a "packagekind:" prefix from the package names.
+
+*SELECTION_MATCH_DEPSTR*::
+When matching dependencies, do a string match on the result of dep2str
+instead of using the normal dependency intersect algorithm.
+
+*SELECTION_INSTALLED_ONLY*::
+Limit the package search to installed packages.
+
+*SELECTION_SOURCE_ONLY*::
+Limit the package search to source packages only.
+
+*SELECTION_WITH_SOURCE*::
+Extend the package search to also match source packages. The default is
+only to match binary packages.
+
+*SELECTION_WITH_DISABLED*::
+Extend the package search to also include disabled packages.
+
+*SELECTION_WITH_BADARCH*::
+Extend the package search to also include packages that are not installable
+on the configured architecture.
+
+*SELECTION_WITH_ALL*::
+Shortcut for selecting the three modifiers above.
+
+*SELECTION_ADD*::
+Add the result of the match to the current selection instead of replacing it.
+
+*SELECTION_SUBTRACT*::
+Remove the result of the match to the current selection instead of replacing it.
+
+*SELECTION_FILTER*::
+Intersect the result of the match to the current selection instead of replacing it.
+
 === ATTRIBUTES ===
 
 	Pool *pool;				/* read only */
@@ -1653,7 +1782,7 @@ Back pointer to pool.
 
 === METHODS ===
 
-	int flags();
+	int flags()
 	my $flags = $sel->flags();
 	flags = sel.flags()
 	flags = sel.flags()
@@ -1666,12 +1795,19 @@ flags will either be SELECTION_NAME or SELECTION_PROVIDES depending
 if there was a package that matched the name or not. If there was
 no match at all, the flags will be zero.
 
-	bool isempty();
+	bool isempty()
 	$sel->isempty()
 	sel.isempty()
 	sel.isempty?
 
 Return true if the selection is empty, i.e. no package could be matched.
+
+	Selection clone(int flags = 0)
+	my $cloned = $sel->clone();
+	cloned = sel.clone()
+	cloned = sel.clone()
+
+Return a copy of a selection.
 
 	void filter(Selection *other)
 	$sel->filter($other);
@@ -1691,13 +1827,22 @@ be added to the set of packages of the selection object. Does an in-place
 modification. Note that the selection flags are no longer meaningful after the
 add operation.
 
+	void subtract(Selection *other)
+	$sel->subtract($other);
+	sel.subtract(other)
+	sel.subtract(other)
+
+Remove the packages of the other selection from the packages of the selection
+object. Does an in-place modification.
+
 	void add_raw(Id how, Id what)
 	$sel->add_raw($how, $what);
 	sel.add_raw(how, what)
 	sel.add_raw(how, what)
 
 Add a raw element to the selection. Check the Job class for information about
-the how and what parameters.
+the how and what parameters. Note that the selection flags are no longer meaningful
+after the add_raw operation.
 
 	Job *jobs(int action)
 	my @jobs = $sel->jobs($action);
@@ -1714,6 +1859,30 @@ erase). See the Job class for the action and action modifier constants.
 	solvables = sel.solvables()
 
 Convert a selection into an array of Solvable objects.
+
+	void select(const char *name, int flags)
+	$sel->select($name, $flags);
+	sel.select(name, flags)
+	sel.select(name, flags)
+
+Do a select operation and combine the result with the current selection. You
+can choose the desired combination method by using either the SELECTION_ADD,
+SELECTION_SUBTRACT, or SELECTION_FILTER flag. If none of the flags are
+used, SELECTION_FILTER|SELECTION_WITH_ALL is assumed.
+
+	void matchdeps(const char *name, int flags, Id keyname, Id marker = -1)
+	$sel->matchdeps($name, $flags, $keyname);
+	sel.matchdeps(name, flags, keyname)
+	sel.matchdeps(name, flags, keyname)
+
+Do a matchdeps operation and combine the result with the current selection.
+
+	void matchdepid(DepId dep, int flags, Id keyname, Id marker = -1)
+	$sel->matchdepid($dep, $flags, $keyname);
+	sel.matchdepid(dep, flags, keyname)
+	sel.matchdepid(dep, flags, keyname)
+
+Do a matchdepid operation and combine the result with the current selection.
 
 	<stringification>
 	my $str = $sel->str;
@@ -1816,6 +1985,21 @@ The matching installed packages are considered to be installed by a user,
 thus not installed to fulfill some dependency. This is needed input for
 the calculation of unneeded packages for jobs that have the
 SOLVER_CLEANDEPS flag set.
+
+*SOLVER_ALLOWUNINSTALL*::
+Allow the solver to deinstall the matching installed packages if they get
+into the way of resolving a dependency. This is like the
+SOLVER_FLAG_ALLOW_UNINSTALL flag, but limited to a specific set of packages.
+
+*SOLVER_FAVOR*::
+Prefer the specified packages if the solver encounters an alternative. If
+a job contains multiple matching favor/disfavor elements, the last one takes
+precedence.
+
+*SOLVER_DISFAVOR*::
+Avoid the specified packages if the solver encounters an alternative. This
+can also be used to block recommended or supplemented packages from being
+installed.
 
 *SOLVER_JOBMASK*::
 A mask containing all the above action bits.
@@ -2049,6 +2233,11 @@ packages that also obsolete the package but are not considered for
 updating. If you cannot use this feature, you can turn it off
 by setting this flag.
 
+*SOLVER_FLAG_NEED_UPDATEPROVIDE*::
+This is somewhat the opposite of SOLVER_FLAG_NO_UPDATEPROVIDE: Only
+packages that provide the installed package names are considered
+for updating.
+
 *SOLVER_FLAG_SPLITPROVIDES*::
 Make the solver aware of special provides of the form
 ``<packagename>:<path>'' used in SUSE systems to support package
@@ -2091,10 +2280,30 @@ of resolving non-orphaned ones. Setting the flag might result
 in no longer working packages in case they are orphaned.
 
 *SOLVER_FLAG_FOCUS_INSTALLED*::
-Resolve installed packages before resolving the given job.
+Resolve installed packages before resolving the given jobs.
 Setting this flag means that the solver will prefer picking
 a package version that fits the other installed packages
 over updating installed packages.
+
+*SOLVER_FLAG_FOCUS_BEST*::
+First resolve the given jobs, then the dependencies of the
+resulting packages, then resolve all already installed
+packages. This will result in more packages being updated
+as when the flag is not used.
+
+*SOLVER_FLAG_INSTALL_ALSO_UPDATES*::
+Update the package if a job is already fulfilled by an installed
+package.
+
+*SOLVER_FLAG_YUM_OBSOLETES*::
+Turn on yum-like package split handling. See the yum documentation
+for more details.
+
+*SOLVER_FLAG_URPM_REORDER*::
+Turn on urpm like package reordering for kernel packages. See
+the urpm documentation for more details.
+
+
 
 Basic rule types:
 
@@ -2110,7 +2319,7 @@ installed package has an update rule that consists of the packages
 that may replace the installed package.
 
 *SOLVER_RULE_FEATURE*::
-Feature rules are fallback rules used when a update rule is disabled. They
+Feature rules are fallback rules used when an update rule is disabled. They
 include all packages that may replace the installed package ignoring the
 update policy, i.e. they contain downgrades, arch changes and so on.
 Without them, the solver would simply erase installed packages if their
@@ -2120,7 +2329,7 @@ update rule gets disabled.
 Job rules implement the job given to the solver.
 
 *SOLVER_RULE_DISTUPGRADE*::
-This are simple negative assertions that make sure that only packages
+These are simple negative assertions that make sure that only packages
 are kept that are also available in one of the repositories.
 
 *SOLVER_RULE_INFARCH*::
@@ -2137,7 +2346,7 @@ choice rules, so you will not see them when a problem is found.
 *SOLVER_RULE_LEARNT*::
 These rules are generated by the solver to keep it from running into
 the same problem multiple times when it has to backtrack. They are
-the main reason why a sat solver is faster then other dependency solver
+the main reason why a sat solver is faster than other dependency solver
 implementations.
 
 Special dependency rule types:
@@ -2354,6 +2563,23 @@ interfaces that show both the job result and the problems.
 Return the reason why a specific solvable was installed or erased. For most of
 the reasons the rule that triggered the decision is also returned.
 
+	Solvable *get_recommended(bool noselected=0);
+	my @solvables = $solver->get_recommended();
+	solvables = solver.get_recommended()
+	solvables = solver.get_recommended()
+
+Return all solvables that are recommended by the solver run result. This includes
+solvables included in the result, set noselected if you want to filter those.
+
+	Solvable *get_suggested(bool noselected=0);
+	my @solvables = $solver->get_suggested();
+	solvables = solver.get_suggested()
+	solvables = solver.get_suggested()
+
+Return all solvables that are suggested by the solver run result. This includes
+solvables included in the result, set noselected if you want to filter those.
+
+
 The Problem Class
 -----------------
 Problems are the way of the solver to interact with the user. You can simply list
@@ -2390,8 +2616,8 @@ that somewhat describes the problem best to the user.
 
 	Rule *findallproblemrules(bool unfiltered = 0)
 	my @probrules = $problem->findallproblemrules();
-	probrules = problem.findallproblemrule()
-	probrules = problem.findallproblemrule()
+	probrules = problem.findallproblemrules()
+	probrules = problem.findallproblemrules()
 
 Return all rules responsible for the problem. The returned set of rules contains
 all the needed information why there was a problem, but it's hard to present
@@ -2680,7 +2906,7 @@ the solver class.
 
 Create a job that implements the solution element. Add this job to the array
 of jobs for all elements of type different to SOLVER_SOLUTION_JOB and
-SOLVER_SOLUTION_POOLJOB. For the later two, a SOLVER_NOOB Job is created,
+SOLVER_SOLUTION_POOLJOB. For the latter two, a SOLVER_NOOB Job is created,
 you should replace the old job with the new one.
 
 	const char *str()
@@ -2718,7 +2944,7 @@ This element installs a package with a different version keeping the other
 versions installed.
 
 *SOLVER_TRANSACTION_MULTIREINSTALL*::
-This element reinstalls a installed package keeping the other versions
+This element reinstalls an installed package keeping the other versions
 installed.
 
 Transaction element types, active view
@@ -2734,7 +2960,7 @@ different content.
 This element installs a newer version of an installed package.
 
 *SOLVER_TRANSACTION_DOWNGRADE*::
-This element installs a older version of an installed package.
+This element installs an older version of an installed package.
 
 *SOLVER_TRANSACTION_OBSOLETES*::
 This element installs a package that obsoletes an installed package.
@@ -2836,7 +3062,7 @@ Returns true if the transaction does not do anything, i.e. has no elements.
 	newsolvables = trans.newsolvables()
 	newsolvables = trans.newsolvables()
 
-Return all packages that are to be installed by the transaction. This are
+Return all packages that are to be installed by the transaction. These are
 the packages that need to be downloaded from the repositories.
 
 	Solvable *keptsolvables();
@@ -2914,18 +3140,18 @@ Return the size change of the installed system in kilobytes (kibibytes).
 	trans.order()
 	trans.order()
 
-Order the steps in the transactions so that dependant packages are updated
+Order the steps in the transactions so that dependent packages are updated
 before packages that depend on them. For rpm, you can also use rpmlib's
 ordering functionality, debian's dpkg does not provide a way to order a
 transaction.
 
 === ACTIVE/PASSIVE VIEW ===
 
-Active view list what new packages get installed, while passive view shows
+Active view lists what new packages get installed, while passive view shows
 what happens to the installed packages. Most often there's not much
-difference between the two modes, but things get interesting of multiple
-package get replaced by one new package. Say you have installed package
-A-1-1 and B-1-1, and now install A-2-1 with has a new dependency that
+difference between the two modes, but things get interesting if multiple
+packages get replaced by one new package. Say you have installed packages
+A-1-1 and B-1-1, and now install A-2-1 which has a new dependency that
 obsoletes B. The transaction elements will be
 
   updated   A-1-1 (other: A-2-1)
@@ -3029,7 +3255,14 @@ These keys are constants in the *solv* class.
 	chksum = solv.Chksum(type, hex)
 	chksum = Solv::Chksum.new(type, hex)
 
-Create an already finalized checksum object.
+Create an already finalized checksum object from a hex string.
+
+	Chksum Chksum_from_bin(Id type, char *bin)
+	my $chksum = solv::Chksum->from_bin($type, $bin);
+	chksum = solv.Chksum.from_bin(type, bin)
+	chksum = Solv::Chksum.from_bin(type, bin)
+
+Create an already finalized checksum object from a binary checksum.
 
 === ATTRIBUTES ===
 
@@ -3047,7 +3280,7 @@ Return the type of the checksum object.
 	chksum.add(str)
 	chksum.add(str)
 
-Add a string to the checksum.
+Add a (binary) string to the checksum.
 
 	void add_fp(FILE *fp)
 	$chksum->add_fp($file);
@@ -3132,7 +3365,8 @@ stdio library.
 
 Create a file handle from the specified file descriptor. The path argument is
 only used to select the correct (de-)compression algorithm, use an empty path
-if you want to make sure to read/write raw data.
+if you want to make sure to read/write raw data. The file descriptor is dup()ed
+before the file handle is created.
 
 === METHODS ===
 
@@ -3143,6 +3377,16 @@ if you want to make sure to read/write raw data.
 
 Return file file descriptor of the file. If the file is not open, `-1` is
 returned.
+
+	void cloexec(bool state)
+	$file->cloexec($state)
+	file.cloexec(state)
+	file.cloexec(state)
+
+Set the close-on-exec flag of the file descriptor. The xfopen function
+returns files with close-on-exec turned on, so if you want to pass
+a file to some other process you need to call cloexec(0) before calling
+exec.
 
 	int dup()
 	my $fileno = $file->dup();
@@ -3165,7 +3409,7 @@ always returns true.
 	file.close()
 	file.close()
 
-Close the file. This is needed for languages like Ruby, that do not destruct
+Close the file. This is needed for languages like Ruby that do not destruct
 objects right after they are no longer referenced. In that case, it is good
 style to close open files so that the file descriptors are freed right away.
 Returns false if there was an error.
@@ -3213,6 +3457,26 @@ after it has been internalized.
 
 Write the contents of the repodata area as solv file.
 
+	Id str2dir(const char *dir, bool create = 1)
+	my $did = data->str2dir($dir);
+	did = data.str2dir(dir)
+	did = data.str2dir(dir)
+
+	const char *dir2str(Id did, const char *suffix = 0)
+	$dir = pool->dir2str($did);
+	dir = pool.dir2str(did)
+	dir = pool.dir2str(did)
+
+Convert a string (directory) into an Id and back. If the string is currently not in the
+pool and _create_ is false, zero is returned.
+
+	void add_dirstr(Id solvid, Id keyname, Id dir, const char *str)
+	$data->add_dirstr($solvid, $keyname, $dir, $string)
+	data.add_dirstr(solvid, keyname, dir, string)
+	data.add_dirstr(solvid, keyname, dir, string)
+
+Add a file path consisting of a dirname Id and a basename string.
+
 	bool add_solv(FILE *fp, int flags = 0);
 	$data->add_solv($fp);
 	data.add_solv(fp)
@@ -3236,9 +3500,10 @@ area.
 	data.extend_to_repo()
 
 Extend the repodata so that it has the same size as the repo it belongs to.
-This method is only needed when switching to a just written repodata extension
-to make the repodata match the written extension (which is always of the
-size of the repo).
+This method is needed when setting up a new extension repodata so that it
+matches the repository size. It is also needed when switching to a just written
+repodata extension to make the repodata match the written extension (which is
+always of the size of the repo).
 
 	<equality>
 	if ($data1 == $data2)
@@ -3290,6 +3555,11 @@ SOLVID_META solvid that stores repodata meta information.
 	$data->set_checksum($solvid, $keyname, $chksum);
 	data.set_checksum(solvid, keyname, chksum)
 	data.set_checksum(solvid, keyname, chksum)
+
+	void set_sourcepkg(Id solvid, const char *sourcepkg);
+	$data.set_sourcepkg($solvid, $sourcepkg);
+	data.set_sourcepkg(solvid, sourcepkg)
+	data.set_sourcepkg(solvid, sourcepkg)
 
 	void add_idarray(Id solvid, Id keyname, DepId id);
 	$data->add_idarray($solvid, $keyname, $id);
@@ -3408,3 +3678,6 @@ Author
 ------
 Michael Schroeder <mls@suse.de>
 
+////
+vim: syntax=asciidoc
+////

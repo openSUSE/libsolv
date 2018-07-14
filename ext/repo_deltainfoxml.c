@@ -5,20 +5,16 @@
  * for further information
  */
 
-#define DO_ARRAY 1
-
 #define _GNU_SOURCE
 #include <sys/types.h>
-#include <limits.h>
-#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <expat.h>
 
 #include "pool.h"
 #include "repo.h"
 #include "chksum.h"
+#include "solv_xmlparser.h"
 #include "repo_deltainfoxml.h"
 
 /*
@@ -52,15 +48,7 @@ enum state {
   NUMSTATES
 };
 
-struct stateswitch {
-  enum state from;
-  char *ename;
-  enum state to;
-  int docontent;
-};
-
-/* !! must be sorted by first column !! */
-static struct stateswitch stateswitches[] = {
+static struct solv_xmlparser_element stateswitches[] = {
   /* compatibility with old yum-presto */
   { STATE_START,       "prestodelta",     STATE_START, 0 },
   { STATE_START,       "deltainfo",       STATE_START, 0 },
@@ -93,19 +81,10 @@ struct deltarpm {
 
 struct parsedata {
   int ret;
-  int depth;
-  enum state state;
-  int statedepth;
-  char *content;
-  int lcontent;
-  int acontent;
-  int docontent;
   Pool *pool;
   Repo *repo;
   Repodata *data;
 
-  struct stateswitch *swtab[NUMSTATES];
-  enum state sbtab[NUMSTATES];
   struct deltarpm delta;
   Id newpkgevr;
   Id newpkgname;
@@ -113,22 +92,9 @@ struct parsedata {
 
   Id *handles;
   int nhandles;
+
+  struct solv_xmlparser xmlp;
 };
-
-/*
- * find attribute
- */
-
-static const char *
-find_attr(const char *txt, const char **atts)
-{
-  for (; *atts; atts += 2)
-    {
-      if (!strcmp(*atts, txt))
-        return atts[1];
-    }
-  return 0;
-}
 
 
 /*
@@ -139,7 +105,7 @@ static Id
 makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
 {
   const char *e, *v, *r, *v2;
-  char *c;
+  char *c, *space;
   int l;
 
   e = v = r = 0;
@@ -174,12 +140,7 @@ makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
     l += strlen(v);
   if (r)
     l += strlen(r) + 1;
-  if (l > pd->acontent)
-    {
-      pd->content = solv_realloc(pd->content, l + 256);
-      pd->acontent = l + 256;
-    }
-  c = pd->content;
+  c = space = solv_xmlparser_contentspace(&pd->xmlp, l);
   if (e)
     {
       strcpy(c, e);
@@ -198,59 +159,28 @@ makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
       c += strlen(c);
     }
   *c = 0;
-  if (!*pd->content)
+  if (!*space)
     return 0;
 #if 0
-  fprintf(stderr, "evr: %s\n", pd->content);
+  fprintf(stderr, "evr: %s\n", space);
 #endif
-  return pool_str2id(pool, pd->content, 1);
+  return pool_str2id(pool, space, 1);
 }
 
-static void XMLCALL
-startElement(void *userData, const char *name, const char **atts)
+static void
+startElement(struct solv_xmlparser *xmlp, int state, const char *name, const char **atts)
 {
-  struct parsedata *pd = userData;
+  struct parsedata *pd = xmlp->userdata;
   Pool *pool = pd->pool;
-  struct stateswitch *sw;
   const char *str;
 
-#if 0
-  fprintf(stderr, "start: [%d]%s\n", pd->state, name);
-#endif
-  if (pd->depth != pd->statedepth)
+  switch(state)
     {
-      pd->depth++;
-      return;
-    }
-
-  pd->depth++;
-  if (!pd->swtab[pd->state])
-    return;
-  for (sw = pd->swtab[pd->state]; sw->from == pd->state; sw++)  /* find name in statetable */
-    if (!strcmp(sw->ename, name))
-      break;
-  if (sw->from != pd->state)
-    {
-#if 0
-      fprintf(stderr, "into unknown: [%d]%s (from: %d)\n", sw->to, name, sw->from);
-#endif
-      return;
-    }
-  pd->state = sw->to;
-  pd->docontent = sw->docontent;
-  pd->statedepth = pd->depth;
-  pd->lcontent = 0;
-  *pd->content = 0;
-
-  switch(pd->state)
-    {
-    case STATE_START:
-      break;
     case STATE_NEWPACKAGE:
-      if ((str = find_attr("name", atts)) != 0)
+      if ((str = solv_xmlparser_find_attr("name", atts)) != 0)
 	pd->newpkgname = pool_str2id(pool, str, 1);
       pd->newpkgevr = makeevr_atts(pool, pd, atts);
-      if ((str = find_attr("arch", atts)) != 0)
+      if ((str = solv_xmlparser_find_attr("arch", atts)) != 0)
 	pd->newpkgarch = pool_str2id(pool, str, 1);
       break;
 
@@ -259,62 +189,44 @@ startElement(void *userData, const char *name, const char **atts)
       pd->delta.bevr = solv_extend(pd->delta.bevr, pd->delta.nbevr, 1, sizeof(Id), 7);
       pd->delta.bevr[pd->delta.nbevr++] = makeevr_atts(pool, pd, atts);
       break;
+
     case STATE_FILENAME:
-      if ((str = find_attr("xml:base", atts)))
+      if ((str = solv_xmlparser_find_attr("xml:base", atts)))
         pd->delta.locbase = solv_strdup(str);
       break;
+
     case STATE_LOCATION:
-      pd->delta.location = solv_strdup(find_attr("href", atts));
-      if ((str = find_attr("xml:base", atts)))
+      pd->delta.location = solv_strdup(solv_xmlparser_find_attr("href", atts));
+      if ((str = solv_xmlparser_find_attr("xml:base", atts)))
         pd->delta.locbase = solv_strdup(str);
       break;
-    case STATE_SIZE:
-      break;
+
     case STATE_CHECKSUM:
       pd->delta.filechecksum = 0;
       pd->delta.filechecksumtype = REPOKEY_TYPE_SHA1;
-      if ((str = find_attr("type", atts)) != 0)
+      if ((str = solv_xmlparser_find_attr("type", atts)) != 0)
 	{
 	  pd->delta.filechecksumtype = solv_chksum_str2type(str);
 	  if (!pd->delta.filechecksumtype)
 	    pool_debug(pool, SOLV_ERROR, "unknown checksum type: '%s'\n", str);
 	}
       break;
-    case STATE_SEQUENCE:
-      break;
+
     default:
       break;
     }
 }
 
 
-static void XMLCALL
-endElement(void *userData, const char *name)
+static void
+endElement(struct solv_xmlparser *xmlp, int state, char *content)
 {
-  struct parsedata *pd = userData;
+  struct parsedata *pd = xmlp->userdata;
   Pool *pool = pd->pool;
   const char *str;
 
-#if 0
-  fprintf(stderr, "end: %s\n", name);
-#endif
-  if (pd->depth != pd->statedepth)
+  switch (state)
     {
-      pd->depth--;
-#if 0
-      fprintf(stderr, "back from unknown %d %d %d\n", pd->state, pd->depth, pd->statedepth);
-#endif
-      return;
-    }
-
-  pd->depth--;
-  pd->statedepth--;
-  switch (pd->state)
-    {
-    case STATE_START:
-      break;
-    case STATE_NEWPACKAGE:
-      break;
     case STATE_DELTA:
       {
 	/* read all data for a deltarpm. commit into attributes */
@@ -356,16 +268,16 @@ endElement(void *userData, const char *name)
       pd->delta.locbase = solv_free(pd->delta.locbase);
       break;
     case STATE_FILENAME:
-      pd->delta.location = solv_strdup(pd->content);
+      pd->delta.location = solv_strdup(content);
       break;
     case STATE_CHECKSUM:
-      pd->delta.filechecksum = solv_strdup(pd->content);
+      pd->delta.filechecksum = solv_strdup(content);
       break;
     case STATE_SIZE:
-      pd->delta.downloadsize = strtoull(pd->content, 0, 10);
+      pd->delta.downloadsize = strtoull(content, 0, 10);
       break;
     case STATE_SEQUENCE:
-      if ((str = pd->content))
+      if ((str = content) != 0)
 	{
 	  const char *s1, *s2;
 	  s1 = strrchr(str, '-');
@@ -392,80 +304,32 @@ endElement(void *userData, const char *name)
     default:
       break;
     }
-
-  pd->state = pd->sbtab[pd->state];
-  pd->docontent = 0;
 }
 
-
-static void XMLCALL
-characterData(void *userData, const XML_Char *s, int len)
+void
+errorCallback(struct solv_xmlparser *xmlp, const char *errstr, unsigned int line, unsigned int column)
 {
-  struct parsedata *pd = userData;
-  int l;
-  char *c;
-  if (!pd->docontent)
-    return;
-  l = pd->lcontent + len + 1;
-  if (l > pd->acontent)
-    {
-      pd->content = solv_realloc(pd->content, l + 256);
-      pd->acontent = l + 256;
-    }
-  c = pd->content + pd->lcontent;
-  pd->lcontent += len;
-  while (len-- > 0)
-    *c++ = *s++;
-  *c = 0;
+  struct parsedata *pd = xmlp->userdata;
+  pd->ret = pool_error(pd->pool, -1, "repo_deltainfoxml: %s at line %u:%u", errstr, line, column);
 }
-
-#define BUFF_SIZE 8192
 
 int
 repo_add_deltainfoxml(Repo *repo, FILE *fp, int flags)
 {
   Pool *pool = repo->pool;
-  struct parsedata pd;
-  char buf[BUFF_SIZE];
-  int i, l;
-  struct stateswitch *sw;
   Repodata *data;
-  XML_Parser parser;
+  struct parsedata pd;
+  int i;
 
   data = repo_add_repodata(repo, flags);
 
   memset(&pd, 0, sizeof(pd));
-  for (i = 0, sw = stateswitches; sw->from != NUMSTATES; i++, sw++)
-    {
-      if (!pd.swtab[sw->from])
-        pd.swtab[sw->from] = sw;
-      pd.sbtab[sw->to] = sw->from;
-    }
   pd.pool = pool;
   pd.repo = repo;
   pd.data = data;
-
-  pd.content = solv_malloc(256);
-  pd.acontent = 256;
-  pd.lcontent = 0;
-
-  parser = XML_ParserCreate(NULL);
-  XML_SetUserData(parser, &pd);
-  XML_SetElementHandler(parser, startElement, endElement);
-  XML_SetCharacterDataHandler(parser, characterData);
-  for (;;)
-    {
-      l = fread(buf, 1, sizeof(buf), fp);
-      if (XML_Parse(parser, buf, l, l == 0) == XML_STATUS_ERROR)
-	{
-	  pd.ret = pool_error(pool, -1, "repo_updateinfoxml: %s at line %u:%u", XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser), (unsigned int)XML_GetCurrentColumnNumber(parser));
-	  break;
-	}
-      if (l == 0)
-	break;
-    }
-  XML_ParserFree(parser);
-  solv_free(pd.content);
+  solv_xmlparser_init(&pd.xmlp, stateswitches, &pd, startElement, endElement, errorCallback);
+  solv_xmlparser_parse(&pd.xmlp, fp);
+  solv_xmlparser_free(&pd.xmlp);
 
   /* now commit all handles */
   if (!pd.ret)

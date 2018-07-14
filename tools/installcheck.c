@@ -2,7 +2,7 @@
  */
 
 /*
- * Copyright (c) 2009, Novell Inc.
+ * Copyright (c) 2009-2015, SUSE LLC
  *
  * This program is licensed under the BSD license, read LICENSE.BSD
  * for further information
@@ -15,7 +15,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-#include <zlib.h>
 
 #include "pool.h"
 #include "poolarch.h"
@@ -28,6 +27,9 @@
 #endif
 #ifdef ENABLE_DEBIAN
 #include "repo_deb.h"
+#endif
+#ifdef ENABLE_ARCHREPO
+#include "repo_arch.h"
 #endif
 #include "solver.h"
 #include "solv_xfopen.h"
@@ -46,6 +48,22 @@ usage(char** argv)
   exit(1);
 }
 
+#if defined(ENABLE_SUSEREPO) || defined(ENABLE_RPMMD) || defined(ENABLE_DEBIAN) || defined(ENABLE_ARCHREPO)
+static int
+strlen_comp(const char *str)
+{
+  size_t l = strlen(str);
+  if (l > 3 && !strcmp(str + l - 3, ".gz"))
+    return l - 3;
+  if (l > 3 && !strcmp(str + l - 3, ".xz"))
+    return l - 3;
+  if (l > 4 && !strcmp(str + l - 4, ".bz2"))
+    return l - 4;
+  if (l > 5 && !strcmp(str + l - 4, ".lzma"))
+    return l - 5;
+  return l;
+}
+#endif
 
 int
 main(int argc, char **argv)
@@ -80,7 +98,10 @@ main(int argc, char **argv)
   for (i = 2; i < argc; i++)
     {
       FILE *fp;
-      int r, l;
+      int r;
+#if defined(ENABLE_SUSEREPO) || defined(ENABLE_RPMMD) || defined(ENABLE_DEBIAN) || defined(ENABLE_ARCHREPO)
+      int l;
+#endif
 
       if (!strcmp(argv[i], "--withsrc"))
 	{
@@ -109,7 +130,9 @@ main(int argc, char **argv)
           ++i;
           continue;
         }
-      l = strlen(argv[i]);
+#if defined(ENABLE_SUSEREPO) || defined(ENABLE_RPMMD) || defined(ENABLE_DEBIAN) || defined(ENABLE_ARCHREPO)
+      l = strlen_comp(argv[i]);
+#endif
       if (!strcmp(argv[i], "-"))
 	fp = stdin;
       else if ((fp = solv_xfopen(argv[i], 0)) == 0)
@@ -123,30 +146,43 @@ main(int argc, char **argv)
         {
         }
 #ifdef ENABLE_SUSEREPO
-      else if (l >= 8 && !strcmp(argv[i] + l - 8, "packages"))
-	{
-	  r = repo_add_susetags(repo, fp, 0, 0, 0);
-	}
-      else if (l >= 11 && !strcmp(argv[i] + l - 11, "packages.gz"))
+      else if (l >= 8 && !strncmp(argv[i] + l - 8, "packages", 8))
 	{
 	  r = repo_add_susetags(repo, fp, 0, 0, 0);
 	}
 #endif
 #ifdef ENABLE_RPMMD
-      else if (l >= 14 && !strcmp(argv[i] + l - 14, "primary.xml.gz"))
+      else if (l >= 11 && !strncmp(argv[i] + l - 11, "primary.xml", 11))
 	{
 	  r = repo_add_rpmmd(repo, fp, 0, 0);
+          if (!r && i + 1 < argc)
+            {
+              l = strlen_comp(argv[i + 1]);
+              if (l >= 13 && !strncmp(argv[i + 1] + l - 13, "filelists.xml", 13))
+                {
+                  i++;
+                  fclose(fp);
+                  if ((fp = solv_xfopen(argv[i], 0)) == 0)
+                    {
+                      perror(argv[i]);
+                      exit(1);
+                    }
+                  r = repo_add_rpmmd(repo, fp, 0, REPO_EXTEND_SOLVABLES|REPO_LOCALPOOL);
+                }
+            }
 	}
 #endif
 #ifdef ENABLE_DEBIAN
-      else if (l >= 8 && !strcmp(argv[i] + l - 8, "Packages"))
+      else if (l >= 8 && !strncmp(argv[i] + l - 8, "Packages", 8))
 	{
 	  r = repo_add_debpackages(repo, fp, 0);
 	}
-      else if (l >= 11 && !strcmp(argv[i] + l - 11, "Packages.gz"))
-	{
-	  r = repo_add_debpackages(repo, fp, 0);
-	}
+#endif
+#ifdef ENABLE_ARCHREPO
+      else if (l >= 7 && (!strncmp(argv[i] + l - 7, ".db.tar", 7)))
+        {
+	  r = repo_add_arch_repo(repo, fp, 0);
+        }
 #endif
       else
 	r = repo_add_solv(repo, fp, 0);
@@ -272,14 +308,6 @@ main(int argc, char **argv)
 	      cand.elements[j++] = p;
 	      continue;
 	    }
-#if 0
-	  Solvable *s = pool->solvables + p;
-	  if (!strcmp(pool_id2str(pool, s->name), "libusb-compat-devel"))
-	    {
-	      cand.elements[j++] = p;
-	      continue;
-	    }
-#endif
 	}
       cand.count = j;
       if (i == j)
@@ -413,15 +441,6 @@ main(int argc, char **argv)
 		}
 	    }
 	}
-#if 0
-      else
-	{
-	  if (!strcmp(pool_id2str(pool, s->name), "libusb-compat-devel"))
-	    {
-	      solver_printdecisions(solv);
-	    }
-	}
-#endif
     }
   solver_free(solv);
   exit(status);

@@ -1,0 +1,28 @@
+
+- make dataiterator only return the last occurance of a key
+
+- implement package priority (for things like Debian's pin feature)
+
+- merge SUSETAGS_FILE_* and  REPOSITORY_REPOMD_* keys into REPOSITORY_RESOURCE
+
+- re-order key ids
+
+- deal with DIRSTR entries having dirid 0 (for source rpms)
+
+- drop patchcheck
+
+- rename repo2solv.sh to repo2solv (maybe rewrite in C?)
+
+- obey -A option in repo2solv
+
+- make FAVOR handling deal with versions
+
+- write more manpages
+
+- bindings: selection.flags() should be a attribute and not a method
+
+- rename repodata_lookup_id_uninternalized to repodata_lookup_id_voidid_uninternalized
+  and add a notfound argument
+
+IDEAS:
+

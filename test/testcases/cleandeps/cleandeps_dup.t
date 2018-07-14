@@ -13,7 +13,8 @@ system i686 rpm system
 
 # check untargeted
 job distupgrade name A [cleandeps]
-result transaction,problems <inline>
+result transaction,problems,cleandeps <inline>
+#>cleandeps B1-1-1.noarch@system
 #>erase B1-1-1.noarch@system
 #>install B2-1-1.noarch@test
 #>upgrade A-1-1.noarch@system A-2-1.noarch@test
@@ -21,7 +22,8 @@ result transaction,problems <inline>
 # check targeted
 nextjob
 job distupgrade name A = 2 [cleandeps]
-result transaction,problems <inline>
+result transaction,problems,cleandeps <inline>
+#>cleandeps B1-1-1.noarch@system
 #>erase B1-1-1.noarch@system
 #>install B2-1-1.noarch@test
 #>upgrade A-1-1.noarch@system A-2-1.noarch@test
@@ -29,5 +31,15 @@ result transaction,problems <inline>
 # check targeted to 1-2
 nextjob
 job distupgrade name A = 1-2 [cleandeps]
-result transaction,problems <inline>
+result transaction,problems,cleandeps <inline>
 #>upgrade A-1-1.noarch@system A-1-2.noarch@test
+
+# check all packages
+nextjob
+job distupgrade all packages [cleandeps]
+result transaction,problems,cleandeps <inline>
+#>cleandeps B1-1-1.noarch@system
+#>erase B1-1-1.noarch@system
+#>install B2-1-1.noarch@test
+#>upgrade A-1-1.noarch@system A-2-1.noarch@test
+

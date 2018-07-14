@@ -109,12 +109,12 @@ queue_truncate(Queue *q, int n)
 
 extern void queue_init(Queue *q);
 extern void queue_init_buffer(Queue *q, Id *buf, int size);
-extern void queue_init_clone(Queue *t, Queue *s);
+extern void queue_init_clone(Queue *target, const Queue *source);
 extern void queue_free(Queue *q);
 
 extern void queue_insert(Queue *q, int pos, Id id);
 extern void queue_insert2(Queue *q, int pos, Id id1, Id id2);
-extern void queue_insertn(Queue *q, int pos, int n, Id *elements);
+extern void queue_insertn(Queue *q, int pos, int n, const Id *elements);
 extern void queue_delete(Queue *q, int pos);
 extern void queue_delete2(Queue *q, int pos);
 extern void queue_deleten(Queue *q, int pos, int n);

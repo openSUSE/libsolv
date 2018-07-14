@@ -18,11 +18,17 @@ static struct resultflags2str {
   { TESTCASE_RESULT_ORPHANED,           "orphaned" },
   { TESTCASE_RESULT_RECOMMENDED,        "recommended" },
   { TESTCASE_RESULT_UNNEEDED,           "unneeded" },
+  { TESTCASE_RESULT_ALTERNATIVES,       "alternatives" },
+  { TESTCASE_RESULT_RULES,              "rules" },
+  { TESTCASE_RESULT_GENID,              "genid" },
+  { TESTCASE_RESULT_REASON,             "reason" },
+  { TESTCASE_RESULT_CLEANDEPS,          "cleandeps" },
+  { TESTCASE_RESULT_JOBS,               "jobs" },
   { 0, 0 }
 };
 
 static void
-usage(ex)
+usage(int ex)
 {
   fprintf(ex ? stderr : stdout, "Usage: testsolv <testcase>\n");
   exit(ex);
@@ -65,21 +71,23 @@ main(int argc, char **argv)
   Pool *pool;
   Queue job;
   Queue solq;
-  Solver *solv;
+  Solver *solv, *reusesolv = 0;
   char *result = 0;
   int resultflags = 0;
   int debuglevel = 0;
   int writeresult = 0;
+  char *writetestcase = 0;
   int multijob = 0;
   int rescallback = 0;
   int c;
   int ex = 0;
   const char *list = 0;
+  int list_with_deps = 0;
   FILE *fp;
   const char *p;
 
   queue_init(&solq);
-  while ((c = getopt(argc, argv, "vmrhl:s:")) >= 0)
+  while ((c = getopt(argc, argv, "vmrhL:l:s:T:")) >= 0)
     {
       switch (c)
       {
@@ -97,12 +105,20 @@ main(int argc, char **argv)
           break;
         case 'l':
 	  list = optarg;
+	  list_with_deps = 0;
+          break;
+        case 'L':
+	  list = optarg;
+	  list_with_deps = 1;
           break;
         case 's':
 	  if ((p = strchr(optarg, ':')))
 	    queue_push2(&solq, atoi(optarg), atoi(p + 1));
 	  else
 	    queue_push2(&solq, 1, atoi(optarg));
+          break;
+        case 'T':
+	  writetestcase = optarg;
           break;
         default:
 	  usage(1);
@@ -115,6 +131,8 @@ main(int argc, char **argv)
     {
       pool = pool_create();
       pool_setdebuglevel(pool, debuglevel);
+      /* report all errors */
+      pool_setdebugmask(pool, pool->debugmask | SOLV_ERROR);
 
       fp = fopen(argv[optind], "r");
       if (!fp)
@@ -131,9 +149,14 @@ main(int argc, char **argv)
 	  if (!solv)
 	    {
 	      pool_free(pool);
-	      exit(1);
+	      exit(resultflags == 77 ? 77 : 1);
 	    }
-
+	  if (reusesolv)
+	    {
+	      solver_free(solv);
+	      solv = reusesolv;
+	      reusesolv = 0;
+	    }
 	  if (!multijob && !feof(fp))
 	    multijob = 1;
 
@@ -141,11 +164,17 @@ main(int argc, char **argv)
 	    printf("test %d:\n", multijob++);
 	  if (list)
 	    {
+	      Id p = 0;
 	      int selflags = SELECTION_NAME|SELECTION_PROVIDES|SELECTION_CANON|SELECTION_DOTARCH|SELECTION_REL|SELECTION_GLOB|SELECTION_FLAT;
 	      if (*list == '/')
 		selflags |= SELECTION_FILELIST;
 	      queue_empty(&job);
-	      selection_make(pool, &job, list, selflags);
+	      if (list_with_deps)
+	        p = testcase_str2solvid(pool, list);
+	      if (p)
+		queue_push2(&job, SOLVER_SOLVABLE, p);
+	      else
+	        selection_make(pool, &job, list, selflags);
 	      if (!job.elements)
 		printf("No match\n");
 	      else
@@ -155,7 +184,34 @@ main(int argc, char **argv)
 		  queue_init(&q);
 		  selection_solvables(pool, &job, &q);
 		  for (i = 0; i < q.count; i++)
-		    printf("  - %s\n", testcase_solvid2str(pool, q.elements[i]));
+		    {
+		      printf("  - %s\n", testcase_solvid2str(pool, q.elements[i]));
+		      if (list_with_deps)
+			{
+			  int j, k;
+			  const char *vendor;
+			  static Id deps[] = {
+			    SOLVABLE_PROVIDES, SOLVABLE_REQUIRES, SOLVABLE_CONFLICTS, SOLVABLE_OBSOLETES,
+			    SOLVABLE_RECOMMENDS, SOLVABLE_SUGGESTS, SOLVABLE_SUPPLEMENTS, SOLVABLE_ENHANCES,
+			    SOLVABLE_PREREQ_IGNOREINST,
+			    0
+			  };
+			  vendor = pool_lookup_str(pool, q.elements[i], SOLVABLE_VENDOR);
+			  if (vendor)
+			    printf("    %s: %s\n", pool_id2str(pool, SOLVABLE_VENDOR), vendor);
+			  for (j = 0; deps[j]; j++)
+			    {
+			      Queue dq;
+			      queue_init(&dq);
+			      pool_lookup_idarray(pool, q.elements[i], deps[j], &dq);
+			      if (dq.count)
+			        printf("    %s:\n", pool_id2str(pool, deps[j]));
+			      for (k = 0; k < dq.count; k++)
+			        printf("      %s\n", pool_dep2str(pool, dq.elements[k]));
+			      queue_free(&dq);
+			    }
+			}
+		    }
 		  queue_free(&q);
 		}
 	    }
@@ -172,8 +228,8 @@ main(int argc, char **argv)
 	      solver_solve(solv, &job);
 	      solv->solution_callback = 0;
 	      solv->solution_callback_data = 0;
-	      if (!resultflags)
-		resultflags = TESTCASE_RESULT_TRANSACTION | TESTCASE_RESULT_PROBLEMS;
+	      if ((resultflags & ~TESTCASE_RESULT_REUSE_SOLVER) == 0)
+		resultflags |= TESTCASE_RESULT_TRANSACTION | TESTCASE_RESULT_PROBLEMS;
 	      myresult = testcase_solverresult(solv, resultflags);
 	      if (rescallback && reportsolutiondata.result)
 		{
@@ -228,6 +284,8 @@ main(int argc, char **argv)
 	  else
 	    {
 	      int pcnt = solver_solve(solv, &job);
+	      if (writetestcase)
+		testcase_write(solv, writetestcase, resultflags, 0, 0);
 	      if (pcnt && solq.count)
 		{
 		  int i, taken = 0;
@@ -283,8 +341,13 @@ main(int argc, char **argv)
 		}
 	    }
 	  queue_free(&job);
-	  solver_free(solv);
+	  if ((resultflags & TESTCASE_RESULT_REUSE_SOLVER) != 0 && !feof(fp))
+	    reusesolv = solv;
+	  else
+	    solver_free(solv);
 	}
+      if (reusesolv)
+	solver_free(reusesolv);
       pool_free(pool);
       fclose(fp);
     }

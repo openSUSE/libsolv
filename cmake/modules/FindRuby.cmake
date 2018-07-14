@@ -112,7 +112,7 @@ IF(RUBY_EXECUTABLE  AND NOT  RUBY_VERSION_MAJOR)
    _RUBY_CONFIG_VAR("sitelibdir" RUBY_SITELIB_DIR)
 
    # vendor_ruby available ?
-   EXECUTE_PROCESS(COMMAND ${RUBY_EXECUTABLE} -r rbconfig -e "print 'true' unless Config::CONFIG['vendorarchdir'].nil?"
+   EXECUTE_PROCESS(COMMAND ${RUBY_EXECUTABLE} -r rbconfig -e "print 'true' unless RbConfig::CONFIG['vendorarchdir'].nil?"
       OUTPUT_VARIABLE RUBY_HAS_VENDOR_RUBY  ERROR_QUIET)
 
    IF(RUBY_HAS_VENDOR_RUBY)

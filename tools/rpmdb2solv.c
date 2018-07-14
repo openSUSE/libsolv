@@ -15,8 +15,6 @@
  */
 
 #include <sys/types.h>
-#include <limits.h>
-#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -207,7 +205,10 @@ main(int argc, char **argv)
 
 #ifdef ENABLE_APPDATA
   if (add_appdata)
-    repo_add_appdata_dir(repo, "/usr/share/appdata", REPO_USE_ROOTDIR | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE);
+    {
+      repo_add_appdata_dir(repo, "/usr/share/metainfo", REPO_USE_ROOTDIR | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE | APPDATA_SEARCH_UNINTERNALIZED_FILELIST);
+      repo_add_appdata_dir(repo, "/usr/share/appdata", REPO_USE_ROOTDIR | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE | APPDATA_SEARCH_UNINTERNALIZED_FILELIST);
+    }
 #endif
   repodata_internalize(data);
 

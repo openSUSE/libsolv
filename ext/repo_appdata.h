@@ -8,4 +8,5 @@
 int repo_add_appdata(Repo *repo, FILE *fp, int flags);
 int repo_add_appdata_dir(Repo *repo, const char *appdatadir, int flags);
 
+#define APPDATA_SEARCH_UNINTERNALIZED_FILELIST		(1 << 8)
 #define APPDATA_CHECK_DESKTOP_FILE	(1 << 30)	/* internal */

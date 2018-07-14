@@ -17,6 +17,7 @@
 
 #include "pooltypes.h"
 #include "queue.h"
+#include "bitmap.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -79,6 +80,12 @@ void solvable_unset(Solvable *s, Id keyname);
 int solvable_identical(Solvable *s1, Solvable *s2);
 Id solvable_selfprovidedep(Solvable *s);
 int solvable_matchesdep(Solvable *s, Id keyname, Id dep, int marker);
+
+/* weird suse stuff */
+int solvable_is_irrelevant_patch(Solvable *s, Map *installedmap);
+int solvable_trivial_installable_map(Solvable *s, Map *installedmap, Map *conflictsmap, Map *multiversionmap);
+int solvable_trivial_installable_queue(Solvable *s, Queue *installed, Map *multiversionmap);
+int solvable_trivial_installable_repo(Solvable *s, struct _Repo *installed, Map *multiversionmap);
 
 #ifdef __cplusplus
 }

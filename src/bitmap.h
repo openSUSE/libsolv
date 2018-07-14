@@ -33,14 +33,17 @@ typedef struct _Map {
 #define MAPCLR(m, n) ((m)->map[(n) >> 3] &= ~(1 << ((n) & 7)))
 /* test bit */
 #define MAPTST(m, n) ((m)->map[(n) >> 3] & (1 << ((n) & 7)))
+/* clear some bits at a position */
+#define MAPCLR_AT(m, n) ((m)->map[(n) >> 3] = 0)
 
 extern void map_init(Map *m, int n);
-extern void map_init_clone(Map *t, Map *s);
+extern void map_init_clone(Map *target, const Map *source);
 extern void map_grow(Map *m, int n);
 extern void map_free(Map *m);
-extern void map_and(Map *t, Map *s);
-extern void map_or(Map *t, Map *s);
-extern void map_subtract(Map *t, Map *s);
+extern void map_and(Map *t, const Map *s);
+extern void map_or(Map *t, const Map *s);
+extern void map_subtract(Map *t, const Map *s);
+extern void map_invertall(Map *m);
 
 static inline void map_empty(Map *m)
 {
@@ -61,6 +64,10 @@ static inline void map_clr(Map *m, int n)
 static inline int map_tst(Map *m, int n)
 {
   return MAPTST(m, n);
+}
+static inline void map_clr_at(Map *m, int n)
+{
+  MAPCLR_AT(m, n);
 }
 
 #ifdef __cplusplus

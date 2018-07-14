@@ -1,4 +1,6 @@
 
+VPATH = gen
+
 man:	man3 man1
 
 man3:	libsolv.3 libsolv-bindings.3 libsolv-constantids.3 libsolv-history.3 libsolv-pool.3
@@ -13,10 +15,10 @@ html: libsolv.html libsolv-bindings.html libsolv-constantids.html libsolv-histor
 .SUFFIXES: .html .3 .1 .txt
 
 .txt.1:
-	a2x -f manpage $<
+	a2x -f manpage -D gen $<
 
 .txt.3:
-	a2x -f manpage $<
+	a2x -f manpage -D gen $<
 
 .txt.html:
-	a2x -f xhtml $<
+	a2x -f xhtml -D gen $<

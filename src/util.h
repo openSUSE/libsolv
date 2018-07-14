@@ -29,6 +29,7 @@ extern void *solv_malloc2(size_t, size_t);
 extern void *solv_calloc(size_t, size_t);
 extern void *solv_realloc(void *, size_t);
 extern void *solv_realloc2(void *, size_t, size_t);
+extern void *solv_extend_realloc(void *, size_t, size_t, size_t);
 extern void *solv_free(void *);
 extern char *solv_strdup(const char *);
 extern void solv_oom(size_t, size_t);
@@ -48,12 +49,12 @@ static inline void *solv_extend(void *buf, size_t len, size_t nmemb, size_t size
   if (nmemb == 1)
     {
       if ((len & block) == 0)
-	buf = solv_realloc2(buf, len + (1 + block), size);
+	buf = solv_extend_realloc(buf, len + 1, size, block);
     }
   else
     {
       if (((len - 1) | block) != ((len + nmemb - 1) | block))
-	buf = solv_realloc2(buf, (len + (nmemb + block)) & ~block, size);
+	buf = solv_extend_realloc(buf, len + nmemb, size, block);
     }
   return buf;
 }
@@ -76,7 +77,7 @@ static inline void *solv_zextend(void *buf, size_t len, size_t nmemb, size_t siz
 static inline void *solv_extend_resize(void *buf, size_t len, size_t size, size_t block)
 {
   if (len)
-    buf = solv_realloc2(buf, (len + block) & ~block, size);
+    buf = solv_extend_realloc(buf, len, size, block);
   return buf;
 }
 
@@ -85,7 +86,7 @@ static inline void *solv_calloc_block(size_t len, size_t size, size_t block)
   void *buf;
   if (!len)
     return 0;
-  buf = solv_malloc2((len + block) & ~block, size);
+  buf = solv_extend_realloc((void *)0, len, size, block);
   memset(buf, 0, ((len + block) & ~block) * size);
   return buf;
 }

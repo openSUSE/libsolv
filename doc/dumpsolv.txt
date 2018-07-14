@@ -24,3 +24,7 @@ Write the contents in JSON format.
 Author
 ------
 Michael Schroeder <mls@suse.de>
+
+////
+vim: syntax=asciidoc
+////

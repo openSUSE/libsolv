@@ -58,8 +58,9 @@ main(int argc, char **argv)
   FILE *fp;
   char buf[4096], *p;
   const char *basefile = 0;
+  int is_repo = 0;
 
-  while ((c = getopt(argc, argv, "0b:m:")) >= 0)
+  while ((c = getopt(argc, argv, "0b:m:r")) >= 0)
     {
       switch(c)
 	{
@@ -68,6 +69,9 @@ main(int argc, char **argv)
 	  break;
 	case 'm':
 	  manifest = optarg;
+	  break;
+	case 'r':
+	  is_repo = 1;
 	  break;
 	case '0':
 	  manifest0 = 1;
@@ -113,8 +117,32 @@ main(int argc, char **argv)
   repo = repo_create(pool, "deb2solv");
   repo_add_repodata(repo, 0);
   res = 0;
+  if (!ndebs && !manifest && is_repo)
+    {
+      if (repo_add_debpackages(repo, stdin, REPO_REUSE_REPODATA|REPO_NO_INTERNALIZE))
+	{
+	  fprintf(stderr, "deb2solv: %s\n", pool_errstr(pool));
+	  res = 1;
+	}
+    }
   for (i = 0; i < ndebs; i++)
     {
+      if (is_repo)
+	{
+	  if ((fp = fopen(debs[i], "r")) == 0)
+	    {
+	      perror(debs[i]);
+	      res = 1;
+	      continue;
+	    }
+	  if (repo_add_debpackages(repo, fp, REPO_REUSE_REPODATA|REPO_NO_INTERNALIZE))
+	    {
+	      fprintf(stderr, "deb2solv: %s\n", pool_errstr(pool));
+	      res = 1;
+	    }
+	  fclose(fp);
+	  continue;
+	}
       if (repo_add_deb(repo, debs[i], REPO_REUSE_REPODATA|REPO_NO_INTERNALIZE) == 0)
 	{
 	  fprintf(stderr, "deb2solv: %s\n", pool_errstr(pool));

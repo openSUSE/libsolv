@@ -21,7 +21,7 @@
 #include "util.h"
 
 static const char *archpolicies[] = {
-#ifdef FEDORA
+#if defined(FEDORA) || defined(MAGEIA)
   "x86_64",	"x86_64:athlon:i686:i586:i486:i386",
 #else
   "x86_64",	"x86_64:i686:i586:i486:i386",
@@ -29,39 +29,27 @@ static const char *archpolicies[] = {
   "i686",	"i686:i586:i486:i386",
   "i586",	"i586:i486:i386",
   "i486",	"i486:i386",
-  "i386",	"i386",
   "s390x",	"s390x:s390",
-  "s390",	"s390",
-  "ppc64le",    "ppc64le",
   "ppc64",	"ppc64:ppc",
-  "ppc",	"ppc",
   "ppc64p7",	"ppc64p7:ppc64:ppc",
   "ia64",	"ia64:i686:i586:i486:i386",
-  "aarch64",	"aarch64",
-  "armv6hl",	"armv6hl",
   "armv7hnl",	"armv7hnl:armv7hl:armv6hl",
   "armv7hl",	"armv7hl:armv6hl",
-  "armv7l",	"armv7l:armv6l:armv5tejl:armv5tel:armv5l:armv4tl:armv4l:armv3l",
-  "armv6l",	"armv6l:armv5tejl:armv5tel:armv5l:armv4tl:armv4l:armv3l",
-  "armv5tejl",	"armv5tejl:armv5tel:armv5l:armv4tl:armv4l:armv3l",
-  "armv5tel",	"armv5tel:armv5l:armv4tl:armv4l:armv3l",
-  "armv5tl",	"armv5l:armv4tl:armv4l:armv3l",
+  "armv7l",	"armv7l:armv6l:armv5tejl:armv5tel:armv5tl:armv5l:armv4tl:armv4l:armv3l",
+  "armv6l",	"armv6l:armv5tejl:armv5tel:armv5tl:armv5l:armv4tl:armv4l:armv3l",
+  "armv5tejl",	"armv5tejl:armv5tel:armv5tl:armv5l:armv4tl:armv4l:armv3l",
+  "armv5tel",	"armv5tel:armv5tl:armv5l:armv4tl:armv4l:armv3l",
+  "armv5tl",	"armv5tl:armv5l:armv4tl:armv4l:armv3l",
   "armv5l",	"armv5l:armv4tl:armv4l:armv3l",
   "armv4tl",	"armv4tl:armv4l:armv3l",
   "armv4l",	"armv4l:armv3l",
-  "armv3l",	"armv3l",
-  "sh3",	"sh3",
-  "sh4",	"sh4",
   "sh4a",	"sh4a:sh4",
   "sparc64v",	"sparc64v:sparc64:sparcv9v:sparcv9:sparcv8:sparc",
   "sparc64",	"sparc64:sparcv9:sparcv8:sparc",
   "sparcv9v",	"sparcv9v:sparcv9:sparcv8:sparc",
   "sparcv9",	"sparcv9:sparcv8:sparc",
   "sparcv8",	"sparcv8:sparc",
-  "sparc",	"sparc",
-  "mipsel",	"mipsel",
-  "m68k",	"m68k",
-#ifdef FEDORA
+#if defined(FEDORA) || defined(MAGEIA)
   "ia32e",	"ia32e:x86_64:athlon:i686:i586:i486:i386",
   "athlon",	"athlon:i686:i586:i486:i386",
   "amd64",	"amd64:x86_64:athlon:i686:i586:i486:i386",
@@ -78,15 +66,13 @@ pool_setarch(Pool *pool, const char *arch)
   if (arch)
     {
       int i;
-
       /* convert arch to known policy */
       for (i = 0; archpolicies[i]; i += 2)
 	if (!strcmp(archpolicies[i], arch))
-	  break;
-      if (archpolicies[i])
-	arch = archpolicies[i + 1];
-      else
-	arch = "";
+	  {
+	    arch = archpolicies[i + 1];
+	    break;
+	  }
     }
   pool_setarchpolicy(pool, arch);
 }

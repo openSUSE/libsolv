@@ -16,9 +16,13 @@ Description
 -----------
 The helix format was a metadata format used in the RedCarpet
 package manager. It's still used in libzypp testcases.
-The helix2solv tool reads data in helix format from standhard
-input and write it in solv file format to standard output.
+The helix2solv tool reads data in helix format from standard
+input and writes it in solv file format to standard output.
 
 Author
 ------
 Michael Schroeder <mls@suse.de>
+
+////
+vim: syntax=asciidoc
+////

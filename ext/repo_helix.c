@@ -21,13 +21,12 @@
  */
 
 #include <sys/types.h>
-#include <limits.h>
-#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <expat.h>
 
+#include "queue.h"
+#include "solv_xmlparser.h"
 #include "repo_helix.h"
 #include "evr.h"
 
@@ -75,22 +74,10 @@ enum state {
   STATE_PATCH,
   STATE_PRODUCT,
 
-  STATE_PEPOCH,
-  STATE_PVERSION,
-  STATE_PRELEASE,
-  STATE_PARCH,
-
   NUMSTATES
 };
 
-struct stateswitch {
-  enum state from;
-  char *ename;
-  enum state to;
-  int docontent;
-};
-
-static struct stateswitch stateswitches[] = {
+static struct solv_xmlparser_element stateswitches[] = {
   { STATE_START,       "channel",         STATE_CHANNEL, 0 },
   { STATE_CHANNEL,     "subchannel",      STATE_SUBCHANNEL, 0 },
   { STATE_SUBCHANNEL,  "package",         STATE_PACKAGE, 0 },
@@ -104,10 +91,10 @@ static struct stateswitch stateswitches[] = {
   { STATE_PACKAGE,     "name",            STATE_NAME, 1 },
   { STATE_PACKAGE,     "vendor",          STATE_VENDOR, 1 },
   { STATE_PACKAGE,     "buildtime",       STATE_BUILDTIME, 1 },
-  { STATE_PACKAGE,     "epoch",           STATE_PEPOCH, 1 },
-  { STATE_PACKAGE,     "version",         STATE_PVERSION, 1 },
-  { STATE_PACKAGE,     "release",         STATE_PRELEASE, 1 },
-  { STATE_PACKAGE,     "arch",            STATE_PARCH, 1 },
+  { STATE_PACKAGE,     "epoch",           STATE_EPOCH, 1 },
+  { STATE_PACKAGE,     "version",         STATE_VERSION, 1 },
+  { STATE_PACKAGE,     "release",         STATE_RELEASE, 1 },
+  { STATE_PACKAGE,     "arch",            STATE_ARCH, 1 },
   { STATE_PACKAGE,     "history",         STATE_HISTORY, 0 },
   { STATE_PACKAGE,     "provides",        STATE_PROVIDES, 0 },
   { STATE_PACKAGE,     "requires",        STATE_REQUIRES, 0 },
@@ -119,6 +106,7 @@ static struct stateswitch stateswitches[] = {
   { STATE_PACKAGE,     "suggests",        STATE_SUGGESTS, 0 },
   { STATE_PACKAGE,     "enhances",        STATE_ENHANCES, 0 },
   { STATE_PACKAGE,     "freshens",        STATE_FRESHENS, 0 },
+  { STATE_PACKAGE,     "deps",            STATE_PACKAGE, 0 },	/* ignore deps element */
 
   { STATE_HISTORY,     "update",          STATE_UPDATE, 0 },
   { STATE_UPDATE,      "epoch",           STATE_EPOCH, 1 },
@@ -144,17 +132,8 @@ static struct stateswitch stateswitches[] = {
  * parser data
  */
 
-typedef struct _parsedata {
+struct parsedata {
   int ret;
-  /* XML parser data */
-  int depth;
-  enum state state;	/* current state */
-  int statedepth;
-  char *content;	/* buffer for content of node */
-  int lcontent;		/* actual length of current content */
-  int acontent;		/* actual buffer size */
-  int docontent;	/* handle content */
-
   /* repo data */
   Pool *pool;		/* current pool */
   Repo *repo;		/* current repo */
@@ -163,6 +142,7 @@ typedef struct _parsedata {
   Offset freshens;	/* current freshens vector */
 
   /* package data */
+  int  srcpackage;	/* is srcpackage element */
   int  epoch;		/* epoch (as offset into evrspace) */
   int  version;		/* version (as offset into evrspace) */
   int  release;		/* release (as offset into evrspace) */
@@ -171,9 +151,8 @@ typedef struct _parsedata {
   int  levrspace;	/* actual evr length */
   char *kind;
 
-  struct stateswitch *swtab[NUMSTATES];
-  enum state sbtab[NUMSTATES];
-} Parsedata;
+  struct solv_xmlparser xmlp;
+};
 
 
 /*------------------------------------------------------------------*/
@@ -182,9 +161,9 @@ typedef struct _parsedata {
 /* create Id from epoch:version-release */
 
 static Id
-evr2id(Pool *pool, Parsedata *pd, const char *e, const char *v, const char *r)
+evr2id(Pool *pool, struct parsedata *pd, const char *e, const char *v, const char *r)
 {
-  char *c;
+  char *c, *space;
   int l;
 
   /* treat explitcit 0 as NULL */
@@ -211,15 +190,10 @@ evr2id(Pool *pool, Parsedata *pd, const char *e, const char *v, const char *r)
   if (r)
     l += strlen(r) + 1;  /* -r */
 
-  /* extend content if not sufficient */
-  if (l > pd->acontent)
-    {
-      pd->content = (char *)realloc(pd->content, l + 256);
-      pd->acontent = l + 256;
-    }
+  /* get content space */
+  c = space = solv_xmlparser_contentspace(&pd->xmlp, l);
 
-  /* copy e-v-r to content */
-  c = pd->content;
+  /* copy e-v-r */
   if (e)
     {
       strcpy(c, e);
@@ -239,13 +213,13 @@ evr2id(Pool *pool, Parsedata *pd, const char *e, const char *v, const char *r)
     }
   *c = 0;
   /* if nothing inserted, return Id 0 */
-  if (!*pd->content)
-    return ID_NULL;
+  if (!*space)
+    return 0;
 #if 0
-  fprintf(stderr, "evr: %s\n", pd->content);
+  fprintf(stderr, "evr: %s\n", space);
 #endif
   /* intern and create */
-  return pool_str2id(pool, pd->content, 1);
+  return pool_str2id(pool, space, 1);
 }
 
 
@@ -255,7 +229,7 @@ evr2id(Pool *pool, Parsedata *pd, const char *e, const char *v, const char *r)
  *   odd index is value
  */
 static Id
-evr_atts2id(Pool *pool, Parsedata *pd, const char **atts)
+evr_atts2id(Pool *pool, struct parsedata *pd, const char **atts)
 {
   const char *e, *v, *r;
   e = v = r = 0;
@@ -312,7 +286,7 @@ static struct flagtab flagtab[] = {
  */
 
 static unsigned int
-adddep(Pool *pool, Parsedata *pd, unsigned int olddeps, const char **atts, Id marker)
+adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, const char **atts, Id marker)
 {
   Id id, name;
   const char *n, *f, *k;
@@ -342,13 +316,9 @@ adddep(Pool *pool, Parsedata *pd, unsigned int olddeps, const char **atts, Id ma
   if (k)			       /* if kind!=package, intern <kind>:<name> */
     {
       int l = strlen(k) + 1 + strlen(n) + 1;
-      if (l > pd->acontent)	       /* extend buffer if needed */
-	{
-	  pd->content = (char *)realloc(pd->content, l + 256);
-	  pd->acontent = l + 256;
-	}
-      sprintf(pd->content, "%s:%s", k, n);
-      name = pool_str2id(pool, pd->content, 1);
+      char *space = solv_xmlparser_contentspace(&pd->xmlp, l);
+      sprintf(space, "%s:%s", k, n);
+      name = pool_str2id(pool, space, 1);
     }
   else
     {
@@ -382,76 +352,30 @@ adddep(Pool *pool, Parsedata *pd, unsigned int olddeps, const char **atts, Id ma
 
 /*----------------------------------------------------------------*/
 
-/*
- * XML callback
- * <name>
- *
- */
-
-static void XMLCALL
-startElement(void *userData, const char *name, const char **atts)
+static void
+startElement(struct solv_xmlparser *xmlp, int state, const char *name, const char **atts)
 {
-  Parsedata *pd = (Parsedata *)userData;
-  struct stateswitch *sw;
+  struct parsedata *pd = xmlp->userdata;
   Pool *pool = pd->pool;
   Solvable *s = pd->solvable;
 
-  if (pd->depth != pd->statedepth)
-    {
-      pd->depth++;
-      return;
-    }
-
-  /* ignore deps element */
-  if (pd->state == STATE_PACKAGE && !strcmp(name, "deps"))
-    return;
-
-  pd->depth++;
-
-  /* find node name in stateswitch */
-  if (!pd->swtab[pd->state])
-    return;
-  for (sw = pd->swtab[pd->state]; sw->from == pd->state; sw++)
-  {
-    if (!strcmp(sw->ename, name))
-      break;
-  }
-
-  /* check if we're at the right level */
-  if (sw->from != pd->state)
-    {
-#if 0
-      fprintf(stderr, "into unknown: %s\n", name);
-#endif
-      return;
-    }
-
-  /* set new state */
-  pd->state = sw->to;
-
-  pd->docontent = sw->docontent;
-  pd->statedepth = pd->depth;
-
-  /* start with empty content */
-  /* (will collect data until end element) */
-  pd->lcontent = 0;
-  *pd->content = 0;
-
-  switch (pd->state)
+  switch (state)
     {
 
     case STATE_NAME:
       if (pd->kind)		       /* if kind is set (non package) */
         {
-          strcpy(pd->content, pd->kind);
-          pd->lcontent = strlen(pd->content);
-	  pd->content[pd->lcontent++] = ':';   /* prefix name with '<kind>:' */
-	  pd->content[pd->lcontent] = 0;
+          strcpy(xmlp->content, pd->kind);
+          xmlp->lcontent = strlen(xmlp->content);
+	  xmlp->content[xmlp->lcontent++] = ':';   /* prefix name with '<kind>:' */
+	  xmlp->content[xmlp->lcontent] = 0;
 	}
       break;
 
     case STATE_PACKAGE:		       /* solvable name */
       pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->repo));
+      pd->srcpackage = 0;
+      pd->kind = NULL;		       /* default is (src)package */
       if (!strcmp(name, "selection"))
         pd->kind = "selection";
       else if (!strcmp(name, "pattern"))
@@ -464,8 +388,8 @@ startElement(void *userData, const char *name, const char **atts)
         pd->kind = "patch";
       else if (!strcmp(name, "application"))
         pd->kind = "application";
-      else
-        pd->kind = NULL;	       /* default is package */
+      else if (!strcmp(name, "srcpackage"))
+	pd->srcpackage = 1;
       pd->levrspace = 1;
       pd->epoch = 0;
       pd->version = 0;
@@ -542,7 +466,8 @@ startElement(void *userData, const char *name, const char **atts)
     }
 }
 
-static const char *findKernelFlavor(Parsedata *pd, Solvable *s)
+static const char *
+findKernelFlavor(struct parsedata *pd, Solvable *s)
 {
   Pool *pool = pd->pool;
   Id pid, *pidp;
@@ -589,41 +514,21 @@ static const char *findKernelFlavor(Parsedata *pd, Solvable *s)
 }
 
 
-/*
- * XML callback
- * </name>
- *
- * create Solvable from collected data
- */
-
-static void XMLCALL
-endElement(void *userData, const char *name)
+static void
+endElement(struct solv_xmlparser *xmlp, int state, char *content)
 {
-  Parsedata *pd = (Parsedata *)userData;
+  struct parsedata *pd = xmlp->userdata;
   Pool *pool = pd->pool;
   Solvable *s = pd->solvable;
   Id evr;
   unsigned int t = 0;
   const char *flavor;
 
-  if (pd->depth != pd->statedepth)
-    {
-      pd->depth--;
-      /* printf("back from unknown %d %d %d\n", pd->state, pd->depth, pd->statedepth); */
-      return;
-    }
-
-  /* ignore deps element */
-  if (pd->state == STATE_PACKAGE && !strcmp(name, "deps"))
-    return;
-
-  pd->depth--;
-  pd->statedepth--;
-  switch (pd->state)
+  switch (state)
     {
 
     case STATE_PACKAGE:		       /* package complete */
-      if (name[0] == 's' && name[1] == 'r' && name[2] == 'c' && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
+      if (pd->srcpackage && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
 	s->arch = ARCH_SRC;
       if (!s->arch)                    /* default to "noarch" */
 	s->arch = ARCH_NOARCH;
@@ -632,12 +537,11 @@ endElement(void *userData, const char *name)
         s->evr = evr2id(pool, pd,
                         pd->epoch   ? pd->evrspace + pd->epoch   : 0,
                         pd->version ? pd->evrspace + pd->version : 0,
-                        pd->release ? pd->evrspace + pd->release : "");
+                        pd->release ? pd->evrspace + pd->release : 0);
       /* ensure self-provides */
       if (s->name && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
         s->provides = repo_addid_dep(pd->repo, s->provides, pool_rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
-      s->supplements = repo_fix_supplements(pd->repo, s->provides, s->supplements, pd->freshens);
-      s->conflicts = repo_fix_conflicts(pd->repo, s->conflicts);
+      repo_rewrite_suse_deps(s, pd->freshens);
       pd->freshens = 0;
 
       /* see bugzilla bnc#190163 */
@@ -721,13 +625,13 @@ endElement(void *userData, const char *name)
 	}
       break;
     case STATE_NAME:
-      s->name = pool_str2id(pool, pd->content, 1);
+      s->name = pool_str2id(pool, content, 1);
       break;
     case STATE_VENDOR:
-      s->vendor = pool_str2id(pool, pd->content, 1);
+      s->vendor = pool_str2id(pool, content, 1);
       break;
     case STATE_BUILDTIME:
-      t = atoi (pd->content);
+      t = atoi(content);
       if (t)
 	repodata_set_num(pd->data, s - pool->solvables, SOLVABLE_BUILDTIME, t);
       break;	
@@ -747,72 +651,38 @@ endElement(void *userData, const char *name)
     case STATE_EPOCH:
     case STATE_VERSION:
     case STATE_RELEASE:
-    case STATE_PEPOCH:
-    case STATE_PVERSION:
-    case STATE_PRELEASE:
       /* ensure buffer space */
-      if (pd->lcontent + 1 + pd->levrspace > pd->aevrspace)
+      if (xmlp->lcontent + 1 + pd->levrspace > pd->aevrspace)
 	{
-	  pd->evrspace = (char *)realloc(pd->evrspace, pd->lcontent + 1 + pd->levrspace + 256);
-	  pd->aevrspace = pd->lcontent + 1 + pd->levrspace + 256;
+	  pd->aevrspace = xmlp->lcontent + 1 + pd->levrspace + 256;
+	  pd->evrspace = (char *)realloc(pd->evrspace, pd->aevrspace);
 	}
-      memcpy(pd->evrspace + pd->levrspace, pd->content, pd->lcontent + 1);
-      if (pd->state == STATE_EPOCH || pd->state == STATE_PEPOCH)
+      memcpy(pd->evrspace + pd->levrspace, xmlp->content, xmlp->lcontent + 1);
+      if (state == STATE_EPOCH)
 	pd->epoch = pd->levrspace;
-      else if (pd->state == STATE_VERSION || pd->state == STATE_PVERSION)
+      else if (state == STATE_VERSION)
 	pd->version = pd->levrspace;
       else
 	pd->release = pd->levrspace;
-      pd->levrspace += pd->lcontent + 1;
+      pd->levrspace += xmlp->lcontent + 1;
       break;
     case STATE_ARCH:
-    case STATE_PARCH:
-      s->arch = pool_str2id(pool, pd->content, 1);
+      s->arch = pool_str2id(pool, content, 1);
       break;
     default:
       break;
     }
-  pd->state = pd->sbtab[pd->state];
-  pd->docontent = 0;
-  /* printf("back from known %d %d %d\n", pd->state, pd->depth, pd->statedepth); */
 }
 
-
-/*
- * XML callback
- * character data
- *
- */
-
-static void XMLCALL
-characterData(void *userData, const XML_Char *s, int len)
+static void
+errorCallback(struct solv_xmlparser *xmlp, const char *errstr, unsigned int line, unsigned int column)
 {
-  Parsedata *pd = (Parsedata *)userData;
-  int l;
-  char *c;
-
-  /* check if current nodes content is interesting */
-  if (!pd->docontent)
-    return;
-
-  /* adapt content buffer */
-  l = pd->lcontent + len + 1;
-  if (l > pd->acontent)
-    {
-      pd->content = (char *)realloc(pd->content, l + 256);
-      pd->acontent = l + 256;
-    }
-  /* append new content to buffer */
-  c = pd->content + pd->lcontent;
-  pd->lcontent += len;
-  while (len-- > 0)
-    *c++ = *s++;
-  *c = 0;
+  struct parsedata *pd = xmlp->userdata;
+  pd->ret = pool_error(pd->pool, -1, "%s at line %u", errstr, line);
 }
+
 
 /*-------------------------------------------------------------------*/
-
-#define BUFF_SIZE 8192
 
 /*
  * read 'helix' type xml from fp
@@ -824,60 +694,29 @@ int
 repo_add_helix(Repo *repo, FILE *fp, int flags)
 {
   Pool *pool = repo->pool;
-  Parsedata pd;
+  struct parsedata pd;
   Repodata *data;
-  char buf[BUFF_SIZE];
-  int i, l;
-  struct stateswitch *sw;
   unsigned int now;
-  XML_Parser parser;
 
   now = solv_timems(0);
   data = repo_add_repodata(repo, flags);
 
   /* prepare parsedata */
   memset(&pd, 0, sizeof(pd));
-  for (i = 0, sw = stateswitches; sw->from != NUMSTATES; i++, sw++)
-    {
-      if (!pd.swtab[sw->from])
-        pd.swtab[sw->from] = sw;
-      pd.sbtab[sw->to] = sw->from;
-    }
-
   pd.pool = pool;
   pd.repo = repo;
-
-  pd.content = (char *)malloc(256);	/* must hold all solvable kinds! */
-  pd.acontent = 256;
-  pd.lcontent = 0;
-
-  pd.evrspace = (char *)malloc(256);
-  pd.aevrspace= 256;
-  pd.levrspace = 1;
   pd.data = data;
+  solv_xmlparser_init(&pd.xmlp, stateswitches, &pd, startElement, endElement, errorCallback);
 
-  /* set up XML parser */
+  pd.evrspace = (char *)solv_malloc(256);
+  pd.aevrspace = 256;
+  pd.levrspace = 1;
 
-  parser = XML_ParserCreate(NULL);
-  XML_SetUserData(parser, &pd);       /* make parserdata available to XML callbacks */
-  XML_SetElementHandler(parser, startElement, endElement);
-  XML_SetCharacterDataHandler(parser, characterData);
+  solv_xmlparser_init(&pd.xmlp, stateswitches, &pd, startElement, endElement, errorCallback);
+  solv_xmlparser_parse(&pd.xmlp, fp);
+  solv_xmlparser_free(&pd.xmlp);
 
-  /* read/parse XML file */
-  for (;;)
-    {
-      l = fread(buf, 1, sizeof(buf), fp);
-      if (XML_Parse(parser, buf, l, l == 0) == XML_STATUS_ERROR)
-	{
-	  pd.ret = pool_error(pool, -1, "%s at line %u", XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser));
-	  break;
-	}
-      if (l == 0)
-	break;
-    }
-  XML_ParserFree(parser);
-  free(pd.content);
-  free(pd.evrspace);
+  solv_free(pd.evrspace);
 
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);

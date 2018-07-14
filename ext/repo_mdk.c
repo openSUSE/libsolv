@@ -11,12 +11,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <expat.h>
 
 #include "pool.h"
 #include "repo.h"
 #include "util.h"
 #include "chksum.h"
+#include "solv_xmlparser.h"
 #include "repo_mdk.h"
 
 static Offset
@@ -123,6 +123,8 @@ repo_add_mdk(Repo *repo, FILE *fp, int flags)
 	s->provides = parse_deps(s, buf + 10, 0);
       else if (!strncmp(buf + 1, "requires@", 9))
 	s->requires = parse_deps(s, buf + 10, SOLVABLE_PREREQMARKER);
+      else if (!strncmp(buf + 1, "recommends@", 11))
+	s->recommends = parse_deps(s, buf + 10, 0);
       else if (!strncmp(buf + 1, "suggests@", 9))
 	s->suggests = parse_deps(s, buf + 10, 0);
       else if (!strncmp(buf + 1, "obsoletes@", 10))
@@ -136,6 +138,8 @@ repo_add_mdk(Repo *repo, FILE *fp, int flags)
 	  char *arch;
 	  char *version;
 	  char *filename;
+	  char *disttag = 0;
+	  char *distepoch = 0;
 	  if ((epochstr = strchr(nvra, '@')) != 0)
 	    {
 	      char *sizestr;
@@ -146,14 +150,23 @@ repo_add_mdk(Repo *repo, FILE *fp, int flags)
 		  *sizestr++ = 0;
 		  if ((groupstr = strchr(sizestr, '@')) != 0)
 		    {
-		      char *n;
 		      *groupstr++ = 0;
-		      if ((n = strchr(groupstr, '@')) != 0)
-			*n = 0;
+		      if ((disttag = strchr(groupstr, '@')) != 0)
+			{
+			  *disttag++ = 0;
+			  if ((distepoch = strchr(disttag, '@')) != 0)
+			    {
+			      char *n;
+			      *distepoch++ = 0;
+			      if ((n = strchr(distepoch, '@')) != 0)
+				*n = 0;
+			    }
+			}
 		      if (*groupstr)
 			repodata_set_poolstr(data, s - pool->solvables, SOLVABLE_GROUP, groupstr);
 		    }
-		  repodata_set_num(data, s - pool->solvables, SOLVABLE_INSTALLSIZE, strtoull(sizestr, 0, 10));
+		  if (*sizestr)
+		    repodata_set_num(data, s - pool->solvables, SOLVABLE_INSTALLSIZE, strtoull(sizestr, 0, 10));
 		}
 	    }
           filename = pool_tmpjoin(pool, nvra, ".rpm", 0);
@@ -163,47 +176,21 @@ repo_add_mdk(Repo *repo, FILE *fp, int flags)
 	      *arch++ = 0;
 	      s->arch = pool_str2id(pool, arch, 1);
 	    }
-	  /* argh, do we have a distepoch or not, check self-provides */
-	  if (s->provides)
+	  if (disttag && *disttag)
 	    {
-	      Id id, lastid, *idp = s->repo->idarraydata + s->provides;
-	      lastid = 0;
-	      for (idp = s->repo->idarraydata + s->provides; (id = *idp) != 0; idp++)
-		{
-		  const char *evr, *name;
-		  int namel;
-		  Reldep *rd;
-		  if (!ISRELDEP(id))
-		    continue;
-		  rd = GETRELDEP(pool, id);
-		  if (rd->flags != REL_EQ)
-		    continue;
-		  name = pool_id2str(pool, rd->name);
-		  namel = strlen(name);
-		  if (strncmp(name, nvra, namel) != 0 || nvra[namel] != '-')
-		    continue;
-		  evr = pool_id2str(pool, rd->evr);
-		  evr = strrchr(evr, '-');
-		  if (evr && strchr(evr, ':') != 0)
-		    lastid = id;
-		}
-	      if (lastid)
-		{
-		  /* self provides found, and it contains a distepoch */
-		  /* replace with self-provides distepoch to get rid of the disttag */
-		  char *nvradistepoch = strrchr(nvra, '-');
-		  if (nvradistepoch)
-		    {
-		      Reldep *rd = GETRELDEP(pool, lastid);
-		      const char *evr = pool_id2str(pool, rd->evr);
-		      evr = strrchr(evr, '-');
-		      if (evr && (evr = strchr(evr, ':')) != 0)
-			{
-			  if (strlen(evr) < strlen(nvradistepoch))
-			    strcpy(nvradistepoch, evr);
-			}
-		    }
-		}
+	      /* strip disttag from release */
+	      char *n = strrchr(nvra, '-');
+	      if (n && !strncmp(n + 1, disttag, strlen(disttag)))
+		*n = 0;
+	    }
+	  if (distepoch && *distepoch)
+	    {
+	      /* add distepoch */
+	      int le = strlen(distepoch);
+	      int ln = strlen(nvra);
+	      nvra[ln++] = ':';
+	      memmove(nvra + ln, distepoch, le);	/* may overlap */
+	      nvra[le + ln] = 0;
 	    }
 	  version = strrchr(nvra, '-');
 	  if (version)
@@ -259,15 +246,7 @@ enum state {
   NUMSTATES
 };
 
-struct stateswitch {
-  enum state from;
-  char *ename;
-  enum state to;
-  int docontent;
-};
-
-/* must be sorted by first column */
-static struct stateswitch stateswitches[] = {
+static struct solv_xmlparser_element stateswitches[] = {
   { STATE_START, "media_info", STATE_MEDIA_INFO, 0 },
   { STATE_MEDIA_INFO, "info", STATE_INFO, 1 },
   { STATE_MEDIA_INFO, "files", STATE_FILES, 1 },
@@ -278,30 +257,11 @@ struct parsedata {
   Pool *pool;
   Repo *repo;
   Repodata *data;
-  int depth;
-  enum state state;
-  int statedepth;
-  char *content;
-  int lcontent;
-  int acontent;
-  int docontent;
-  struct stateswitch *swtab[NUMSTATES];
-  enum state sbtab[NUMSTATES];
   Solvable *solvable;
   Hashtable joinhash;
   Hashval joinhashmask;
+  struct solv_xmlparser xmlp;
 };
-
-static inline const char *
-find_attr(const char *txt, const char **atts)
-{
-  for (; *atts; atts += 2)
-    {
-      if (!strcmp(*atts, txt))
-        return atts[1];
-    }
-  return 0;
-}
 
 static Hashtable
 joinhash_init(Repo *repo, Hashval *hmp)
@@ -393,56 +353,37 @@ joinhash_lookup(Repo *repo, Hashtable ht, Hashval hm, const char *fn, const char
   return 0;
 }
 
-static void XMLCALL
-startElement(void *userData, const char *name, const char **atts)
+static void
+startElement(struct solv_xmlparser *xmlp, int state, const char *name, const char **atts)
 {
-  struct parsedata *pd = userData;
+  struct parsedata *pd = xmlp->userdata;
   Pool *pool = pd->pool;
-  struct stateswitch *sw;
 
-  if (pd->depth != pd->statedepth)
-    {
-      pd->depth++;
-      return;
-    }
-  pd->depth++;
-  if (!pd->swtab[pd->state])
-    return;
-  for (sw = pd->swtab[pd->state]; sw->from == pd->state; sw++)
-    if (!strcmp(sw->ename, name))
-      break;
-  if (sw->from != pd->state)
-    return;
-  pd->state = sw->to;
-  pd->docontent = sw->docontent;
-  pd->statedepth = pd->depth;
-  pd->lcontent = 0;
-  *pd->content = 0;
-  switch (pd->state)
+  switch (state)
     {
     case STATE_INFO:
       {
-	const char *fn = find_attr("fn", atts);
-	const char *distepoch = find_attr("distepoch", atts);
+	const char *fn = solv_xmlparser_find_attr("fn", atts);
+	const char *distepoch = solv_xmlparser_find_attr("distepoch", atts);
 	const char *str;
 	pd->solvable = joinhash_lookup(pd->repo, pd->joinhash, pd->joinhashmask, fn, distepoch);
 	if (!pd->solvable)
 	  break;
-	str = find_attr("url", atts);
+	str = solv_xmlparser_find_attr("url", atts);
 	if (str && *str)
 	  repodata_set_str(pd->data, pd->solvable - pool->solvables, SOLVABLE_URL, str);
-	str = find_attr("license", atts);
+	str = solv_xmlparser_find_attr("license", atts);
 	if (str && *str)
 	  repodata_set_poolstr(pd->data, pd->solvable - pool->solvables, SOLVABLE_LICENSE, str);
-	str = find_attr("sourcerpm", atts);
+	str = solv_xmlparser_find_attr("sourcerpm", atts);
 	if (str && *str)
 	  repodata_set_sourcepkg(pd->data, pd->solvable - pool->solvables, str);
         break;
       }
     case STATE_FILES:
       {
-	const char *fn = find_attr("fn", atts);
-	const char *distepoch = find_attr("distepoch", atts);
+	const char *fn = solv_xmlparser_find_attr("fn", atts);
+	const char *distepoch = solv_xmlparser_find_attr("distepoch", atts);
 	pd->solvable = joinhash_lookup(pd->repo, pd->joinhash, pd->joinhashmask, fn, distepoch);
         break;
       }
@@ -451,29 +392,22 @@ startElement(void *userData, const char *name, const char **atts)
     }
 }
 
-static void XMLCALL
-endElement(void *userData, const char *name)
+static void
+endElement(struct solv_xmlparser *xmlp, int state, char *content)
 {
-  struct parsedata *pd = userData;
+  struct parsedata *pd = xmlp->userdata;
   Solvable *s = pd->solvable;
-  if (pd->depth != pd->statedepth)
-    {
-      pd->depth--;
-      return;
-    }
-  pd->depth--;
-  pd->statedepth--;
-  switch (pd->state)
+  switch (state)
     {
     case STATE_INFO:
-      if (s && *pd->content)
-        repodata_set_str(pd->data, s - pd->pool->solvables, SOLVABLE_DESCRIPTION, pd->content);
+      if (s && *content)
+        repodata_set_str(pd->data, s - pd->pool->solvables, SOLVABLE_DESCRIPTION, content);
       break;
     case STATE_FILES:
-      if (s && *pd->content)
+      if (s && *content)
 	{
 	  char *np, *p, *sl;
-	  for (p = pd->content; p && *p; p = np)
+	  for (p = content; p && *p; p = np)
 	    {
 	      Id id;
 	      np = strchr(p, '\n');
@@ -501,42 +435,21 @@ endElement(void *userData, const char *name)
     default:
       break;
     }
-  pd->state = pd->sbtab[pd->state];
-  pd->docontent = 0;
 }
 
-static void XMLCALL
-characterData(void *userData, const XML_Char *s, int len)
+static void
+errorCallback(struct solv_xmlparser *xmlp, const char *errstr, unsigned int line, unsigned int column)
 {
-  struct parsedata *pd = userData;
-  int l;
-  char *c;
-  if (!pd->docontent)
-    return;
-  l = pd->lcontent + len + 1;
-  if (l > pd->acontent)
-    {
-      pd->content = solv_realloc(pd->content, l + 256);
-      pd->acontent = l + 256;
-    }
-  c = pd->content + pd->lcontent;
-  pd->lcontent += len;
-  while (len-- > 0)
-    *c++ = *s++;
-  *c = 0;
+  struct parsedata *pd = xmlp->userdata;
+  pool_debug(pd->pool, SOLV_ERROR, "%s at line %u:%u\n", errstr, line, column);
 }
 
-#define BUFF_SIZE 8192
 
 int
 repo_add_mdk_info(Repo *repo, FILE *fp, int flags)
 {
   Repodata *data;
   struct parsedata pd;
-  char buf[BUFF_SIZE];
-  int i, l;
-  struct stateswitch *sw;
-  XML_Parser parser;
 
   if (!(flags & REPO_EXTEND_SOLVABLES))
     {
@@ -550,36 +463,10 @@ repo_add_mdk_info(Repo *repo, FILE *fp, int flags)
   pd.repo = repo;
   pd.pool = repo->pool;
   pd.data = data;
-
-  pd.content = solv_malloc(256);
-  pd.acontent = 256;
-
+  solv_xmlparser_init(&pd.xmlp, stateswitches, &pd, startElement, endElement, errorCallback);
   pd.joinhash = joinhash_init(repo, &pd.joinhashmask);
-
-  for (i = 0, sw = stateswitches; sw->from != NUMSTATES; i++, sw++)
-    {
-      if (!pd.swtab[sw->from])
-        pd.swtab[sw->from] = sw;
-      pd.sbtab[sw->to] = sw->from;
-    }
-
-  parser = XML_ParserCreate(NULL);
-  XML_SetUserData(parser, &pd);
-  XML_SetElementHandler(parser, startElement, endElement);
-  XML_SetCharacterDataHandler(parser, characterData);
-  for (;;)
-    {
-      l = fread(buf, 1, sizeof(buf), fp);
-      if (XML_Parse(parser, buf, l, l == 0) == XML_STATUS_ERROR)
-        {
-          pool_debug(pd.pool, SOLV_ERROR, "%s at line %u:%u\n", XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser), (unsigned int)XML_GetCurrentColumnNumber(parser));
-          break;
-        }
-      if (l == 0)
-        break;
-    }
-  XML_ParserFree(parser);
-  solv_free(pd.content);
+  solv_xmlparser_parse(&pd.xmlp, fp);
+  solv_xmlparser_free(&pd.xmlp);
   solv_free(pd.joinhash);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);

@@ -10,14 +10,17 @@ IF (ENABLE_RPMDB)
 ADD_EXECUTABLE (rpmdb2solv rpmdb2solv.c)
 TARGET_LINK_LIBRARIES (rpmdb2solv toolstuff libsolvext libsolv ${SYSTEM_LIBRARIES})
 
-ADD_EXECUTABLE (rpms2solv rpms2solv.c)
-TARGET_LINK_LIBRARIES (rpms2solv toolstuff libsolvext libsolv ${SYSTEM_LIBRARIES})
-
 ADD_EXECUTABLE (findfileconflicts findfileconflicts.c)
 TARGET_LINK_LIBRARIES (findfileconflicts libsolvext libsolv ${SYSTEM_LIBRARIES})
 
-SET (tools_list ${tools_list} rpmdb2solv rpms2solv)
+SET (tools_list ${tools_list} rpmdb2solv)
 ENDIF (ENABLE_RPMDB)
+
+IF (ENABLE_RPMPKG)
+ADD_EXECUTABLE (rpms2solv rpms2solv.c)
+TARGET_LINK_LIBRARIES (rpms2solv toolstuff libsolvext libsolv ${SYSTEM_LIBRARIES})
+SET (tools_list ${tools_list} rpms2solv)
+ENDIF (ENABLE_RPMPKG)
 
 IF (ENABLE_RPMMD)
 ADD_EXECUTABLE (repomdxml2solv repomdxml2solv.c)

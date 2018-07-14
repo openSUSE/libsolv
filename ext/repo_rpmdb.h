@@ -25,6 +25,7 @@ extern Id repo_add_rpm(Repo *repo, const char *rpm, int flags);
 #define RPM_ADD_WITH_LEADSIGID	(1 << 16)
 #define RPM_ADD_WITH_CHANGELOG	(1 << 17)
 #define RPM_ADD_FILTERED_FILELIST (1 << 18)
+#define RPMDB_KEEP_GPG_PUBKEY   (1 << 19)
 
 #define RPMDB_EMPTY_REFREPO	(1 << 30)	/* internal */
 

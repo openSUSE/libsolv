@@ -8,14 +8,11 @@
 #define _GNU_SOURCE
 
 #include <sys/types.h>
-#include <limits.h>
-#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <dirent.h>
-#include <zlib.h>
-#include <getopt.h>
+#include <unistd.h>
 
 #include "pool.h"
 #include "repo.h"

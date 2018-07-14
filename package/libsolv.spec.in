@@ -1,7 +1,7 @@
 #
 # spec file for package libsolv
 #
-# Copyright (c) 2012 SUSE LINUX Products GmbH, Nuernberg, Germany.
+# Copyright (c) 2017 SUSE LINUX Products GmbH, Nuernberg, Germany.
 #
 # All modifications and additions to the file contributed by third parties
 # remain the property of their copyright owners, unless otherwise agreed
@@ -26,30 +26,37 @@ BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 %bcond_without disable_shared
 %bcond_without perl_binding
 %bcond_without python_binding
+%bcond_without python3_binding
 %bcond_without ruby_binding
 %bcond_with zypp
+
+%if 0%{?leap_version} >= 420300 || 0%{?sle_version} >= 120300 || 0%{?suse_version} >= 1330 || !0%{?suse_version}
+%bcond_without bz2
+%bcond_without xz
+%else
+%bcond_with bz2
+%bcond_with xz
+%endif
+
+%if 0%{?fedora} || 0%{?rhel} >= 7 || 0%{?mageia} >= 6 || 0%{?suse_version} >= 1330
+%bcond_without richdeps
+%else
+%bcond_with richdeps
+%endif
 
 %if 0%{?mandriva_version}
 # force this version on mandriva
 BuildRequires:  libneon0.26-devel
 %endif
-%if 0%{?fedora_version} || 0%{?rhel_version} >= 600 || 0%{?centos_version} >= 600
-BuildRequires:  db4-devel
+%if 0%{?fedora} || 0%{?rhel} >= 6 || 0%{?mageia}
+BuildRequires:  db-devel
 %endif
-%if 0%{?suse_version}
-%if 0%{?suse_version} < 1030
-BuildRequires:  expat
-%else
-BuildRequires:  libexpat-devel
-%endif
-%if 0%{?suse_version} < 1100
+BuildRequires:  libxml2-devel
+%if 0%{?suse_version} && 0%{?suse_version} < 1100
 BuildRequires:  graphviz
 %endif
-%if 0%{?suse_version} > 1020
+%if 0%{?suse_version} > 1020 || 0%{?fedora} || 0%{?mageia}
 BuildRequires:  fdupes
-%endif
-%else
-BuildRequires:  expat-devel
 %endif
 BuildRequires:  cmake
 BuildRequires:  gcc-c++
@@ -58,41 +65,66 @@ BuildRequires:  zlib-devel
 
 %if %{with perl_binding}
 BuildRequires:  perl
-%if 0%{?fedora_version} || 0%{?rhel_version} >= 600 || 0%{?centos_version} >= 600
+%if 0%{?fedora} || 0%{?rhel} >= 6 || 0%{?mageia}
 BuildRequires:  perl-devel
 %endif
 BuildRequires:  swig
 %endif
+
 %if %{with ruby_binding}
-%global ruby_vendorarch %(ruby  -r rbconfig -e "puts Config::CONFIG['vendorarchdir'].nil? ? Config::CONFIG['sitearchdir'] : Config::CONFIG['vendorarchdir']")
+%global ruby_vendorarch %(ruby  -r rbconfig -e "puts RbConfig::CONFIG['vendorarchdir'].nil? ? RbConfig::CONFIG['sitearchdir'] : RbConfig::CONFIG['vendorarchdir']")
 BuildRequires:  ruby
 BuildRequires:  ruby-devel
 BuildRequires:  swig
 %endif
+
 %if %{with python_binding}
-%global python_sitearch %(python -c "from distutils.sysconfig import get_python_lib; print get_python_lib(True);")
+%global python_sitearch %(python -c "from distutils.sysconfig import get_python_lib; print(get_python_lib(True))")
 BuildRequires:  python-devel
 BuildRequires:  swig
 %endif
 
-Summary:        A new approach to package dependency solving
+%if %{with python3_binding}
+%global python3_sitearch %(python3 -c "from distutils.sysconfig import get_python_lib; print(get_python_lib(True))")
+BuildRequires:  python3-devel
+%endif
+
+%if %{with bz2}
+%if 0%{?suse_version}
+BuildRequires:  libbz2-devel
+%else
+BuildRequires:  bzip2-devel
+%endif
+%endif
+
+%if %{with xz}
+BuildRequires:  xz-devel
+%endif
+
+
+Summary:        Package dependency solver using a satisfiability algorithm
 License:        BSD-3-Clause
 Group:          Development/Libraries/C and C++
 
 %description
-A new approach to package dependency solving
+libsolv is a library for solving packages and reading repositories.
+The solver uses a satisfiability algorithm.
 
 %if !%{with disable_shared}
 %package -n libsolv@LIBSOLV_SOVERSION@
-Summary:        A new approach to package dependency solving
-Group:          Development/Libraries/C and C++
+Summary:        Package dependency solver using a satisfiability algorithm
+Group:          System/Libraries
 
 %description -n libsolv@LIBSOLV_SOVERSION@
-A new approach to package dependency solving
+libsolv is a library for solving packages and reading repositories.
+It consists of two central blocks: Using a dictionary approach to
+store and retrieve package and dependency information, and, using a
+so-called satisfiability algorithm for resolving package
+dependencies.
 
 %endif
 %package devel
-Summary:        A new approach to package dependency solving
+Summary:        Development files for libsolv, a package solver
 Group:          Development/Libraries/C and C++
 %if !%{with disable_shared}
 Requires:       libsolv@LIBSOLV_SOVERSION@ = %version
@@ -101,24 +133,28 @@ Requires:       rpm-devel
 Conflicts:      libsatsolver-devel
 
 %description devel
-Development files for libsolv, a new approach to package dependency solving
+Development files for libsolv, a library for solving packages and
+reading repositories.
 
 %package tools
-Summary:        A new approach to package dependency solving
-Group:          Development/Libraries/C and C++
+Summary:        Utilities to work with .solv files
+Group:          System/Management
 Obsoletes:      satsolver-tools < 0.18
 Provides:       satsolver-tools = 0.18
 Conflicts:      satsolver-tools-obsolete
 Requires:       gzip bzip2 coreutils findutils
 
 %description tools
-A new approach to package dependency solving.
+libsolv is a library for solving packages and reading repositories.
+
+This subpackage contains utilities to create and work with the .solv
+files used by libsolv.
 
 %package demo
 Summary:        Applications demoing the libsolv library
 Group:          System/Management
 Requires:       curl
-%if 0%{?fedora_version} || 0%{?rhel_version} >= 600 || 0%{?centos_version} >= 600
+%if 0%{?fedora} || 0%{?rhel} >= 6 || 0%{?mageia}
 Requires:       gnupg2
 %endif
 %if 0%{?suse_version}
@@ -134,7 +170,7 @@ Summary:        Ruby bindings for the libsolv library
 Group:          Development/Languages/Ruby
 
 %description -n ruby-solv
-Ruby bindings for sat solver.
+Ruby bindings for libsolv.
 
 %package -n python-solv
 %if 0%{?py_requires:1} && %{with python_binding}
@@ -144,7 +180,14 @@ Summary:        Python bindings for the libsolv library
 Group:          Development/Languages/Python
 
 %description -n python-solv
-Python bindings for sat solver.
+Python bindings for libsolv.
+
+%package -n python3-solv
+Summary:        Python3 bindings for the libsolv library
+Group:          Development/Languages/Python
+
+%description -n python3-solv
+Python3 bindings for libsolv.
 
 %package -n perl-solv
 Requires:       perl = %{perl_version}
@@ -152,55 +195,63 @@ Summary:        Perl bindings for the libsolv library
 Group:          Development/Languages/Perl
 
 %description -n perl-solv
-Perl bindings for sat solver.
+Perl bindings for libsolv.
 
 %prep
 %setup -n libsolv-%{version}
 
 %build
-export CFLAGS="$RPM_OPT_FLAGS"
+export CFLAGS="%{optflags}"
 export CXXFLAGS="$CFLAGS"
 
 CMAKE_FLAGS=
-%if 0%{?fedora_version} || 0%{?rhel_version} >= 600 || 0%{?centos_version} >= 600
-CMAKE_FLAGS="-DFEDORA=1"
+%if 0%{?fedora} || 0%{?rhel} >= 6
+CMAKE_FLAGS="-DFEDORA=1 -DENABLE_APPDATA=1 -DENABLE_COMPS=1"
+%endif
+%if 0%{?mageia}
+CMAKE_FLAGS="-DMAGEIA=1 -DENABLE_APPDATA=1 -DENABLE_COMPS=1"
 %endif
 %if 0%{?suse_version}
-CMAKE_FLAGS="-DSUSE=1 -DENABLE_APPDATA=1"
+CMAKE_FLAGS="-DSUSE=1 -DENABLE_APPDATA=1 -DENABLE_COMPS=1"
 %endif
 
-cmake   $CMAKE_FLAGS \
+cmake	$CMAKE_FLAGS \
 	-DCMAKE_INSTALL_PREFIX=%{_prefix} \
 	-DLIB=%{_lib} \
 	-DCMAKE_VERBOSE_MAKEFILE=TRUE \
 	-DCMAKE_BUILD_TYPE=RelWithDebInfo \
+	-DWITH_LIBXML2=1 \
 	%{?with_enable_static:-DENABLE_STATIC=1} \
 	%{?with_disable_shared:-DDISABLE_SHARED=1} \
 	%{?with_perl_binding:-DENABLE_PERL=1} \
 	%{?with_python_binding:-DENABLE_PYTHON=1} \
+	%{?with_python3_binding:-DENABLE_PYTHON3=1} \
 	%{?with_ruby_binding:-DENABLE_RUBY=1} \
+	%{?with_bz2:-DENABLE_BZIP2_COMPRESSION=1} \
+	%{?with_xz:-DENABLE_LZMA_COMPRESSION=1} \
+	%{?with_richdeps:-DENABLE_COMPLEX_DEPS=1} \
 	%{?with_zypp:-DENABLE_SUSEREPO=1 -DENABLE_HELIXREPO=1} \
 	-DUSE_VENDORDIRS=1 \
 	-DCMAKE_SKIP_RPATH=1
-make %{?jobs:-j %jobs}
+make %{?_smp_mflags}
 
 %install
-make DESTDIR=$RPM_BUILD_ROOT install
-%if %{with python_binding}
+make DESTDIR=%{buildroot} install
 %if 0%{?suse_version}
-pushd $RPM_BUILD_ROOT/%{python_sitearch}
+%if %{with python_binding}
+pushd %{buildroot}/%{python_sitearch}
 python %py_libdir/py_compile.py *.py
 python -O %py_libdir/py_compile.py *.py
 popd
+%endif
+%if %{with python3_binding}
+%py3_compile %{buildroot}/%{python3_sitearch}
 %endif
 %endif
 %if %{with disable_shared}
 # we want to leave the .a file untouched
 export NO_BRP_STRIP_DEBUG=true
 %endif
-
-%clean
-rm -rf "$RPM_BUILD_ROOT"
 
 %if !%{with disable_shared}
 %post -n libsolv@LIBSOLV_SOVERSION@ -p /sbin/ldconfig
@@ -209,7 +260,7 @@ rm -rf "$RPM_BUILD_ROOT"
 
 %files -n libsolv@LIBSOLV_SOVERSION@
 %defattr(-,root,root)
-%doc LICENSE*
+%license LICENSE*
 %{_libdir}/libsolv.so.*
 %{_libdir}/libsolvext.so.*
 %endif
@@ -240,6 +291,7 @@ rm -rf "$RPM_BUILD_ROOT"
 %{_mandir}/man1/helix2solv*
 %endif
 %{_datadir}/cmake/Modules/*
+%{_libdir}/pkgconfig/libsolv*.pc
 %{_mandir}/man3/*
 
 %files demo
@@ -262,6 +314,15 @@ rm -rf "$RPM_BUILD_ROOT"
 %files -n python-solv
 %defattr(-,root,root)
 %{python_sitearch}/*
+%endif
+
+%if %{with python3_binding}
+%files -n python3-solv
+%defattr(-,root,root)
+%{python3_sitearch}/*solv*
+%if 0%{?suse_version}
+%{python3_sitearch}/*/*solv*
+%endif
 %endif
 
 %changelog

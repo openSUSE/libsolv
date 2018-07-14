@@ -18,19 +18,16 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <errno.h>
-#include <limits.h>
-#include <fcntl.h>
-#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
 #include <dirent.h>
-#include <expat.h>
 
 #include "pool.h"
 #include "repo.h"
 #include "util.h"
+#include "solv_xmlparser.h"
 #define DISABLE_SPLIT
 #include "tools_util.h"
 #include "repo_content.h"
@@ -68,15 +65,7 @@ enum state {
   NUMSTATES
 };
 
-struct stateswitch {
-  enum state from;
-  char *ename;
-  enum state to;
-  int docontent;
-};
-
-/* !! must be sorted by first column !! */
-static struct stateswitch stateswitches[] = {
+static struct solv_xmlparser_element stateswitches[] = {
   { STATE_START,     "product",       STATE_PRODUCT,       0 },
   { STATE_PRODUCT,   "vendor",        STATE_VENDOR,        1 },
   { STATE_PRODUCT,   "name",          STATE_NAME,          1 },
@@ -107,19 +96,11 @@ static struct stateswitch stateswitches[] = {
 struct parsedata {
   const char *filename;
   const char *basename;
-  int depth;
-  enum state state;
-  int statedepth;
-  char *content;
-  int lcontent;
-  int acontent;
-  int docontent;
   Pool *pool;
   Repo *repo;
   Repodata *data;
 
-  struct stateswitch *swtab[NUMSTATES];
-  enum state sbtab[NUMSTATES];
+  struct solv_xmlparser xmlp;
   struct joindata jd;
 
   const char *tmplang;
@@ -138,26 +119,6 @@ struct parsedata {
   int productscheme;
 };
 
-
-/*
- * find_attr
- * find value for xml attribute
- * I: txt, name of attribute
- * I: atts, list of key/value attributes
- * O: pointer to value of matching key, or NULL
- *
- */
-
-static inline const char *
-find_attr(const char *txt, const char **atts)
-{
-  for (; *atts; atts += 2)
-    {
-      if (!strcmp(*atts, txt))
-        return atts[1];
-    }
-  return 0;
-}
 
 static time_t
 datestr2timestamp(const char *date)
@@ -183,58 +144,19 @@ datestr2timestamp(const char *date)
   return timegm(&tm);
 }
 
-/*
- * XML callback: startElement
- */
-
-static void XMLCALL
-startElement(void *userData, const char *name, const char **atts)
+static void
+startElement(struct solv_xmlparser *xmlp, int state, const char *name, const char **atts)
 {
-  struct parsedata *pd = userData;
+  struct parsedata *pd = xmlp->userdata;
   Pool *pool = pd->pool;
   Solvable *s = pd->solvable;
-  struct stateswitch *sw;
 
-#if 0
-  fprintf(stderr, "start: [%d]%s\n", pd->state, name);
-#endif
-  if (pd->depth != pd->statedepth)
-    {
-      pd->depth++;
-      return;
-    }
-
-  pd->depth++;
-  if (!pd->swtab[pd->state])	/* no statetable -> no substates */
-    {
-#if 0
-      fprintf(stderr, "into unknown: %s (from: %d)\n", name, pd->state);
-#endif
-      return;
-    }
-  for (sw = pd->swtab[pd->state]; sw->from == pd->state; sw++)  /* find name in statetable */
-    if (!strcmp(sw->ename, name))
-      break;
-
-  if (sw->from != pd->state)
-    {
-#if 0
-      fprintf(stderr, "into unknown: %s (from: %d)\n", name, pd->state);
-#endif
-      return;
-    }
-  pd->state = sw->to;
-  pd->docontent = sw->docontent;
-  pd->statedepth = pd->depth;
-  pd->lcontent = 0;
-  *pd->content = 0;
-
-  switch(pd->state)
+  switch(state)
     {
     case STATE_PRODUCT:
       /* parse 'schemeversion' and store in global variable */
       {
-        const char * scheme = find_attr("schemeversion", atts);
+        const char * scheme = solv_xmlparser_find_attr("schemeversion", atts);
         pd->productscheme = (scheme && *scheme) ? atoi(scheme) : -1;
       }
       if (!s)
@@ -247,14 +169,14 @@ startElement(void *userData, const char *name, const char **atts)
       /* <summary lang="xy">... */
     case STATE_SUMMARY:
     case STATE_DESCRIPTION:
-      pd->tmplang = join_dup(&pd->jd, find_attr("lang", atts));
+      pd->tmplang = join_dup(&pd->jd, solv_xmlparser_find_attr("lang", atts));
       break;
     case STATE_URL:
-      pd->urltype = pool_str2id(pd->pool, find_attr("name", atts), 1);
+      pd->urltype = pool_str2id(pd->pool, solv_xmlparser_find_attr("name", atts), 1);
       break;
     case STATE_REGUPDREPO:
       {
-        const char *repoid = find_attr("repoid", atts);
+        const char *repoid = solv_xmlparser_find_attr("repoid", atts);
 	if (repoid && *repoid)
 	  {
 	    Id h = repodata_new_handle(pd->data);
@@ -269,28 +191,13 @@ startElement(void *userData, const char *name, const char **atts)
 }
 
 
-static void XMLCALL
-endElement(void *userData, const char *name)
+static void
+endElement(struct solv_xmlparser *xmlp, int state, char *content)
 {
-  struct parsedata *pd = userData;
+  struct parsedata *pd = xmlp->userdata;
   Solvable *s = pd->solvable;
 
-#if 0
-  fprintf(stderr, "end: [%d]%s\n", pd->state, name);
-#endif
-  if (pd->depth != pd->statedepth)
-    {
-      pd->depth--;
-#if 0
-      fprintf(stderr, "back from unknown %d %d %d\n", pd->state, pd->depth, pd->statedepth);
-#endif
-      return;
-    }
-
-  pd->depth--;
-  pd->statedepth--;
-
-  switch (pd->state)
+  switch (state)
     {
     case STATE_PRODUCT:
       /* product done, finish solvable */
@@ -326,148 +233,74 @@ endElement(void *userData, const char *name)
       pd->solvable = 0;
       break;
     case STATE_VENDOR:
-      s->vendor = pool_str2id(pd->pool, pd->content, 1);
+      s->vendor = pool_str2id(pd->pool, content, 1);
       break;
     case STATE_NAME:
-      s->name = pool_str2id(pd->pool, join2(&pd->jd, "product", ":", pd->content), 1);
+      s->name = pool_str2id(pd->pool, join2(&pd->jd, "product", ":", content), 1);
       break;
     case STATE_VERSION:
-      pd->tmpvers = solv_strdup(pd->content);
+      pd->tmpvers = solv_strdup(content);
       break;
     case STATE_RELEASE:
-      pd->tmprel = solv_strdup(pd->content);
+      pd->tmprel = solv_strdup(content);
       break;
     case STATE_ARCH:
-      s->arch = pool_str2id(pd->pool, pd->content, 1);
+      s->arch = pool_str2id(pd->pool, content, 1);
       break;
     case STATE_PRODUCTLINE:
-      repodata_set_str(pd->data, pd->handle, PRODUCT_PRODUCTLINE, pd->content);
+      repodata_set_str(pd->data, pd->handle, PRODUCT_PRODUCTLINE, content);
     break;
     case STATE_UPDATEREPOKEY:
       /** obsolete **/
       break;
     case STATE_SUMMARY:
-      repodata_set_str(pd->data, pd->handle, pool_id2langid(pd->pool, SOLVABLE_SUMMARY, pd->tmplang, 1), pd->content);
+      repodata_set_str(pd->data, pd->handle, pool_id2langid(pd->pool, SOLVABLE_SUMMARY, pd->tmplang, 1), content);
       break;
     case STATE_SHORTSUMMARY:
-      repodata_set_str(pd->data, pd->handle, PRODUCT_SHORTLABEL, pd->content);
+      repodata_set_str(pd->data, pd->handle, PRODUCT_SHORTLABEL, content);
       break;
     case STATE_DESCRIPTION:
-      repodata_set_str(pd->data, pd->handle, pool_id2langid(pd->pool, SOLVABLE_DESCRIPTION, pd->tmplang, 1), pd->content);
+      repodata_set_str(pd->data, pd->handle, pool_id2langid(pd->pool, SOLVABLE_DESCRIPTION, pd->tmplang, 1), content);
       break;
     case STATE_URL:
       if (pd->urltype)
         {
-          repodata_add_poolstr_array(pd->data, pd->handle, PRODUCT_URL, pd->content);
+          repodata_add_poolstr_array(pd->data, pd->handle, PRODUCT_URL, content);
           repodata_add_idarray(pd->data, pd->handle, PRODUCT_URL_TYPE, pd->urltype);
         }
       break;
     case STATE_TARGET:
-      repodata_set_str(pd->data, pd->handle, PRODUCT_REGISTER_TARGET, pd->content);
+      repodata_set_str(pd->data, pd->handle, PRODUCT_REGISTER_TARGET, content);
       break;
     case STATE_REGRELEASE:
-      repodata_set_str(pd->data, pd->handle, PRODUCT_REGISTER_RELEASE, pd->content);
+      repodata_set_str(pd->data, pd->handle, PRODUCT_REGISTER_RELEASE, content);
       break;
     case STATE_REGFLAVOR:
-      repodata_set_str(pd->data, pd->handle, PRODUCT_REGISTER_FLAVOR, pd->content);
+      repodata_set_str(pd->data, pd->handle, PRODUCT_REGISTER_FLAVOR, content);
       break;
     case STATE_CPEID:
-      if (*pd->content)
-        repodata_set_str(pd->data, pd->handle, SOLVABLE_CPEID, pd->content);
+      if (*content)
+        repodata_set_str(pd->data, pd->handle, SOLVABLE_CPEID, content);
       break;
     case STATE_ENDOFLIFE:
-      if (*pd->content)
-	{
-	  time_t t = datestr2timestamp(pd->content);
-	  if (t)
-	    repodata_set_num(pd->data, pd->handle, PRODUCT_ENDOFLIFE, (unsigned long long)t);
-	}
+      /* FATE#320699: Support tri-state product-endoflife (tag absent, present but nodate(0), present + date) */
+      repodata_set_num(pd->data, pd->handle, PRODUCT_ENDOFLIFE, (*content ? datestr2timestamp(content) : 0));
       break;
     default:
       break;
     }
-
-  pd->state = pd->sbtab[pd->state];
-  pd->docontent = 0;
-
-#if 0
-      fprintf(stderr, "end: [%s] -> %d\n", name, pd->state);
-#endif
 }
-
-
-static void XMLCALL
-characterData(void *userData, const XML_Char *s, int len)
-{
-  struct parsedata *pd = userData;
-  int l;
-  char *c;
-  if (!pd->docontent)
-    return;
-  l = pd->lcontent + len + 1;
-  if (l > pd->acontent)
-    {
-      pd->content = solv_realloc(pd->content, l + 256);
-      pd->acontent = l + 256;
-    }
-  c = pd->content + pd->lcontent;
-  pd->lcontent += len;
-  while (len-- > 0)
-    *c++ = *s++;
-  *c = 0;
-}
-
-#define BUFF_SIZE 8192
-
-
-/*
- * add single product to repo
- *
- */
 
 static void
-add_code11_product(struct parsedata *pd, FILE *fp)
+errorCallback(struct solv_xmlparser *xmlp, const char *errstr, unsigned int line, unsigned int column)
 {
-  char buf[BUFF_SIZE];
-  int l;
-  struct stat st;
-  XML_Parser parser;
-
-  if (!fstat(fileno(fp), &st))
-    {
-      pd->currentproduct = st.st_ino;
-      pd->ctime = (unsigned int)st.st_ctime;
-    }
-  else
-    {
-      pd->currentproduct = pd->baseproduct + 1; /* make it != baseproduct if stat fails */
-      pool_error(pd->pool, 0, "fstat: %s", strerror(errno));
-      pd->ctime = 0;
-    }
-
-  parser = XML_ParserCreate(NULL);
-  XML_SetUserData(parser, pd);
-  XML_SetElementHandler(parser, startElement, endElement);
-  XML_SetCharacterDataHandler(parser, characterData);
-
-  for (;;)
-    {
-      l = fread(buf, 1, sizeof(buf), fp);
-      if (XML_Parse(parser, buf, l, l == 0) == XML_STATUS_ERROR)
-	{
-	  pool_debug(pd->pool, SOLV_ERROR, "%s: %s at line %u:%u\n", pd->filename, XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser), (unsigned int)XML_GetCurrentColumnNumber(parser));
-	  XML_ParserFree(parser);
-	  if (pd->solvable)
-	    {
-	      repo_free_solvable(pd->repo, pd->solvable - pd->pool->solvables, 1);
-	      pd->solvable = 0;
-	    }
-	  return;
-	}
-      if (l == 0)
-	break;
-    }
-  XML_ParserFree(parser);
+  struct parsedata *pd = xmlp->userdata;
+  pool_debug(pd->pool, SOLV_ERROR, "%s: %s at line %u:%u\n", pd->filename, errstr, line, column);
+  if (pd->solvable)
+    {   
+      repo_free_solvable(pd->repo, pd->solvable - pd->pool->solvables, 1); 
+      pd->solvable = 0;
+    }   
 }
 
 
@@ -476,9 +309,7 @@ repo_add_code11_products(Repo *repo, const char *dirpath, int flags)
 {
   Repodata *data;
   struct parsedata pd;
-  struct stateswitch *sw;
   DIR *dir;
-  int i;
 
   data = repo_add_repodata(repo, flags);
 
@@ -487,15 +318,7 @@ repo_add_code11_products(Repo *repo, const char *dirpath, int flags)
   pd.pool = repo->pool;
   pd.data = data;
 
-  pd.content = solv_malloc(256);
-  pd.acontent = 256;
-
-  for (i = 0, sw = stateswitches; sw->from != NUMSTATES; i++, sw++)
-    {
-      if (!pd.swtab[sw->from])
-        pd.swtab[sw->from] = sw;
-      pd.sbtab[sw->to] = sw->from;
-    }
+  solv_xmlparser_init(&pd.xmlp, stateswitches, &pd, startElement, endElement, errorCallback);
 
   if (flags & REPO_USE_ROOTDIR)
     dirpath = pool_prepend_rootdir(repo->pool, dirpath);
@@ -525,14 +348,22 @@ repo_add_code11_products(Repo *repo, const char *dirpath, int flags)
 	      pool_error(repo->pool, 0, "%s: %s", fullpath, strerror(errno));
 	      continue;
 	    }
+	  if (fstat(fileno(fp), &st))
+	    {
+	      pool_error(repo->pool, 0, "%s: %s", fullpath, strerror(errno));
+	      fclose(fp);
+	      continue;
+	    }
+	  pd.currentproduct = st.st_ino;
+	  pd.ctime = (unsigned int)st.st_ctime;
 	  pd.filename = fullpath;
 	  pd.basename = entry->d_name;
-	  add_code11_product(&pd, fp);
+	  solv_xmlparser_parse(&pd.xmlp, fp);
 	  fclose(fp);
 	}
       closedir(dir);
     }
-  solv_free(pd.content);
+  solv_xmlparser_free(&pd.xmlp);
   join_freemem(&pd.jd);
   if (flags & REPO_USE_ROOTDIR)
     solv_free((char *)dirpath);

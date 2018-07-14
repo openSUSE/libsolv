@@ -5,20 +5,16 @@
  * for further information
  */
 
-#define DO_ARRAY 1
-
 #define _GNU_SOURCE
 #include <sys/types.h>
-#include <limits.h>
-#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <expat.h>
 
 #include "pool.h"
 #include "repo.h"
 #include "chksum.h"
+#include "solv_xmlparser.h"
 #include "repo_repomdxml.h"
 
 /*
@@ -110,15 +106,7 @@ enum state {
   NUMSTATES
 };
 
-struct stateswitch {
-  enum state from;
-  char *ename;
-  enum state to;
-  int docontent;
-};
-
-/* !! must be sorted by first column !! */
-static struct stateswitch stateswitches[] = {
+static struct solv_xmlparser_element stateswitches[] = {
   /* suseinfo tags */
   { STATE_START,       "repomd",          STATE_REPOMD, 0 },
   { STATE_START,       "suseinfo",        STATE_SUSEINFO, 0 },
@@ -153,20 +141,12 @@ static struct stateswitch stateswitches[] = {
 
 struct parsedata {
   int ret;
-  int depth;
-  enum state state;
-  int statedepth;
-  char *content;
-  int lcontent;
-  int acontent;
-  int docontent;
   Pool *pool;
   Repo *repo;
   Repodata *data;
 
-  XML_Parser *parser;
-  struct stateswitch *swtab[NUMSTATES];
-  enum state sbtab[NUMSTATES];
+  struct solv_xmlparser xmlp;
+
   int timestamp;
   /* handles for collection
      structures */
@@ -180,66 +160,20 @@ struct parsedata {
   Id chksumtype;
 };
 
-/*
- * find attribute
- */
 
-static inline const char *
-find_attr(const char *txt, const char **atts)
+static void
+startElement(struct solv_xmlparser *xmlp, int state, const char *name, const char **atts)
 {
-  for (; *atts; atts += 2)
-    {
-      if (!strcmp(*atts, txt))
-        return atts[1];
-    }
-  return 0;
-}
+  struct parsedata *pd = xmlp->userdata;
 
-
-static void XMLCALL
-startElement(void *userData, const char *name, const char **atts)
-{
-  struct parsedata *pd = userData;
-  /*Pool *pool = pd->pool;*/
-  struct stateswitch *sw;
-
-#if 0
-  fprintf(stderr, "start: [%d]%s\n", pd->state, name);
-#endif
-  if (pd->depth != pd->statedepth)
-    {
-      pd->depth++;
-      return;
-    }
-
-  pd->depth++;
-  if (!pd->swtab[pd->state])
-    return;
-  for (sw = pd->swtab[pd->state]; sw->from == pd->state; sw++)  /* find name in statetable */
-    if (!strcmp(sw->ename, name))
-      break;
-
-  if (sw->from != pd->state)
-    {
-#if 0
-      fprintf(stderr, "into unknown: %s (from: %d)\n", name, pd->state);
-#endif
-      return;
-    }
-  pd->state = sw->to;
-  pd->docontent = sw->docontent;
-  pd->statedepth = pd->depth;
-  pd->lcontent = 0;
-  *pd->content = 0;
-
-  switch(pd->state)
+  switch(state)
     {
     case STATE_REPOMD:
       {
         const char *updstr;
 
         /* this should be OBSOLETE soon */
-        updstr = find_attr("updates", atts);
+        updstr = solv_xmlparser_find_attr("updates", atts);
         if (updstr)
           {
             char *value = solv_strdup(updstr);
@@ -253,7 +187,7 @@ startElement(void *userData, const char *name, const char **atts)
 		  repodata_add_poolstr_array(pd->data, SOLVID_META, REPOSITORY_UPDATES, value);
 		value = p;
 	      }
-	    free(fvalue);
+	    solv_free(fvalue);
           }
         break;
       }
@@ -261,7 +195,7 @@ startElement(void *userData, const char *name, const char **atts)
       {
         /* this is extra metadata about the product this repository
            was designed for */
-        const char *cpeid = find_attr("cpeid", atts);
+        const char *cpeid = solv_xmlparser_find_attr("cpeid", atts);
         pd->rphandle = repodata_new_handle(pd->data);
         /* set the cpeid for the product
            the label is set in the content of the tag */
@@ -273,7 +207,7 @@ startElement(void *userData, const char *name, const char **atts)
       {
         /* this is extra metadata about the product this repository
            was designed for */
-        const char *cpeid = find_attr("cpeid", atts);
+        const char *cpeid = solv_xmlparser_find_attr("cpeid", atts);
         pd->ruhandle = repodata_new_handle(pd->data);
         /* set the cpeid for the product
            the label is set in the content of the tag */
@@ -283,7 +217,7 @@ startElement(void *userData, const char *name, const char **atts)
       }
     case STATE_DATA:
       {
-        const char *type= find_attr("type", atts);
+        const char *type= solv_xmlparser_find_attr("type", atts);
         pd->rdhandle = repodata_new_handle(pd->data);
 	if (type)
           repodata_set_poolstr(pd->data, pd->rdhandle, REPOSITORY_REPOMD_TYPE, type);
@@ -291,7 +225,7 @@ startElement(void *userData, const char *name, const char **atts)
       }
     case STATE_LOCATION:
       {
-        const char *href = find_attr("href", atts);
+        const char *href = solv_xmlparser_find_attr("href", atts);
 	if (href)
           repodata_set_str(pd->data, pd->rdhandle, REPOSITORY_REPOMD_LOCATION, href);
         break;
@@ -299,10 +233,10 @@ startElement(void *userData, const char *name, const char **atts)
     case STATE_CHECKSUM:
     case STATE_OPENCHECKSUM:
       {
-        const char *type= find_attr("type", atts);
+        const char *type= solv_xmlparser_find_attr("type", atts);
         pd->chksumtype = type && *type ? solv_chksum_str2type(type) : 0;
 	if (!pd->chksumtype)
-          pd->ret = pool_error(pd->pool, -1, "line %d: unknown checksum type: %s", (unsigned int)XML_GetCurrentLineNumber(*pd->parser), type ? type : "NULL");
+          pd->ret = pool_error(pd->pool, -1, "line %d: unknown checksum type: %s", solv_xmlparser_lineno(xmlp), type ? type : "NULL");
         break;
       }
     default:
@@ -311,27 +245,11 @@ startElement(void *userData, const char *name, const char **atts)
   return;
 }
 
-static void XMLCALL
-endElement(void *userData, const char *name)
+static void
+endElement(struct solv_xmlparser *xmlp, int state, char *content)
 {
-  struct parsedata *pd = userData;
-  /* Pool *pool = pd->pool; */
-
-#if 0
-  fprintf(stderr, "endElement: %s\n", name);
-#endif
-  if (pd->depth != pd->statedepth)
-    {
-      pd->depth--;
-#if 0
-      fprintf(stderr, "back from unknown %d %d %d\n", pd->state, pd->depth, pd->statedepth);
-#endif
-      return;
-    }
-
-  pd->depth--;
-  pd->statedepth--;
-  switch (pd->state)
+  struct parsedata *pd = xmlp->userdata;
+  switch (state)
     {
     case STATE_REPOMD:
       if (pd->timestamp > 0)
@@ -347,10 +265,10 @@ endElement(void *userData, const char *name)
     case STATE_OPENCHECKSUM:
       if (!pd->chksumtype)
 	break;
-      if (strlen(pd->content) != 2 * solv_chksum_len(pd->chksumtype))
-        pd->ret = pool_error(pd->pool, -1, "line %d: invalid checksum length for %s", (unsigned int)XML_GetCurrentLineNumber(*pd->parser), solv_chksum_type2str(pd->chksumtype));
+      if (strlen(content) != 2 * solv_chksum_len(pd->chksumtype))
+        pd->ret = pool_error(pd->pool, -1, "line %d: invalid checksum length for %s", solv_xmlparser_lineno(xmlp), solv_chksum_type2str(pd->chksumtype));
       else
-        repodata_set_checksum(pd->data, pd->rdhandle, pd->state == STATE_CHECKSUM ? REPOSITORY_REPOMD_CHECKSUM : REPOSITORY_REPOMD_OPENCHECKSUM, pd->chksumtype, pd->content);
+        repodata_set_checksum(pd->data, pd->rdhandle, state == STATE_CHECKSUM ? REPOSITORY_REPOMD_CHECKSUM : REPOSITORY_REPOMD_OPENCHECKSUM, pd->chksumtype, content);
       break;
 
     case STATE_TIMESTAMP:
@@ -360,7 +278,7 @@ endElement(void *userData, const char *name)
          * of all resources to save it as the time
          * the metadata was generated
          */
-        int timestamp = atoi(pd->content);
+        int timestamp = atoi(content);
 	if (timestamp)
           repodata_set_num(pd->data, pd->rdhandle, REPOSITORY_REPOMD_TIMESTAMP, timestamp);
         if (timestamp > pd->timestamp)
@@ -369,7 +287,7 @@ endElement(void *userData, const char *name)
       }
     case STATE_EXPIRE:
       {
-        int expire = atoi(pd->content);
+        int expire = atoi(content);
 	if (expire > 0)
 	  repodata_set_num(pd->data, SOLVID_META, REPOSITORY_EXPIRE, expire);
         break;
@@ -377,68 +295,46 @@ endElement(void *userData, const char *name)
       /* repomd.xml content and suseinfo.xml keywords are equivalent */
     case STATE_CONTENT:
     case STATE_KEYWORD:
-      if (*pd->content)
-	repodata_add_poolstr_array(pd->data, SOLVID_META, REPOSITORY_KEYWORDS, pd->content);
+      if (*content)
+	repodata_add_poolstr_array(pd->data, SOLVID_META, REPOSITORY_KEYWORDS, content);
       break;
     case STATE_REVISION:
-      if (*pd->content)
-	repodata_set_str(pd->data, SOLVID_META, REPOSITORY_REVISION, pd->content);
+      if (*content)
+	repodata_set_str(pd->data, SOLVID_META, REPOSITORY_REVISION, content);
       break;
     case STATE_DISTRO:
       /* distro tag is used in repomd.xml to say the product this repo is
          made for */
-      if (*pd->content)
-        repodata_set_str(pd->data, pd->rphandle, REPOSITORY_PRODUCT_LABEL, pd->content);
+      if (*content)
+        repodata_set_str(pd->data, pd->rphandle, REPOSITORY_PRODUCT_LABEL, content);
       repodata_add_flexarray(pd->data, SOLVID_META, REPOSITORY_DISTROS, pd->rphandle);
       break;
     case STATE_UPDATES:
       /* updates tag is used in suseinfo.xml to say the repo updates a product
          however it s not yet a tag standarized for repomd.xml */
-      if (*pd->content)
-        repodata_set_str(pd->data, pd->ruhandle, REPOSITORY_PRODUCT_LABEL, pd->content);
+      if (*content)
+        repodata_set_str(pd->data, pd->ruhandle, REPOSITORY_PRODUCT_LABEL, content);
       repodata_add_flexarray(pd->data, SOLVID_META, REPOSITORY_UPDATES, pd->ruhandle);
       break;
     case STATE_REPO:
-      if (*pd->content)
-	repodata_add_poolstr_array(pd->data, SOLVID_META, REPOSITORY_REPOID, pd->content);
+      if (*content)
+	repodata_add_poolstr_array(pd->data, SOLVID_META, REPOSITORY_REPOID, content);
       break;
     case STATE_SIZE:
-      if (*pd->content)
-	repodata_set_num(pd->data, pd->rdhandle, REPOSITORY_REPOMD_SIZE, strtoull(pd->content, 0, 10));
+      if (*content)
+	repodata_set_num(pd->data, pd->rdhandle, REPOSITORY_REPOMD_SIZE, strtoull(content, 0, 10));
       break;
     default:
       break;
     }
-
-  pd->state = pd->sbtab[pd->state];
-  pd->docontent = 0;
-
-  return;
 }
 
-
-static void XMLCALL
-characterData(void *userData, const XML_Char *s, int len)
+static void
+errorCallback(struct solv_xmlparser *xmlp, const char *errstr, unsigned int line, unsigned int column)
 {
-  struct parsedata *pd = userData;
-  int l;
-  char *c;
-  if (!pd->docontent)
-    return;
-  l = pd->lcontent + len + 1;
-  if (l > pd->acontent)
-    {
-      pd->content = realloc(pd->content, l + 256);
-      pd->acontent = l + 256;
-    }
-  c = pd->content + pd->lcontent;
-  pd->lcontent += len;
-  while (len-- > 0)
-    *c++ = *s++;
-  *c = 0;
+  struct parsedata *pd = xmlp->userdata;
+  pd->ret = pool_error(pd->pool, -1, "repo_repomdxml: %s at line %u:%u", errstr, line, column);
 }
-
-#define BUFF_SIZE 8192
 
 int
 repo_add_repomdxml(Repo *repo, FILE *fp, int flags)
@@ -446,50 +342,22 @@ repo_add_repomdxml(Repo *repo, FILE *fp, int flags)
   Pool *pool = repo->pool;
   struct parsedata pd;
   Repodata *data;
-  char buf[BUFF_SIZE];
-  int i, l;
-  struct stateswitch *sw;
-  XML_Parser parser;
 
   data = repo_add_repodata(repo, flags);
 
   memset(&pd, 0, sizeof(pd));
   pd.timestamp = 0;
-  for (i = 0, sw = stateswitches; sw->from != NUMSTATES; i++, sw++)
-    {
-      if (!pd.swtab[sw->from])
-        pd.swtab[sw->from] = sw;
-      pd.sbtab[sw->to] = sw->from;
-    }
   pd.pool = pool;
   pd.repo = repo;
   pd.data = data;
+  solv_xmlparser_init(&pd.xmlp, stateswitches, &pd, startElement, endElement, errorCallback);
 
-  pd.content = malloc(256);
-  pd.acontent = 256;
-  pd.lcontent = 0;
-  parser = XML_ParserCreate(NULL);
-  XML_SetUserData(parser, &pd);
-  pd.parser = &parser;
-  XML_SetElementHandler(parser, startElement, endElement);
-  XML_SetCharacterDataHandler(parser, characterData);
-  for (;;)
-    {
-      l = fread(buf, 1, sizeof(buf), fp);
-      if (XML_Parse(parser, buf, l, l == 0) == XML_STATUS_ERROR)
-	{
-	  pd.ret = pool_error(pool, -1, "repo_repomdxml: %s at line %u:%u", XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser), (unsigned int)XML_GetCurrentColumnNumber(parser));
-	  break;
-	}
-      if (l == 0)
-	break;
-    }
-  XML_ParserFree(parser);
+  solv_xmlparser_parse(&pd.xmlp, fp);
+  solv_xmlparser_free(&pd.xmlp);
 
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
 
-  free(pd.content);
   return pd.ret;
 }
 

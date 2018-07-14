@@ -44,9 +44,7 @@ class Repo_generic
     chksum.add("1.1")
     chksum.add(cookie)
     chksum.add_fstat(f.fileno)
-    extcookie = chksum.raw()
-    extcookie[0] = 1 if extcookie[0] == 0
-    return extcookie
+    return chksum.raw()
   end
 
   def cachepath(ext = nil)
@@ -68,6 +66,7 @@ class Repo_generic
       end
     end
     @cookie = nil
+    @extcookie = nil
     if !dorefresh && usecachedrepo(nil)
       puts "repo: '#{@name}' cached"
       return true
@@ -152,17 +151,17 @@ class Repo_generic
     return true
   end
 
-  def writecachedrepo(ext, info = nil)
+  def writecachedrepo(ext, repodata = nil)
     return if @incomplete
     begin
       Dir::mkdir("/var/cache/solv", 0755) unless FileTest.directory?("/var/cache/solv")
       f =  Tempfile.new('.newsolv-', '/var/cache/solv')
       f.chmod(0444)
       sf = Solv::xfopen_fd('', f.fileno)
-      if !info
+      if !repodata
 	@handle.write(sf)
       elsif ext
-	info.write(sf)
+	repodata.write(sf)
       else
 	@handle.write_first_repodata(sf)
       end
@@ -179,12 +178,12 @@ class Repo_generic
 	if sf
 	  if !ext
 	    @handle.empty()
-	    abort("internal error, cannot reload solv file") unless @handle.add_solv(sf, Solv::Repo::SOLV_ADD_NO_STUBS)
+	    abort("internal error, cannot reload solv file") unless @handle.add_solv(sf, repodata ? 0 : Solv::Repo::SOLV_ADD_NO_STUBS)
 	  else
-	    info.extend_to_repo()
+	    repodata.extend_to_repo()
 	    flags = Solv::Repo::REPO_EXTEND_SOLVABLES
 	    flags |= Solv::Repo::REPO_LOCALPOOL if ext != 'DL'
-	    info.add_solv(sf, flags)
+	    repodata.add_solv(sf, flags)
 	  end
 	  sf.close
 	end
@@ -213,6 +212,33 @@ class Repo_generic
 
   def packagespath()
     return ''
+  end
+
+  @@langtags = {
+    Solv::SOLVABLE_SUMMARY     => Solv::REPOKEY_TYPE_STR,
+    Solv::SOLVABLE_DESCRIPTION => Solv::REPOKEY_TYPE_STR,
+    Solv::SOLVABLE_EULA        => Solv::REPOKEY_TYPE_STR,
+    Solv::SOLVABLE_MESSAGEINS  => Solv::REPOKEY_TYPE_STR,
+    Solv::SOLVABLE_MESSAGEDEL  => Solv::REPOKEY_TYPE_STR,
+    Solv::SOLVABLE_CATEGORY    => Solv::REPOKEY_TYPE_ID,
+  }
+
+  def add_ext_keys(ext, repodata, h)
+    if ext == 'DL'
+      repodata.add_idarray(h, Solv::REPOSITORY_KEYS, Solv::REPOSITORY_DELTAINFO)
+      repodata.add_idarray(h, Solv::REPOSITORY_KEYS, Solv::REPOKEY_TYPE_FLEXARRAY)
+    elsif ext == 'DU'
+      repodata.add_idarray(h, Solv::REPOSITORY_KEYS, Solv::SOLVABLE_DISKUSAGE)
+      repodata.add_idarray(h, Solv::REPOSITORY_KEYS, Solv::REPOKEY_TYPE_DIRNUMNUMARRAY)
+    elsif ext == 'FL'
+      repodata.add_idarray(h, Solv::REPOSITORY_KEYS, Solv::SOLVABLE_FILELIST)
+      repodata.add_idarray(h, Solv::REPOSITORY_KEYS, Solv::REPOKEY_TYPE_DIRSTRARRAY)
+    else
+      @@langtags.sort.each do |langid, langtype|
+	repodata.add_idarray(h, Solv::REPOSITORY_KEYS, @handle.pool.id2langid(langid, ext, true))
+	repodata.add_idarray(h, Solv::REPOSITORY_KEYS, langtype)
+      end
+    end
   end
 end
 
@@ -285,18 +311,13 @@ class Repo_rpmmd < Repo_generic
     repodata.set_poolstr(h, Solv::REPOSITORY_REPOMD_TYPE, what)
     repodata.set_str(h, Solv::REPOSITORY_REPOMD_LOCATION, filename)
     repodata.set_checksum(h, Solv::REPOSITORY_REPOMD_CHECKSUM, filechksum)
-    if ext == 'DL'
-      repodata.add_idarray(h, Solv::REPOSITORY_KEYS, Solv::REPOSITORY_DELTAINFO)
-      repodata.add_idarray(h, Solv::REPOSITORY_KEYS, Solv::REPOKEY_TYPE_FLEXARRAY)
-    elsif ext == 'FL'
-      repodata.add_idarray(h, Solv::REPOSITORY_KEYS, Solv::SOLVABLE_FILELIST)
-      repodata.add_idarray(h, Solv::REPOSITORY_KEYS, Solv::REPOKEY_TYPE_DIRSTRARRAY)
-    end
+    add_ext_keys(ext, repodata, h)
     repodata.add_flexarray(Solv::SOLVID_META, Solv::REPOSITORY_EXTERNAL, h)
   end
 
   def add_exts
     repodata = @handle.add_repodata(0)
+    repodata.extend_to_repo()
     add_ext(repodata, 'deltainfo', 'DL')
     add_ext(repodata, 'filelists', 'FL')
     repodata.internalize()
@@ -394,35 +415,12 @@ class Repo_susetags < Repo_generic
     return true
   end
 
-  @@langtags = {
-    Solv::SOLVABLE_SUMMARY     => Solv::REPOKEY_TYPE_STR,
-    Solv::SOLVABLE_DESCRIPTION => Solv::REPOKEY_TYPE_STR,
-    Solv::SOLVABLE_EULA        => Solv::REPOKEY_TYPE_STR,
-    Solv::SOLVABLE_MESSAGEINS  => Solv::REPOKEY_TYPE_STR,
-    Solv::SOLVABLE_MESSAGEDEL  => Solv::REPOKEY_TYPE_STR,
-    Solv::SOLVABLE_CATEGORY    => Solv::REPOKEY_TYPE_ID,
-  }
-
   def add_ext(repodata, what, ext)
     (filename, filechksum) = find(what)
     h = repodata.new_handle()
     repodata.set_str(h, Solv::SUSETAGS_FILE_NAME, filename)
     repodata.set_checksum(h, Solv::SUSETAGS_FILE_CHECKSUM, filechksum)
-    if ext == 'DL'
-      repodata.add_idarray(h, Solv::REPOSITORY_KEYS, Solv::REPOSITORY_DELTAINFO)
-      repodata.add_idarray(h, Solv::REPOSITORY_KEYS, Solv::REPOKEY_TYPE_FLEXARRAY)
-    elsif ext == 'DU'
-      repodata.add_idarray(h, Solv::REPOSITORY_KEYS, Solv::SOLVABLE_DISKUSAGE)
-      repodata.add_idarray(h, Solv::REPOSITORY_KEYS, Solv::REPOKEY_TYPE_DIRNUMNUMARRAY)
-    elsif ext == 'FL'
-      repodata.add_idarray(h, Solv::REPOSITORY_KEYS, Solv::SOLVABLE_FILELIST)
-      repodata.add_idarray(h, Solv::REPOSITORY_KEYS, Solv::REPOKEY_TYPE_DIRSTRARRAY)
-    else
-      @@langtags.sort.each do |langid, langtype|
-	repodata.add_idarray(h, Solv::REPOSITORY_KEYS, @handle.pool.id2langid(langid, ext, true))
-	repodata.add_idarray(h, Solv::REPOSITORY_KEYS, langtype)
-      end
-    end
+    add_ext_keys(ext, repodata, h)
     repodata.add_flexarray(Solv::SOLVID_META, Solv::REPOSITORY_EXTERNAL, h)
   end
 
@@ -494,7 +492,7 @@ class Repo_system < Repo_generic
     end
     f = Solv::xfopen(cachepath())
     @handle.add_rpmdb_reffp(f, Solv::Repo::REPO_REUSE_REPODATA)
-    f.close
+    f.close if f
     writecachedrepo(nil)
     return true
   end
@@ -727,7 +725,7 @@ if !newpkgs.empty?
   for p in newpkgs
     downloadsize += p.lookup_num(Solv::SOLVABLE_DOWNLOADSIZE)
   end
-  puts "Downloading #{newpkgs.length} packages, #{downloadsize} K"
+  puts "Downloading #{newpkgs.length} packages, #{downloadsize / 1024} K"
   for p in newpkgs
     repo = p.repo.appdata
     location, medianr = p.lookup_location()
@@ -758,6 +756,7 @@ for p in trans.steps
     f = newpkgsfp.delete(p.id)
     next unless f
     mode = steptype == Solv::Transaction::SOLVER_TRANSACTION_INSTALL ? '-U' : '-i'
+    f.cloexec(0)
     system('rpm', mode, '--force', '--nodeps', '--nodigest', '--nosignature', "/dev/fd/#{f.fileno().to_s}") || abort("rpm failed: #{$? >> 8}")
     f.close
   end

@@ -259,3 +259,16 @@ solv_chksum_free(Chksum *chk, unsigned char *cp)
   return 0;
 }
 
+int
+solv_chksum_cmp(Chksum *chk, Chksum *chk2)
+{
+  int len;
+  const unsigned char *res1, *res2;
+  if (chk == chk2)
+    return 1;
+  if (!chk || !chk2 || chk->type != chk2->type)
+    return 0;
+  res1 = solv_chksum_get(chk, &len);
+  res2 = solv_chksum_get(chk2, 0);
+  return memcmp(res1, res2, len) == 0 ? 1 : 0;
+}

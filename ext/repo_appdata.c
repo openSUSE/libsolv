@@ -14,20 +14,17 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <limits.h>
-#include <fcntl.h>
-#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
 #include <dirent.h>
-#include <expat.h>
 #include <errno.h>
 
 #include "pool.h"
 #include "repo.h"
 #include "util.h"
+#include "solv_xmlparser.h"
 #include "repo_appdata.h"
 
 
@@ -49,18 +46,12 @@ enum state {
   STATE_GROUP,
   STATE_KEYWORDS,
   STATE_KEYWORD,
+  STATE_EXTENDS,
   NUMSTATES
 };
 
-struct stateswitch {
-  enum state from;
-  char *ename;
-  enum state to;
-  int docontent;
-};
 
-/* !! must be sorted by first column !! */
-static struct stateswitch stateswitches[] = {
+static struct solv_xmlparser_element stateswitches[] = {
   { STATE_START,       "applications",  STATE_START,         0 },
   { STATE_START,       "components",    STATE_START,         0 },
   { STATE_START,       "application",   STATE_APPLICATION,   0 },
@@ -74,6 +65,7 @@ static struct stateswitch stateswitches[] = {
   { STATE_APPLICATION, "url",           STATE_URL,           1 },
   { STATE_APPLICATION, "project_group", STATE_GROUP,         1 },
   { STATE_APPLICATION, "keywords",      STATE_KEYWORDS,      0 },
+  { STATE_APPLICATION, "extends",       STATE_EXTENDS,       1 },
   { STATE_DESCRIPTION, "p",             STATE_P,             1 },
   { STATE_DESCRIPTION, "ul",            STATE_UL,            0 },
   { STATE_DESCRIPTION, "ol",            STATE_OL,            0 },
@@ -84,98 +76,59 @@ static struct stateswitch stateswitches[] = {
 };
 
 struct parsedata {
-  int depth;
-  enum state state;
-  int statedepth;
-  char *content;
-  int lcontent;
-  int acontent;
-  int docontent;
   Pool *pool;
   Repo *repo;
   Repodata *data;
-
-  struct stateswitch *swtab[NUMSTATES];
-  enum state sbtab[NUMSTATES];
+  int ret;
 
   Solvable *solvable;
   Id handle;
 
+  int skiplang;
   char *description;
   int licnt;
   int skip_depth;
   int flags;
   char *desktop_file;
   int havesummary;
+  const char *filename;
+  Queue *owners;
+
+  struct solv_xmlparser xmlp;
 };
 
 
-static inline const char *
-find_attr(const char *txt, const char **atts)
+static void
+startElement(struct solv_xmlparser *xmlp, int state, const char *name, const char **atts)
 {
-  for (; *atts; atts += 2)
-    if (!strcmp(*atts, txt))
-      return atts[1];
-  return 0;
-}
-
-
-static void XMLCALL
-startElement(void *userData, const char *name, const char **atts)
-{
-  struct parsedata *pd = userData;
+  struct parsedata *pd = xmlp->userdata;
   Pool *pool = pd->pool;
   Solvable *s = pd->solvable;
-  struct stateswitch *sw;
+  const char *type;
 
-#if 0
-  fprintf(stderr, "start: [%d]%s\n", pd->state, name);
-#endif
-  if (pd->depth != pd->statedepth)
+  /* ignore all language tags */
+  if (pd->skiplang || solv_xmlparser_find_attr("xml:lang", atts))
     {
-      pd->depth++;
+      pd->skiplang++;
       return;
     }
 
-  pd->depth++;
-  if (!pd->swtab[pd->state])	/* no statetable -> no substates */
-    {
-#if 0
-      fprintf(stderr, "into unknown: %s (from: %d)\n", name, pd->state);
-#endif
-      return;
-    }
-  for (sw = pd->swtab[pd->state]; sw->from == pd->state; sw++)  /* find name in statetable */
-    if (!strcmp(sw->ename, name))
-      break;
-
-  if (sw->from != pd->state)
-    {
-#if 0
-      fprintf(stderr, "into unknown: %s (from: %d)\n", name, pd->state);
-#endif
-      return;
-    }
-  pd->state = sw->to;
-  pd->docontent = sw->docontent;
-  pd->statedepth = pd->depth;
-  pd->lcontent = 0;
-  *pd->content = 0;
-
-  if (!pd->skip_depth && find_attr("xml:lang", atts))
-    pd->skip_depth = pd->depth;
-  if (pd->skip_depth)
-    {
-      pd->docontent = 0;
-      return;
-    }
-
-  switch(pd->state)
+  switch(state)
     {
     case STATE_APPLICATION:
+      type = solv_xmlparser_find_attr("type", atts);
+      if (!type || !*type)
+        type = "desktop";
+      if (strcmp(type, "desktop") != 0)
+	{
+	  /* ignore for now */
+	  pd->solvable = 0;
+	  break;
+	}
       s = pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->repo));
       pd->handle = s - pool->solvables;
       pd->havesummary = 0;
+      repodata_set_poolstr(pd->data, pd->handle, SOLVABLE_CATEGORY, type);
       break;
     case STATE_DESCRIPTION:
       pd->description = solv_free(pd->description);
@@ -191,51 +144,55 @@ startElement(void *userData, const char *name, const char **atts)
 
 /* replace whitespace with one space/newline */
 /* also strip starting/ending whitespace */
-static void
+static char *
 wsstrip(struct parsedata *pd)
 {
+  struct solv_xmlparser *xmlp = &pd->xmlp;
   int i, j;
   int ws = 0;
-  for (i = j = 0; pd->content[i]; i++)
+  for (i = j = 0; xmlp->content[i]; i++)
     {
-      if (pd->content[i] == ' ' || pd->content[i] == '\t' || pd->content[i] == '\n')
+      if (xmlp->content[i] == ' ' || xmlp->content[i] == '\t' || xmlp->content[i] == '\n')
 	{
-	  ws |= pd->content[i] == '\n' ? 2 : 1;
+	  ws |= xmlp->content[i] == '\n' ? 2 : 1;
 	  continue;
 	}
       if (ws && j)
-	pd->content[j++] = (ws & 2) ? '\n' : ' ';
+	xmlp->content[j++] = (ws & 2) ? '\n' : ' ';
       ws = 0;
-      pd->content[j++] = pd->content[i];
+      xmlp->content[j++] = xmlp->content[i];
     }
-  pd->content[j] = 0;
-  pd->lcontent = j;
+  xmlp->content[j] = 0;
+  xmlp->lcontent = j;
+  return xmlp->content;
 }
 
 /* indent all lines */
-static void
+static char *
 indent(struct parsedata *pd, int il)
 {
+  struct solv_xmlparser *xmlp = &pd->xmlp;
   int i, l;
-  for (l = 0; pd->content[l]; )
+  for (l = 0; xmlp->content[l]; )
     {
-      if (pd->content[l] == '\n')
+      if (xmlp->content[l] == '\n')
 	{
 	  l++;
 	  continue;
 	}
-      if (pd->lcontent + il + 1 > pd->acontent)
+      if (xmlp->lcontent + il + 1 > xmlp->acontent)
 	{
-	  pd->acontent = pd->lcontent + il + 256;
-	  pd->content = realloc(pd->content, pd->acontent);
+	  xmlp->acontent = xmlp->lcontent + il + 256;
+	  xmlp->content = realloc(xmlp->content, xmlp->acontent);
 	}
-      memmove(pd->content + l + il, pd->content + l, pd->lcontent - l + 1);
+      memmove(xmlp->content + l + il, xmlp->content + l, xmlp->lcontent - l + 1);
       for (i = 0; i < il; i++)
-	pd->content[l + i] = ' ';
-      pd->lcontent += il;
-      while (pd->content[l] && pd->content[l] != '\n')
+	xmlp->content[l + i] = ' ';
+      xmlp->lcontent += il;
+      while (xmlp->content[l] && xmlp->content[l] != '\n')
 	l++;
     }
+  return xmlp->content;
 }
 
 static void
@@ -311,40 +268,43 @@ add_missing_tags_from_desktop_file(struct parsedata *pd, Solvable *s, const char
   fclose(fp);
 }
 
-static void XMLCALL
-endElement(void *userData, const char *name)
+static char *
+guess_filename_from_id(Pool *pool, const char *id)
 {
-  struct parsedata *pd = userData;
+  int l = strlen(id);
+  char *r = pool_tmpjoin(pool, id, ".metainfo.xml", 0);
+  if (l > 8 && !strcmp(".desktop", id + l - 8))
+    strcpy(r + l - 8, ".appdata.xml");
+  else if (l > 4 && !strcmp(".ttf", id + l - 4))
+    strcpy(r + l - 4, ".metainfo.xml");
+  else if (l > 4 && !strcmp(".otf", id + l - 4))
+    strcpy(r + l - 4, ".metainfo.xml");
+  else if (l > 4 && !strcmp(".xml", id + l - 4))
+    strcpy(r + l - 4, ".metainfo.xml");
+  else if (l > 3 && !strcmp(".db", id + l - 3))
+    strcpy(r + l - 3, ".metainfo.xml");
+  else
+    return 0;
+  return r;
+}
+
+static void
+endElement(struct solv_xmlparser *xmlp, int state, char *content)
+{
+  struct parsedata *pd = xmlp->userdata;
   Pool *pool = pd->pool;
   Solvable *s = pd->solvable;
   Id id;
 
-#if 0
-  fprintf(stderr, "end: [%d]%s\n", pd->state, name);
-#endif
-  if (pd->depth != pd->statedepth)
+  if (pd->skiplang)
     {
-      pd->depth--;
-#if 0
-      fprintf(stderr, "back from unknown %d %d %d\n", pd->state, pd->depth, pd->statedepth);
-#endif
+      pd->skiplang--;
       return;
     }
+  if (!s)
+    return;
 
-  pd->depth--;
-  pd->statedepth--;
-
-  if (pd->skip_depth && pd->depth + 1 >= pd->skip_depth)
-    {
-      if (pd->depth + 1 == pd->skip_depth)
-	pd->skip_depth = 0;
-      pd->state = pd->sbtab[pd->state];
-      pd->docontent = 0;
-      return;
-    }
-  pd->skip_depth = 0;
-
-  switch (pd->state)
+  switch (state)
     {
     case STATE_APPLICATION:
       if (!s->arch)
@@ -361,44 +321,57 @@ endElement(void *userData, const char *name)
 	    l -= 8;
 	  s->name = pool_strn2id(pool, name, l, 1);
 	}
+      if (!s->requires && pd->owners)
+	{
+	  int i;
+	  Id id;
+	  for (i = 0; i < pd->owners->count; i++)
+	    {
+	      Solvable *os = pd->pool->solvables + pd->owners->elements[i];
+	      s->requires = repo_addid_dep(pd->repo, s->requires, os->name, 0);
+	      id = pool_str2id(pd->pool, pool_tmpjoin(pd->pool, "application-appdata(", pool_id2str(pd->pool, os->name), ")"), 1);
+	      s->provides = repo_addid_dep(pd->repo, s->provides, id, 0);
+	    }
+	}
+      if (!s->requires && (pd->desktop_file || pd->filename))
+	{
+	  /* add appdata() link requires/provides */
+	  const char *filename = pd->filename;
+	  if (!filename)
+	    filename = guess_filename_from_id(pool, pd->desktop_file);
+	  if (filename)
+	    {
+	      filename = pool_tmpjoin(pool, "application-appdata(", filename, ")");
+	      s->requires = repo_addid_dep(pd->repo, s->requires, pool_str2id(pd->pool, filename + 12, 1), 0);
+	      s->provides = repo_addid_dep(pd->repo, s->provides, pool_str2id(pd->pool, filename, 1), 0);
+	    }
+	}
       if (s->name && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
 	s->provides = repo_addid_dep(pd->repo, s->provides, pool_rel2id(pd->pool, s->name, s->evr, REL_EQ, 1), 0);
       pd->solvable = 0;
       pd->desktop_file = solv_free(pd->desktop_file);
       break;
     case STATE_ID:
-      pd->desktop_file = solv_strdup(pd->content);
-      /* guess the appdata.xml file name from the id element */
-      if (pd->lcontent > 8 && !strcmp(".desktop", pd->content + pd->lcontent - 8))
-	pd->content[pd->lcontent - 8] = 0;
-      else if (pd->lcontent > 4 && !strcmp(".ttf", pd->content + pd->lcontent - 4))
-	pd->content[pd->lcontent - 4] = 0;
-      else if (pd->lcontent > 4 && !strcmp(".otf", pd->content + pd->lcontent - 4))
-	pd->content[pd->lcontent - 4] = 0;
-      else if (pd->lcontent > 4 && !strcmp(".xml", pd->content + pd->lcontent - 4))
-	pd->content[pd->lcontent - 4] = 0;
-      else if (pd->lcontent > 3 && !strcmp(".db", pd->content + pd->lcontent - 3))
-	pd->content[pd->lcontent - 3] = 0;
-      id = pool_str2id(pd->pool, pool_tmpjoin(pool, "appdata(", pd->content, ".appdata.xml)"), 1);
-      s->requires = repo_addid_dep(pd->repo, s->requires, id, 0);
-      id = pool_str2id(pd->pool, pool_tmpjoin(pool, "application-appdata(", pd->content, ".appdata.xml)"), 1);
-      s->provides = repo_addid_dep(pd->repo, s->provides, id, 0);
+      pd->desktop_file = solv_strdup(content);
       break;
     case STATE_NAME:
-      s->name = pool_str2id(pd->pool, pool_tmpjoin(pool, "application:", pd->content, 0), 1);
+      s->name = pool_str2id(pd->pool, pool_tmpjoin(pool, "application:", content, 0), 1);
       break;
     case STATE_LICENCE:
-      repodata_add_poolstr_array(pd->data, pd->handle, SOLVABLE_LICENSE, pd->content);
+      repodata_add_poolstr_array(pd->data, pd->handle, SOLVABLE_LICENSE, content);
       break;
     case STATE_SUMMARY:
       pd->havesummary = 1;
-      repodata_set_str(pd->data, pd->handle, SOLVABLE_SUMMARY, pd->content);
+      repodata_set_str(pd->data, pd->handle, SOLVABLE_SUMMARY, content);
       break;
     case STATE_URL:
-      repodata_set_str(pd->data, pd->handle, SOLVABLE_URL, pd->content);
+      repodata_set_str(pd->data, pd->handle, SOLVABLE_URL, content);
       break;
     case STATE_GROUP:
-      repodata_add_poolstr_array(pd->data, pd->handle, SOLVABLE_GROUP, pd->content);
+      repodata_add_poolstr_array(pd->data, pd->handle, SOLVABLE_GROUP, content);
+      break;
+    case STATE_EXTENDS:
+      repodata_add_poolstr_array(pd->data, pd->handle, SOLVABLE_EXTENDS, content);
       break;
     case STATE_DESCRIPTION:
       if (pd->description)
@@ -411,81 +384,60 @@ endElement(void *userData, const char *name)
 	}
       break;
     case STATE_P:
-      wsstrip(pd);
-      pd->description = solv_dupappend(pd->description, pd->content, "\n\n");
+      content = wsstrip(pd);
+      pd->description = solv_dupappend(pd->description, content, "\n\n");
       break;
     case STATE_UL_LI:
       wsstrip(pd);
-      indent(pd, 4);
-      pd->content[2] = '-';
-      pd->description = solv_dupappend(pd->description, pd->content, "\n");
+      content = indent(pd, 4);
+      content[2] = '-';
+      pd->description = solv_dupappend(pd->description, content, "\n");
       break;
     case STATE_OL_LI:
       wsstrip(pd);
-      indent(pd, 4);
+      content = indent(pd, 4);
       if (++pd->licnt >= 10)
-	pd->content[0] = '0' + (pd->licnt / 10) % 10;
-      pd->content[1] = '0' + pd->licnt  % 10;
-      pd->content[2] = '.';
-      pd->description = solv_dupappend(pd->description, pd->content, "\n");
+	content[0] = '0' + (pd->licnt / 10) % 10;
+      content[1] = '0' + pd->licnt  % 10;
+      content[2] = '.';
+      pd->description = solv_dupappend(pd->description, content, "\n");
       break;
     case STATE_UL:
     case STATE_OL:
       pd->description = solv_dupappend(pd->description, "\n", 0);
       break;
     case STATE_PKGNAME:
-      id = pool_str2id(pd->pool, pd->content, 1);
+      id = pool_str2id(pd->pool, content, 1);
       s->requires = repo_addid_dep(pd->repo, s->requires, id, 0);
+      id = pool_str2id(pd->pool, pool_tmpjoin(pd->pool, "application-appdata(", content, ")"), 1);
+      s->provides = repo_addid_dep(pd->repo, s->provides, id, 0);
       break;
     case STATE_KEYWORD:
-      repodata_add_poolstr_array(pd->data, pd->handle, SOLVABLE_KEYWORDS, pd->content);
+      repodata_add_poolstr_array(pd->data, pd->handle, SOLVABLE_KEYWORDS, content);
       break;
     default:
       break;
     }
-
-  pd->state = pd->sbtab[pd->state];
-  pd->docontent = 0;
-
-#if 0
-  fprintf(stderr, "end: [%s] -> %d\n", name, pd->state);
-#endif
 }
 
-
-static void XMLCALL
-characterData(void *userData, const XML_Char *s, int len)
+static void
+errorCallback(struct solv_xmlparser *xmlp, const char *errstr, unsigned int line, unsigned int column)
 {
-  struct parsedata *pd = userData;
-  int l;
-  char *c;
-  if (!pd->docontent)
-    return;
-  l = pd->lcontent + len + 1;
-  if (l > pd->acontent)
-    {
-      pd->acontent = l + 256;
-      pd->content = realloc(pd->content, pd->acontent);
+  struct parsedata *pd = xmlp->userdata;
+  pool_debug(pd->pool, SOLV_ERROR, "repo_appdata: %s at line %u:%u\n", errstr, line, column);
+  pd->ret = -1;
+  if (pd->solvable)
+    {   
+      repo_free_solvable(pd->repo, pd->solvable - pd->pool->solvables, 1); 
+      pd->solvable = 0;
     }
-  c = pd->content + pd->lcontent;
-  pd->lcontent += len;
-  while (len-- > 0)
-    *c++ = *s++;
-  *c = 0;
 }
 
-#define BUFF_SIZE 8192
-
-int
-repo_add_appdata(Repo *repo, FILE *fp, int flags)
+static int
+repo_add_appdata_fn(Repo *repo, FILE *fp, int flags, const char *filename, Queue *owners)
 {
-  Pool *pool = repo->pool;
-  struct parsedata pd;
-  struct stateswitch *sw;
   Repodata *data;
-  char buf[BUFF_SIZE];
-  int i, l;
-  int ret = 0;
+  struct parsedata pd;
 
   data = repo_add_repodata(repo, flags);
   memset(&pd, 0, sizeof(pd));
@@ -493,48 +445,74 @@ repo_add_appdata(Repo *repo, FILE *fp, int flags)
   pd.pool = repo->pool;
   pd.data = data;
   pd.flags = flags;
+  pd.filename = filename;
+  pd.owners = owners;
 
-  pd.content = malloc(256);
-  pd.acontent = 256;
+  solv_xmlparser_init(&pd.xmlp, stateswitches, &pd, startElement, endElement, errorCallback);
+  solv_xmlparser_parse(&pd.xmlp, fp);
+  solv_xmlparser_free(&pd.xmlp);
 
-  for (i = 0, sw = stateswitches; sw->from != NUMSTATES; i++, sw++)
-    {
-      if (!pd.swtab[sw->from])
-        pd.swtab[sw->from] = sw;
-      pd.sbtab[sw->to] = sw->from;
-    }
-
-  XML_Parser parser = XML_ParserCreate(NULL);
-  XML_SetUserData(parser, &pd);
-  XML_SetElementHandler(parser, startElement, endElement);
-  XML_SetCharacterDataHandler(parser, characterData);
-
-  for (;;)
-    {
-      l = fread(buf, 1, sizeof(buf), fp);
-      if (XML_Parse(parser, buf, l, l == 0) == XML_STATUS_ERROR)
-	{
-	  pool_error(pool, -1, "repo_appdata: %s at line %u:%u\n", XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser), (unsigned int)XML_GetCurrentColumnNumber(parser));
-	  if (pd.solvable)
-	    {
-	      repo_free_solvable(repo, pd.solvable - pd.pool->solvables, 1);
-	      pd.solvable = 0;
-	    }
-	  ret = -1;
-	  break;
-	}
-      if (l == 0)
-	break;
-    }
-  XML_ParserFree(parser);
+  solv_free(pd.desktop_file);
+  solv_free(pd.description);
 
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
 
-  solv_free(pd.content);
-  solv_free(pd.desktop_file);
-  solv_free(pd.description);
-  return ret;
+  return pd.ret;
+}
+
+int
+repo_add_appdata(Repo *repo, FILE *fp, int flags)
+{
+  return repo_add_appdata_fn(repo, fp, flags, 0, 0);
+}
+
+static void
+search_uninternalized_filelist(Repo *repo, const char *dir, Queue *res)
+{
+  Pool *pool = repo->pool;
+  Id rdid, p;
+  Id iter, did, idid;
+
+  for (rdid = 1; rdid < repo->nrepodata; rdid++)
+    {
+      Repodata *data = repo_id2repodata(repo, rdid);
+      if (!data)
+	continue;
+      if (data->state == REPODATA_STUB)
+	continue;
+      if (!repodata_has_keyname(data, SOLVABLE_FILELIST))
+	continue;
+      did = repodata_str2dir(data, dir, 0);
+      if (!did)
+	continue;
+      for (p = data->start; p < data->end; p++)
+	{
+	  if (p >= pool->nsolvables)
+	    continue;
+	  if (pool->solvables[p].repo != repo)
+	    continue;
+	  iter = 0;
+	  for (;;)
+	    {
+	      const char *str;
+	      int l;
+	      Id id;
+	      idid = did;
+	      str = repodata_lookup_dirstrarray_uninternalized(data, p, SOLVABLE_FILELIST, &idid, &iter);
+	      if (!iter)
+		break;
+	      l = strlen(str);
+	      if (l > 12 && strncmp(str + l - 12, ".appdata.xml", 12))
+		id = pool_str2id(pool, str, 1);
+	      else if (l > 13 && strncmp(str + l - 13, ".metainfo.xml", 13))
+		id = pool_str2id(pool, str, 1);
+	      else
+		continue;
+	      queue_push2(res, p, id);
+	    }
+	}
+    }
 }
 
 /* add all files ending in .appdata.xml */
@@ -544,7 +522,13 @@ repo_add_appdata_dir(Repo *repo, const char *appdatadir, int flags)
   DIR *dir;
   char *dirpath;
   Repodata *data;
+  Queue flq;
+  Queue oq;
 
+  queue_init(&flq);
+  queue_init(&oq);
+  if (flags & APPDATA_SEARCH_UNINTERNALIZED_FILELIST)
+    search_uninternalized_filelist(repo, appdatadir, &flq);
   data = repo_add_repodata(repo, flags);
   if (flags & REPO_USE_ROOTDIR)
     dirpath = pool_prepend_rootdir(repo->pool, appdatadir);
@@ -558,9 +542,10 @@ repo_add_appdata_dir(Repo *repo, const char *appdatadir, int flags)
 	  const char *n;
 	  FILE *fp;
 	  int len = strlen(entry->d_name);
-	  if (len <= 12 || strcmp(entry->d_name + len - 12, ".appdata.xml") != 0)
-	    continue;
 	  if (entry->d_name[0] == '.')
+	    continue;
+	  if (!(len > 12 && !strcmp(entry->d_name + len - 12, ".appdata.xml")) &&
+	      !(len > 13 && !strcmp(entry->d_name + len - 13, ".metainfo.xml")))
 	    continue;
           n = pool_tmpjoin(repo->pool, dirpath, "/", entry->d_name);
 	  fp = fopen(n, "r");
@@ -569,7 +554,19 @@ repo_add_appdata_dir(Repo *repo, const char *appdatadir, int flags)
 	      pool_error(repo->pool, 0, "%s: %s", n, strerror(errno));
 	      continue;
 	    }
-	  repo_add_appdata(repo, fp, flags | REPO_NO_INTERNALIZE | REPO_REUSE_REPODATA | APPDATA_CHECK_DESKTOP_FILE);
+	  if (flags & APPDATA_SEARCH_UNINTERNALIZED_FILELIST)
+	    {
+	      Id id = pool_str2id(repo->pool, entry->d_name, 0);
+	      queue_empty(&oq);
+	      if (id)
+		{
+		  int i;
+		  for (i = 0; i < flq.count; i += 2)
+		    if (flq.elements[i + 1] == id)
+		      queue_push(&oq, flq.elements[i]);
+		}
+	    }
+	  repo_add_appdata_fn(repo, fp, flags | REPO_NO_INTERNALIZE | REPO_REUSE_REPODATA | APPDATA_CHECK_DESKTOP_FILE, entry->d_name, oq.count ? &oq : 0);
 	  fclose(fp);
 	}
       closedir(dir);
@@ -577,5 +574,7 @@ repo_add_appdata_dir(Repo *repo, const char *appdatadir, int flags)
   solv_free(dirpath);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
+  queue_free(&oq);
+  queue_free(&flq);
   return 0;
 }

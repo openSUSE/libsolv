@@ -1,0 +1,805 @@
+#!/usr/bin/tclsh
+
+package require solv
+package require inifile
+package require fileutil
+
+set reposdir /etc/zypp/repos.d
+
+### some helpers
+
+proc fileno {file} {
+  if [regexp -- {^file(\d+)$} $file match fd] {
+    return $fd
+  }
+  error "file not open"
+}
+
+set ::globalarray_cnt 0
+
+proc globalarray {} {
+  set name "::globalarray_[incr ::globalarray_cnt]"
+  array set $name [list varName $name]
+  return $name
+}
+
+### generic repo handling (cache reading/writing)
+
+proc repo_calc_cookie_file {selfName filename} {
+  upvar $selfName self
+  set chksum [solv::new_Chksum $solv::REPOKEY_TYPE_SHA256]
+  $chksum add "1.1"
+  $chksum add_stat $filename
+  return [$chksum raw]
+}
+
+proc repo_calc_cookie_fp {selfName fp} {
+  upvar $selfName self
+  set chksum [solv::new_Chksum $solv::REPOKEY_TYPE_SHA256]
+  $chksum add "1.1"
+  $chksum add_fp $fp
+  return [$chksum raw]
+}
+
+proc repo_calc_cookie_ext {selfName f cookie} {
+  upvar $selfName self
+  set chksum [solv::new_Chksum $solv::REPOKEY_TYPE_SHA256]
+  $chksum add "1.1"
+  $chksum add $cookie
+  $chksum add_fstat [$f fileno]
+  return [$chksum raw]
+}
+
+proc repo_cachepath {selfName {ext "-"}} {
+  upvar $selfName self
+  regsub {^\.} $self(name) _ path
+  if {$ext ne "-"} {
+    set path "${path}_$ext.solvx"
+  } else {
+    set path "${path}.solv"
+  }
+  regsub -all / $path _ path
+  return "/var/cache/solv/$path"
+}
+
+proc repo_generic_load {selfName pool} {
+  upvar $selfName self
+  set handle [ $pool add_repo $self(name) ]
+  set self(handle) $handle
+  $handle configure -priority [expr 99 - $self(priority)] -appdata $self(varName)
+  set dorefresh $self(autorefresh)
+  set metadata_expire $self(metadata_expire)
+  catch {
+    if {$metadata_expire == -1 || [clock seconds] - [file mtime [repo_cachepath self]] < $metadata_expire} {
+      set dorefresh 0
+    }
+  }
+  set self(cookie) {}
+  set self(extcookie) {}
+  if { !$dorefresh && [repo_usecachedrepo self] } {
+    puts "repo $self(name): cached"
+    return 1 
+  }
+  return 0 
+}
+
+proc repo_free_handle {selfName} {
+  upvar $selfName self
+  set handle $self(handle)
+  unset self(handle)
+  $handle free 1
+}
+
+proc repo_usecachedrepo {selfName {ext "-"} {mark 0}} {
+  upvar $selfName self
+  set repopath [repo_cachepath self $ext]
+  set code [catch {
+    set f [open $repopath "rb"]
+    seek $f -32 end
+    set fcookie [read $f 32]
+    set cookie [expr {$ext eq "-" ? $self(cookie) : $self(extcookie)}]
+    if {$cookie ne {} && $cookie ne $fcookie} {
+      close $f
+      return 0
+    }
+    set fextcookie {}
+    if {$ext eq "-" && $self(type) ne "system"} {
+      seek $f -64 end
+      set fextcookie [read $f 32]
+    }
+    seek $f 0 start
+    set ff [solv::xfopen_fd {} [fileno $f]]
+    close $f
+    set flags 0
+    if {$ext ne "-"} {
+      set flags [expr $solv::Repo_REPO_USE_LOADING | $solv::Repo_REPO_EXTEND_SOLVABLES]
+      if {$ext ne "DL"} {
+	set flags [expr $flags | $solv::Repo_REPO_LOCALPOOL]
+      }
+    }
+    if {! [$self(handle) add_solv $ff $flags]} {
+      $ff close
+      return 0
+    }
+    $ff close
+    if {$self(type) ne "system" && $ext eq "-"} {
+      set self(cookie) $fcookie
+      set self(extcookie) $fextcookie
+    }
+    if {$mark} {
+      catch {
+        ::fileutil::touch -c -m -t [clock seconds] $repopath
+      }
+    }
+    return 1
+  } res]
+  return [expr {$code == 2 ? $res : 0}]
+}
+
+proc repo_writecachedrepo {selfName {ext "-"} {repodata "NULL"}} {
+  upvar $selfName self
+  if [info exists self(incomplete)] {
+    return
+  }
+  file mkdir "/var/cache/solv"
+  ::fileutil::tempdir "/var/cache/solv"
+  set tempfilename [::fileutil::tempfile ".newsolv-"]
+  ::fileutil::tempdirReset
+  set f [solv::xfopen $tempfilename "w+"]
+  file attributes $tempfilename -permissions 0444
+  if {$repodata eq {NULL}} {
+    $self(handle) write $f
+  } else {
+    $repodata write $f
+  }
+  $f flush
+  if {$self(type) ne "system" && $ext eq "-"} {
+    if {$self(extcookie) eq {}} {
+      set self(extcookie) [repo_calc_cookie_ext self $f $self(cookie)]
+    }
+    $f write $self(extcookie)
+  }
+  $f write [expr {$ext eq "-" ? $self(cookie) : $self(extcookie)}]
+  $f close
+  file rename -force -- $tempfilename [repo_cachepath self $ext]
+}
+
+proc repo_download {selfName file uncompress chksum {markincomplete 0}} {
+  upvar $selfName self
+  regsub {/$} $self(baseurl) {} url
+  set url "$url/$file"
+  set tempfilename [::fileutil::tempfile]
+  set f [open $tempfilename rb+]
+  file delete -- $tempfilename
+  if [catch {
+    exec -ignorestderr -- curl -f -s -L $url ">@$f"
+  }] {
+    seek $f 0 end
+    if {($chksum ne "" && $chksum ne "NULL") || [tell $f] != 0} {
+      puts "$file: download error"
+    }
+    close $f
+    return {NULL}
+  }
+  seek $f 0 start
+  if {$chksum ne "" && $chksum ne "NULL"} {
+    set fchksum [solv::new_Chksum [$chksum cget -type]]
+    if {$fchksum eq "" || $fchksum eq "NULL"} {
+      puts "$file: unknown checksum type"
+      if {$markincomplete} {
+	set self(incomplete) 1
+      }
+      close $f
+      return {NULL}
+    }
+    $fchksum add_fd [fileno $f]
+    if {[$fchksum != $chksum]} {
+      puts "$file: checksum mismatch"
+      if {$markincomplete} {
+	set self(incomplete) 1
+      }
+      close $f
+      return {NULL}
+    }
+  }
+  set ff [solv::xfopen_fd [expr {$uncompress ? $file : ""}] [fileno $f]]
+  close $f
+  return $ff
+}
+
+proc repo_generic_add_ext_keys {selfName ext repodata h} {
+  upvar $selfName self
+  if {$ext eq "DL"} {
+    $repodata add_idarray $h $solv::REPOSITORY_KEYS $solv::REPOSITORY_DELTAINFO
+    $repodata add_idarray $h $solv::REPOSITORY_KEYS $solv::REPOKEY_TYPE_FLEXARRAY
+  } elseif {$ext eq "DU"} {
+    $repodata add_idarray $h $solv::REPOSITORY_KEYS $solv::SOLVABLE_DISKUSAGE
+    $repodata add_idarray $h $solv::REPOSITORY_KEYS $solv::REPOKEY_TYPE_DIRNUMNUMARRAY
+  } elseif {$ext eq "FL"} {
+    $repodata add_idarray $h $solv::REPOSITORY_KEYS $solv::SOLVABLE_FILELIST
+    $repodata add_idarray $h $solv::REPOSITORY_KEYS $solv::REPOKEY_TYPE_DIRSTRARRAY
+  }
+}
+
+### system
+
+proc repo_system_load {selfName pool} {
+  upvar $selfName self
+  set handle [ $pool add_repo $self(name) ]
+  set self(handle) $handle
+  $handle configure -appdata $self(varName)
+  $pool configure -installed $handle
+  puts -nonewline "rpm database: "
+  set self(cookie) [repo_calc_cookie_file self "/var/lib/rpm/Packages"]
+  if [repo_usecachedrepo self] {
+    puts "cached"
+    return 1
+  }
+  puts "reading"
+  set f [solv::xfopen [repo_cachepath self]]
+  $handle add_rpmdb_reffp $f $solv::Repo_REPO_REUSE_REPODATA
+  repo_writecachedrepo self
+}
+
+### repomd
+
+proc repo_repomd_add_ext {selfName repodata what ext} {
+  upvar $selfName self
+  set where [repo_repomd_find self $what]
+  if {$where eq {}} {
+    return
+  }
+  set h [$repodata new_handle]
+  $repodata set_poolstr $h $solv::REPOSITORY_REPOMD_TYPE $what
+  $repodata set_str $h $solv::REPOSITORY_REPOMD_LOCATION [lindex $where 0]
+  $repodata set_checksum $h $solv::REPOSITORY_REPOMD_CHECKSUM [lindex $where 1]
+  repo_generic_add_ext_keys self $ext $repodata $h
+  $repodata add_flexarray $solv::SOLVID_META $solv::REPOSITORY_EXTERNAL $h
+}
+
+proc repo_repomd_add_exts {selfName} {
+  upvar $selfName self
+  set repodata [$self(handle) add_repodata 0]
+  $repodata extend_to_repo
+  repo_repomd_add_ext self $repodata "filelists" "FL"
+  $repodata internalize
+}
+
+proc repo_repomd_find {selfName what} {
+  upvar $selfName self
+  set di [$self(handle) Dataiterator_meta $solv::REPOSITORY_REPOMD_TYPE $what $solv::Dataiterator_SEARCH_STRING]
+  $di prepend_keyname $solv::REPOSITORY_REPOMD
+  solv::iter d $di {
+    set dp [$d parentpos]
+    set filename [$dp lookup_str $solv::REPOSITORY_REPOMD_LOCATION]
+    set checksum [$dp lookup_checksum $solv::REPOSITORY_REPOMD_CHECKSUM]
+    if {$filename ne "" && $checksum eq "NULL"} {
+      puts "no $filename file checksum"
+    } elseif {$filename ne ""} {
+      return [list $filename $checksum]
+    }
+  }
+  return {}
+}
+
+proc repo_repomd_load {selfName pool} {
+  upvar $selfName self
+  if [repo_generic_load self $pool] {
+    return 1
+  }
+  puts -nonewline "rpmmd repo '$self(name)': "
+  set f [repo_download self {repodata/repomd.xml} 0 {}]
+  if {$f eq {NULL}} {
+    puts "no repomd.xml file, skipped"
+    repo_free_handle self
+    return 0
+  }
+  set self(cookie) [repo_calc_cookie_fp self $f]
+  if [repo_usecachedrepo self "-" 1] {
+    puts "cached"
+    return 1
+  }
+  set handle $self(handle)
+  $handle add_repomdxml $f
+  puts "fetching"
+  set primary [repo_repomd_find self primary]
+  if {$primary ne {}} {
+    set f [repo_download self [lindex $primary 0] 1 [lindex $primary 1] 1]
+    if {$f ne {NULL}} {
+      $handle add_rpmmd $f {}
+      $f close
+    }
+    if [info exists self(incomplete)] {
+      return 0
+    }
+  }
+  set updateinfo [repo_repomd_find self primary]
+  if {$updateinfo ne {}} {
+    set f [repo_download self [lindex $updateinfo  0] 1 [lindex $updateinfo 1] 1]
+    if {$f ne {NULL}} {
+      $handle add_updateinfoxml $f
+      $f close
+    }
+  }
+  repo_repomd_add_exts self
+  repo_writecachedrepo self
+  $self(handle) create_stubs
+  return 1
+}
+
+proc repo_repomd_packagespath {selfName} {
+  return ""
+}
+
+proc repo_repomd_load_ext {selfName repodata} {
+  upvar $selfName self
+  switch -- [$repodata lookup_str $solv::SOLVID_META $solv::REPOSITORY_REPOMD_TYPE] {
+    "deltainfo" {
+      set ext DL
+    }
+    "filelists" {
+      set ext FL
+    }
+    default {
+      return 0
+    }
+  }
+  puts -nonewline "\[$self(name):$ext: "
+  flush stdout
+  if [repo_usecachedrepo self $ext] {
+    puts "cached]"
+    return 1
+  }
+  puts "fetching]"
+  set handle $self(handle)
+  set filename [$repodata lookup_str $solv::SOLVID_META $solv::REPOSITORY_REPOMD_LOCATION]
+  set filechecksum [$repodata lookup_checksum $solv::SOLVID_META $solv::REPOSITORY_REPOMD_CHECKSUM]
+  set f [repo_download self $filename 1 $filechecksum]
+  if {$f eq {NULL}} {
+    return 0
+  }
+  if {$ext eq "FL"} {
+    $handle add_rpmmd $f "FL" [ expr $solv::Repo_REPO_USE_LOADING | $solv::Repo_REPO_EXTEND_SOLVABLES | $solv::Repo_REPO_LOCALPOOL]
+  }
+  $f close
+  repo_writecachedrepo self $ext $repodata
+  return 1
+}
+
+### susetags
+
+proc repo_susetags_add_ext {selfName repodata what ext} {
+  upvar $selfName self
+  set where [repo_susetags_find self $what]
+  if {$where eq {}} {
+    return
+  }
+  set h [$repodata new_handle]
+  $repodata set_str $h $solv::SUSETAGS_FILE_NAME [lindex $where 0]
+  $repodata set_checksum $h $solv::SUSETAGS_FILE_CHECKSUM [lindex $where 1]
+  repo_generic_add_ext_keys self $ext $repodata $h
+  $repodata add_flexarray $solv::SOLVID_META $solv::REPOSITORY_EXTERNAL $h
+}
+
+proc repo_susetags_add_exts {selfName} {
+  upvar $selfName self
+  set repodata [$self(handle) add_repodata 0]
+  $repodata extend_to_repo
+  repo_susetags_add_ext self $repodata "packages.FL" "FL"
+  repo_susetags_add_ext self $repodata "packages.FL.gz" "FL"
+  $repodata internalize
+}
+
+proc repo_susetags_find {selfName what} {
+  upvar $selfName self
+  set di [$self(handle) Dataiterator_meta $solv::SUSETAGS_FILE_NAME $what $solv::Dataiterator_SEARCH_STRING]
+  $di prepend_keyname $solv::SUSETAGS_FILE
+  solv::iter d $di {
+    set dp [$d parentpos]
+    set checksum [$dp lookup_checksum $solv::SUSETAGS_FILE_CHECKSUM]
+    return [list $what $checksum]
+  }
+  return {}
+}
+
+proc repo_susetags_load {selfName pool} {
+  upvar $selfName self
+  if [repo_generic_load self $pool] {
+    return 1
+  }
+  puts -nonewline "susetags repo '$self(name)': "
+  set f [repo_download self {content} 0 {}]
+  if {$f eq {NULL}} {
+    puts "no content file, skipped"
+    repo_free_handle self
+    return 0
+  }
+  set self(cookie) [repo_calc_cookie_fp self $f]
+  if [repo_usecachedrepo self "-" 1] {
+    puts "cached"
+    return 1
+  }
+  set handle $self(handle)
+  $handle add_content $f
+  puts "fetching"
+  set defvendorid [[$handle cget -meta] lookup_id $solv::SUSETAGS_DEFAULTVENDOR]
+  set descrdir [[$handle cget -meta] lookup_str $solv::SUSETAGS_DESCRDIR]
+  if {$descrdir eq {NULL}} {
+    set descrdir "suse/setup/descr"
+  }
+  set packages [repo_susetags_find self "packages.gz"]
+  if {$packages eq {}} {
+    set packages [repo_susetags_find self "packages"]
+  }
+  if {$packages ne {}} {
+    set f [repo_download self "$descrdir/[lindex $packages 0]" 1 [lindex $packages 1] 1]
+    if {$f ne {NULL}} {
+      $handle add_susetags $f $defvendorid {} [expr $solv::Repo_REPO_NO_INTERNALIZE | $solv::Repo_SUSETAGS_RECORD_SHARES]
+      $f close
+      set packages [repo_susetags_find self "packages.en.gz"]
+      if {$packages eq {}} {
+	set packages [repo_susetags_find self "packages.en"]
+      }
+      if {$packages ne {}} {
+	set f [repo_download self "$descrdir/[lindex $packages 0]" 1 [lindex $packages 1] 1]
+	if {$f ne {NULL}} {
+          $handle add_susetags $f $defvendorid {} [expr $solv::Repo_REPO_NO_INTERNALIZE | $solv::Repo_REPO_REUSE_REPODATA | $solv::Repo_REPO_EXTEND_SOLVABLES ]
+	  $f close
+	}
+      }
+      $handle internalize
+    }
+  }
+  repo_susetags_add_exts self
+  repo_writecachedrepo self
+  $self(handle) create_stubs
+  return 1
+}
+
+proc repo_susetags_packagespath {selfName} {
+  upvar $selfName self
+  set datadir [[$self(handle) cget -meta] lookup_str $solv::SUSETAGS_DATADIR]
+  return [expr {$datadir ne {} ? "$datadir/" : "suse/"}]
+}
+
+proc repo_susetags_load_ext {selfName repodata} {
+  upvar $selfName self
+  set filename [$repodata lookup_str $solv::SOLVID_META $solv::SUSETAGS_FILE_NAME]
+  set ext [string range $filename 9 10]
+  puts -nonewline "\[$self(name):$ext: "
+  flush stdout
+  if [repo_usecachedrepo self $ext] {
+    puts "cached]"
+    return 1
+  }
+  puts "fetching]"
+  set handle $self(handle)
+  set defvendorid [[$handle cget -meta] lookup_id $solv::SUSETAGS_DEFAULTVENDOR]
+  set descrdir [[$handle cget -meta] lookup_str $solv::SUSETAGS_DESCRDIR]
+  if {$descrdir eq {NULL}} {
+    set descrdir "suse/setup/descr"
+  }
+  set filechecksum [$repodata lookup_checksum $solv::SOLVID_META $solv::SUSETAGS_FILE_CHECKSUM]
+  set f [repo_download self "$descrdir/$filename" 1 $filechecksum]
+  if {$f eq {NULL}} {
+    return 0
+  }
+  set flags [expr $solv::Repo_REPO_USE_LOADING | $solv::Repo_REPO_EXTEND_SOLVABLES]
+  if {$ext ne "DL"} {
+    set flags [expr $flags | $solv::Repo_REPO_LOCALPOOL]
+  }
+  $handle add_susetags $f $defvendorid $ext $flags
+  $f close
+  repo_writecachedrepo self $ext $repodata
+  return 1
+}
+
+### unknown
+
+proc repo_unknown_load {selfName pool} {
+  upvar $selfName self
+  puts "unsupported repo '$self(name)': skipped"
+  return 0
+}
+
+### poor man's OO
+
+proc repo_load {selfName pool} {
+  upvar $selfName self
+  "repo_$self(type)_load" self $pool
+}
+
+proc repo_packagespath {selfName} {
+  upvar $selfName self
+  "repo_$self(type)_packagespath" self
+}
+
+proc repo_load_ext {selfName repodata} {
+  upvar $selfName self
+  "repo_$self(type)_load_ext" self $repodata
+}
+
+###
+
+proc load_stub {repodata} {
+  set code [catch {
+    upvar #0 [[$repodata cget -repo] cget -appdata] repo
+    if [info exists repo(handle)] {
+      return [repo_load_ext repo $repodata]
+    }
+    return 0
+  } res]
+  if {$code == 2} {
+    return $res
+  }
+  puts stderr $res
+  return 0
+}
+
+###
+
+set repoNames {}
+foreach reponame [lsort [glob -nocomplain -directory $reposdir *.repo]] {
+  set ini [::ini::open $reponame r]
+  foreach alias [::ini::sections $ini] {
+    upvar #0 [globalarray] repo
+    array set repo {enabled 0 priority 99 autorefresh 1 type rpm-md metadata_expire 900}
+    array set repo [::ini::get $ini $alias]
+    set repo(name) $alias
+    switch -exact -- $repo(type) {
+      rpm-md  { set repo(type) repomd }
+      yast2   { set repo(type) susetags }
+      default { set repo(type) unknown }
+    }
+    lappend repoNames $repo(varName)
+  }
+  ::ini::close $ini
+}
+
+set pool [solv::new_Pool]
+$pool setarch
+$pool set_loadcallback load_stub
+
+upvar #0 [globalarray] sysrepo
+array set sysrepo [list name {@System} type system]
+repo_load sysrepo $pool
+
+foreach repoName $repoNames {
+  upvar 0 $repoName repo
+  if {$repo(enabled)} {
+    repo_load repo $pool
+  }
+}
+
+
+set cmd [lindex $::argv 0]
+set ::argv [lreplace $::argv 0 0]
+
+array set cmdabbrev [ list \
+  in install \
+  rm erase \
+  ls list \
+  ve verify \
+  se search \
+]
+if [info exists cmdabbrev($cmd)] {
+  set cmd $cmdabbrev($cmd)
+}
+
+if {$cmd eq "search"} {
+  set arg [lindex $::argv 0]
+  $pool createwhatprovides
+  set sel [$pool Selection]
+  set di [$pool Dataiterator $solv::SOLVABLE_NAME $arg [ expr $solv::Dataiterator_SEARCH_SUBSTRING | $solv::Dataiterator_SEARCH_NOCASE ]]
+  solv::iter d $di {
+    $sel add_raw $solv::Job_SOLVER_SOLVABLE [$d cget -solvid]
+  }
+  foreach s [$sel solvables] {
+    puts [format { - %s [%s]: %s} [$s str] [[$s cget -repo] cget -name] [$s lookup_str $solv::SOLVABLE_SUMMARY]]
+  }
+  exit
+}
+
+$pool addfileprovides
+$pool createwhatprovides
+
+array set cmdactionmap [ list \
+  install $solv::Job_SOLVER_INSTALL \
+  erase $solv::Job_SOLVER_ERASE \
+  up $solv::Job_SOLVER_UPDATE \
+  dup $solv::Job_SOLVER_DISTUPGRADE \
+  verify $solv::Job_SOLVER_VERIFY \
+  list 0 \
+  info 0 \
+]
+
+set jobs {}
+foreach arg $::argv {
+  set flags [expr $solv::Selection_SELECTION_NAME | $solv::Selection_SELECTION_PROVIDES | $solv::Selection_SELECTION_GLOB | \
+                  $solv::Selection_SELECTION_CANON | $solv::Selection_SELECTION_DOTARCH | $solv::Selection_SELECTION_REL ]
+  switch -glob -- $arg {
+    "/*" {
+      set flags [expr $flags | $solv::Selection_SELECTION_FILELIST ]
+      if {$cmd eq "erase"} {
+        set flags [expr $flags | $solv::Selection_SELECTION_INSTALLED_ONLY ]
+      }
+    }
+  }
+  set sel [$pool select $arg $flags]
+  if [$sel isempty] {
+    set sel [$pool select $arg [expr $flags | $solv::Selection_SELECTION_NOCASE]]
+    if {![$sel isempty]} {
+      puts "\[ignoring case for '$arg']"
+    }
+  }
+  if [$sel isempty] {
+    puts "nothing matches '$arg'"
+    exit 1
+  }
+  if {[$sel flags] & $solv::Selection_SELECTION_FILELIST} {
+    puts "\[using file list match for '$arg']"
+  }
+  if {[$sel flags] & $solv::Selection_SELECTION_PROVIDES} {
+    puts "\[using capability match for '$arg']"
+  }
+  lappend jobs {*}[$sel jobs $cmdactionmap($cmd)]
+}
+
+if {$jobs eq {} && ($cmd eq "up" || $cmd eq "dup" || $cmd eq "verify") } {
+  set sel [$pool Selection_all]
+  lappend jobs {*}[$sel jobs $cmdactionmap($cmd)]
+}
+
+if {$jobs eq {}} {
+  puts "no package matched."
+  exit 1
+}
+
+if {$cmd eq "list" || $cmd eq "info"} {
+  foreach job $jobs {
+    foreach s [$job solvables] {
+      if {$cmd eq "info"} {
+        puts [format {Name:        %s} [$s str]]
+        puts [format {Repo:        %s} [[$s cget -repo] cget -name]]
+        puts [format {Summary:     %s} [$s lookup_str $solv::SOLVABLE_SUMMARY]]
+        set str [$s lookup_str $solv::SOLVABLE_URL]
+	if {$str ne {}} {
+          puts [format {Url:         %s} $str]
+	}
+        set str [$s lookup_str $solv::SOLVABLE_LICENSE]
+	if {$str ne {}} {
+          puts [format {License      %s} $str]
+	}
+        puts [format {Description: %s} [$s lookup_str $solv::SOLVABLE_DESCRIPTION]]
+	puts {}
+      } else {
+        puts [format {  - %s [%s]} [$s str] [[$s cget -repo] cget -name]]
+        puts [format {    %s} [$s lookup_str $solv::SOLVABLE_SUMMARY]]
+      }
+    }
+  }
+  exit
+}
+
+#$pool set_debuglevel 1
+set solver [$pool Solver]
+$solver set_flag $solv::Solver_SOLVER_FLAG_SPLITPROVIDES 1
+if {$cmd eq "erase"} {
+  $solver set_flag $solv::Solver_SOLVER_FLAG_ALLOW_UNINSTALL 1
+}
+
+set problems [$solver solve $jobs]
+if {$problems ne {}} {
+  set pcnt 1
+  foreach problem $problems {
+    puts [format {Problem %d/%d:} $pcnt [llength $problems]]
+    puts [$problem str]
+    incr pcnt
+  }
+  exit 1
+}
+
+set trans [$solver transaction]
+
+if [$trans isempty] {
+  puts "Nothing to do."
+  exit
+}
+
+puts {}
+puts "Transaction summary:"
+puts {}
+foreach cl [$trans classify [expr $solv::Transaction_SOLVER_TRANSACTION_SHOW_OBSOLETES | $solv::Transaction_SOLVER_TRANSACTION_OBSOLETE_IS_UPGRADE]] {
+  switch -- [$cl cget -type] \
+    $solv::Transaction_SOLVER_TRANSACTION_ERASE {
+      puts [format {%d erased packages:} [$cl cget -count]]
+    } \
+    $solv::Transaction_SOLVER_TRANSACTION_INSTALL {
+      puts [format {%d installed packages:} [$cl cget -count]]
+    } \
+    $solv::Transaction_SOLVER_TRANSACTION_REINSTALLED {
+      puts [format {%d reinstalled packages:} [$cl cget -count]]
+    } \
+    $solv::Transaction_SOLVER_TRANSACTION_DOWNGRADED {
+      puts [format {%d downgraded packages:} [$cl cget -count]]
+    } \
+    $solv::Transaction_SOLVER_TRANSACTION_CHANGED {
+      puts [format {%d changed packages:} [$cl cget -count]]
+    } \
+    $solv::Transaction_SOLVER_TRANSACTION_UPGRADED {
+      puts [format {%d upgraded packages:} [$cl cget -count]]
+    } \
+    $solv::Transaction_SOLVER_TRANSACTION_VENDORCHANGE {
+      puts [format {%d vendor changes from '%s' to '%s':} [$cl cget -count] [$cl cget -fromstr] [$cl cget -tostr]]
+    } \
+    $solv::Transaction_SOLVER_TRANSACTION_ARCHCHANGE {
+      puts [format {%d archchanges from '%s' to '%s':} [$cl cget -count] [$cl cget -fromstr] [$cl cget -tostr]]
+    } \
+    default continue
+  foreach p [$cl solvables] {
+    set cltype [$cl cget -type]
+    if {$cltype == $solv::Transaction_SOLVER_TRANSACTION_UPGRADED || $cltype ==$solv::Transaction_SOLVER_TRANSACTION_DOWNGRADED} {
+      set op [$trans othersolvable $p]
+      puts [format {  - %s -> %s} [$p str] [$op str]]
+    } else {
+      puts [format {  - %s} [$p str]]
+    }
+  }
+  puts {}
+}
+puts [format {install size change: %d K} [$trans calc_installsizechange]]
+puts {}
+
+while 1 {
+  puts -nonewline "OK to continue (y/n)? "
+  flush stdout
+  set yn [gets stdin]
+  if {$yn eq "y"} {
+    break
+  }
+  if {$yn eq "n" || $yn eq "q"} {
+    exit
+  }
+}
+
+set newpkgs [$trans newsolvables]
+array set newpkgs_f {}
+if {$newpkgs ne {}} {
+  set downloadsize 0
+  foreach p $newpkgs {
+    set downloadsize [expr $downloadsize + [$p lookup_num $solv::SOLVABLE_DOWNLOADSIZE]]
+  }
+  puts [format {Downloading %d packages, %d K} [llength $newpkgs] [expr $downloadsize / 1024]]
+  foreach p $newpkgs {
+    upvar #0 [[$p cget -repo] cget -appdata] repo
+    set location [$p lookup_location]
+    if {$location eq {}} {
+      continue
+    }
+    set location "[repo_packagespath repo][lindex $location 0]"
+    set checksum [$p lookup_checksum $solv::SOLVABLE_CHECKSUM]
+    set f [repo_download repo $location 0 $checksum]
+    set newpkgs_f([$p cget -id]) $f
+    puts -nonewline "."
+    flush stdout
+  }
+  puts {}
+}
+
+puts "Committing transaction:"
+$trans order
+foreach p [$trans steps] {
+  set steptype [$trans steptype $p $solv::Transaction_SOLVER_TRANSACTION_RPM_ONLY]
+  if {$steptype == $solv::Transaction_SOLVER_TRANSACTION_ERASE} {
+    puts "erase [$p str]"
+    regsub {^[0-9]+:} [$p cget -evr] {} nvr
+    set nvr "[$p cget -name]-$nvr.[$p cget -arch]"
+    exec -ignorestderr -- rpm -e --nodeps --nodigest --nosignature $nvr
+  } elseif {$steptype == $solv::Transaction_SOLVER_TRANSACTION_INSTALL || $steptype == $solv::Transaction_SOLVER_TRANSACTION_MULTIINSTALL} {
+    puts "install [$p str]"
+    set f $newpkgs_f([$p cget -id])
+    set mode [expr {$steptype == $solv::Transaction_SOLVER_TRANSACTION_INSTALL ? "-U" : "-i"}]
+    $f cloexec 0
+    exec -ignorestderr -- rpm $mode --force --nodeps --nodigest --nosignature "/dev/fd/[$f fileno]"
+  }
+}

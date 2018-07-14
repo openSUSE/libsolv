@@ -10,9 +10,9 @@
 %markfunc Pool "mark_Pool";
 #endif
 
-/*
- * binaryblob handling
- */
+/**
+ ** binaryblob handling
+ **/
 
 %{
 typedef struct {
@@ -22,7 +22,24 @@ typedef struct {
 %}
 
 %typemap(in,noblock=1,fragment="SWIG_AsCharPtrAndSize") (const unsigned char *str, size_t len) (int res, char *buf = 0, size_t size = 0, int alloc = 0) {
+#if defined(SWIGTCL)
+  {
+    int bal;
+    unsigned char *ba;
+    res = SWIG_TypeError;
+    ba = Tcl_GetByteArrayFromObj($input, &bal);
+    if (ba) {
+      buf = (char *)ba;
+      size = bal;
+      res = SWIG_OK;
+      alloc = SWIG_OLDOBJ;
+    }
+  }
+#else
   res = SWIG_AsCharPtrAndSize($input, &buf, &size, &alloc);
+  if (buf && size)
+    size--;
+#endif
   if (!SWIG_IsOK(res)) {
 #if defined(SWIGPYTHON)
     const void *pybuf = 0;
@@ -49,6 +66,8 @@ typedef struct {
 %typemap(out,noblock=1,fragment="SWIG_FromCharPtrAndSize") BinaryBlob {
 #if defined(SWIGPYTHON) && defined(PYTHON3)
   $result = $1.data ? Py_BuildValue("y#", $1.data, $1.len) : SWIG_Py_Void();
+#elif defined(SWIGTCL)
+  Tcl_SetObjResult(interp, $1.data ? Tcl_NewByteArrayObj($1.data, $1.len) : NULL);
 #else
   $result = SWIG_FromCharPtrAndSize($1.data, $1.len);
 #if defined(SWIGPERL)
@@ -57,10 +76,20 @@ typedef struct {
 #endif
 }
 
+/**
+ ** Queue handling
+ **/
+
+%typemap(arginit) Queue {
+  queue_init(&$1);
+}
+%typemap(freearg) Queue {
+  queue_free(&$1);
+}
+
 #if defined(SWIGPYTHON)
 %typemap(in) Queue {
   /* Check if is a list */
-  queue_init(&$1);
   if (PyList_Check($input)) {
     int size = PyList_Size($input);
     int i = 0;
@@ -68,16 +97,12 @@ typedef struct {
       PyObject *o = PyList_GetItem($input,i);
       int v;
       int e = SWIG_AsVal_int(o, &v);
-      if (!SWIG_IsOK(e)) {
+      if (!SWIG_IsOK(e))
         SWIG_exception_fail(SWIG_ArgError(e), "list must contain only integers");
-        queue_free(&$1);
-        return NULL;
-      }
       queue_push(&$1, v);
     }
   } else {
-    PyErr_SetString(PyExc_TypeError,"not a list");
-    return NULL;
+    SWIG_exception_fail(SWIG_TypeError, "list must contain only integers");
   }
 }
 
@@ -110,13 +135,12 @@ typedef struct {
 
 %enddef
 
-#endif
+#endif  /* SWIGPYTHON */
 
 #if defined(SWIGPERL)
 %typemap(in) Queue {
   AV *av;
   int i, size;
-  queue_init(&$1);
   if (!SvROK($input) || SvTYPE(SvRV($input)) != SVt_PVAV)
     SWIG_croak("Argument $argnum is not an array reference.");
   av = (AV*)SvRV($input);
@@ -145,6 +169,7 @@ typedef struct {
   queue_free(&$1);
   $result = 0;
 }
+
 %define Queue2Array(type, step, con) %{
   int i;
   int cnt = $1.count / step;
@@ -166,31 +191,22 @@ typedef struct {
 %}
 %enddef
 
-#endif
+#endif  /* SWIGPERL */
 
-%typemap(arginit) Queue {
-  queue_init(&$1);
-}
-%typemap(freearg) Queue {
-  queue_free(&$1);
-}
 
 #if defined(SWIGRUBY)
 %typemap(in) Queue {
   int size, i;
-  VALUE *o;
-  queue_init(&$1);
-  size = RARRAY_LEN($input);
+  VALUE *o, ary;
+  ary = rb_Array($input);
+  size = RARRAY_LEN(ary);
   i = 0;
-  o = RARRAY_PTR($input);
+  o = RARRAY_PTR(ary);
   for (i = 0; i < size; i++, o++) {
     int v;
     int e = SWIG_AsVal_int(*o, &v);
     if (!SWIG_IsOK(e))
-      {
-        SWIG_Error(SWIG_RuntimeError, "list must contain only integers");
-        SWIG_fail;
-      }
+      SWIG_exception_fail(SWIG_TypeError, "list must contain only integers");
     queue_push(&$1, v);
   }
 }
@@ -226,14 +242,96 @@ typedef struct {
   $result = o;
 %}
 %enddef
-#endif
 
+#endif  /* SWIGRUBY */
 
+#if defined(SWIGTCL)
+%typemap(in) Queue {
+  /* Check if is a list */
+  int size = 0;
+  int i = 0;
+
+  if (TCL_OK != Tcl_ListObjLength(interp, $input, &size))
+    SWIG_exception_fail(SWIG_TypeError, "argument is not a list");
+  for (i = 0; i < size; i++) {
+    Tcl_Obj *o = NULL;
+    int e, v;
+
+    if (TCL_OK != Tcl_ListObjIndex(interp, $input, i, &o))
+      SWIG_exception_fail(SWIG_IndexError, "failed to retrieve a list member");
+    e = SWIG_AsVal_int SWIG_TCL_CALL_ARGS_2(o, &v);
+    if (!SWIG_IsOK(e))
+      SWIG_exception_fail(SWIG_ArgError(e), "list must contain only integers");
+    queue_push(&$1, v);
+  }
+}
+
+%typemap(out) Queue {
+  Tcl_Obj *objvx[$1.count];
+  int i;
+
+  for (i = 0; i < $1.count; i++) {
+    objvx[i] = SWIG_From_int($1.elements[i]);
+  }
+  Tcl_SetObjResult(interp, Tcl_NewListObj($1.count, objvx));
+  queue_free(&$1);
+}
+
+%define Queue2Array(type, step, con) %{
+  { /* scope is needed to make the goto of SWIG_exception_fail work */
+    int i;
+    int cnt = $1.count / step;
+    Id *idp = $1.elements;
+    Tcl_Obj *objvx[cnt];
+
+    for (i = 0; i < cnt; i++, idp += step) {
+      Id id = *idp;
+#define result resultx
+#define Tcl_SetObjResult(i, x) resultobj = x
+      type result = con;
+      Tcl_Obj *resultobj;
+      $typemap(out, type)
+      objvx[i] = resultobj;
+#undef Tcl_SetObjResult
+#undef result
+    }
+    queue_free(&$1);
+    Tcl_SetObjResult(interp, Tcl_NewListObj(cnt, objvx));
+  }
+%}
+
+%enddef
+
+%typemap(in) Queue solvejobs {
+  /* Check if is a list */
+  int size = 0;
+  int i = 0;
+
+  if (TCL_OK != Tcl_ListObjLength(interp, $input, &size))
+    SWIG_exception_fail(SWIG_TypeError, "argument is not a list");
+  for (i = 0; i < size; i++) {
+    Tcl_Obj *o = NULL;
+    void *jp;
+    Job *j;
+    int e;
+
+    if (TCL_OK != Tcl_ListObjIndex(interp, $input, i, &o))
+      SWIG_exception_fail(SWIG_IndexError, "failed to retrieve a list member");
+    e = SWIG_ConvertPtr(o, &jp ,SWIGTYPE_p_Job, 0 |  0 );
+    if (!SWIG_IsOK(e))
+      SWIG_exception_fail(SWIG_ArgError(e), "list member is not a Job");
+    j = (Job *)jp;
+    queue_push2(&$1, j->how, j->what);
+  }
+}
+
+#endif  /* SWIGTCL */
 
 
 #if defined(SWIGPERL)
 
-/* work around a swig bug */
+/* work around a swig bug for swig versions < 2.0.5 */
+#if SWIG_VERSION < 0x020005
 %{
 #undef SWIG_CALLXS
 #ifdef PERL_OBJECT
@@ -246,6 +344,7 @@ typedef struct {
 #  endif
 #endif
 %}
+#endif
 
 
 %define perliter(class)
@@ -329,27 +428,38 @@ SWIG_Perl_NewArrayObj(SWIG_MAYBE_PERL_OBJECT void *ptr, swig_type_info *t, int f
 %typemap(out) Repo_solvable_iterator * solvables_iter = Perliterator;
 %typemap(out) Dataiterator * = Perliterator;
 
-#endif
+#endif  /* SWIGPERL */
 
+
+/**
+ ** appdata handling
+ **/
 
 #if defined(SWIGPYTHON)
 typedef PyObject *AppObjectPtr;
+%typemap(in) AppObjectPtr {
+  if ($input)
+    Py_INCREF($input);
+  $1 = $input;
+}
 %typemap(out) AppObjectPtr {
   $result = $1 ? $1 : Py_None;
   Py_INCREF($result);
 }
-#endif
-#if defined(SWIGPERL)
+#elif defined(SWIGPERL)
 typedef SV *AppObjectPtr;
 %typemap(in) AppObjectPtr {
-  $1 = SvROK($input) ? SvRV($input) : 0;
+  if ($input) {
+    $1 = newSV(0);
+    sv_setsv((SV *)$1, $input);
+  } else
+    $1 = (void *)0;
 }
 %typemap(out) AppObjectPtr {
-  $result = $1 ? newRV_inc($1) : newSV(0);
+  $result = sv_2mortal($1 ? SvREFCNT_inc($1) : newSV(0));
   argvi++;
 }
-#endif
-#if defined(SWIGRUBY)
+#elif defined(SWIGRUBY)
 typedef VALUE AppObjectPtr;
 %typemap(in) AppObjectPtr {
   $1 = (void *)$input;
@@ -357,8 +467,23 @@ typedef VALUE AppObjectPtr;
 %typemap(out) AppObjectPtr {
   $result = (VALUE)$1;
 }
+#elif defined(SWIGTCL)
+typedef Tcl_Obj *AppObjectPtr;
+%typemap(in) AppObjectPtr {
+  if ($input)
+    Tcl_IncrRefCount($input);
+  $1 = (void *)$input;
+}
+%typemap(out) AppObjectPtr {
+  Tcl_SetObjResult(interp, $1 ? $1 : Tcl_NewObj());
+}
+#else
+#warning AppObjectPtr not defined for this language!
 #endif
 
+/**
+ ** FILE handling
+ **/
 
 #ifdef SWIGPYTHON
 %include "file.i"
@@ -372,6 +497,8 @@ typedef VALUE AppObjectPtr;
 SWIGINTERN int
 #ifdef SWIGRUBY
 SWIG_AsValSolvFpPtr(VALUE obj, FILE **val) {
+#elif defined(SWIGTCL)
+SWIG_AsValSolvFpPtr SWIG_TCL_DECL_ARGS_2(void *obj, FILE **val) {
 #else
 SWIG_AsValSolvFpPtr(void *obj, FILE **val) {
 #endif
@@ -393,14 +520,24 @@ SWIG_AsValSolvFpPtr(void *obj, FILE **val) {
   return SWIG_TypeError;
 }
 
+#if defined(SWIGTCL)
+#define SWIG_AsValSolvFpPtr(x, y) SWIG_AsValSolvFpPtr SWIG_TCL_CALL_ARGS_2(x, y)
+#endif
+
 }
 
+
+/**
+ ** DepId handling
+ **/
 
 %fragment("SWIG_AsValDepId","header") {
 
 SWIGINTERN int
 #ifdef SWIGRUBY
 SWIG_AsValDepId(VALUE obj, int *val) {
+#elif defined(SWIGTCL)
+SWIG_AsValDepId SWIG_TCL_DECL_ARGS_2(void *obj, int *val) {
 #else
 SWIG_AsValDepId(void *obj, int *val) {
 #endif
@@ -408,7 +545,11 @@ SWIG_AsValDepId(void *obj, int *val) {
   void *vptr = 0;
   int ecode;
   if (!desc) desc = SWIG_TypeQuery("Dep *");
+#ifdef SWIGTCL
+  ecode = SWIG_AsVal_int SWIG_TCL_CALL_ARGS_2(obj, val);
+#else
   ecode = SWIG_AsVal_int(obj, val);
+#endif
   if (SWIG_IsOK(ecode))
     return ecode;
   if ((SWIG_ConvertPtr(obj, &vptr, desc, 0)) == SWIG_OK) {
@@ -419,20 +560,39 @@ SWIG_AsValDepId(void *obj, int *val) {
   return SWIG_TypeError;
 }
 
+#ifdef SWIGTCL
+#define SWIG_AsValDepId(x, y) SWIG_AsValDepId SWIG_TCL_CALL_ARGS_2(x, y)
+#endif
 }
 
+/**
+ ** Pool disown helper
+ **/
+
 %typemap(out) disown_helper {
-#ifdef SWIGRUBY
+#if defined(SWIGRUBY)
   SWIG_ConvertPtr(self, &argp1,SWIGTYPE_p_Pool, SWIG_POINTER_DISOWN |  0 );
-#endif
-#ifdef SWIGPYTHON
+#elif defined(SWIGPYTHON)
   SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_Pool, SWIG_POINTER_DISOWN |  0 );
-#endif
-#ifdef SWIGPERL
+#elif defined(SWIGPERL)
   SWIG_ConvertPtr(ST(0), &argp1,SWIGTYPE_p_Pool, SWIG_POINTER_DISOWN |  0 );
+#elif defined(SWIGTCL)
+  SWIG_ConvertPtr(objv[1], &argp1, SWIGTYPE_p_Pool, SWIG_POINTER_DISOWN | 0);
+#else
+#warning disown_helper not implemented for this language, this is likely going to leak memory
 #endif
+
+#ifdef SWIGTCL
+  Tcl_SetObjResult(interp, SWIG_From_int((int)(0)));
+#else
   $result = SWIG_From_int((int)(0));
+#endif
 }
+
+
+/**
+ ** misc stuff
+ **/
 
 %include "typemaps.i"
 
@@ -447,6 +607,10 @@ SWIG_AsValDepId(void *obj, int *val) {
 %typemaps_asval(%checkcode(INT32), SWIG_AsValDepId, "SWIG_AsValDepId", DepId);
 
 
+/**
+ ** the C declarations
+ **/
+
 %{
 #include <stdbool.h>
 #include <stdio.h>
@@ -454,6 +618,7 @@ SWIG_AsValDepId(void *obj, int *val) {
 #include <sys/utsname.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 /* argh, swig undefs bool for perl */
 #ifndef bool
@@ -471,7 +636,7 @@ typedef int bool;
 #include "selection.h"
 
 #include "repo_write.h"
-#ifdef ENABLE_RPMDB
+#if defined(ENABLE_RPMDB) || defined(ENABLE_RPMPKG)
 #include "repo_rpmdb.h"
 #endif
 #ifdef ENABLE_PUBKEY
@@ -500,7 +665,11 @@ typedef int bool;
 #ifdef SUSE
 #include "repo_autopattern.h"
 #endif
+#if defined(ENABLE_COMPLEX_DEPS) && (defined(ENABLE_SUSEREPO) || defined(ENABLE_RPMMD) || defined(ENABLE_RPMDB) || defined(ENABLE_RPMPKG))
+#include "pool_parserpmrichdep.h"
+#endif
 #include "solv_xfopen.h"
+#include "testcase.h"
 
 /* for old ruby versions */
 #ifndef RARRAY_PTR
@@ -593,6 +762,17 @@ typedef struct {
 } Ruleinfo;
 
 typedef struct {
+  Solver *solv;
+  Id type;
+  Id rid;
+  Id from_id;
+  Id dep_id;
+  Id chosen_id;
+  Queue choices;
+  int level;
+} Alternative;
+
+typedef struct {
   Transaction *transaction;
   int mode;
   Id type;
@@ -615,7 +795,129 @@ typedef Dataiterator Datamatch;
 
 typedef int disown_helper;
 
+struct myappdata {
+  void *appdata;
+  int disowned;
+};
+
+
 %}
+
+/**
+ ** appdata helpers
+ **/
+
+#ifdef SWIGRUBY
+
+%{
+SWIGINTERN void appdata_disown_helper(void *appdata) {
+}
+SWIGINTERN void appdata_clr_helper(void **appdatap) {
+  *appdatap = 0;
+}
+SWIGINTERN void appdata_set_helper(void **appdatap, void *appdata) {
+  *appdatap = appdata;
+}
+SWIGINTERN void *appdata_get_helper(void *appdata) {
+  return appdata;
+}
+%}
+
+#elif defined(SWIGTCL)
+
+%{
+SWIGINTERN void appdata_disown_helper(void *appdata) {
+}
+SWIGINTERN void appdata_clr_helper(void **appdatap) {
+  if (*appdatap)
+    Tcl_DecrRefCount((Tcl_Obj *)(*appdatap));
+  *appdatap = 0;
+}
+SWIGINTERN void appdata_set_helper(void **appdatap, void *appdata) {
+  appdata_clr_helper(appdatap);
+  *appdatap = appdata;
+}
+SWIGINTERN void *appdata_get_helper(void *appdata) {
+  return appdata;
+}
+%}
+
+#elif defined(SWIGPYTHON)
+
+%{
+SWIGINTERN void appdata_disown_helper(void *appdata) {
+  struct myappdata *myappdata = appdata;
+  if (!myappdata || !myappdata->appdata || myappdata->disowned)
+    return;
+  myappdata->disowned = 1;
+  Py_DECREF((PyObject *)myappdata->appdata);
+}
+SWIGINTERN void appdata_clr_helper(void **appdatap) {
+  struct myappdata *myappdata = *(struct myappdata **)appdatap;
+  if (myappdata && myappdata->appdata && !myappdata->disowned) {
+    Py_DECREF((PyObject *)myappdata->appdata);
+  }
+  *appdatap = solv_free(myappdata);
+}
+SWIGINTERN void appdata_set_helper(void **appdatap, void *appdata) {
+  appdata_clr_helper(appdatap);
+  if (appdata) {
+    struct myappdata *myappdata = *appdatap = solv_calloc(sizeof(struct myappdata), 1);
+    myappdata->appdata = appdata;
+  }
+}
+SWIGINTERN void *appdata_get_helper(void *appdata) {
+  return appdata ? ((struct myappdata *)appdata)->appdata : 0;
+}
+
+%}
+
+#elif defined(SWIGPERL)
+
+%{
+SWIGINTERN void appdata_disown_helper(void *appdata) {
+  struct myappdata *myappdata = appdata;
+  SV *rsv;
+  if (!myappdata || !myappdata->appdata || myappdata->disowned)
+    return;
+  rsv = myappdata->appdata;
+  if (!SvROK(rsv))
+    return;
+  myappdata->appdata = SvRV(rsv);
+  myappdata->disowned = 1;
+  SvREFCNT_dec(rsv);
+}
+SWIGINTERN void appdata_clr_helper(void **appdatap) {
+  struct myappdata *myappdata = *(struct myappdata **)appdatap;
+  if (myappdata && myappdata->appdata && !myappdata->disowned) {
+    SvREFCNT_dec((SV *)myappdata->appdata);
+  }
+  *appdatap = solv_free(myappdata);
+}
+SWIGINTERN void appdata_set_helper(void **appdatap, void *appdata) {
+  appdata_clr_helper(appdatap);
+  if (appdata) {
+    struct myappdata *myappdata = *appdatap = solv_calloc(sizeof(struct myappdata), 1);
+    myappdata->appdata = appdata;
+  }
+}
+SWIGINTERN void *appdata_get_helper(void *appdata) {
+  struct myappdata *myappdata = appdata;
+  if (!myappdata || !myappdata->appdata)
+    return 0;
+  return myappdata->disowned ? newRV_noinc((SV *)myappdata->appdata) : myappdata->appdata;
+}
+
+%}
+
+#else
+#warning appdata helpers not implemented for this language
+#endif
+
+
+/**
+ ** the SWIG declarations defining the API
+ **/
 
 #ifdef SWIGRUBY
 %mixin Dataiterator "Enumerable";
@@ -635,7 +937,20 @@ typedef int Id;
 %constant int REL_EQ;
 %constant int REL_GT;
 %constant int REL_LT;
+%constant int REL_AND;
+%constant int REL_OR;
+%constant int REL_WITH;
+%constant int REL_NAMESPACE;
 %constant int REL_ARCH;
+%constant int REL_FILECONFLICT;
+%constant int REL_COND;
+%constant int REL_COMPAT;
+%constant int REL_KIND;
+%constant int REL_MULTIARCH;
+%constant int REL_ELSE;
+%constant int REL_ERROR;
+%constant int REL_WITHOUT;
+%constant int REL_UNLESS;
 
 typedef struct {
   Pool* const pool;
@@ -697,7 +1012,6 @@ typedef struct {
 %nodefaultctor Pool;
 %nodefaultdtor Pool;
 typedef struct {
-  AppObjectPtr appdata;
 } Pool;
 
 %nodefaultctor Repo;
@@ -708,7 +1022,6 @@ typedef struct {
   int priority;
   int subpriority;
   int const nsolvables;
-  AppObjectPtr appdata;
 } Repo;
 
 %nodefaultctor Solver;
@@ -747,9 +1060,14 @@ SolvFp *solvfp_xfopen_fd(const char *fn, int fd, const char *mode = 0);
     SolvFp *sfp;
     FILE *fp;
     fd = dup(fd);
-    fp = fd == -1 ? 0 : solv_xfopen_fd(fn, fd, mode);
-    if (!fp)
+    if (fd == -1)
       return 0;
+    fcntl(fd, F_SETFD, FD_CLOEXEC);
+    fp = solv_xfopen_fd(fn, fd, mode);
+    if (!fp) {
+      close(fd);
+      return 0;
+    }
     sfp = solv_calloc(1, sizeof(SolvFp));
     sfp->fp = fp;
     return sfp;
@@ -760,6 +1078,8 @@ SolvFp *solvfp_xfopen_fd(const char *fn, int fd, const char *mode = 0);
     fp = solv_xfopen(fn, mode);
     if (!fp)
       return 0;
+    if (fileno(fp) != -1)
+      fcntl(fileno(fp), F_SETFD, FD_CLOEXEC);
     sfp = solv_calloc(1, sizeof(SolvFp));
     sfp->fp = fp;
     return sfp;
@@ -784,6 +1104,17 @@ typedef struct {
   Id const id;
   Id const type;
 } Solutionelement;
+
+%nodefaultctor Alternative;
+typedef struct {
+  Solver *const solv;
+  Id const type;
+  Id const rid;
+  Id const from_id;
+  Id const dep_id;
+  Id const chosen_id;
+  int level;
+} Alternative;
 
 %nodefaultctor Transaction;
 %nodefaultdtor Transaction;
@@ -811,6 +1142,9 @@ typedef struct {
   int dup() {
     return $self->fp ? dup(fileno($self->fp)) : -1;
   }
+  bool write(const unsigned char *str, size_t len) {
+    return fwrite(str, len, 1, $self->fp) == 1;
+  }
   bool flush() {
     if (!$self->fp)
       return 1;
@@ -823,6 +1157,11 @@ typedef struct {
     ret = fclose($self->fp) == 0;
     $self->fp = 0;
     return ret;
+  }
+  void cloexec(bool state) {
+    if (!$self->fp || fileno($self->fp) == -1)
+      return;
+    fcntl(fileno($self->fp), F_SETFD, state ? FD_CLOEXEC : 0);
   }
 }
 
@@ -845,6 +1184,9 @@ typedef struct {
   static const Id SOLVER_VERIFY = SOLVER_VERIFY;
   static const Id SOLVER_DROP_ORPHANED = SOLVER_DROP_ORPHANED;
   static const Id SOLVER_USERINSTALLED = SOLVER_USERINSTALLED;
+  static const Id SOLVER_ALLOWUNINSTALL = SOLVER_ALLOWUNINSTALL;
+  static const Id SOLVER_FAVOR = SOLVER_FAVOR;
+  static const Id SOLVER_DISFAVOR = SOLVER_DISFAVOR;
   static const Id SOLVER_JOBMASK = SOLVER_JOBMASK;
   static const Id SOLVER_WEAK = SOLVER_WEAK;
   static const Id SOLVER_ESSENTIAL = SOLVER_ESSENTIAL;
@@ -884,18 +1226,27 @@ typedef struct {
     return pool_isemptyupdatejob($self->pool, $self->how, $self->what);
   }
 
+#if defined(SWIGTCL)
+  %rename("==") __eq__;
+#endif
   bool __eq__(Job *j) {
     return $self->pool == j->pool && $self->how == j->how && $self->what == j->what;
   }
+#if defined(SWIGTCL)
+  %rename("!=") __ne__;
+#endif
   bool __ne__(Job *j) {
     return !Job___eq__($self, j);
   }
-#if defined(SWIGPERL)
+#if defined(SWIGPERL) || defined(SWIGTCL)
   %rename("str") __str__;
 #endif
   const char *__str__() {
     return pool_job2str($self->pool, $self->how, $self->what, 0);
   }
+#if defined(SWIGPERL) || defined(SWIGTCL)
+  %rename("repr") __repr__;
+#endif
   const char *__repr__() {
     const char *str = pool_job2str($self->pool, $self->how, $self->what, ~0);
     return pool_tmpjoin($self->pool, "<Job ", str, ">");
@@ -913,8 +1264,18 @@ typedef struct {
   static const Id SELECTION_GLOB = SELECTION_GLOB;
   static const Id SELECTION_FLAT = SELECTION_FLAT;
   static const Id SELECTION_NOCASE = SELECTION_NOCASE;
+  static const Id SELECTION_SKIP_KIND = SELECTION_SKIP_KIND;
+  static const Id SELECTION_MATCH_DEPSTR = SELECTION_MATCH_DEPSTR;
   static const Id SELECTION_SOURCE_ONLY = SELECTION_SOURCE_ONLY;
   static const Id SELECTION_WITH_SOURCE = SELECTION_WITH_SOURCE;
+  static const Id SELECTION_WITH_DISABLED = SELECTION_WITH_DISABLED;
+  static const Id SELECTION_WITH_BADARCH = SELECTION_WITH_BADARCH;
+  static const Id SELECTION_WITH_ALL = SELECTION_WITH_ALL;
+  static const Id SELECTION_ADD = SELECTION_ADD;
+  static const Id SELECTION_SUBTRACT = SELECTION_SUBTRACT;
+  static const Id SELECTION_FILTER = SELECTION_FILTER;
+  static const Id SELECTION_FILTER_KEEP_IFEMPTY = SELECTION_FILTER_KEEP_IFEMPTY;
+  static const Id SELECTION_FILTER_SWAPPED = SELECTION_FILTER_SWAPPED;
 
   Selection(Pool *pool) {
     Selection *s;
@@ -936,6 +1297,13 @@ typedef struct {
   bool isempty() {
     return $self->q.count == 0;
   }
+  %newobject clone;
+  Selection *clone(int flags = 0) {
+    Selection *s = new_Selection($self->pool);
+    queue_init_clone(&s->q, &$self->q);
+    s->flags = $self->flags;
+    return s;
+  }
   void filter(Selection *lsel) {
     if ($self->pool != lsel->pool)
       queue_empty(&$self->q);
@@ -952,6 +1320,27 @@ typedef struct {
   void add_raw(Id how, Id what) {
     queue_push2(&$self->q, how, what);
   }
+  void subtract(Selection *lsel) {
+    if ($self->pool == lsel->pool)
+      selection_subtract($self->pool, &$self->q, &lsel->q);
+  }
+  
+  void select(const char *name, int flags) {
+    if ((flags & SELECTION_MODEBITS) == 0)
+      flags |= SELECTION_FILTER | SELECTION_WITH_ALL;
+    $self->flags = selection_make($self->pool, &$self->q, name, flags);
+  }
+  void matchdeps(const char *name, int flags, Id keyname, Id marker = -1) {
+    if ((flags & SELECTION_MODEBITS) == 0)
+      flags |= SELECTION_FILTER | SELECTION_WITH_ALL;
+    $self->flags = selection_make_matchdeps($self->pool, &$self->q, name, flags, keyname, marker);
+  }
+  void matchdepid(DepId dep, int flags, Id keyname, Id marker = -1) {
+    if ((flags & SELECTION_MODEBITS) == 0)
+      flags |= SELECTION_FILTER | SELECTION_WITH_ALL;
+    $self->flags = selection_make_matchdepid($self->pool, &$self->q, dep, flags, keyname, marker);
+  }
+
   %typemap(out) Queue jobs Queue2Array(Job *, 2, new_Job(arg1->pool, id, idp[1]));
   %newobject jobs;
   Queue jobs(int flags) {
@@ -972,12 +1361,15 @@ typedef struct {
     return q;
   }
 
-#if defined(SWIGPERL)
+#if defined(SWIGPERL) || defined(SWIGTCL)
   %rename("str") __str__;
 #endif
   const char *__str__() {
     return pool_selection2str($self->pool, &$self->q, 0);
   }
+#if defined(SWIGPERL) || defined(SWIGTCL)
+  %rename("repr") __repr__;
+#endif
   const char *__repr__() {
     const char *str = pool_selection2str($self->pool, &$self->q, ~0);
     return pool_tmpjoin($self->pool, "<Selection ", str, ">");
@@ -997,6 +1389,20 @@ typedef struct {
       return 0;
     return solv_chksum_create_from_bin(type, buf);
   }
+  %newobject from_bin;
+  static Chksum *from_bin(Id type, const unsigned char *str, size_t len) {
+    return len == solv_chksum_len(type) ? solv_chksum_create_from_bin(type, str) : 0;
+  }
+#if defined(SWIGPERL)
+  %perlcode {
+    undef *solv::Chksum::from_bin;
+    *solv::Chksum::from_bin = sub {
+      my $pkg = shift;
+      my $self = solvc::Chksum_from_bin(@_);
+      bless $self, $pkg if defined $self;
+    };
+  }
+#endif
   ~Chksum() {
     solv_chksum_free($self, 0);
   }
@@ -1065,24 +1471,22 @@ typedef struct {
     return solv_chksum_type2str(solv_chksum_get_type($self));
   }
 
+#if defined(SWIGTCL)
+  %rename("==") __eq__;
+#endif
   bool __eq__(Chksum *chk) {
-    int l;
-    const unsigned char *b, *bo;
-    if (!chk)
-      return 0;
-    if (solv_chksum_get_type($self) != solv_chksum_get_type(chk))
-      return 0;
-    b = solv_chksum_get($self, &l);
-    bo = solv_chksum_get(chk, 0);
-    return memcmp(b, bo, l) == 0;
+    return solv_chksum_cmp($self, chk);
   }
+#if defined(SWIGTCL)
+  %rename("!=") __ne__;
+#endif
   bool __ne__(Chksum *chk) {
-    return !Chksum___eq__($self, chk);
+    return !solv_chksum_cmp($self, chk);
   }
 #if defined(SWIGRUBY)
   %rename("to_s") __str__;
 #endif
-#if defined(SWIGPERL)
+#if defined(SWIGPERL) || defined(SWIGTCL)
   %rename("str") __str__;
 #endif
   %newobject __str__;
@@ -1095,6 +1499,9 @@ typedef struct {
     solv_free((void *)h);
     return str;
   }
+#if defined(SWIGPERL) || defined(SWIGTCL)
+  %rename("repr") __repr__;
+#endif
   %newobject __repr__;
   const char *__repr__() {
     const char *h = Chksum___str__($self);
@@ -1114,10 +1521,17 @@ typedef struct {
   static const int POOL_FLAG_NOINSTALLEDOBSOLETES = POOL_FLAG_NOINSTALLEDOBSOLETES;
   static const int POOL_FLAG_HAVEDISTEPOCH = POOL_FLAG_HAVEDISTEPOCH;
   static const int POOL_FLAG_NOOBSOLETESMULTIVERSION = POOL_FLAG_NOOBSOLETESMULTIVERSION;
+  static const int DISTTYPE_RPM = DISTTYPE_RPM;
+  static const int DISTTYPE_DEB = DISTTYPE_DEB;
+  static const int DISTTYPE_ARCH = DISTTYPE_ARCH;
+  static const int DISTTYPE_HAIKU = DISTTYPE_HAIKU;
 
   Pool() {
     Pool *pool = pool_create();
     return pool;
+  }
+  int setdisttype(int disttype) {
+    return pool_setdisttype($self, disttype);
   }
   void set_debuglevel(int level) {
     pool_setdebuglevel($self, level);
@@ -1150,18 +1564,21 @@ typedef struct {
     return SWIG_IsOK(ecode) ? vresult : 0;
   }
   %}
-  void set_loadcallback(PyObject *callable) {
+  void clr_loadcallback() {
     if ($self->loadcallback == loadcallback) {
       PyObject *obj = $self->loadcallbackdata;
       Py_DECREF(obj);
+      pool_setloadcallback($self, 0, 0);
     }
+  }
+  void set_loadcallback(PyObject *callable) {
+    Pool_clr_loadcallback($self);
     if (callable) {
       Py_INCREF(callable);
+      pool_setloadcallback($self, loadcallback, callable);
     }
-    pool_setloadcallback($self, callable ? loadcallback : 0, callable);
   }
-#endif
-#if defined(SWIGPERL)
+#elif defined(SWIGPERL)
 %{
   SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
     int count;
@@ -1184,16 +1601,20 @@ typedef struct {
     return ret;
   }
 %}
-  void set_loadcallback(SV *callable) {
-    if ($self->loadcallback == loadcallback)
+  void clr_loadcallback() {
+    if ($self->loadcallback == loadcallback) {
       SvREFCNT_dec($self->loadcallbackdata);
-    if (callable)
-      SvREFCNT_inc(callable);
-    pool_setloadcallback($self, callable ? loadcallback : 0, callable);
+      pool_setloadcallback($self, 0, 0);
+    }
   }
-#endif
-
-#if defined(SWIGRUBY)
+  void set_loadcallback(SV *callable) {
+    Pool_clr_loadcallback($self);
+    if (callable) {
+      SvREFCNT_inc(callable);
+      pool_setloadcallback($self, loadcallback, callable);
+    }
+  }
+#elif defined(SWIGRUBY)
 %{
   SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
     XRepodata *xd = new_XRepodata(data->repo, data->repodataid);
@@ -1210,26 +1631,97 @@ typedef struct {
     }
   }
 %}
+  void clr_loadcallback() {
+    pool_setloadcallback($self, 0, 0);
+  }
   %typemap(in, numinputs=0) VALUE callable {
     $1 = rb_block_given_p() ? rb_block_proc() : 0;
   }
   void set_loadcallback(VALUE callable) {
     pool_setloadcallback($self, callable ? loadcallback : 0, (void *)callable);
   }
+#elif defined(SWIGTCL)
+  %{
+  typedef struct {
+    Tcl_Interp *interp;
+    Tcl_Obj *obj;
+  } tcl_callback_t;
+  SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
+    tcl_callback_t *callback_var = (tcl_callback_t *)d;
+    Tcl_Interp *interp = callback_var->interp;
+    XRepodata *xd = new_XRepodata(data->repo, data->repodataid);
+    int result, ecode = 0, vresult = 0;
+    Tcl_Obj *objvx[2];
+    objvx[0] = callback_var->obj;
+    objvx[1] = SWIG_NewInstanceObj(SWIG_as_voidptr(xd), SWIGTYPE_p_XRepodata, 0); 
+    Tcl_IncrRefCount(objvx[1]);
+    result = Tcl_EvalObjv(interp, sizeof(objvx)/sizeof(*objvx), objvx, TCL_EVAL_GLOBAL);
+    Tcl_DecrRefCount(objvx[1]);
+    if (result != TCL_OK)
+      return 0; /* exception */
+    ecode = SWIG_AsVal_int(interp, Tcl_GetObjResult(interp), &vresult);
+    return SWIG_IsOK(ecode) ? vresult : 0;
+  }
+  %}
+  void clr_loadcallback() {
+    if ($self->loadcallback == loadcallback) {
+      tcl_callback_t *callback_var = $self->loadcallbackdata;
+      Tcl_DecrRefCount(callback_var->obj);
+      solv_free(callback_var);
+      pool_setloadcallback($self, 0, 0);
+    }
+  }
+  void set_loadcallback(Tcl_Obj *callable, Tcl_Interp *interp) {
+    Pool_clr_loadcallback($self);
+    if (callable) {
+      tcl_callback_t *callback_var = solv_malloc(sizeof(tcl_callback_t));
+      Tcl_IncrRefCount(callable);
+      callback_var->interp = interp;
+      callback_var->obj = callable;
+      pool_setloadcallback($self, loadcallback, callback_var);
+    }
+  }
+#else
+#warning loadcallback not implemented for this language
 #endif
 
   ~Pool() {
-    Pool_set_loadcallback($self, 0);
-    pool_free($self);
+    Pool *pool = $self;
+    Id repoid;
+    Repo *repo;
+    FOR_REPOS(repoid, repo)
+      appdata_clr_helper(&repo->appdata);
+    Pool_clr_loadcallback(pool);
+    appdata_clr_helper(&pool->appdata);
+    pool_free(pool);
   }
   disown_helper free() {
-    Pool_set_loadcallback($self, 0);
-    pool_free($self);
+    Pool *pool = $self;
+    Id repoid;
+    Repo *repo;
+    FOR_REPOS(repoid, repo)
+      appdata_clr_helper(&repo->appdata);
+    Pool_clr_loadcallback(pool);
+    appdata_clr_helper(&pool->appdata);
+    pool_free(pool);
     return 0;
   }
   disown_helper disown() {
     return 0;
   }
+  AppObjectPtr appdata;
+  %{
+  SWIGINTERN void Pool_appdata_set(Pool *pool, AppObjectPtr appdata) {
+    appdata_set_helper(&pool->appdata, appdata);
+  }
+  SWIGINTERN AppObjectPtr Pool_appdata_get(Pool *pool) {
+    return appdata_get_helper(pool->appdata);
+  }
+  %}
+  void appdata_disown() {
+    appdata_disown_helper($self->appdata);
+  }
+
   Id str2id(const char *str, bool create=1) {
     return pool_str2id($self, str, create);
   }
@@ -1238,6 +1730,13 @@ typedef struct {
     Id id = pool_str2id($self, str, create);
     return new_Dep($self, id);
   }
+#if defined(ENABLE_COMPLEX_DEPS) && (defined(ENABLE_SUSEREPO) || defined(ENABLE_RPMMD) || defined(ENABLE_RPMDB) || defined(ENABLE_RPMPKG))
+  %newobject Dep;
+  Dep *parserpmrichdep(const char *str) {
+    Id id = pool_parserpmrichdep($self, str);
+    return new_Dep($self, id);
+  }
+#endif
   const char *id2str(Id id) {
     return pool_id2str($self, id);
   }
@@ -1347,10 +1846,10 @@ typedef struct {
   SWIGINTERN void Pool_installed_set(Pool *pool, Repo *installed) {
     pool_set_installed(pool, installed);
   }
-  Repo *Pool_installed_get(Pool *pool) {
+  SWIGINTERN Repo *Pool_installed_get(Pool *pool) {
     return pool->installed;
   }
-  const char *Pool_errstr_get(Pool *pool) {
+  SWIGINTERN const char *Pool_errstr_get(Pool *pool) {
     return pool_errstr(pool);
   }
   %}
@@ -1397,6 +1896,16 @@ typedef struct {
     return pool_queuetowhatprovides($self, &q);
   }
 
+  void set_namespaceproviders(DepId ns, DepId evr, bool value=1) {
+    Id dep = pool_rel2id($self, ns, evr, REL_NAMESPACE, 1);
+    pool_set_whatprovides($self, dep, value ? 2 : 1);
+  }
+
+  void flush_namespaceproviders(DepId ns, DepId evr) {
+    pool_flush_namespaceproviders($self, ns, evr);
+  }
+
+
   %typemap(out) Queue whatmatchesdep Queue2Array(XSolvable *, 1, new_XSolvable(arg1, id));
   %newobject whatmatchesdep;
   Queue whatmatchesdep(Id keyname, DepId dep, Id marker = -1) {
@@ -1439,6 +1948,20 @@ typedef struct {
   Selection *select(const char *name, int flags) {
     Selection *sel = new_Selection($self);
     sel->flags = selection_make($self, &sel->q, name, flags);
+    return sel;
+  }
+
+  %newobject matchdeps;
+  Selection *matchdeps(const char *name, int flags, Id keyname, Id marker = -1) {
+    Selection *sel = new_Selection($self);
+    sel->flags = selection_make_matchdeps($self, &sel->q, name, flags, keyname, marker);
+    return sel;
+  }
+
+  %newobject matchdepid;
+  Selection *matchdepid(DepId dep, int flags, Id keyname, Id marker = -1) {
+    Selection *sel = new_Selection($self);
+    sel->flags = selection_make_matchdepid($self, &sel->q, dep, flags, keyname, marker);
     return sel;
   }
 
@@ -1500,6 +2023,7 @@ rb_eval_string(
 #endif
 
   void free(bool reuseids = 0) {
+    appdata_clr_helper(&$self->appdata);
     repo_free($self, reuseids);
   }
   void empty(bool reuseids = 0) {
@@ -1511,6 +2035,17 @@ rb_eval_string(
   bool isempty() {
     return !$self->nsolvables;
   }
+
+  AppObjectPtr appdata;
+  %{
+  SWIGINTERN void Repo_appdata_set(Repo *repo, AppObjectPtr appdata) {
+    appdata_set_helper(&repo->appdata, appdata);
+  }
+  SWIGINTERN AppObjectPtr Repo_appdata_get(Repo *repo) {
+    return appdata_get_helper(repo->appdata);
+  }
+  %}
+
   bool add_solv(const char *name, int flags = 0) {
     FILE *fp = fopen(name, "r");
     int r;
@@ -1537,6 +2072,8 @@ rb_eval_string(
   bool add_rpmdb_reffp(FILE *reffp, int flags = 0) {
     return repo_add_rpmdb_reffp($self, reffp, flags) == 0;
   }
+#endif
+#ifdef ENABLE_RPMPKG
   %newobject add_rpm;
   XSolvable *add_rpm(const char *name, int flags = 0) {
     return new_XSolvable($self->pool, repo_add_rpm($self, name, flags));
@@ -1733,13 +2270,52 @@ rb_eval_string(
   }
 #endif
 
+  Repo *createshadow(const char *name) {
+    Repo *repo = repo_create($self->pool, name);
+    if ($self->idarraysize) {
+      repo_reserve_ids(repo, 0, $self->idarraysize);
+      memcpy(repo->idarraydata, $self->idarraydata, sizeof(Id) * $self->idarraysize);
+      repo->idarraysize = $self->idarraysize;
+    }
+    repo->start = $self->start;
+    repo->end = $self->end;
+    repo->nsolvables = $self->nsolvables;
+    return repo;
+  }
+
+  void moveshadow(Queue q) {
+    Pool *pool = $self->pool;
+    int i;
+    for (i = 0; i < q.count; i++) {
+      Solvable *s;
+      Id p = q.elements[i];
+      if (p < $self->start || p >= $self->end)
+        continue;
+      s = pool->solvables + p;
+      if ($self->idarraysize != s->repo->idarraysize)
+        continue;
+      s->repo = $self;
+    }
+  }
+
+#if defined(SWIGTCL)
+  %rename("==") __eq__;
+#endif
   bool __eq__(Repo *repo) {
     return $self == repo;
   }
+#if defined(SWIGTCL)
+  %rename("!=") __ne__;
+#endif
   bool __ne__(Repo *repo) {
     return $self != repo;
   }
-#if defined(SWIGPERL)
+#if defined(SWIGPYTHON)
+  int __hash__() {
+    return $self->repoid;
+  }
+#endif
+#if defined(SWIGPERL) || defined(SWIGTCL)
   %rename("str") __str__;
 #endif
   %newobject __str__;
@@ -1750,6 +2326,9 @@ rb_eval_string(
     sprintf(buf, "Repo#%d", $self->repoid);
     return solv_strdup(buf);
   }
+#if defined(SWIGPERL) || defined(SWIGTCL)
+  %rename("repr") __repr__;
+#endif
   %newobject __repr__;
   const char *__repr__() {
     char buf[20];
@@ -2016,6 +2595,9 @@ rb_eval_string(
     *solv::Datamatch::str = *solvc::Datamatch_stringify;
   }
 #endif
+#if defined(SWIGTCL)
+  %rename("stringify") __str__;
+#endif
   const char *__str__() {
     KeyValue kv = $self->kv;
     const char *str = repodata_stringify($self->pool, $self->data, $self->key, &kv, SEARCH_FILES | SEARCH_CHECKSUMS);
@@ -2103,7 +2685,6 @@ rb_eval_string(
 #ifdef SWIGPERL
   perliter(solv::Pool_repo_iterator)
 #endif
-  %newobject __next__;
   Repo *__next__() {
     Pool *pool = $self->pool;
     if ($self->id >= pool->nrepos)
@@ -2119,7 +2700,7 @@ rb_eval_string(
   void each() {
     Repo *n;
     while ((n = Pool_repo_iterator___next__($self)) != 0) {
-      rb_yield(SWIG_NewPointerObj(SWIG_as_voidptr(n), SWIGTYPE_p_Repo, SWIG_POINTER_OWN | 0));
+      rb_yield(SWIG_NewPointerObj(SWIG_as_voidptr(n), SWIGTYPE_p_Repo, 0 | 0));
     }
   }
 #endif
@@ -2240,18 +2821,32 @@ rb_eval_string(
   const char *str() {
     return pool_dep2str($self->pool, $self->id);
   }
+#if defined(SWIGTCL)
+  %rename("==") __eq__;
+#endif
   bool __eq__(Dep *s) {
     return $self->pool == s->pool && $self->id == s->id;
   }
+#if defined(SWIGTCL)
+  %rename("!=") __ne__;
+#endif
   bool __ne__(Dep *s) {
     return !Dep___eq__($self, s);
   }
-#if defined(SWIGPERL)
+#if defined(SWIGPYTHON)
+  int __hash__() {
+    return $self->id;
+  }
+#endif
+#if defined(SWIGPERL) || defined(SWIGTCL)
   %rename("str") __str__;
 #endif
   const char *__str__() {
     return pool_dep2str($self->pool, $self->id);
   }
+#if defined(SWIGPERL) || defined(SWIGTCL)
+  %rename("repr") __repr__;
+#endif
   %newobject __repr__;
   const char *__repr__() {
     char buf[20];
@@ -2309,6 +2904,9 @@ rb_eval_string(
   }
   const char *lookup_location(unsigned int *OUTPUT) {
     return solvable_lookup_location($self->pool->solvables + $self->id, OUTPUT);
+  }
+  const char *lookup_sourcepkg() {
+    return solvable_lookup_sourcepkg($self->pool->solvables + $self->id);
   }
   %newobject Dataiterator;
   Dataiterator *Dataiterator(Id key, const char *match = 0, int flags = 0) {
@@ -2477,19 +3075,39 @@ rb_eval_string(
   int evrcmp(XSolvable *s2) {
     return pool_evrcmp($self->pool, $self->pool->solvables[$self->id].evr, s2->pool->solvables[s2->id].evr, EVRCMP_COMPARE);
   }
+#ifdef SWIGRUBY
+  %rename("matchesdep?") matchesdep;
+#endif
+  bool matchesdep(Id keyname, DepId id, Id marker = -1) {
+    return solvable_matchesdep($self->pool->solvables + $self->id, keyname, id, marker);
+  }
 
+#if defined(SWIGTCL)
+  %rename("==") __eq__;
+#endif
   bool __eq__(XSolvable *s) {
     return $self->pool == s->pool && $self->id == s->id;
   }
+#if defined(SWIGTCL)
+  %rename("!=") __ne__;
+#endif
   bool __ne__(XSolvable *s) {
     return !XSolvable___eq__($self, s);
   }
-#if defined(SWIGPERL)
+#if defined(SWIGPYTHON)
+  int __hash__() {
+    return $self->id;
+  }
+#endif
+#if defined(SWIGPERL) || defined(SWIGTCL)
   %rename("str") __str__;
 #endif
   const char *__str__() {
     return pool_solvid2str($self->pool, $self->id);
   }
+#if defined(SWIGPERL) || defined(SWIGTCL)
+  %rename("repr") __repr__;
+#endif
   %newobject __repr__;
   const char *__repr__() {
     char buf[20];
@@ -2550,7 +3168,7 @@ rb_eval_string(
       queue_push(&q, i);
     return q;
   }
-#if defined(SWIGPERL)
+#if defined(SWIGPERL) || defined(SWIGTCL)
   %rename("str") __str__;
 #endif
   const char *__str__() {
@@ -2706,7 +3324,7 @@ rb_eval_string(
   %newobject Job;
   Job *Job() {
     Id extraflags = solver_solutionelement_extrajobflags($self->solv, $self->problemid, $self->solutionid);
-    if ($self->type == SOLVER_SOLUTION_JOB || SOLVER_SOLUTION_POOLJOB)
+    if ($self->type == SOLVER_SOLUTION_JOB || $self->type == SOLVER_SOLUTION_POOLJOB)
       return new_Job($self->solv->pool, SOLVER_NOOP, 0);
     if ($self->type == SOLVER_SOLUTION_INFARCH || $self->type == SOLVER_SOLUTION_DISTUPGRADE || $self->type == SOLVER_SOLUTION_BEST)
       return new_Job($self->solv->pool, SOLVER_INSTALL|SOLVER_SOLVABLE|SOLVER_NOTBYUSER|extraflags, $self->p);
@@ -2779,6 +3397,10 @@ rb_eval_string(
   static const int SOLVER_FLAG_BREAK_ORPHANS = SOLVER_FLAG_BREAK_ORPHANS;
   static const int SOLVER_FLAG_FOCUS_INSTALLED = SOLVER_FLAG_FOCUS_INSTALLED;
   static const int SOLVER_FLAG_YUM_OBSOLETES = SOLVER_FLAG_YUM_OBSOLETES;
+  static const int SOLVER_FLAG_NEED_UPDATEPROVIDE = SOLVER_FLAG_NEED_UPDATEPROVIDE;
+  static const int SOLVER_FLAG_FOCUS_BEST = SOLVER_FLAG_FOCUS_BEST;
+  static const int SOLVER_FLAG_STRONG_RECOMMENDS = SOLVER_FLAG_STRONG_RECOMMENDS;
+  static const int SOLVER_FLAG_INSTALL_ALSO_UPDATES = SOLVER_FLAG_INSTALL_ALSO_UPDATES;
 
   static const int SOLVER_REASON_UNRELATED = SOLVER_REASON_UNRELATED;
   static const int SOLVER_REASON_UNIT_RULE = SOLVER_REASON_UNIT_RULE;
@@ -2847,6 +3469,21 @@ rb_eval_string(
       queue_push(&q, i);
     return q;
   }
+#if defined(SWIGTCL)
+  %typemap(out) Queue solve Queue2Array(Problem *, 1, new_Problem(arg1, id));
+  %newobject solve;
+  Queue solve(Queue solvejobs) {
+    Queue q;
+    int i, cnt;
+    queue_init(&q);
+    solver_solve($self, &solvejobs);
+    cnt = solver_problem_count($self);
+    for (i = 1; i <= cnt; i++)
+      queue_push(&q, i);
+    return q;
+  }
+#endif
+
   %newobject transaction;
   Transaction *transaction() {
     return solver_create_transaction($self);
@@ -2857,6 +3494,114 @@ rb_eval_string(
     int reason = solver_describe_decision($self, s->id, &ruleid);
     *OUTPUT = new_XRule($self, ruleid);
     return reason;
+  }
+
+  %newobject describe_weakdep_decision_raw;
+  Queue describe_weakdep_decision_raw(XSolvable *s) {
+    Queue q;
+    queue_init(&q);
+    solver_describe_weakdep_decision($self, s->id, &q);
+    return q;
+  }
+#if defined(SWIGPYTHON)
+  %pythoncode {
+    def describe_weakdep_decision(self, s):
+      d = iter(self.describe_weakdep_decision_raw(s))
+      return [ (t, XSolvable(self.pool, sid), Dep(self.pool, id)) for t, sid, id in zip(d, d, d) ]
+  }
+#endif
+#if defined(SWIGPERL)
+  %perlcode {
+    sub solv::Solver::describe_weakdep_decision {
+      my ($self, $s) = @_;
+      my $pool = $self->{'pool'};
+      my @res;
+      my @d = $self->describe_weakdep_decision_raw($s);
+      push @res, [ splice(@d, 0, 3) ] while @d;
+      return map { [ $_->[0], solv::XSolvable->new($pool, $_->[1]), solv::Dep->new($pool, $_->[2]) ] } @res;
+    }
+  }
+#endif
+#if defined(SWIGRUBY)
+%init %{
+rb_eval_string(
+    "class Solv::Solver\n"
+    "  def describe_weakdep_decision(s)\n"
+    "    self.describe_weakdep_decision_raw(s).each_slice(3).map { |t, sid, id| [ t, Solv::XSolvable.new(self.pool, sid), Solv::Dep.new(self.pool, id)] }\n"
+    "  end\n"
+    "end\n"
+  );
+%}
+#endif
+
+  int alternatives_count() {
+    return solver_alternatives_count($self);
+  }
+
+  %newobject alternative;
+  Alternative *alternative(Id aid) {
+    Alternative *a = solv_calloc(1, sizeof(*a));
+    a->solv = $self;
+    queue_init(&a->choices);
+    a->type = solver_get_alternative($self, aid, &a->dep_id, &a->from_id, &a->chosen_id, &a->choices, &a->level);
+    if (!a->type) {
+      queue_free(&a->choices);
+      solv_free(a);
+      return 0;
+    }
+    if (a->type == SOLVER_ALTERNATIVE_TYPE_RULE) {
+      a->rid = a->dep_id;
+      a->dep_id = 0;
+    }
+    return a;
+  }
+
+  %typemap(out) Queue all_alternatives Queue2Array(Alternative *, 1, Solver_alternative(arg1, id));
+  %newobject all_alternatives;
+  Queue all_alternatives() {
+    Queue q;
+    int i, cnt;
+    queue_init(&q);
+    cnt = solver_alternatives_count($self);
+    for (i = 1; i <= cnt; i++)
+      queue_push(&q, i);
+    return q;
+  }
+
+  bool write_testcase(const char *dir) {
+    return testcase_write($self, dir, TESTCASE_RESULT_TRANSACTION | TESTCASE_RESULT_PROBLEMS, 0, 0);
+  }
+
+  Queue raw_decisions(int filter=0) {
+    Queue q;
+    queue_init(&q);
+    solver_get_decisionqueue($self, &q);
+    if (filter) {
+      int i, j;
+      for (i = j = 0; i < q.count; i++)
+        if ((filter > 0 && q.elements[i] > 1) ||
+            (filter < 0 && q.elements[i] < 0))
+          q.elements[j++] = q.elements[i];
+      queue_truncate(&q, j);
+    }
+    return q;
+  }
+
+  %typemap(out) Queue get_recommended Queue2Array(XSolvable *, 1, new_XSolvable(arg1->pool, id));
+  %newobject get_recommended;
+  Queue get_recommended(bool noselected=0) {
+    Queue q;
+    queue_init(&q);
+    solver_get_recommendations($self, &q, NULL, noselected);
+    return q;
+  }
+  %typemap(out) Queue get_suggested Queue2Array(XSolvable *, 1, new_XSolvable(arg1->pool, id));
+  %newobject get_suggested;
+  Queue get_suggested(bool noselected=0) {
+    Queue q;
+    queue_init(&q);
+    solver_get_recommendations($self, NULL, &q, noselected);
+    return q;
   }
 }
 
@@ -3051,12 +3796,26 @@ rb_eval_string(
     return q;
   }
 
+#if defined(SWIGTCL)
+  %rename("==") __eq__;
+#endif
   bool __eq__(XRule *xr) {
     return $self->solv == xr->solv && $self->id == xr->id;
   }
+#if defined(SWIGTCL)
+  %rename("!=") __ne__;
+#endif
   bool __ne__(XRule *xr) {
     return !XRule___eq__($self, xr);
   }
+#if defined(SWIGPYTHON)
+  int __hash__() {
+    return $self->id;
+  }
+#endif
+#if defined(SWIGPERL) || defined(SWIGTCL)
+  %rename("repr") __repr__;
+#endif
   %newobject __repr__;
   const char *__repr__() {
     char buf[20];
@@ -3128,6 +3887,9 @@ rb_eval_string(
     if (buf)
       repodata_set_bin_checksum(repo_id2repodata($self->repo, $self->id), solvid, keyname, solv_chksum_get_type(chksum), buf);
   }
+  void set_sourcepkg(Id solvid, const char *sourcepkg) {
+    repodata_set_sourcepkg(repo_id2repodata($self->repo, $self->id), solvid, sourcepkg);
+  }
   const char *lookup_str(Id solvid, Id keyname) {
     return repodata_lookup_str(repo_id2repodata($self->repo, $self->id), solvid, keyname);
   }
@@ -3154,6 +3916,18 @@ rb_eval_string(
   bool write(FILE *fp) {
     return repodata_write(repo_id2repodata($self->repo, $self->id), fp) == 0;
   }
+  Id str2dir(const char *dir, bool create=1) {
+    Repodata *data = repo_id2repodata($self->repo, $self->id);
+    return repodata_str2dir(data, dir, create);
+  }
+  const char *dir2str(Id did, const char *suf = 0) {
+    Repodata *data = repo_id2repodata($self->repo, $self->id);
+    return repodata_dir2str(data, did, suf);
+  }
+  void add_dirstr(Id solvid, Id keyname, Id dir, const char *str) {
+    Repodata *data = repo_id2repodata($self->repo, $self->id);
+    repodata_add_dirstr(data, solvid, keyname, dir, str);
+  }
   bool add_solv(FILE *fp, int flags = 0) {
     Repodata *data = repo_id2repodata($self->repo, $self->id);
     int r, oldstate = data->state;
@@ -3167,12 +3941,26 @@ rb_eval_string(
     Repodata *data = repo_id2repodata($self->repo, $self->id);
     repodata_extend_block(data, data->repo->start, data->repo->end - data->repo->start);
   }
+#if defined(SWIGTCL)
+  %rename("==") __eq__;
+#endif
   bool __eq__(XRepodata *xr) {
     return $self->repo == xr->repo && $self->id == xr->id;
   }
+#if defined(SWIGTCL)
+  %rename("!=") __ne__;
+#endif
   bool __ne__(XRepodata *xr) {
     return !XRepodata___eq__($self, xr);
   }
+#if defined(SWIGPYTHON)
+  int __hash__() {
+    return $self->id;
+  }
+#endif
+#if defined(SWIGPERL) || defined(SWIGTCL)
+  %rename("repr") __repr__;
+#endif
   %newobject __repr__;
   const char *__repr__() {
     char buf[20];
@@ -3202,3 +3990,82 @@ rb_eval_string(
 #endif
 }
 #endif
+
+%extend Alternative {
+  static const int SOLVER_ALTERNATIVE_TYPE_RULE = SOLVER_ALTERNATIVE_TYPE_RULE;
+  static const int SOLVER_ALTERNATIVE_TYPE_RECOMMENDS = SOLVER_ALTERNATIVE_TYPE_RECOMMENDS;
+  static const int SOLVER_ALTERNATIVE_TYPE_SUGGESTS = SOLVER_ALTERNATIVE_TYPE_SUGGESTS;
+
+  ~Alternative() {
+    queue_free(&$self->choices);
+    solv_free($self);
+  }
+  %newobject chosen;
+  XSolvable * const chosen;
+  %newobject rule;
+  XRule * const rule;
+  %newobject depsolvable;
+  XSolvable * const depsolvable;
+  %newobject dep;
+  Dep * const dep;
+  %{
+    SWIGINTERN XSolvable *Alternative_chosen_get(Alternative *a) {
+      return new_XSolvable(a->solv->pool, a->chosen_id);
+    }
+    SWIGINTERN XRule *Alternative_rule_get(Alternative *a) {
+      return new_XRule(a->solv, a->rid);
+    }
+    SWIGINTERN XSolvable *Alternative_depsolvable_get(Alternative *a) {
+      return new_XSolvable(a->solv->pool, a->from_id);
+    }
+    SWIGINTERN Dep *Alternative_dep_get(Alternative *a) {
+      return new_Dep(a->solv->pool, a->dep_id);
+    }
+  %}
+
+  Queue choices_raw() {
+    Queue r;
+    queue_init_clone(&r, &$self->choices);
+    return r;
+  }
+
+  %typemap(out) Queue choices Queue2Array(XSolvable *, 1, new_XSolvable(arg1->solv->pool, id));
+  Queue choices() {
+    int i;
+    Queue r;
+    queue_init_clone(&r, &$self->choices);
+    for (i = 0; i < r.count; i++)
+      if (r.elements[i] < 0)
+        r.elements[i] = -r.elements[i];
+    return r;
+  }
+
+#if defined(SWIGPERL) || defined(SWIGTCL)
+  %rename("str") __str__;
+#endif
+  const char *__str__() {
+    return solver_alternative2str($self->solv, $self->type, $self->type == SOLVER_ALTERNATIVE_TYPE_RULE ? $self->rid : $self->dep_id, $self->from_id);
+  }
+}
+
+#if defined(SWIGTCL)
+%init %{
+  Tcl_Eval(interp,
+"proc solv::iter {varname iter body} {\n"\
+"  while 1 {\n"\
+"    set value [$iter __next__]\n"\
+"    if {$value eq \"NULL\"} { break }\n"\
+"    uplevel [list set $varname $value]\n"\
+"    set code [catch {uplevel $body} result]\n"\
+"    switch -exact -- $code {\n"\
+"      0 {}\n"\
+"      3 { return }\n"\
+"      4 {}\n"\
+"      default { return -code $code $result }\n"\
+"    }\n"\
+"  }\n"\
+"}\n"
+  );
+%}
+#endif
+

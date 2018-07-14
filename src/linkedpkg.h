@@ -18,7 +18,7 @@ has_package_link(Pool *pool, Solvable *s)
   const char *name = pool_id2str(pool, s->name);
   if (name[0] == 'a' && !strncmp("application:", name, 12))
     return 1;
-  if (name[0] == 'p' && !strncmp("pattern:", name, 7))
+  if (name[0] == 'p' && !strncmp("pattern:", name, 8))
     return 1;
   if (name[0] == 'p' && !strncmp("product:", name, 8))
     return 1;
@@ -34,5 +34,7 @@ extern Id find_autoproduct_name(Pool *pool, Solvable *s);
 
 /* generic */
 extern void find_package_link(Pool *pool, Solvable *s, Id *reqidp, Queue *qr, Id *prvidp, Queue *qp);
+extern int pool_link_evrcmp(Pool *pool, Solvable *s1, Solvable *s2);
+extern void extend_updatemap_to_buddies(Solver *solv);
 
 #endif

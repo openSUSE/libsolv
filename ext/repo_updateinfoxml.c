@@ -8,16 +8,14 @@
 #define _GNU_SOURCE
 #define _XOPEN_SOURCE /* glibc2 needs this */
 #include <sys/types.h>
-#include <limits.h>
-#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <expat.h>
 #include <time.h>
 
 #include "pool.h"
 #include "repo.h"
+#include "solv_xmlparser.h"
 #include "repo_updateinfoxml.h"
 #define DISABLE_SPLIT
 #include "tools_util.h"
@@ -75,16 +73,7 @@ enum state {
   NUMSTATES
 };
 
-struct stateswitch {
-  enum state from;
-  char *ename;
-  enum state to;
-  int docontent;
-};
-
-
-/* !! must be sorted by first column !! */
-static struct stateswitch stateswitches[] = {
+static struct solv_xmlparser_element stateswitches[] = {
   { STATE_START,       "updates",         STATE_UPDATES,     0 },
   { STATE_START,       "update",          STATE_UPDATE,      0 },
   { STATE_UPDATES,     "update",          STATE_UPDATE,      0 },
@@ -112,13 +101,6 @@ static struct stateswitch stateswitches[] = {
 
 struct parsedata {
   int ret;
-  int depth;
-  enum state state;
-  int statedepth;
-  char *content;
-  int lcontent;
-  int acontent;
-  int docontent;
   Pool *pool;
   Repo *repo;
   Repodata *data;
@@ -126,10 +108,8 @@ struct parsedata {
   Solvable *solvable;
   time_t buildtime;
   Id collhandle;
+  struct solv_xmlparser xmlp;
   struct joindata jd;
-
-  struct stateswitch *swtab[NUMSTATES];
-  enum state sbtab[NUMSTATES];
 };
 
 /*
@@ -161,7 +141,7 @@ static Id
 makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
 {
   const char *e, *v, *r, *v2;
-  char *c;
+  char *c, *space;
   int l;
 
   e = v = r = 0;
@@ -190,12 +170,8 @@ makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
     l += strlen(v);
   if (r)
     l += strlen(r) + 1;
-  if (l > pd->acontent)
-    {
-      pd->content = realloc(pd->content, l + 256);
-      pd->acontent = l + 256;
-    }
-  c = pd->content;
+  
+  c = space = solv_xmlparser_contentspace(&pd->xmlp, l);
   if (e)
     {
       strcpy(c, e);
@@ -214,60 +190,25 @@ makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
       c += strlen(c);
     }
   *c = 0;
-  if (!*pd->content)
+  if (!*space)
     return 0;
 #if 0
-  fprintf(stderr, "evr: %s\n", pd->content);
+  fprintf(stderr, "evr: %s\n", space);
 #endif
-  return pool_str2id(pool, pd->content, 1);
+  return pool_str2id(pool, space, 1);
 }
 
 
 
-static void XMLCALL
-startElement(void *userData, const char *name, const char **atts)
+static void
+startElement(struct solv_xmlparser *xmlp, int state, const char *name, const char **atts)
 {
-  struct parsedata *pd = userData;
+  struct parsedata *pd = xmlp->userdata;
   Pool *pool = pd->pool;
   Solvable *solvable = pd->solvable;
-  struct stateswitch *sw;
-  /*const char *str; */
 
-#if 0
-  fprintf(stderr, "start: [%d]%s\n", pd->state, name);
-#endif
-  if (pd->depth != pd->statedepth)
+  switch(state)
     {
-      pd->depth++;
-      return;
-    }
-
-  pd->depth++;
-  if (!pd->swtab[pd->state])
-    return;
-  for (sw = pd->swtab[pd->state]; sw->from == pd->state; sw++)  /* find name in statetable */
-    if (!strcmp(sw->ename, name))
-      break;
-
-  if (sw->from != pd->state)
-    {
-#if 0
-      fprintf(stderr, "into unknown: %s (from: %d)\n", name, pd->state);
-#endif
-      return;
-    }
-  pd->state = sw->to;
-  pd->docontent = sw->docontent;
-  pd->statedepth = pd->depth;
-  pd->lcontent = 0;
-  *pd->content = 0;
-
-  switch(pd->state)
-    {
-    case STATE_START:
-      break;
-    case STATE_UPDATES:
-      break;
       /*
        * <update from="rel-eng@fedoraproject.org"
        *         status="stable"
@@ -297,26 +238,11 @@ startElement(void *userData, const char *name, const char **atts)
         pd->buildtime = (time_t)0;
       }
       break;
-      /* <id>FEDORA-2007-4594</id> */
-    case STATE_ID:
-      break;
-      /* <title>imlib-1.9.15-6.fc8</title> */
-    case STATE_TITLE:
-      break;
-      /* <release>Fedora 8</release> */
-    case STATE_RELEASE:
-      break;
-      /*  <issued date="2008-03-21 21:36:55"/>
-      */
+
     case STATE_ISSUED:
     case STATE_UPDATED:
       {
-	const char *date = 0;
-	for (; *atts; atts += 2)
-	  {
-	    if (!strcmp(*atts, "date"))
-	      date = atts[1];
-	  }
+	const char *date = solv_xmlparser_find_attr("date", atts);
 	if (date)
 	  {
 	    time_t t = datestr2timestamp(date);
@@ -325,13 +251,7 @@ startElement(void *userData, const char *name, const char **atts)
 	  }
       }
       break;
-    case STATE_REFERENCES:
-      break;
-      /*  <reference href="https://bugzilla.redhat.com/show_bug.cgi?id=330471"
-       *             id="330471"
-       *             title="LDAP schema file missing for dhcpd"
-       *             type="bugzilla"/>
-       */
+
     case STATE_REFERENCE:
       {
         const char *href = 0, *id = 0, *title = 0, *type = 0;
@@ -359,20 +279,7 @@ startElement(void *userData, const char *name, const char **atts)
 	repodata_add_flexarray(pd->data, pd->handle, UPDATE_REFERENCE, refhandle);
       }
       break;
-      /* <description>This update ...</description> */
-    case STATE_DESCRIPTION:
-      break;
-      /* <message type="confirm">This update ...</message> */
-    case STATE_MESSAGE:
-      break;
-    case STATE_PKGLIST:
-      break;
-      /* <collection short="F8" */
-    case STATE_COLLECTION:
-      break;
-      /* <name>Fedora 8</name> */
-    case STATE_NAME:
-      break;
+
       /*   <package arch="ppc64" name="imlib-debuginfo" release="6.fc8"
        *            src="http://download.fedoraproject.org/pub/fedora/linux/updates/8/ppc64/imlib-debuginfo-1.9.15-6.fc8.ppc64.rpm"
        *            version="1.9.15">
@@ -414,19 +321,7 @@ startElement(void *userData, const char *name, const char **atts)
 	  repodata_set_id(pd->data, pd->collhandle, UPDATE_COLLECTION_ARCH, a);
         break;
       }
-      /* <filename>libntlm-0.4.2-1.fc8.x86_64.rpm</filename> */
-      /* <filename>libntlm-0.4.2-1.fc8.x86_64.rpm</filename> */
-    case STATE_FILENAME:
-      break;
-      /* <reboot_suggested>True</reboot_suggested> */
-    case STATE_REBOOT:
-      break;
-      /* <restart_suggested>True</restart_suggested> */
-    case STATE_RESTART:
-      break;
-      /* <relogin_suggested>True</relogin_suggested> */
-    case STATE_RELOGIN:
-      break;
+
     default:
       break;
     }
@@ -434,34 +329,16 @@ startElement(void *userData, const char *name, const char **atts)
 }
 
 
-static void XMLCALL
-endElement(void *userData, const char *name)
+static void
+endElement(struct solv_xmlparser *xmlp, int state, char *content)
 {
-  struct parsedata *pd = userData;
+  struct parsedata *pd = xmlp->userdata;
   Pool *pool = pd->pool;
   Solvable *s = pd->solvable;
   Repo *repo = pd->repo;
 
-#if 0
-      fprintf(stderr, "end: %s\n", name);
-#endif
-  if (pd->depth != pd->statedepth)
+  switch (state)
     {
-      pd->depth--;
-#if 0
-      fprintf(stderr, "back from unknown %d %d %d\n", pd->state, pd->depth, pd->statedepth);
-#endif
-      return;
-    }
-
-  pd->depth--;
-  pd->statedepth--;
-  switch (pd->state)
-    {
-    case STATE_START:
-      break;
-    case STATE_UPDATES:
-      break;
     case STATE_UPDATE:
       s->provides = repo_addid_dep(repo, s->provides, pool_rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
       if (pd->buildtime)
@@ -470,80 +347,75 @@ endElement(void *userData, const char *name)
 	  pd->buildtime = (time_t)0;
 	}
       break;
+
     case STATE_ID:
-      s->name = pool_str2id(pool, join2(&pd->jd, "patch", ":", pd->content), 1);
+      s->name = pool_str2id(pool, join2(&pd->jd, "patch", ":", content), 1);
       break;
+
       /* <title>imlib-1.9.15-6.fc8</title> */
     case STATE_TITLE:
-      while (pd->lcontent > 0 && pd->content[pd->lcontent - 1] == '\n')
-        pd->content[--pd->lcontent] = 0;
-      repodata_set_str(pd->data, pd->handle, SOLVABLE_SUMMARY, pd->content);
+      /* strip trailing newlines */
+      while (pd->xmlp.lcontent > 0 && content[pd->xmlp.lcontent - 1] == '\n')
+        content[--pd->xmlp.lcontent] = 0;
+      repodata_set_str(pd->data, pd->handle, SOLVABLE_SUMMARY, content);
       break;
+
     case STATE_SEVERITY:
-      repodata_set_poolstr(pd->data, pd->handle, UPDATE_SEVERITY, pd->content);
+      repodata_set_poolstr(pd->data, pd->handle, UPDATE_SEVERITY, content);
       break;
+
     case STATE_RIGHTS:
-      repodata_set_poolstr(pd->data, pd->handle, UPDATE_RIGHTS, pd->content);
+      repodata_set_poolstr(pd->data, pd->handle, UPDATE_RIGHTS, content);
       break;
-      /*
-       * <release>Fedora 8</release>
-       */
-    case STATE_RELEASE:
-      break;
-    case STATE_ISSUED:
-      break;
-    case STATE_REFERENCES:
-      break;
-    case STATE_REFERENCE:
-      break;
+
       /*
        * <description>This update ...</description>
        */
     case STATE_DESCRIPTION:
-      repodata_set_str(pd->data, pd->handle, SOLVABLE_DESCRIPTION, pd->content);
+      repodata_set_str(pd->data, pd->handle, SOLVABLE_DESCRIPTION, content);
       break;
+
       /*
        * <message>Warning! ...</message>
        */
     case STATE_MESSAGE:
-      repodata_set_str(pd->data, pd->handle, UPDATE_MESSAGE, pd->content);
+      repodata_set_str(pd->data, pd->handle, UPDATE_MESSAGE, content);
       break;
-    case STATE_PKGLIST:
-      break;
-    case STATE_COLLECTION:
-      break;
-    case STATE_NAME:
-      break;
+
     case STATE_PACKAGE:
       repodata_add_flexarray(pd->data, pd->handle, UPDATE_COLLECTION, pd->collhandle);
       pd->collhandle = 0;
       break;
+
       /* <filename>libntlm-0.4.2-1.fc8.x86_64.rpm</filename> */
       /* <filename>libntlm-0.4.2-1.fc8.x86_64.rpm</filename> */
     case STATE_FILENAME:
-      repodata_set_str(pd->data, pd->collhandle, UPDATE_COLLECTION_FILENAME, pd->content);
+      repodata_set_str(pd->data, pd->collhandle, UPDATE_COLLECTION_FILENAME, content);
       break;
+
       /* <reboot_suggested>True</reboot_suggested> */
     case STATE_REBOOT:
-      if (pd->content[0] == 'T' || pd->content[0] == 't'|| pd->content[0] == '1')
+      if (content[0] == 'T' || content[0] == 't'|| content[0] == '1')
 	{
 	  /* FIXME: this is per-package, the global flag should be computed at runtime */
 	  repodata_set_void(pd->data, pd->handle, UPDATE_REBOOT);
 	  repodata_set_void(pd->data, pd->collhandle, UPDATE_REBOOT);
 	}
       break;
+
       /* <restart_suggested>True</restart_suggested> */
     case STATE_RESTART:
-      if (pd->content[0] == 'T' || pd->content[0] == 't'|| pd->content[0] == '1')
+      if (content[0] == 'T' || content[0] == 't'|| content[0] == '1')
 	{
 	  /* FIXME: this is per-package, the global flag should be computed at runtime */
 	  repodata_set_void(pd->data, pd->handle, UPDATE_RESTART);
 	  repodata_set_void(pd->data, pd->collhandle, UPDATE_RESTART);
 	}
       break;
+
       /* <relogin_suggested>True</relogin_suggested> */
     case STATE_RELOGIN:
-      if (pd->content[0] == 'T' || pd->content[0] == 't'|| pd->content[0] == '1')
+      if (content[0] == 'T' || content[0] == 't'|| content[0] == '1')
 	{
 	  /* FIXME: this is per-package, the global flag should be computed at runtime */
 	  repodata_set_void(pd->data, pd->handle, UPDATE_RELOGIN);
@@ -553,86 +425,31 @@ endElement(void *userData, const char *name)
     default:
       break;
     }
-
-  pd->state = pd->sbtab[pd->state];
-  pd->docontent = 0;
 }
 
-
-static void XMLCALL
-characterData(void *userData, const XML_Char *s, int len)
+static void
+errorCallback(struct solv_xmlparser *xmlp, const char *errstr, unsigned int line, unsigned int column)
 {
-  struct parsedata *pd = userData;
-  int l;
-  char *c;
-
-  if (!pd->docontent)
-    {
-#if 0
-      fprintf(stderr, "Content: [%d]'%.*s'\n", pd->state, len, s);
-#endif
-      return;
-    }
-  l = pd->lcontent + len + 1;
-  if (l > pd->acontent)
-    {
-      pd->content = realloc(pd->content, l + 256);
-      pd->acontent = l + 256;
-    }
-  c = pd->content + pd->lcontent;
-  pd->lcontent += len;
-  while (len-- > 0)
-    *c++ = *s++;
-  *c = 0;
+  struct parsedata *pd = xmlp->userdata;
+  pd->ret = pool_error(pd->pool, -1, "repo_updateinfoxml: %s at line %u:%u", errstr, line, column);
 }
-
-
-#define BUFF_SIZE 8192
 
 int
 repo_add_updateinfoxml(Repo *repo, FILE *fp, int flags)
 {
   Pool *pool = repo->pool;
-  struct parsedata pd;
-  char buf[BUFF_SIZE];
-  int i, l;
-  struct stateswitch *sw;
   Repodata *data;
-  XML_Parser parser;
+  struct parsedata pd;
 
   data = repo_add_repodata(repo, flags);
 
   memset(&pd, 0, sizeof(pd));
-  for (i = 0, sw = stateswitches; sw->from != NUMSTATES; i++, sw++)
-    {
-      if (!pd.swtab[sw->from])
-        pd.swtab[sw->from] = sw;
-      pd.sbtab[sw->to] = sw->from;
-    }
   pd.pool = pool;
   pd.repo = repo;
   pd.data = data;
-
-  pd.content = malloc(256);
-  pd.acontent = 256;
-  pd.lcontent = 0;
-  parser = XML_ParserCreate(NULL);
-  XML_SetUserData(parser, &pd);
-  XML_SetElementHandler(parser, startElement, endElement);
-  XML_SetCharacterDataHandler(parser, characterData);
-  for (;;)
-    {
-      l = fread(buf, 1, sizeof(buf), fp);
-      if (XML_Parse(parser, buf, l, l == 0) == XML_STATUS_ERROR)
-	{
-	  pd.ret = pool_error(pool, -1, "repo_updateinfoxml: %s at line %u:%u", XML_ErrorString(XML_GetErrorCode(parser)), (unsigned int)XML_GetCurrentLineNumber(parser), (unsigned int)XML_GetCurrentColumnNumber(parser));
-	  break;
-	}
-      if (l == 0)
-	break;
-    }
-  XML_ParserFree(parser);
-  free(pd.content);
+  solv_xmlparser_init(&pd.xmlp, stateswitches, &pd, startElement, endElement, errorCallback);
+  solv_xmlparser_parse(&pd.xmlp, fp);
+  solv_xmlparser_free(&pd.xmlp);
   join_freemem(&pd.jd);
 
   if (!(flags & REPO_NO_INTERNALIZE))

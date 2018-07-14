@@ -58,6 +58,7 @@ typedef enum {
   SOLVER_RULE_PKG_OBSOLETES,
   SOLVER_RULE_PKG_IMPLICIT_OBSOLETES,
   SOLVER_RULE_PKG_INSTALLED_OBSOLETES,
+  SOLVER_RULE_PKG_RECOMMENDS,
   SOLVER_RULE_UPDATE = 0x200,
   SOLVER_RULE_FEATURE = 0x300,
   SOLVER_RULE_JOB = 0x400,
@@ -99,7 +100,7 @@ solver_enablerule(struct _Solver *solv, Rule *r)
     r->d = -r->d - 1;
 }
 
-extern Rule *solver_addrule(struct _Solver *solv, Id p, Id d);
+extern Rule *solver_addrule(struct _Solver *solv, Id p, Id p2, Id d);
 extern void solver_unifyrules(struct _Solver *solv);
 extern int solver_rulecmp(struct _Solver *solv, Rule *r1, Rule *r2);
 extern void solver_shrinkrules(struct _Solver *solv, int nrules);
@@ -111,7 +112,8 @@ extern void solver_addpkgrulesforlinked(struct _Solver *solv, Map *m);
 extern void solver_addpkgrulesforupdaters(struct _Solver *solv, Solvable *s, Map *m, int allow_all);
 
 /* update/feature rules */
-extern void solver_addupdaterule(struct _Solver *solv, Solvable *s, int allow_all);
+extern void solver_addfeaturerule(struct _Solver *solv, Solvable *s);
+extern void solver_addupdaterule(struct _Solver *solv, Solvable *s);
 
 /* infarch rules */
 extern void solver_addinfarchrules(struct _Solver *solv, Map *addedmap);
@@ -145,6 +147,7 @@ extern int  solver_rule2jobidx(struct _Solver *solv, Id rid);
 extern Id   solver_rule2job(struct _Solver *solv, Id rid, Id *whatp);
 extern Id   solver_rule2solvable(struct _Solver *solv, Id rid);
 extern void solver_rule2rules(struct _Solver *solv, Id rid, Queue *q, int recursive);
+extern Id   solver_rule2pkgrule(struct _Solver *solv, Id rid);
 
 /* orphan handling */
 extern void solver_breakorphans(struct _Solver *solv);
