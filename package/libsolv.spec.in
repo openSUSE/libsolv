@@ -237,6 +237,8 @@ make %{?_smp_mflags}
 
 %install
 make DESTDIR=%{buildroot} install
+ln -s repo2solv %{buildroot}/%{_bindir}/repo2solv.sh
+
 %if 0%{?suse_version}
 %if %{with python_binding}
 pushd %{buildroot}/%{python_sitearch}
