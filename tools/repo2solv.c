@@ -570,15 +570,23 @@ repomd_extend(Repo *repo, const char *dir, const char *what, const char *languag
 static void
 repomd_extend_languages(Repo *repo, const char *dir, int missingok)
 {
+  char **susedatas = 0;
+  int nsusedatas = 0, i;
   Dataiterator di;
   dataiterator_init(&di, repo->pool, repo, SOLVID_META, REPOSITORY_REPOMD_TYPE, "susedata.", SEARCH_STRINGSTART);
   dataiterator_prepend_keyname(&di, REPOSITORY_REPOMD);
   while (dataiterator_step(&di))
     {
-      char *what = solv_strdup(di.kv.str);
-      repomd_extend(repo, dir, what, what + 9, missingok);
+      susedatas = solv_extend(susedatas, nsusedatas, 1, sizeof(char *), 15);
+      susedatas[nsusedatas++] = solv_strdup(di.kv.str);
     }
   dataiterator_free(&di);
+  for (i = 0; i < nsusedatas; i++)
+    {
+      repomd_extend(repo, dir, susedatas[i], susedatas[i] + 9, missingok);
+      susedatas[i] = solv_free(susedatas[i]);
+    }
+  solv_free(susedatas);
 }
 
 static void
@@ -736,7 +744,7 @@ main(int argc, char **argv)
   Pool *pool = pool_create();
   Repo *repo = repo_create(pool, "<repo>");
 
-  while ((c = getopt(argc, argv, "hAXRFo:")) >= 0)
+  while ((c = getopt(argc, argv, "hAXRFCo:")) >= 0)
     {
       switch(c)
 	{
@@ -759,6 +767,9 @@ main(int argc, char **argv)
 	  break;
 	case 'F':
 	  add_filelist = 1;
+	  break;
+	case 'C':
+	  add_changelog = 1;
 	  break;
 	case 'o':
 	  outfile = optarg;
