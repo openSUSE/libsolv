@@ -1,0 +1,60 @@
+repo2solv(1)
+============
+:man manual: LIBSOLV
+:man source: libsolv
+
+
+Name
+----
+repo2solv - convert repository metadata into a solv file
+
+Synopsis
+--------
+*repo2solv* ['OPTIONS'] 'DIR'
+
+Description
+-----------
+The repo2solv tool converts repository metadata in the directory
+'DIR' into a solv file written to standard output.
+
+Note that repo2solv does not verify signatures or checksum, it
+is expected that this is done by the tool that downloads the
+metadata.
+
+If no metadata is detected, repo2solv assumes the "plaindir"
+format and generates the solv file from all rpm files it
+finds.
+
+*-o* 'OUTFILE'::
+Write the solv file to 'OUTFILE' instead of stdout.
+
+*-R*::
+Also recurse into subdirectories in "plaindir" mode.
+
+*-F*::
+Put the complete filelist in the output. The default is
+to just include the "importent" parts of the file list,
+except for "plaindir" mode, which always includes all
+files.
+
+*-C*::
+Add changelog entires to the output.
+
+*-A*::
+Add appdata pseudo packages to the output. This is an
+experimental feature.
+
+*-X*::
+Autoexpand SUSE pattern and product provides into packages.
+
+See Also
+--------
+dumpsolv(1)
+
+Author
+------
+Michael Schroeder <mls@suse.de>
+
+////
+vim: syntax=asciidoc
+////
