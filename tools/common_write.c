@@ -65,6 +65,8 @@ keyfilter_solv(Repo *data, Repokey *key, void *kfdata)
     return KEY_STORAGE_DROPPED;
   if (!kd->haveexternal && key->name == REPOSITORY_EXTERNAL)
     return KEY_STORAGE_DROPPED;
+  if (key->name == SUSETAGS_SHARE_NAME || key->name == SUSETAGS_SHARE_EVR || key->name == SUSETAGS_SHARE_ARCH)
+    return KEY_STORAGE_DROPPED;
   for (i = 0; verticals[i]; i++)
     if (key->name == verticals[i])
       return KEY_STORAGE_VERTICAL_OFFSET;

@@ -4,7 +4,7 @@
 
 ADD_LIBRARY (toolstuff STATIC common_write.c)
 
-SET (tools_list mergesolv dumpsolv installcheck testsolv)
+SET (tools_list mergesolv dumpsolv installcheck testsolv repo2solv)
 
 IF (ENABLE_RPMDB)
 ADD_EXECUTABLE (rpmdb2solv rpmdb2solv.c)
@@ -112,6 +112,8 @@ TARGET_LINK_LIBRARIES (mergesolv toolstuff libsolvext libsolv ${SYSTEM_LIBRARIES
 ADD_EXECUTABLE (testsolv testsolv.c)
 TARGET_LINK_LIBRARIES (testsolv libsolvext libsolv ${SYSTEM_LIBRARIES})
 
+ADD_EXECUTABLE (repo2solv repo2solv.c )
+TARGET_LINK_LIBRARIES (repo2solv toolstuff libsolvext libsolv ${SYSTEM_LIBRARIES})
+
 INSTALL (TARGETS ${tools_list} DESTINATION ${BIN_INSTALL_DIR})
 
-INSTALL (PROGRAMS repo2solv.sh DESTINATION ${BIN_INSTALL_DIR})
