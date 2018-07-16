@@ -1,6 +1,9 @@
 #! /bin/sh
 # repo2solv
 #
+# this is a shell implementation of repo2solv that makes use of
+# the different parser utilities
+#
 # give it a directory of a local mirror of a repo and this
 # tries to detect the repo type and generate one SOLV file on stdout
 
