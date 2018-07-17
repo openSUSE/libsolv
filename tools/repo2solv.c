@@ -365,8 +365,8 @@ read_susetags_repo(Repo *repo, const char *dir)
   struct dirent *de;
 
   /* read content file */
-  tmp = pool_tmpjoin(pool, dir, "content", 0);
   repo_add_repodata(repo, 0);
+  tmp = solv_dupjoin(dir, "/content", 0);
   if ((fp = fopen(tmp, "r")) != 0)
     {
       if (repo_add_content(repo, fp, REPO_REUSE_REPODATA))
@@ -378,6 +378,7 @@ read_susetags_repo(Repo *repo, const char *dir)
       descrdir = repo_lookup_str(repo, SOLVID_META, SUSETAGS_DESCRDIR);
       defvendor = repo_lookup_id(repo, SOLVID_META, SUSETAGS_DEFAULTVENDOR);
     }
+  tmp = solv_free(tmp);
 
   /* get content of descrdir directory */
   ddir = solv_dupjoin(dir, "/", descrdir);
