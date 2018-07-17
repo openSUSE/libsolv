@@ -33,9 +33,11 @@ BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 %if 0%{?leap_version} >= 420300 || 0%{?sle_version} >= 120300 || 0%{?suse_version} >= 1330 || !0%{?suse_version}
 %bcond_without bz2
 %bcond_without xz
+%bcond_without zstd
 %else
 %bcond_with bz2
 %bcond_with xz
+%bcond_with zstd
 %endif
 
 %if 0%{?fedora} || 0%{?rhel} >= 7 || 0%{?mageia} >= 6 || 0%{?suse_version} >= 1330
@@ -101,6 +103,9 @@ BuildRequires:  bzip2-devel
 BuildRequires:  xz-devel
 %endif
 
+%if %{with zstd}
+BuildRequires:  libzstd-devel
+%endif
 
 Summary:        Package dependency solver using a satisfiability algorithm
 License:        BSD-3-Clause
@@ -229,6 +234,8 @@ cmake	$CMAKE_FLAGS \
 	%{?with_ruby_binding:-DENABLE_RUBY=1} \
 	%{?with_bz2:-DENABLE_BZIP2_COMPRESSION=1} \
 	%{?with_xz:-DENABLE_LZMA_COMPRESSION=1} \
+	%{?with_zstd:-DENABLE_ZSTD_COMPRESSION=1} \
+	%{?with_zstd:-DENABLE_ZCHUNK_COMPRESSION=1} \
 	%{?with_richdeps:-DENABLE_COMPLEX_DEPS=1} \
 	%{?with_zypp:-DENABLE_SUSEREPO=1 -DENABLE_HELIXREPO=1} \
 	-DUSE_VENDORDIRS=1 \
