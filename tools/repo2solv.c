@@ -358,7 +358,7 @@ read_susetags_repo(Repo *repo, const char *dir)
   char *tmp;
   FILE *fp;
   Id defvendor = 0;
-  const char *descrdir = "suse/setup/descr";
+  const char *descrdir = 0;
   char **files = 0;
   int nfiles = 0;
   DIR *dp;
@@ -378,6 +378,8 @@ read_susetags_repo(Repo *repo, const char *dir)
       descrdir = repo_lookup_str(repo, SOLVID_META, SUSETAGS_DESCRDIR);
       defvendor = repo_lookup_id(repo, SOLVID_META, SUSETAGS_DEFAULTVENDOR);
     }
+  if (!descrdir)
+    descrdir = "suse/setup/descr";
   tmp = solv_free(tmp);
 
   /* get content of descrdir directory */
