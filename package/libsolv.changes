@@ -1,3 +1,17 @@
+------------------------------------------------------------------
+Wed Jul 18 14:11:51 UTC 2018 - ngompa13@gmail.com
+
+- Fix compatibility with Mageia and RH/Fedora
+
+------------------------------------------------------------------
+Wed Jul 18 11:02:29 UTC 2018 - tchvatal@suse.com
+
+- Sort a bit with spec-cleaner
+- Use python/ruby/etc condition names to match what other packages
+  do in order to make sure we are enabling/disabling stuff within
+  prjcfg
+- Silence the source unpacking
+
 -------------------------------------------------------------------
 Fri Mar 23 12:02:08 CET 2018 - mls@suse.de
 
