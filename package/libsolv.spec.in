@@ -34,14 +34,18 @@
 %else
 %bcond_with richdeps
 %endif
+# we need at least swig 1.3.40 for the bindings ($typemap support)
 %if 0%{?suse_version} != 1110
 %bcond_without python3
-%else
-%bcond_with python3
-%endif
 %bcond_without python
 %bcond_without ruby
 %bcond_without perl
+%else
+%bcond_with python3
+%bcond_with python
+%bcond_without ruby
+%bcond_without perl
+%endif
 %bcond_without static
 %bcond_with shared
 %bcond_with zypp
