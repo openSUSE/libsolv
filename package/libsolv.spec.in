@@ -20,10 +20,13 @@
 %if 0%{?sle_version} >= 120300 || 0%{?suse_version} >= 1330 || !0%{?suse_version}
 %bcond_without bz2
 %bcond_without xz
-%bcond_without zstd
 %else
 %bcond_with bz2
 %bcond_with xz
+%endif
+%if 0%{?sle_version} >= 150000 || 0%{?suse_version} >= 1500
+%bcond_without zstd
+%else
 %bcond_with zstd
 %endif
 %if 0%{?fedora} || 0%{?rhel} >= 7 || 0%{?mageia} >= 6 || 0%{?suse_version} >= 1330
