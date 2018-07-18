@@ -32,11 +32,12 @@ struct solv_zchunk {
   int data_chk_len;
   Chksum *data_chk;	/* for data checksum verification */
 
-  unsigned int chunk_chk_type;
+  unsigned int chunk_chk_type;	/* chunk checksum */
   int chunk_chk_len;
   Id chunk_chk_id;
 
-  unsigned int nchunks;	/* chunks left */
+  unsigned int streamid;	/* stream we are reading */
+  unsigned int nchunks;		/* chunks left */
   unsigned char *chunks;
 
   ZSTD_DCtx *dctx;
@@ -141,9 +142,14 @@ nextchunk(struct solv_zchunk *zck, unsigned int streamid)
 
   for (;;)
     {
-      if (zck->nchunks == 0 || p >= zck->hdr_end)
+      if (zck->nchunks == 0)
+	{
+	  zck->chunks = p;
+	  return 1;		/* EOF reached */
+	}
+      if (p >= zck->hdr_end)
 	return 0;
-      sid = streamid;
+      sid = streamid ? 1 : 0;
       /* check if this is the correct stream */
       if ((zck->flags & 1) != 0 && (p = getuint(p, zck->hdr_end, &sid)) == 0)
 	return 0;
@@ -235,7 +241,7 @@ open_error(struct solv_zchunk *zck)
 }
 
 struct solv_zchunk *
-solv_zchunk_open(FILE *fp)
+solv_zchunk_open(FILE *fp, unsigned int streamid)
 {
   struct solv_zchunk *zck;
   unsigned char *p;
@@ -246,6 +252,7 @@ solv_zchunk_open(FILE *fp)
   unsigned int lead_size;
   unsigned int preface_size;
   unsigned int index_size;
+  unsigned int nchunks;
 
   zck = solv_calloc(1, sizeof(*zck));
 
@@ -314,19 +321,22 @@ solv_zchunk_open(FILE *fp)
   if (zck->chunk_chk_len < 0)
     return open_error(zck);
   
-  if ((p = getuint(p, zck->hdr_end, &zck->nchunks)) == 0 || zck->nchunks > MAX_CHUNK_CNT)
+  if ((p = getuint(p, zck->hdr_end, &nchunks)) == 0 || nchunks > MAX_CHUNK_CNT)
     return open_error(zck);
-  zck->nchunks += 1;	/* add 1 for the dict chunk */
-  zck->chunks = p;
 
-  /* setup decompression context */
+  /* setup decompressor */
   if (zck->comp == 2)
     {
-      zck->dctx = ZSTD_createDCtx();
-      if (!zck->dctx)
+      if ((zck->dctx = ZSTD_createDCtx()) == 0)
 	return open_error(zck);
     }
+
   zck->fp = fp;
+  zck->chunks = p;
+  zck->nchunks = 1;			/* the dict stream */
+  zck->streamid = streamid;
+  if (streamid == 0)
+    return zck;	
 
   /* setup dictionary */
   if (!nextchunk(zck, 0))
@@ -347,7 +357,8 @@ solv_zchunk_open(FILE *fp)
   zck->buf_used = 0;
   zck->buf_avail = 0;
 
-  /* ready to go */
+  /* ready to read the rest of the chunks */
+  zck->nchunks = nchunks;
   return zck;
 }
 
@@ -367,14 +378,14 @@ solv_zchunk_read(struct solv_zchunk *zck, char *buf, size_t len)
 	  if (!zck->nchunks)
 	    {
 	      /* verify data checksum if requested */
-	      if (zck->data_chk && memcmp(solv_chksum_get(zck->data_chk, 0), zck->data_chk_ptr, zck->data_chk_len) != 0) {
+	      if (zck->streamid != 0 && zck->data_chk && memcmp(solv_chksum_get(zck->data_chk, 0), zck->data_chk_ptr, zck->data_chk_len) != 0) {
 	        zck->eof = 2;
 	        return -1;
 	      }
 	      zck->eof = 1;
 	      return n;
 	    }
-	  if (!nextchunk(zck, 1))
+	  if (!nextchunk(zck, zck->streamid))
 	    {
 	      zck->eof = 2;
 	      return -1;

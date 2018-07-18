@@ -520,7 +520,7 @@ static void *zchunkopen(const char *path, const char *mode, int fd)
     fp = fopen(path, mode);
   if (!fp)
     return 0;
-  f = solv_zchunk_open(fp);
+  f = solv_zchunk_open(fp, 1);
   if (!f)
     fclose(fp);
   return cookieopen(f, mode, (ssize_t (*)(void *, char *, size_t))solv_zchunk_read, 0, (int (*)(void *))solv_zchunk_close);
