@@ -459,6 +459,10 @@ main(int argc, char **argv)
       dataiterator_free(&di);
       if (repofilter.count)
 	selection_filter(pool, &sel, &repofilter);
+      if (archfilter.count)
+	selection_filter(pool, &sel, &archfilter);
+      if (kindfilter.count)
+	selection_filter(pool, &sel, &kindfilter);
 	
       queue_init(&q);
       selection_solvables(pool, &sel, &q);
