@@ -43,8 +43,8 @@
 %else
 %bcond_with python3
 %bcond_with python
-%bcond_without ruby
-%bcond_without perl
+%bcond_with ruby
+%bcond_with perl
 %endif
 %bcond_without static
 %bcond_with shared
