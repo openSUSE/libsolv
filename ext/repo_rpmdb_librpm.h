@@ -114,7 +114,7 @@ static struct rpmdbentry *
 getinstalledrpmdbids(struct rpmdbstate *state, const char *index, const char *match, int *nentriesp, char **namedatap)
 {
   const void * key;
-  size_t keylen;
+  size_t keylen, matchl = 0;
   Id nameoff;
 
   char *namedata = 0;
@@ -132,13 +132,19 @@ getinstalledrpmdbids(struct rpmdbstate *state, const char *index, const char *ma
   if (state->dbenvopened != 1 && !opendbenv(state))
     return 0;
 
+  if (match)
+    matchl = strlen(match);
   ii = rpmdbIndexIteratorInit(rpmtsGetRdb(state->ts), RPMDBI_NAME);
 
   while (rpmdbIndexIteratorNext(ii, &key, &keylen) == 0)
     {
-
-      if (keylen == 10 && !memcmp(key, "gpg-pubkey", 10))
-       continue;
+      if (match)
+	{
+	  if (keylen != matchl || memcmp(key, match, keylen) != 0)
+	    continue;
+	}
+      else if (keylen == 10 && !memcmp(key, "gpg-pubkey", 10))
+        continue;
       nameoff = namedatal;
       if (namedatap)
        {
