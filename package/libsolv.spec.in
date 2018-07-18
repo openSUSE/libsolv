@@ -34,7 +34,11 @@
 %else
 %bcond_with richdeps
 %endif
+%if 0%{?suse_version} != 1110
 %bcond_without python3
+%else
+%bcond_with python3
+%endif
 %bcond_without python
 %bcond_without ruby
 %bcond_without perl
