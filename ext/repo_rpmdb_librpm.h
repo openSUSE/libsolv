@@ -111,7 +111,7 @@ closepkgdb(struct rpmdbstate *state)
 /* get the rpmdbids of all installed packages from the Name index database.
  * This is much faster then querying the big Packages database */
 static struct rpmdbentry *
-getinstalledrpmdbids(struct rpmdbstate *state, const char *index, const char *match, int *nentriesp, char **namedatap)
+getinstalledrpmdbids(struct rpmdbstate *state, const char *index, const char *match, int *nentriesp, char **namedatap, int keep_gpg_pubkey)
 {
   const void * key;
   size_t keylen, matchl = 0;
@@ -143,7 +143,7 @@ getinstalledrpmdbids(struct rpmdbstate *state, const char *index, const char *ma
 	  if (keylen != matchl || memcmp(key, match, keylen) != 0)
 	    continue;
 	}
-      else if (keylen == 10 && !memcmp(key, "gpg-pubkey", 10))
+      else if (!keep_gpg_pubkey && keylen == 10 && !memcmp(key, "gpg-pubkey", 10))
         continue;
       nameoff = namedatal;
       if (namedatap)

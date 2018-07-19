@@ -1742,7 +1742,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
       memset(dircache, 0, sizeof(dircache));
 
       /* get ids of installed rpms */
-      entries = getinstalledrpmdbids(&state, "Name", 0, &nentries, &namedata);
+      entries = getinstalledrpmdbids(&state, "Name", 0, &nentries, &namedata, flags & RPMDB_KEEP_GPG_PUBKEY);
       if (!entries)
 	{
 	  freestate(&state);
@@ -2396,7 +2396,7 @@ rpm_installedrpmdbids(void *rpmstate, const char *index, const char *match, Queu
   struct rpmdbentry *entries;
   int nentries, i;
 
-  entries = getinstalledrpmdbids(rpmstate, index ? index : "Name", match, &nentries, 0);
+  entries = getinstalledrpmdbids(rpmstate, index ? index : "Name", match, &nentries, 0, 0);
   if (rpmdbidq)
     {
       queue_empty(rpmdbidq);
