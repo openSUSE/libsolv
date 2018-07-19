@@ -302,9 +302,9 @@ solv_zchunk_open(FILE *fp, unsigned int streamid)
   zck->data_chk_len = hdr_chk_len;
 #endif
   p += hdr_chk_len;	/* skip data checksum */
-  zck->flags = p[0] << 24 | p[1] << 16 | p[2] << 8 | p[3];
-  p += 4;
-  if ((zck->flags & 0xfffffffe) != 0)
+  if ((p = getuint(p, zck->hdr_end, &zck->flags)) == 0)
+    return open_error(zck);
+  if ((zck->flags & ~(1)) != 0)
     return open_error(zck);
   if ((p = getuint(p, zck->hdr_end, &zck->comp)) == 0 || (zck->comp != 0 && zck->comp != 2))
     return open_error(zck);	/* only uncompressed + zstd */
