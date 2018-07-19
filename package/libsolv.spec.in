@@ -283,6 +283,7 @@ make ARGS=--output-on-failure test
 %exclude %{_bindir}/helix2solv
 %exclude %{_mandir}/man1/helix2solv*
 %endif
+%exclude %{_mandir}/man1/solv.1*
 %exclude %{_bindir}/solv
 %{_bindir}/*
 %{_mandir}/man1/*
@@ -309,6 +310,7 @@ make ARGS=--output-on-failure test
 %files demo
 %defattr(-,root,root)
 %{_bindir}/solv
+%{_mandir}/man1/solv.1*
 
 %if %{with perl}
 %files -n perl-solv

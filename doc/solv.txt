@@ -1,0 +1,73 @@
+solv(1)
+=======
+:man manual: LIBSOLV
+:man source: libsolv
+
+
+Name
+----
+solv - example package manager based on libsolv
+
+Synopsis
+--------
+*solv* install [OPTIONS] PKG...
+
+*solv* erase [OPTIONS] PKG...
+
+*solv* list [OPTIONS] PKG...
+
+*solv* info [OPTIONS] PKG...
+
+*solv* search [OPTIONS] STRING...
+
+*solv* verify [OPTIONS] PKG...
+
+*solv* update [OPTIONS] PKG...
+
+*solv* dist-upgrade [OPTIONS] PKG...
+
+*solv* repolist [OPTIONS]
+
+Description
+-----------
+The solv tool demos some features of the libsolv library. It is not
+meant to replace a real package manager, for example it does not cache
+downloaded packages.
+
+*--root* 'ROOTDIR'::
+Install packages using 'ROOTDIR' as root of the filesystem. This also
+means that the package database of 'ROOTDIR' will be used.
+
+*--clean*::
+Also get rid of no longer needed packages when erasing, like libraries
+that have been used by the erased packages.
+
+*--best*::
+Force usage of the best package (normally the one with the highest
+version) for install and update operations.
+
+*--testcase*::
+Write a testcase after dependency solving.
+
+The following options can be used to filter the packages. If the
+same option is used multiple times, the result is ORed together.
+
+*-i*::
+Limit the packages to installed ones.
+
+*-r* 'REPO'::
+Limit the packages to the specified repository.
+
+*--arch* 'ARCHITECTURE'::
+Limit the packages to the specified package architecture.
+
+*--type* 'TYPE'::
+Limit the packages to the specified package type.
+
+Author
+------
+Michael Schroeder <mls@suse.de>
+
+////
+vim: syntax=asciidoc
+////

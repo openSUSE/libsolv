@@ -4,7 +4,7 @@ SET (libsolv_MANPAGES3
     libsolv-pool.3)
 
 SET (libsolv_MANPAGES1
-    mergesolv.1 dumpsolv.1 installcheck.1 testsolv.1 repo2solv.1)
+    mergesolv.1 dumpsolv.1 installcheck.1 testsolv.1 repo2solv.1 solv.1)
 
 IF (ENABLE_RPMDB)
 SET (libsolv_MANPAGES1 ${libsolv_MANPAGES1} rpmdb2solv.1 rpms2solv.1)

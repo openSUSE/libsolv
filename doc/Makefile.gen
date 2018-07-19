@@ -8,7 +8,7 @@ man3:	libsolv.3 libsolv-bindings.3 libsolv-constantids.3 libsolv-history.3 libso
 man1:	mergesolv.1 dumpsolv.1 installcheck.1 testsolv.1 rpmdb2solv.1 rpms2solv.1 \
 	rpmmd2solv.1 repomdxml2solv.1 updateinfoxml2solv.1 deltainfoxml2solv.1 \
 	helix2solv.1 susetags2solv.1 comps2solv.1 deb2solv.1 mdk2solv.1 \
-	archpkgs2solv.1 archrepo2solv.1 appdata2solv.1 repo2solv.1
+	archpkgs2solv.1 archrepo2solv.1 appdata2solv.1 repo2solv.1 solv.1
 
 html: libsolv.html libsolv-bindings.html libsolv-constantids.html libsolv-history.html libsolv-pool.html
 
