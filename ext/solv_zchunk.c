@@ -28,13 +28,16 @@ struct solv_zchunk {
   unsigned int flags;	/* header flags */
   unsigned int comp;	/* compression type */
 
-  unsigned char *data_chk_ptr;
-  int data_chk_len;
-  Chksum *data_chk;	/* for data checksum verification */
+  unsigned int hdr_chk_type;	/* header + data checksum */
+  unsigned int hdr_chk_len;
+  Id hdr_chk_id;
 
   unsigned int chunk_chk_type;	/* chunk checksum */
-  int chunk_chk_len;
+  unsigned int chunk_chk_len;
   Id chunk_chk_id;
+
+  Chksum *data_chk;	/* for data checksum verification */
+  unsigned char *data_chk_ptr;
 
   unsigned int streamid;	/* stream we are reading */
   unsigned int nchunks;		/* chunks left */
@@ -83,31 +86,32 @@ getuint(unsigned char *p, unsigned char *endp, unsigned int *dp)
   return 0;
 }
 
-static int
-chksum_len(unsigned int type)
+static unsigned char *
+getchksum(unsigned char *p, unsigned char *endp, unsigned int *typep, unsigned int *lenp, Id *idp)
 {
-  if (type == 0)
-    return 20;
-  if (type == 1)
-    return 32;
-  if (type == 2)
-    return 64;
-  if (type == 3)
-    return 16;
-  return -1;
-}
-
-static Id
-chksum_id(unsigned int type)
-{
-  if (type == 0)
-    return REPOKEY_TYPE_SHA1;
-  if (type == 1)
-    return REPOKEY_TYPE_SHA256;
-  if (type == 2)
-    return REPOKEY_TYPE_SHA512;
-  if (type == 3)
-    return REPOKEY_TYPE_SHA512;
+  if ((p = getuint(p, endp, typep)) == 0)
+    return 0;
+  switch (*typep)
+    {
+    case 0:
+      *lenp = 20;
+      *idp = REPOKEY_TYPE_SHA1;
+      return p;
+    case 1:
+      *lenp = 32;
+      *idp = REPOKEY_TYPE_SHA256;
+      return p;
+    case 2:
+      *lenp = 64;
+      *idp = REPOKEY_TYPE_SHA512;
+      return p;
+    case 3:
+      *lenp = 16;
+      *idp = REPOKEY_TYPE_SHA512;
+      return p;
+    default:
+      break;
+    }
   return 0;
 }
 
@@ -131,7 +135,7 @@ static int
 nextchunk(struct solv_zchunk *zck, unsigned int streamid)
 {
   unsigned char *p = zck->chunks;
-  unsigned char *chunk_chksum;
+  unsigned char *chunk_chk_ptr;
   unsigned int sid, chunk_len, uncompressed_len;
   unsigned char *cbuf;
 
@@ -153,7 +157,7 @@ nextchunk(struct solv_zchunk *zck, unsigned int streamid)
       /* check if this is the correct stream */
       if ((zck->flags & 1) != 0 && (p = getuint(p, zck->hdr_end, &sid)) == 0)
 	return 0;
-      chunk_chksum = p;
+      chunk_chk_ptr = p;	/* remember for verification */
       p += zck->chunk_chk_len;
       if (p >= zck->hdr_end)
 	return 0;
@@ -182,7 +186,7 @@ nextchunk(struct solv_zchunk *zck, unsigned int streamid)
   if (zck->data_chk)
     solv_chksum_add(zck->data_chk, cbuf, chunk_len);
 
-  /* verify the checksum */
+  /* verify the chunk checksum */
   if (zck->chunk_chk_id)
     {
       Chksum *chk = solv_chksum_create(zck->chunk_chk_id);
@@ -192,7 +196,7 @@ nextchunk(struct solv_zchunk *zck, unsigned int streamid)
 	  return 0;
 	}
       solv_chksum_add(chk, cbuf, chunk_len);
-      if (memcmp(solv_chksum_get(chk, 0), chunk_chksum, zck->chunk_chk_len) != 0)
+      if (memcmp(solv_chksum_get(chk, 0), chunk_chk_ptr, zck->chunk_chk_len) != 0)
 	{
 	  solv_chksum_free(chk, 0);
 	  solv_free(cbuf);
@@ -218,7 +222,7 @@ nextchunk(struct solv_zchunk *zck, unsigned int streamid)
     {
       /* zstd compressed */
       size_t r;
-      zck->buf = solv_malloc(uncompressed_len + 1);
+      zck->buf = solv_malloc(uncompressed_len + 1);	/* +1 so we can detect too large frames */
       if (zck->ddict)
 	r = ZSTD_decompress_usingDDict(zck->dctx, zck->buf, uncompressed_len + 1, cbuf, chunk_len, zck->ddict);
       else
@@ -245,9 +249,6 @@ solv_zchunk_open(FILE *fp, unsigned int streamid)
 {
   struct solv_zchunk *zck;
   unsigned char *p;
-  unsigned int hdr_chk_type;
-  int hdr_chk_len;
-  Id hdr_chk_id;
   unsigned int hdr_size;	/* preface + index + signatures */
   unsigned int lead_size;
   unsigned int preface_size;
@@ -256,34 +257,31 @@ solv_zchunk_open(FILE *fp, unsigned int streamid)
 
   zck = solv_calloc(1, sizeof(*zck));
 
-  /* read the header */
+  /* read and parse the lead, read the complete header */
   zck->hdr = solv_calloc(15, 1);
+  zck->hdr_end = zck->hdr + 15;
   if (fread(zck->hdr, 15, 1, fp) != 1 || memcmp(zck->hdr, "\000ZCK1", 5) != 0)
     return open_error(zck);
   p = zck->hdr + 5;
-  if ((p = getuint(p, zck->hdr + 15, &hdr_chk_type)) == 0)
+  if ((p = getchksum(p, zck->hdr_end, &zck->hdr_chk_type, &zck->hdr_chk_len, &zck->hdr_chk_id)) == 0)
     return open_error(zck);
-  hdr_chk_len = chksum_len(hdr_chk_type);
-  if (hdr_chk_len < 0)
+  if ((p = getuint(p, zck->hdr_end, &hdr_size)) == 0 || hdr_size > MAX_HDR_SIZE)
     return open_error(zck);
-  hdr_chk_id = chksum_id(hdr_chk_type);
-  if ((p = getuint(p, zck->hdr + 15, &hdr_size)) == 0 || hdr_size > MAX_HDR_SIZE)
-    return open_error(zck);
-  lead_size = p - zck->hdr + hdr_chk_len;
+  lead_size = p - zck->hdr + zck->hdr_chk_len;
   zck->hdr = solv_realloc(zck->hdr, lead_size + hdr_size);
   zck->hdr_end = zck->hdr + lead_size + hdr_size;
   if (fread(zck->hdr + 15, lead_size + hdr_size - 15, 1, fp) != 1)
     return open_error(zck);
 
   /* verify header checksum to guard against corrupt files */
-  if (hdr_chk_id)
+  if (zck->hdr_chk_id)
     {
-      Chksum *chk = solv_chksum_create(hdr_chk_id);
+      Chksum *chk = solv_chksum_create(zck->hdr_chk_id);
       if (!chk)
 	return open_error(zck);
-      solv_chksum_add(chk, zck->hdr, lead_size - hdr_chk_len);
+      solv_chksum_add(chk, zck->hdr, lead_size - zck->hdr_chk_len);
       solv_chksum_add(chk, zck->hdr + lead_size, hdr_size);
-      if (memcmp(solv_chksum_get(chk, 0), zck->hdr + (lead_size - hdr_chk_len), hdr_chk_len) != 0)
+      if (memcmp(solv_chksum_get(chk, 0), zck->hdr + (lead_size - zck->hdr_chk_len), zck->hdr_chk_len) != 0)
 	{
 	  solv_chksum_free(chk, 0);
 	  return open_error(zck);
@@ -291,37 +289,32 @@ solv_zchunk_open(FILE *fp, unsigned int streamid)
       solv_chksum_free(chk, 0);
     }
 
-  /* parse preface */
+  /* parse preface: data chksum, flags, compression */
   p = zck->hdr + lead_size;
-  if (p + hdr_chk_len + 4 > zck->hdr_end)
+  if (p + zck->hdr_chk_len > zck->hdr_end)
     return open_error(zck);
+  zck->data_chk_ptr = p;
+  p += zck->hdr_chk_len;
 #ifdef VERIFY_DATA_CHKSUM
-  if (hdr_chk_id && (zck->data_chk = solv_chksum_create(hdr_chk_id)) == 0)
+  if (zck->hdr_chk_id && (zck->data_chk = solv_chksum_create(zck->hdr_chk_id)) == 0)
     return open_error(zck);
-  zck->data_chk_ptr = zck->hdr + lead_size;
-  zck->data_chk_len = hdr_chk_len;
 #endif
-  p += hdr_chk_len;	/* skip data checksum */
   if ((p = getuint(p, zck->hdr_end, &zck->flags)) == 0)
     return open_error(zck);
   if ((zck->flags & ~(1)) != 0)
     return open_error(zck);
   if ((p = getuint(p, zck->hdr_end, &zck->comp)) == 0 || (zck->comp != 0 && zck->comp != 2))
-    return open_error(zck);	/* only uncompressed + zstd */
+    return open_error(zck);	/* only uncompressed + zstd supported */
   preface_size = p - (zck->hdr + lead_size);
 
-  /* parse index */
+  /* parse index: index size, index chksum type, num chunks, chunk data  */
   if ((p = getuint(p, zck->hdr_end, &index_size)) == 0)
     return open_error(zck);
   if (hdr_size < preface_size + index_size)
     return open_error(zck);
-  if ((p = getuint(p, zck->hdr_end, &zck->chunk_chk_type)) == 0)
+  if ((p = getchksum(p, zck->hdr_end, &zck->chunk_chk_type, &zck->chunk_chk_len, &zck->chunk_chk_id)) == 0)
     return open_error(zck);
-  zck->chunk_chk_len = chksum_len(zck->chunk_chk_type);
-  if (zck->chunk_chk_len < 0)
-    return open_error(zck);
-  
-  if ((p = getuint(p, zck->hdr_end, &nchunks)) == 0 || nchunks > MAX_CHUNK_CNT)
+  if ((p = getuint(p, zck->hdr_end, &nchunks)) == 0 || nchunks < 1 || nchunks > MAX_CHUNK_CNT)
     return open_error(zck);
 
   /* setup decompressor */
@@ -358,7 +351,7 @@ solv_zchunk_open(FILE *fp, unsigned int streamid)
   zck->buf_avail = 0;
 
   /* ready to read the rest of the chunks */
-  zck->nchunks = nchunks;
+  zck->nchunks = nchunks - 1;	/* subtract 1 for the dict stream */
   return zck;
 }
 
@@ -366,19 +359,17 @@ ssize_t
 solv_zchunk_read(struct solv_zchunk *zck, char *buf, size_t len)
 {
   size_t n = 0;
-  unsigned int bite;
   if (!zck || zck->eof == 2)
     return -1;
-  if (!len || zck->eof)
-    return 0;
-  for (;;)
+  while (n < len && !zck->eof)
     {
+      unsigned int bite;
       while (!zck->buf_avail)
 	{
 	  if (!zck->nchunks)
 	    {
 	      /* verify data checksum if requested */
-	      if (zck->streamid != 0 && zck->data_chk && memcmp(solv_chksum_get(zck->data_chk, 0), zck->data_chk_ptr, zck->data_chk_len) != 0) {
+	      if (zck->streamid != 0 && zck->data_chk && memcmp(solv_chksum_get(zck->data_chk, 0), zck->data_chk_ptr, zck->hdr_chk_len) != 0) {
 	        zck->eof = 2;
 	        return -1;
 	      }
@@ -396,9 +387,8 @@ solv_zchunk_read(struct solv_zchunk *zck, char *buf, size_t len)
       n += bite;
       zck->buf_used += bite;
       zck->buf_avail -= bite;
-      if (n == len)
-        return n;
     }
+  return n;
 }
 
 int
