@@ -58,27 +58,27 @@ getuint(unsigned char *p, unsigned char *endp, unsigned int *dp)
 {
   if (!p || p >= endp)
     return 0;
-  if (p <= endp && (*p & 0x80) != 0)
+  if (p < endp && (*p & 0x80) != 0)
     {
       *dp = p[0] ^ 0x80;
       return p + 1;
     }
-  if (++p <= endp && (*p & 0x80) != 0)
+  if (++p < endp && (*p & 0x80) != 0)
     {
       *dp = p[-1] ^ ((p[0] ^ 0x80) << 7);
       return p + 1;
     }
-  if (++p <= endp && (*p & 0x80) != 0)
+  if (++p < endp && (*p & 0x80) != 0)
     {
       *dp = p[-2] ^ (p[-1] << 7) ^ ((p[0] ^ 0x80) << 14);
       return p + 1;
     }
-  if (++p <= endp && (*p & 0x80) != 0)
+  if (++p < endp && (*p & 0x80) != 0)
     {
       *dp = p[-3] ^ (p[-2] << 7) ^ (p[1] << 14) ^ ((p[0] ^ 0x80) << 21);
       return p + 1;
     }
-  if (++p <= endp && (*p & 0xf0) == 0x80)
+  if (++p < endp && (*p & 0xf0) == 0x80)
     {
       *dp = p[-4] ^ (p[-3] << 7) ^ (p[2] << 14) ^ (p[1] << 21) ^ ((p[0] ^ 0x80) << 28);
       return p + 1;
