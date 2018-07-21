@@ -253,7 +253,6 @@ solv_zchunk_open(FILE *fp, unsigned int streamid)
   unsigned int lead_size;
   unsigned int preface_size;
   unsigned int index_size;
-  unsigned int nchunks;
 
   zck = solv_calloc(1, sizeof(*zck));
 
@@ -314,7 +313,7 @@ solv_zchunk_open(FILE *fp, unsigned int streamid)
     return open_error(zck);
   if ((p = getchksum(p, zck->hdr_end, &zck->chunk_chk_type, &zck->chunk_chk_len, &zck->chunk_chk_id)) == 0)
     return open_error(zck);
-  if ((p = getuint(p, zck->hdr_end, &nchunks)) == 0 || nchunks < 1 || nchunks > MAX_CHUNK_CNT)
+  if ((p = getuint(p, zck->hdr_end, &zck->nchunks)) == 0 || zck->nchunks > MAX_CHUNK_CNT)
     return open_error(zck);
 
   /* setup decompressor */
@@ -326,10 +325,12 @@ solv_zchunk_open(FILE *fp, unsigned int streamid)
 
   zck->fp = fp;
   zck->chunks = p;
-  zck->nchunks = 1;			/* the dict stream */
   zck->streamid = streamid;
   if (streamid == 0)
-    return zck;	
+    {
+      zck->nchunks = zck->nchunks ? 1 : 0;	/* limit to dict chunk */
+      return zck;	
+    }
 
   /* setup dictionary */
   if (!nextchunk(zck, 0))
@@ -339,8 +340,7 @@ solv_zchunk_open(FILE *fp, unsigned int streamid)
     }
   if (zck->comp == 2 && zck->buf_avail)
     {
-      zck->ddict = ZSTD_createDDict(zck->buf, zck->buf_avail);
-      if (!zck->ddict)
+      if ((zck->ddict = ZSTD_createDDict(zck->buf, zck->buf_avail)) == 0)
 	{
 	  zck->fp = 0;
 	  return open_error(zck);
@@ -351,7 +351,6 @@ solv_zchunk_open(FILE *fp, unsigned int streamid)
   zck->buf_avail = 0;
 
   /* ready to read the rest of the chunks */
-  zck->nchunks = nchunks - 1;	/* subtract 1 for the dict stream */
   return zck;
 }
 
