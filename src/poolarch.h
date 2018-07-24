@@ -24,7 +24,7 @@ extern unsigned char pool_arch2color_slow(Pool *pool, Id arch);
 
 static inline unsigned char pool_arch2color(Pool *pool, Id arch)
 {
-  if (arch >= pool->lastarch)
+  if ((unsigned int)arch >= (unsigned int)pool->lastarch)
     return ARCHCOLOR_ALL;
   if (pool->id2color && pool->id2color[arch])
     return pool->id2color[arch];
