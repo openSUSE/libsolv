@@ -146,7 +146,7 @@ pool_arch2color_slow(Pool *pool, Id arch)
   const char *s;
   unsigned char color;
 
-  if (arch > pool->lastarch)
+  if ((unsigned int)arch >= (unsigned int)pool->lastarch)
     return ARCHCOLOR_ALL;
   if (!pool->id2color)
     pool->id2color = solv_calloc(pool->lastarch + 1, 1);
