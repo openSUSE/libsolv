@@ -57,8 +57,8 @@ prune_to_best_version_sortcmp(const void *ap, const void *bp, void *dp)
   if (sa->arch != sb->arch)
     {
       int aa, ab;
-      aa = (sa->arch <= pool->lastarch) ? pool->id2arch[sa->arch] : 0;
-      ab = (sb->arch <= pool->lastarch) ? pool->id2arch[sb->arch] : 0;
+      aa = pool_arch2score(pool, sa->arch);
+      ab = pool_arch2score(pool, sb->arch);
       if (aa != ab && aa > 1 && ab > 1)
 	return aa - ab;		/* lowest score first */
     }
@@ -646,8 +646,7 @@ prune_to_best_arch(const Pool *pool, Queue *plist)
   for (i = 0; i < plist->count; i++)
     {
       s = pool->solvables + plist->elements[i];
-      a = s->arch;
-      a = (a <= pool->lastarch) ? pool->id2arch[a] : 0;
+      a = pool_arch2score(pool, s->arch);
       if (a && a != 1 && (!bestscore || a < bestscore))
 	bestscore = a;
     }
@@ -656,10 +655,9 @@ prune_to_best_arch(const Pool *pool, Queue *plist)
   for (i = j = 0; i < plist->count; i++)
     {
       s = pool->solvables + plist->elements[i];
-      a = s->arch;
-      if (a > pool->lastarch)
+      a = pool_arch2score(pool, s->arch);
+      if (!a)
 	continue;
-      a = pool->id2arch[a];
       /* a == 1 -> noarch */
       if (a != 1 && ((a ^ bestscore) & 0xffff0000) != 0)
 	continue;
@@ -1383,8 +1381,8 @@ policy_illegal_archchange(Solver *solv, Solvable *s1, Solvable *s2)
     return 0;
   if (!pool->id2arch)
     return 0;
-  a1 = a1 <= pool->lastarch ? pool->id2arch[a1] : 0;
-  a2 = a2 <= pool->lastarch ? pool->id2arch[a2] : 0;
+  a1 = pool_arch2score(pool, a1);
+  a2 = pool_arch2score(pool, a2);
   if (((a1 ^ a2) & 0xffff0000) != 0)
     return 1;
   return 0;

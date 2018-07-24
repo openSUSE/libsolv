@@ -1924,7 +1924,7 @@ typedef struct {
       return 0;
     if (id == ARCH_SRC || id == ARCH_NOSRC || id == ARCH_NOARCH)
       return 1;
-    if (pool->id2arch && (id > pool->lastarch || !pool->id2arch[id]))
+    if (pool->id2arch && pool_arch2score(pool, id) == 0)
       return 0;
     return 1;
   }

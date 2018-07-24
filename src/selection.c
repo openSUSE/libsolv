@@ -32,7 +32,7 @@ str2archid(Pool *pool, const char *arch)
   id = pool_str2id(pool, arch, 0);
   if (!id || id == ARCH_SRC || id == ARCH_NOSRC || id == ARCH_NOARCH)
     return id;
-  if (pool->id2arch && (id > pool->lastarch || !pool->id2arch[id]))
+  if (pool->id2arch && pool_arch2score(pool, id) == 0)
     return 0;
   return id;
 }

@@ -1281,7 +1281,7 @@ solver_problemruleinfo2str(Solver *solv, SolverRuleinfo type, Id source, Id targ
       if (pool_disabled_solvable(pool, ss))
         return pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), " is disabled");
       if (ss->arch && ss->arch != ARCH_SRC && ss->arch != ARCH_NOSRC &&
-          pool->id2arch && (ss->arch > pool->lastarch || !pool->id2arch[ss->arch]))
+          pool->id2arch && pool_arch2score(pool, ss->arch) == 0)
         return pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), " does not have a compatible architecture");
       return pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), " is not installable");
     case SOLVER_RULE_PKG_NOTHING_PROVIDES_DEP:

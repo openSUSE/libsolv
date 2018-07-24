@@ -15,6 +15,7 @@
 
 #include "pooltypes.h"
 #include "pool.h"
+#include "poolarch.h"
 #include "repodata.h"
 #include "dataiterator.h"
 #include "hash.h"
@@ -102,7 +103,7 @@ static inline int pool_badarch_solvable(const Pool *pool, Solvable *s)
 {
   if (!s->arch)
     return 1;
-  if (pool->id2arch && (s->arch > pool->lastarch || !pool->id2arch[s->arch]))
+  if (pool->id2arch && pool_arch2score(pool, s->arch) == 0)
     return 1;
   return 0;
 }
@@ -113,7 +114,7 @@ static inline int pool_installable(const Pool *pool, Solvable *s)
     return 0;
   if (s->repo && s->repo->disabled)
     return 0;
-  if (pool->id2arch && (s->arch > pool->lastarch || !pool->id2arch[s->arch]))
+  if (pool->id2arch && pool_arch2score(pool, s->arch) == 0)
     return 0;
   if (pool->considered)
     {

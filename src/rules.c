@@ -1031,16 +1031,17 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	    }
 	}
 
-      if (m && pool->implicitobsoleteusescolors && (s->arch > pool->lastarch || pool->id2arch[s->arch] != 1))
+      if (m && pool->implicitobsoleteusescolors && pool_arch2score(pool, s->arch) > 1)
 	{
-	  int a = pool->id2arch[s->arch];
+	  int pa, a = pool_arch2score(pool, s->arch);
 	  /* check lock-step candidates */
 	  FOR_PROVIDES(p, pp, s->name)
 	    {
 	      Solvable *ps = pool->solvables + p;
 	      if (s->name != ps->name || s->evr != ps->evr || MAPTST(m, p))
 		continue;
-	      if (ps->arch > pool->lastarch || pool->id2arch[ps->arch] == 1 || pool->id2arch[ps->arch] >= a)
+	      pa = pool_arch2score(pool, ps->arch);
+	      if (!pa || pa == 1 || pa >= a)
 		continue;
 	      queue_push(&workq, p);
 	    }
@@ -1558,8 +1559,7 @@ solver_addinfarchrules(Solver *solv, Map *addedmap)
 	    first = 0;
 	  if (first)
 	    break;
-	  a = ps->arch;
-	  a = (a <= pool->lastarch) ? pool->id2arch[a] : 0;
+	  a = pool_arch2score(pool, ps->arch);
 	  if (a != 1 && installed && ps->repo == installed)
 	    {
 	      if (solv->dupinvolvedmap_all || (solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, p)))
@@ -1593,8 +1593,7 @@ solver_addinfarchrules(Solver *solv, Map *addedmap)
 		continue;
 	      if (solv->dupinvolvedmap_all || (solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, p)))
 		continue;
-	      a = ps->arch;
-	      a = (a <= pool->lastarch) ? pool->id2arch[a] : 0;
+	      a = pool_arch2score(pool, ps->arch);
 	      if (!a)
 		{
 		  queue_pushunique(&allowedarchs, ps->arch);	/* strange arch, allow */
@@ -1609,8 +1608,7 @@ solver_addinfarchrules(Solver *solv, Map *addedmap)
 		  Id a2;
 		  if (p2 == p || s2->name != s->name || s2->evr != pool->solvables[p].evr || s2->arch == pool->solvables[p].arch)
 		    continue;
-		  a2 = s2->arch;
-		  a2 = (a2 <= pool->lastarch) ? pool->id2arch[a2] : 0;
+		  a2 = pool_arch2score(pool, s2->arch);
 		  if (a2 && (a2 == 1 || ((a2 ^ bestarch) & 0xffff0000) == 0))
 		    break;
 		}
@@ -1626,8 +1624,7 @@ solver_addinfarchrules(Solver *solv, Map *addedmap)
 	  ps = pool->solvables + p;
 	  if (ps->name != s->name || !MAPTST(addedmap, p))
 	    continue;
-	  a = ps->arch;
-	  a = (a <= pool->lastarch) ? pool->id2arch[a] : 0;
+	  a = pool_arch2score(pool, ps->arch);
 	  if (a != 1 && bestarch && ((a ^ bestarch) & 0xffff0000) != 0)
 	    {
 	      if (installed && ps->repo == installed)
@@ -1641,7 +1638,7 @@ solver_addinfarchrules(Solver *solv, Map *addedmap)
 		  aa = allowedarchs.elements[j];
 		  if (ps->arch == aa)
 		    break;
-		  aa = (aa <= pool->lastarch) ? pool->id2arch[aa] : 0;
+		  aa = pool_arch2score(pool, aa);
 		  if (aa && ((a ^ aa) & 0xffff0000) == 0)
 		    break;	/* compatible */
 		}
@@ -1665,8 +1662,7 @@ solver_addinfarchrules(Solver *solv, Map *addedmap)
 		  Solvable *s2 = pool->solvables + p2;
 		  if (p2 == p || s2->name != s->name || s2->evr != pool->solvables[p].evr || s2->arch == pool->solvables[p].arch)
 		    continue;
-		  a = s2->arch;
-		  a = (a <= pool->lastarch) ? pool->id2arch[a] : 0;
+		  a = pool_arch2score(pool, s2->arch);
 		  if (a && (a == 1 || ((a ^ bestarch) & 0xffff000) == 0))
 		    {
 		      queue_push(&lsq, p2);

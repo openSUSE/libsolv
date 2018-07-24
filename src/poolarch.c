@@ -104,6 +104,9 @@ pool_setarchpolicy(Pool *pool, const char *arch)
     }
   id = pool->noarchid;
   lastarch = id + 255;
+  /* note that we overallocate one element to be compatible with
+   * old versions that accessed id2arch[lastarch].
+   * id2arch[lastarch] will always be zero */
   id2arch = solv_calloc(lastarch + 1, sizeof(Id));
   id2arch[id] = 1;	/* the "noarch" class */
 
@@ -114,7 +117,7 @@ pool_setarchpolicy(Pool *pool, const char *arch)
       if (l)
 	{
 	  id = pool_strn2id(pool, arch, l, 1);
-	  if (id > lastarch)
+	  if (id >= lastarch)
 	    {
 	      id2arch = solv_realloc2(id2arch, (id + 255 + 1), sizeof(Id));
 	      memset(id2arch + lastarch + 1, 0, (id + 255 - lastarch) * sizeof(Id));

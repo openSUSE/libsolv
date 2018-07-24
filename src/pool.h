@@ -88,7 +88,7 @@ struct _Pool {
 
   Id *id2arch;			/* map arch ids to scores */
   unsigned char *id2color;	/* map arch ids to colors */
-  Id lastarch;			/* last valid entry in id2arch/id2color */
+  Id lastarch;			/* size of the id2arch/id2color arrays */
 
   Queue vendormap;		/* map vendor to vendorclasses mask */
   const char **vendorclasses;	/* vendor equivalence classes */

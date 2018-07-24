@@ -24,7 +24,7 @@ extern unsigned char pool_arch2color_slow(Pool *pool, Id arch);
 
 static inline unsigned char pool_arch2color(Pool *pool, Id arch)
 {
-  if (arch > pool->lastarch)
+  if (arch >= pool->lastarch)
     return ARCHCOLOR_ALL;
   if (pool->id2color && pool->id2color[arch])
     return pool->id2color[arch];
@@ -38,6 +38,10 @@ static inline int pool_colormatch(Pool *pool, Solvable *s1, Solvable *s2)
   if ((pool_arch2color(pool, s1->arch) & pool_arch2color(pool, s2->arch)) != 0)
     return 1;
   return 0;
+}
+
+static inline Id pool_arch2score(const Pool *pool, Id arch) {
+  return (unsigned int)arch < (unsigned int)pool->lastarch ? pool->id2arch[arch] : 0;
 }
 
 #ifdef __cplusplus
