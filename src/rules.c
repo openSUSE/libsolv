@@ -1059,7 +1059,7 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	      if (pool_is_complex_dep(pool, rec))
 		{
 		  pool_add_pos_literals_complex_dep(pool, rec, &workq, m, 0);
-		    continue;
+		  continue;
 		}
 #endif
 	      FOR_PROVIDES(p, pp, rec)
@@ -1076,7 +1076,7 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	      if (pool_is_complex_dep(pool, sug))
 		{
 		  pool_add_pos_literals_complex_dep(pool, sug, &workq, m, 0);
-		    continue;
+		  continue;
 		}
 #endif
 	      FOR_PROVIDES(p, pp, sug)
