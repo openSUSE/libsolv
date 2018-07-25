@@ -1033,7 +1033,7 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 
       if (m && pool->implicitobsoleteusescolors && pool_arch2score(pool, s->arch) > 1)
 	{
-	  int pa, a = pool_arch2score(pool, s->arch);
+	  unsigned int pa, a = pool_arch2score(pool, s->arch);
 	  /* check lock-step candidates */
 	  FOR_PROVIDES(p, pp, s->name)
 	    {
@@ -1532,7 +1532,8 @@ solver_addinfarchrules(Solver *solv, Map *addedmap)
   Pool *pool = solv->pool;
   Repo *installed = pool->installed;
   int first, i, j;
-  Id p, pp, a, aa, bestarch;
+  Id p, pp, aa;
+  unsigned int a, bestscore;
   Solvable *s, *ps, *bests;
   Queue badq, allowedarchs;
   Queue lsq;
@@ -1547,7 +1548,7 @@ solver_addinfarchrules(Solver *solv, Map *addedmap)
 	continue;
       s = pool->solvables + i;
       first = i;
-      bestarch = 0;
+      bestscore = 0;
       bests = 0;
       queue_empty(&allowedarchs);
       FOR_PROVIDES(p, pp, s->name)
@@ -1567,9 +1568,9 @@ solver_addinfarchrules(Solver *solv, Map *addedmap)
 	      queue_pushunique(&allowedarchs, ps->arch);	/* also ok to keep this architecture */
 	      continue;		/* but ignore installed solvables when calculating the best arch */
 	    }
-	  if (a && a != 1 && (!bestarch || a < bestarch))
+	  if (a && a != 1 && (!bestscore || a < bestscore))
 	    {
-	      bestarch = a;
+	      bestscore = a;
 	      bests = ps;
 	    }
 	}
@@ -1580,7 +1581,7 @@ solver_addinfarchrules(Solver *solv, Map *addedmap)
       if (allowedarchs.count == 1 && bests && allowedarchs.elements[0] == bests->arch)
 	allowedarchs.count--;	/* installed arch is best */
 
-      if (allowedarchs.count && pool->implicitobsoleteusescolors && installed && bestarch)
+      if (allowedarchs.count && pool->implicitobsoleteusescolors && installed && bestscore)
 	{
 	  /* need an extra pass for lockstep checking: we only allow to keep an inferior arch
 	   * if the corresponding installed package is not lock-stepped */
@@ -1599,17 +1600,17 @@ solver_addinfarchrules(Solver *solv, Map *addedmap)
 		  queue_pushunique(&allowedarchs, ps->arch);	/* strange arch, allow */
 		  continue;
 		}
-	      if (a == 1 || ((a ^ bestarch) & 0xffff0000) == 0)
+	      if (a == 1 || ((a ^ bestscore) & 0xffff0000) == 0)
 		continue;
 	      /* have installed package with inferior arch, check if lock-stepped */
 	      FOR_PROVIDES(p2, pp2, s->name)
 		{
 		  Solvable *s2 = pool->solvables + p2;
-		  Id a2;
+		  unsigned int a2;
 		  if (p2 == p || s2->name != s->name || s2->evr != pool->solvables[p].evr || s2->arch == pool->solvables[p].arch)
 		    continue;
 		  a2 = pool_arch2score(pool, s2->arch);
-		  if (a2 && (a2 == 1 || ((a2 ^ bestarch) & 0xffff0000) == 0))
+		  if (a2 && (a2 == 1 || ((a2 ^ bestscore) & 0xffff0000) == 0))
 		    break;
 		}
 	      if (!p2)
@@ -1625,7 +1626,7 @@ solver_addinfarchrules(Solver *solv, Map *addedmap)
 	  if (ps->name != s->name || !MAPTST(addedmap, p))
 	    continue;
 	  a = pool_arch2score(pool, ps->arch);
-	  if (a != 1 && bestarch && ((a ^ bestarch) & 0xffff0000) != 0)
+	  if (a != 1 && bestscore && ((a ^ bestscore) & 0xffff0000) != 0)
 	    {
 	      if (installed && ps->repo == installed)
 		{
@@ -1635,11 +1636,12 @@ solver_addinfarchrules(Solver *solv, Map *addedmap)
 		}
 	      for (j = 0; j < allowedarchs.count; j++)
 		{
+		  unsigned int aas;
 		  aa = allowedarchs.elements[j];
 		  if (ps->arch == aa)
 		    break;
-		  aa = pool_arch2score(pool, aa);
-		  if (aa && ((a ^ aa) & 0xffff0000) == 0)
+		  aas = pool_arch2score(pool, aa);
+		  if (aas && ((a ^ aas) & 0xffff0000) == 0)
 		    break;	/* compatible */
 		}
 	      if (j == allowedarchs.count)
@@ -1651,7 +1653,7 @@ solver_addinfarchrules(Solver *solv, Map *addedmap)
       for (j = 0; j < badq.count; j++)
 	{
 	  p = badq.elements[j];
-	  /* lock-step */
+	  /* special lock-step handling */
 	  if (pool->implicitobsoleteusescolors)
 	    {
 	      Id p2;
@@ -1663,7 +1665,7 @@ solver_addinfarchrules(Solver *solv, Map *addedmap)
 		  if (p2 == p || s2->name != s->name || s2->evr != pool->solvables[p].evr || s2->arch == pool->solvables[p].arch)
 		    continue;
 		  a = pool_arch2score(pool, s2->arch);
-		  if (a && (a == 1 || ((a ^ bestarch) & 0xffff000) == 0))
+		  if (a && (a == 1 || ((a ^ bestscore) & 0xffff000) == 0))
 		    {
 		      queue_push(&lsq, p2);
 		      if (installed && s2->repo == installed)

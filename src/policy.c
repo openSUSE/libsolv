@@ -56,11 +56,11 @@ prune_to_best_version_sortcmp(const void *ap, const void *bp, void *dp)
     }
   if (sa->arch != sb->arch)
     {
-      int aa, ab;
+      unsigned int aa, ab;
       aa = pool_arch2score(pool, sa->arch);
       ab = pool_arch2score(pool, sb->arch);
       if (aa != ab && aa > 1 && ab > 1)
-	return aa - ab;		/* lowest score first */
+	return aa < ab ? -1 : 1;	/* lowest score first */
     }
 
   /* the same name, bring installed solvables to the front */

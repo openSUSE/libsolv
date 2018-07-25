@@ -40,8 +40,8 @@ static inline int pool_colormatch(Pool *pool, Solvable *s1, Solvable *s2)
   return 0;
 }
 
-static inline Id pool_arch2score(const Pool *pool, Id arch) {
-  return (unsigned int)arch < (unsigned int)pool->lastarch ? pool->id2arch[arch] : 0;
+static inline unsigned int pool_arch2score(const Pool *pool, Id arch) {
+  return (unsigned int)arch < (unsigned int)pool->lastarch ? (unsigned int)pool->id2arch[arch] : 0;
 }
 
 #ifdef __cplusplus

@@ -1122,22 +1122,22 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
 #endif
       if (s->repo == installed && pool->implicitobsoleteusescolors)
 	{
-	  Id a, bestarch = 0;
+	  unsigned int a, bestscore = 0;
 	  FOR_PROVIDES(p, pp, s->name)
 	    {
 	      Solvable *ps = pool->solvables + p;
 	      if (ps->name != s->name || ps->repo == installed)
 	        continue;
 	      a = pool_arch2score(pool, ps->arch);
-	      if (a && a != 1 && (!bestarch || a < bestarch))
-		bestarch = a;
+	      if (a && a != 1 && (!bestscore || a < bestscore))
+		bestscore = a;
 	    }
-	  if (bestarch && pool_arch2score(pool, s->arch) != bestarch)
+	  if (bestscore && pool_arch2score(pool, s->arch) != bestscore)
 	    {
 	      FOR_PROVIDES(p, pp, s->name)
 		{
 		  Solvable *ps = pool->solvables + p;
-		  if (ps->repo == installed && ps->name == s->name && ps->evr == s->evr && ps->arch != s->arch && pool_arch2score(pool, ps->arch) == bestarch)
+		  if (ps->repo == installed && ps->name == s->name && ps->evr == s->evr && ps->arch != s->arch && pool_arch2score(pool, ps->arch) == bestscore)
 		    if (!MAPTST(&im, p))
 		      {
 #ifdef CLEANDEPSDEBUG
