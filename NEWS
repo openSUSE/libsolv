@@ -2,6 +2,17 @@
 This file contains the major changes between
 libsolv versions:
 
+Version 0.6.35
+- new configuration options:
+  * ENABLE_ZSTD_COMPRESSION: support zstd compression
+  * ENABLE_ZCHUNK_COMPRESSION: support zchunk compression
+- new features:
+  * new repodata_set_kv() function
+  * new pool_solvable2id() inline function
+  * bindings: new str2dir, dir2str, add_dirstr repodata methods
+- other changes
+  * new repo2solv tool replacing the old shell script
+
 Version 0.6.34
 - new features:
   * also look at suggests for package ordering
