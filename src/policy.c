@@ -1236,7 +1236,7 @@ urpm_reorder(Solver *solv, Queue *plist)
 		    {
 		      char kn[256];
 		      Id p, pp, knid;
-		      memcpy(kn, "kernel", 8);
+		      memcpy(kn, "kernel", 7);
 		      memcpy(kn + 6, flavor, release - flavor + 1);
 		      memcpy(kn + 6 + (release - flavor) + 1, sn, flavor - sn);
 		      strcpy(kn + 6 + (release + 1 - sn), release);
