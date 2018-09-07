@@ -56,11 +56,7 @@ stringpool_freehash(Stringpool *ss)
 void
 stringpool_init_empty(Stringpool *ss)
 {
-  const char *emptystrs[] = {
-    "<NULL>",
-    "",
-    0,
-  };
+  static const char *emptystrs[] = { "<NULL>", "", 0 };
   stringpool_init(ss, emptystrs);
 }
 
