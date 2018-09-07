@@ -1000,7 +1000,7 @@ addchangelog(Repodata *data, Id handle, RpmHead *rpmhead)
   char **cn;
   char **cx;
   uint32_t *ct;
-  int i, cnc, cxc, ctc;
+  int i, cnc, cxc, ctc = 0;
   Queue hq;
 
   ct = headint32array(rpmhead, TAG_CHANGELOGTIME, &ctc);
