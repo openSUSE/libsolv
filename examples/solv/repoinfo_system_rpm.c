@@ -17,6 +17,9 @@
 #if defined(ENABLE_APPDATA)
 #include "repo_appdata.h"
 #endif
+#ifdef SUSE
+#include "repo_autopattern.h"
+#endif
 #include "transaction.h"
 
 #include "repoinfo.h"
@@ -118,6 +121,9 @@ read_installed_rpm(struct repoinfo *cinfo)
   if (ofp)
     fclose(ofp);
   repo_internalize(repo);
+#ifdef SUSE
+  repo_add_autopattern(repo, 0);
+#endif
   writecachedrepo(cinfo, 0, 0);
   return 1;
 }
