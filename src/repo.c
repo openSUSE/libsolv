@@ -676,7 +676,7 @@ struct matchdata
   void *callback_data;
 };
 
-int
+static int
 repo_matchvalue(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv)
 {
   struct matchdata *md = cbdata;
