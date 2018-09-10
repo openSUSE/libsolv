@@ -518,17 +518,36 @@ get_data(Repodata *data, Repokey *key, unsigned char **dpp, int advance)
   return 0;
 }
 
-static int
-load_repodata(Repodata *data)
+void
+repodata_load(Repodata *data)
 {
+  if (data->state != REPODATA_STUB)
+    return;
   if (data->loadcallback)
+    data->loadcallback(data);
+  else
+    data->state = REPODATA_ERROR;
+}
+
+static int
+maybe_load_repodata_stub(Repodata *data, Id keyname)
+{
+  if (data->state != REPODATA_STUB)
     {
-      data->loadcallback(data);
-      if (data->state == REPODATA_AVAILABLE)
-	return 1;
+      data->state = REPODATA_ERROR;
+      return 0;
     }
-  data->state = REPODATA_ERROR;
-  return 0;
+  if (keyname)
+    {
+      int i;
+      for (i = 1; i < data->nkeys; i++)
+	if (keyname == data->keys[i].name)
+	  break;
+      if (i == data->nkeys)
+	return 0;
+    }
+  repodata_load(data);
+  return data->state == REPODATA_AVAILABLE ? 1 : 0;
 }
 
 static inline int
@@ -536,28 +555,11 @@ maybe_load_repodata(Repodata *data, Id keyname)
 {
   if (keyname && !repodata_precheck_keyname(data, keyname))
     return 0;	/* do not bother... */
-  switch(data->state)
-    {
-    case REPODATA_STUB:
-      if (keyname)
-	{
-	  int i;
-	  for (i = 1; i < data->nkeys; i++)
-	    if (keyname == data->keys[i].name)
-	      break;
-	  if (i == data->nkeys)
-	    return 0;
-	}
-      return load_repodata(data);
-    case REPODATA_ERROR:
-      return 0;
-    case REPODATA_AVAILABLE:
-    case REPODATA_LOADING:
-      return 1;
-    default:
-      data->state = REPODATA_ERROR;
-      return 0;
-    }
+  if (data->state == REPODATA_AVAILABLE || data->state == REPODATA_LOADING)
+    return 1;
+  if (data->state == REPODATA_ERROR)
+    return 0;
+  return maybe_load_repodata_stub(data, keyname);
 }
 
 static inline unsigned char *

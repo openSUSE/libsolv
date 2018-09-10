@@ -144,6 +144,7 @@ void repodata_freedata(Repodata *data);
 void repodata_free(Repodata *data);
 void repodata_empty(Repodata *data, int localpool);
 
+void repodata_load(Repodata *data);
 
 /*
  * key management functions
