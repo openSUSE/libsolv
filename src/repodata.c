@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2007, Novell Inc.
+ * Copyright (c) 2018, SUSE LLC.
  *
  * This program is licensed under the BSD license, read LICENSE.BSD
  * for further information
@@ -1272,21 +1272,6 @@ datamatcher_checkbasename(Datamatcher *ma, const char *basename)
   else
     return !strcmp(match, basename);
 }
-
-int
-repodata_filelistfilter_matches(Repodata *data, const char *str)
-{
-  /* '.*bin\/.*', '^\/etc\/.*', '^\/usr\/lib\/sendmail$' */
-  /* for now hardcoded */
-  if (strstr(str, "bin/"))
-    return 1;
-  if (!strncmp(str, "/etc/", 5))
-    return 1;
-  if (!strcmp(str, "/usr/lib/sendmail"))
-    return 1;
-  return 0;
-}
-
 
 enum {
   di_bye,
