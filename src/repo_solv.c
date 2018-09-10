@@ -1310,6 +1310,7 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
       /* overwrite stub repodata */
       repodata_freedata(parent);
       data.repodataid = parent->repodataid;
+      data.loadcallback = parent->loadcallback;
       *parent = data;
     }
   else

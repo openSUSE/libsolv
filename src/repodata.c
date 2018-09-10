@@ -3571,7 +3571,7 @@ repodata_disable_paging(Repodata *data)
 }
 
 static void
-repodata_load_stub(Repodata *data)
+repodata_stub_loader(Repodata *data)
 {
   Repo *repo = data->repo;
   Pool *pool = repo->pool;
@@ -3627,7 +3627,7 @@ repodata_add_stub(Repodata **datap)
   if (data->end > data->start)
     repodata_extend_block(sdata, data->start, data->end - data->start);
   sdata->state = REPODATA_STUB;
-  sdata->loadcallback = repodata_load_stub;
+  sdata->loadcallback = repodata_stub_loader;
   *datap = data;
   return sdata;
 }
