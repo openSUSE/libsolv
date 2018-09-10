@@ -94,6 +94,8 @@ repodata_freedata(Repodata *data)
   solv_free(data->attrnum64data);
 
   solv_free(data->dircache);
+
+  repodata_free_filelistfilter(data);
 }
 
 void

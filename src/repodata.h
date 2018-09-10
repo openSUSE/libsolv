@@ -95,6 +95,8 @@ typedef struct _Repodata {
   int error;			/* corrupt solv file */
 
   int filelisttype;		/* type of filelist */
+  Id *filelistfilter;		/* filelist filter used */
+  char *filelistfilterdata;	/* filelist filter string space */
 
   unsigned int schemadatalen;   /* schema storage size */
   Id *schematahash;		/* unification helper */
@@ -215,6 +217,7 @@ const char *repodata_stringify(Pool *pool, Repodata *data, Repokey *key, struct 
 /* filelist filter support */
 void repodata_set_filelisttype(Repodata *data, int filelisttype);
 int repodata_filelistfilter_matches(Repodata *data, const char *str);
+void repodata_free_filelistfilter(Repodata *data);
 
 /* lookup functions */
 Id repodata_lookup_type(Repodata *data, Id solvid, Id keyname);
