@@ -692,6 +692,12 @@ repo_matchvalue(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValu
       if (!datamatcher_match(&md->matcher, str))
 	return 0;
     }
+  else
+    {
+      /* stringify filelist if requested */
+      if (key->name == SOLVABLE_FILELIST && key->type == REPOKEY_TYPE_DIRSTRARRAY && (md->matcher.flags & SEARCH_FILES) != 0)
+        repodata_stringify(md->pool, data, key, kv, md->flags);
+    }
   md->stop = md->callback(md->callback_data, s, data, key, kv);
   return md->stop;
 }
