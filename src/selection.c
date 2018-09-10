@@ -940,7 +940,7 @@ selection_filelist(Pool *pool, Queue *selection, const char *name, int flags)
   if ((flags & SELECTION_NOCASE) != 0)
     type |= SEARCH_NOCASE;
   queue_init(&q);
-  dataiterator_init(&di, pool, flags & SELECTION_INSTALLED_ONLY ? pool->installed : 0, 0, SOLVABLE_FILELIST, name, type|SEARCH_FILES|SEARCH_COMPLETE_FILELIST);
+  dataiterator_init(&di, pool, flags & SELECTION_INSTALLED_ONLY ? pool->installed : 0, 0, SOLVABLE_FILELIST, name, type|SEARCH_FILES);
   while (dataiterator_step(&di))
     {
       Solvable *s = pool->solvables + di.solvid;

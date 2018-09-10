@@ -52,7 +52,7 @@ typedef struct _KeyValue {
 #define SEARCH_SUB			(1<<9)
 #define SEARCH_ARRAYSENTINEL		(1<<10)
 #define SEARCH_DISABLED_REPOS		(1<<11)
-#define SEARCH_COMPLETE_FILELIST	(1<<12)
+#define SEARCH_COMPLETE_FILELIST	(1<<12)		/* ignored, this is the default */
 
 /* stringification flags */
 #define SEARCH_SKIP_KIND		(1<<16)

@@ -927,7 +927,7 @@ pool_addstdproviders(Pool *pool, Id d)
       return 1;
     }
   queue_init_buffer(&q, qbuf, sizeof(qbuf)/sizeof(*qbuf));
-  dataiterator_init(&di, pool, 0, 0, SOLVABLE_FILELIST, str, SEARCH_STRING|SEARCH_FILES|SEARCH_COMPLETE_FILELIST);
+  dataiterator_init(&di, pool, 0, 0, SOLVABLE_FILELIST, str, SEARCH_STRING|SEARCH_FILES);
   for (; dataiterator_step(&di); dataiterator_skip_solvable(&di))
     {
       Solvable *s = pool->solvables + di.solvid;
