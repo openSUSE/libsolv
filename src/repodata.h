@@ -229,6 +229,9 @@ const unsigned char *repodata_lookup_bin_checksum(Repodata *data, Id solvid, Id 
 int repodata_lookup_idarray(Repodata *data, Id solvid, Id keyname, Queue *q);
 const void *repodata_lookup_binary(Repodata *data, Id solvid, Id keyname, int *lenp);
 
+/* internal, used in fileprovides code */
+const unsigned char *repodata_lookup_packed_dirstrarray(Repodata *data, Id solvid, Id keyname);
+
 
 /*-----
  * data assignment functions
