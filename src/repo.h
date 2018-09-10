@@ -146,6 +146,11 @@ Repodata *repo_last_repodata(Repo *repo);
 
 void repo_search(Repo *repo, Id p, Id key, const char *match, int flags, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv), void *cbdata);
 
+/* returns the last repodata that contains the key */
+Repodata *repo_lookup_repodata(Repo *repo, Id entry, Id keyname);
+Repodata *repo_lookup_repodata_opt(Repo *repo, Id entry, Id keyname);
+Repodata *repo_lookup_filelist_repodata(Repo *repo, Id entry, Datamatcher *matcher);
+
 /* returns the string value of the attribute, or NULL if not found */
 Id repo_lookup_type(Repo *repo, Id entry, Id keyname);
 const char *repo_lookup_str(Repo *repo, Id entry, Id keyname);

@@ -716,20 +716,7 @@ repodata_lookup_num(Repodata *data, Id solvid, Id keyname, unsigned long long *v
 int
 repodata_lookup_void(Repodata *data, Id solvid, Id keyname)
 {
-  Id schema;
-  Id *keyp;
-  unsigned char *dp;
-
-  if (!maybe_load_repodata(data, keyname))
-    return 0;
-  dp = solvid2data(data, solvid, &schema);
-  if (!dp)
-    return 0;
-  /* can't use find_key_data as we need to test the type */
-  for (keyp = data->schemadata + data->schemata[schema]; *keyp; keyp++)
-    if (data->keys[*keyp].name == keyname && data->keys[*keyp].type == REPOKEY_TYPE_VOID)
-      return 1;
-  return 0;
+  return repodata_lookup_type(data, solvid, keyname) == REPOKEY_TYPE_VOID ? 1 : 0;
 }
 
 const unsigned char *
@@ -762,9 +749,7 @@ repodata_lookup_idarray(Repodata *data, Id solvid, Id keyname, Queue *q)
 
   queue_empty(q);
   dp = find_key_data(data, solvid, keyname, &key);
-  if (!dp)
-    return 0;
-  if (key->type != REPOKEY_TYPE_IDARRAY)
+  if (!dp || key->type != REPOKEY_TYPE_IDARRAY)
     return 0;
   for (;;)
     {
@@ -1452,88 +1437,21 @@ dataiterator_find_keyname(Dataiterator *di, Id keyname)
   return dp;
 }
 
-static inline int
-is_filelist_extension(Repodata *data)
-{
-  int j;
-  if (!repodata_precheck_keyname(data, SOLVABLE_FILELIST))
-    return 0;
-  for (j = 1; j < data->nkeys; j++)
-    if (data->keys[j].name == SOLVABLE_FILELIST)
-      break;
-  if (j == data->nkeys)
-    return 0;
-  if (data->state != REPODATA_AVAILABLE)
-    return 1;
-  for (j = 1; j < data->nkeys; j++)
-    if (data->keys[j].name != REPOSITORY_SOLVABLES && data->keys[j].name != SOLVABLE_FILELIST)
-      return 0;
-  return 1;
-}
-
-static int
-dataiterator_filelistcheck(Dataiterator *di)
-{
-  int j;
-  int needcomplete = 0;
-  Repodata *data = di->data;
-
-  if ((di->flags & SEARCH_COMPLETE_FILELIST) != 0)
-    if (!di->matcher.match
-       || ((di->matcher.flags & (SEARCH_STRINGMASK|SEARCH_NOCASE)) != SEARCH_STRING
-           && (di->matcher.flags & (SEARCH_STRINGMASK|SEARCH_NOCASE)) != SEARCH_GLOB)
-       || !repodata_filelistfilter_matches(data, di->matcher.match))
-      needcomplete = 1;
-  if (data->state != REPODATA_AVAILABLE)
-    return needcomplete ? 1 : 0;
-  if (!needcomplete)
-    {
-      /* we don't need the complete filelist, so ignore all stubs */
-      if (data->repo->nrepodata == 2)
-	return 1;
-      for (j = 1; j < data->nkeys; j++)
-	if (data->keys[j].name != REPOSITORY_SOLVABLES && data->keys[j].name != SOLVABLE_FILELIST)
-	  return 1;
-      return 0;
-    }
-  else
-    {
-      /* we need the complete filelist. check if we habe a filtered filelist and there's
-       * a extension with the complete filelist later on */
-      for (j = 1; j < data->nkeys; j++)
-	if (data->keys[j].name == SOLVABLE_FILELIST)
-	  break;
-      if (j == data->nkeys)
-	return 0;	/* does not have filelist */
-      for (j = 1; j < data->nkeys; j++)
-	if (data->keys[j].name != REPOSITORY_SOLVABLES && data->keys[j].name != SOLVABLE_FILELIST)
-	  break;
-      if (j == data->nkeys)
-	return 1;	/* this is the externsion */
-      while (data - data->repo->repodata + 1 < data->repo->nrepodata)
-	{
-	  data++;
-	  if (is_filelist_extension(data))
-	    return 0;
-	}
-      return 1;
-    }
-}
-
 int
 dataiterator_step(Dataiterator *di)
 {
   Id schema;
 
-  if (di->state == di_nextattr && di->key->storage == KEY_STORAGE_VERTICAL_OFFSET && di->vert_ddp && di->vert_storestate != di->data->storestate) {
-    unsigned int ddpoff = di->ddp - di->vert_ddp;
-    di->vert_off += ddpoff;
-    di->vert_len -= ddpoff;
-    di->ddp = di->vert_ddp = get_vertical_data(di->data, di->key, di->vert_off, di->vert_len);
-    di->vert_storestate = di->data->storestate;
-    if (!di->ddp)
-      di->state = di_nextkey;
-  }
+  if (di->state == di_nextattr && di->key->storage == KEY_STORAGE_VERTICAL_OFFSET && di->vert_ddp && di->vert_storestate != di->data->storestate)
+    {
+      unsigned int ddpoff = di->ddp - di->vert_ddp;
+      di->vert_off += ddpoff;
+      di->vert_len -= ddpoff;
+      di->ddp = di->vert_ddp = get_vertical_data(di->data, di->key, di->vert_off, di->vert_len);
+      di->vert_storestate = di->data->storestate;
+      if (!di->ddp)
+	di->state = di_nextkey;
+    }
   for (;;)
     {
       switch (di->state)
@@ -1555,10 +1473,16 @@ dataiterator_step(Dataiterator *di)
 	      if (di->solvid > 0 && !(di->flags & SEARCH_NO_STORAGE_SOLVABLE) && (!di->keyname || (di->keyname >= SOLVABLE_NAME && di->keyname <= RPM_RPMDBID)) && di->nparents - di->rootlevel == di->nkeynames)
 		{
 		  extern Repokey repo_solvablekeys[RPM_RPMDBID - SOLVABLE_NAME + 1];
-
 		  di->key = repo_solvablekeys + (di->keyname ? di->keyname - SOLVABLE_NAME : 0);
 		  di->data = 0;
 		  goto di_entersolvablekey;
+		}
+	      if (di->keyname)
+		{
+		  di->data = di->keyname == SOLVABLE_FILELIST ? repo_lookup_filelist_repodata(di->repo, di->solvid, &di->matcher) : repo_lookup_repodata_opt(di->repo, di->solvid, di->keyname);
+		  if (!di->data)
+		    goto di_nextsolvable;
+		  di->repodataid = di->data - di->repo->repodata;
 		}
 	    }
 	  /* FALLTHROUGH */
@@ -1570,8 +1494,6 @@ dataiterator_step(Dataiterator *di)
 		goto di_nextsolvable;
 	      di->data = di->repo->repodata + di->repodataid;
 	    }
-	  if (di->repodataid && di->keyname == SOLVABLE_FILELIST && !dataiterator_filelistcheck(di))
-	    goto di_nextrepodata;
 	  if (!maybe_load_repodata(di->data, di->keyname))
 	    goto di_nextrepodata;
 	  di->dp = solvid2data(di->data, di->solvid, &schema);
@@ -1631,10 +1553,7 @@ dataiterator_step(Dataiterator *di)
 	case di_nextattr:
           di->kv.entry++;
 	  di->ddp = data_fetch(di->ddp, &di->kv, di->key);
-	  if (di->kv.eof)
-	    di->state = di_nextkey;
-	  else
-	    di->state = di_nextattr;
+	  di->state = di->kv.eof ? di_nextkey : di_nextattr;
 	  break;
 
 	case di_nextkey: di_nextkey:
@@ -1645,7 +1564,7 @@ dataiterator_step(Dataiterator *di)
 	  /* FALLTHROUGH */
 
 	case di_nextrepodata: di_nextrepodata:
-	  if (di->repodataid && ++di->repodataid < di->repo->nrepodata)
+	  if (!di->keyname && di->repodataid && ++di->repodataid < di->repo->nrepodata)
 	      goto di_enterrepodata;
 	  /* FALLTHROUGH */
 
@@ -1746,7 +1665,9 @@ dataiterator_step(Dataiterator *di)
         /* special solvable attr handling follows */
 
 	case di_nextsolvablekey: di_nextsolvablekey:
-	  if (di->keyname || di->key->name == RPM_RPMDBID)
+	  if (di->keyname)
+	    goto di_nextsolvable;
+	  if (di->key->name == RPM_RPMDBID)	/* reached end of list? */
 	    goto di_enterrepodata;
 	  di->key++;
 	  /* FALLTHROUGH */
@@ -1781,6 +1702,7 @@ dataiterator_step(Dataiterator *di)
 
 	}
 
+      /* we have a potential match */
       if (di->matcher.match)
 	{
 	  const char *str;
@@ -1788,6 +1710,7 @@ dataiterator_step(Dataiterator *di)
 	  if (di->keyname == SOLVABLE_FILELIST && di->key->type == REPOKEY_TYPE_DIRSTRARRAY && (di->matcher.flags & SEARCH_FILES) != 0)
 	    if (!datamatcher_checkbasename(&di->matcher, di->kv.str))
 	      continue;
+	  /* now stringify so that we can do the matching */
 	  if (!(str = repodata_stringify(di->pool, di->data, di->key, &di->kv, di->flags)))
 	    {
 	      if (di->keyname && (di->key->type == REPOKEY_TYPE_FIXARRAY || di->key->type == REPOKEY_TYPE_FLEXARRAY))
@@ -1799,6 +1722,7 @@ dataiterator_step(Dataiterator *di)
 	}
       else
 	{
+	  /* stringify filelist if requested */
 	  if (di->keyname == SOLVABLE_FILELIST && di->key->type == REPOKEY_TYPE_DIRSTRARRAY && (di->flags & SEARCH_FILES) != 0)
 	    repodata_stringify(di->pool, di->data, di->key, &di->kv, di->flags);
 	}
