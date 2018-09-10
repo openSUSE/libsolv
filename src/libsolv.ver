@@ -224,6 +224,7 @@ SOLV_1.0 {
 		repodata_set_constant;
 		repodata_set_constantid;
 		repodata_set_deltalocation;
+		repodata_set_filelisttype;
 		repodata_set_id;
 		repodata_set_idarray;
 		repodata_set_location;

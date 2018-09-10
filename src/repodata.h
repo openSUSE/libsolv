@@ -53,15 +53,22 @@ typedef struct _Repokey {
 struct dircache;
 #endif
 
-typedef struct _Repodata {
-  Id repodataid;		/* our id */
-  struct _Repo *repo;		/* back pointer to repo */
-
+/* repodata states */
 #define REPODATA_AVAILABLE	0
 #define REPODATA_STUB		1
 #define REPODATA_ERROR		2
 #define REPODATA_STORE		3
 #define REPODATA_LOADING	4
+
+/* repodata filelist types */
+/* note that FILELIST_FILTERED means that the data contains a filtered
+ * filelist *AND* that it is authoritative for all included solvables. */
+#define REPODATA_FILELIST_FILTERED	1
+#define REPODATA_FILELIST_EXTENSION	2
+
+typedef struct _Repodata {
+  Id repodataid;		/* our id */
+  struct _Repo *repo;		/* back pointer to repo */
 
   int state;			/* available, stub or error */
 
@@ -86,6 +93,8 @@ typedef struct _Repodata {
 #ifdef LIBSOLV_INTERNAL
   FILE *fp;			/* file pointer of solv file */
   int error;			/* corrupt solv file */
+
+  int filelisttype;		/* type of filelist */
 
   unsigned int schemadatalen;   /* schema storage size */
   Id *schematahash;		/* unification helper */
@@ -203,8 +212,9 @@ void repodata_search(Repodata *data, Id solvid, Id keyname, int flags, int (*cal
  * if valid, NULL if not possible */
 const char *repodata_stringify(Pool *pool, Repodata *data, Repokey *key, struct _KeyValue *kv, int flags);
 
+/* filelist filter support */
+void repodata_set_filelisttype(Repodata *data, int filelisttype);
 int repodata_filelistfilter_matches(Repodata *data, const char *str);
-
 
 /* lookup functions */
 Id repodata_lookup_type(Repodata *data, Id solvid, Id keyname);

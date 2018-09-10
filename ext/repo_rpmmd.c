@@ -1144,6 +1144,22 @@ repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags)
   repodata_free_dircache(data);
   queue_free(&pd.diskusageq);
 
+  if ((flags & REPO_EXTEND_SOLVABLES) != 0)
+    {
+      /* is this a filelist extension? */
+      if (repodata_has_keyname(data, SOLVABLE_FILELIST))
+	repodata_set_filelisttype(data, REPODATA_FILELIST_EXTENSION);
+    }
+  else
+    {
+      /* is this a primary with a filtered filelist? */
+      if (data->end > data->start)
+	{
+	  repodata_set_filelisttype(data, REPODATA_FILELIST_FILTERED);
+	  repodata_set_void(data, SOLVID_META, REPOSITORY_FILTEREDFILELIST);
+	}
+    }
+
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
   POOL_DEBUG(SOLV_DEBUG_STATS, "repo_add_rpmmd took %d ms\n", solv_timems(now));

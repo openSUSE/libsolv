@@ -1327,6 +1327,17 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
       repo->repodata[repo->nrepodata++] = data;
     }
 
+  if ((flags & REPO_EXTEND_SOLVABLES) != 0)
+    {
+      if (repodata_has_keyname(&data, SOLVABLE_FILELIST))
+	repodata_set_filelisttype(repo->repodata + data.repodataid, REPODATA_FILELIST_EXTENSION);
+    }
+  else
+    {
+      if (repodata_lookup_type(&data, SOLVID_META, REPOSITORY_FILTEREDFILELIST))
+        repodata_set_filelisttype(repo->repodata + data.repodataid, REPODATA_FILELIST_FILTERED);
+    }
+
   /* create stub repodata entries for all external */
   if (!(flags & SOLV_ADD_NO_STUBS) && !parent)
     {
@@ -1334,7 +1345,7 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
 	if (data.keys[key].name == REPOSITORY_EXTERNAL && data.keys[key].type == REPOKEY_TYPE_FLEXARRAY)
 	  break;
       if (key < data.nkeys)
-	repodata_create_stubs(repo->repodata + (repo->nrepodata - 1));
+	repodata_create_stubs(repo->repodata + data.repodataid);
     }
 
   POOL_DEBUG(SOLV_DEBUG_STATS, "repo_add_solv took %d ms\n", solv_timems(now));

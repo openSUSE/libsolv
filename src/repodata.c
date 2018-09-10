@@ -3570,6 +3570,7 @@ repodata_disable_paging(Repodata *data)
     }
 }
 
+/* call the pool's loadcallback to load a stub repodata */
 static void
 repodata_stub_loader(Repodata *data)
 {
@@ -3642,6 +3643,7 @@ repodata_create_stubs(Repodata *data)
   Dataiterator di;
   Id xkeyname = 0;
   int i, cnt = 0;
+  int filelisttype = data->filelisttype;
 
   dataiterator_init(&di, pool, repo, SOLVID_META, REPOSITORY_EXTERNAL, 0, 0);
   while (dataiterator_step(&di))
@@ -3681,6 +3683,8 @@ repodata_create_stubs(Repodata *data)
 	  else
 	    {
 	      repodata_add_stubkey(sdata, xkeyname, di.kv.id);
+	      if (xkeyname == SOLVABLE_FILELIST && filelisttype == REPODATA_FILELIST_FILTERED)
+	        repodata_set_filelisttype(sdata, REPODATA_FILELIST_EXTENSION);
 	      xkeyname = 0;
 	    }
 	}
@@ -3690,6 +3694,12 @@ repodata_create_stubs(Repodata *data)
     repodata_internalize(repo->repodata + stubdataids[i]);
   solv_free(stubdataids);
   return data;
+}
+
+void
+repodata_set_filelisttype(Repodata *data, int type)
+{
+  data->filelisttype = type;
 }
 
 unsigned int
