@@ -1342,10 +1342,10 @@ a specific id and want to avoid the string compare overhead.
 
 	Id lookup_id(Id keyname)
 	my $id = $solvable->lookup_id($keyname);
-	id = solvable.lookup_id(solvid)
-	id = solvable.lookup_id(solvid)
+	id = solvable.lookup_id(keyname)
+	id = solvable.lookup_id(keyname)
 
-	unsigned long long lookup_num(Id solvid, Id keyname, unsigned long long notfound = 0)
+	unsigned long long lookup_num(Id keyname, unsigned long long notfound = 0)
 	my $num = $solvable->lookup_num($keyname);
 	num = solvable.lookup_num(keyname)
 	num = solvable.lookup_num(keyname)
@@ -1382,9 +1382,9 @@ array, use 1 to select the second part or 0 to retrieve all ids
 including the marker.
 
 	const char *lookup_location(unsigned int *OUTPUT);
-	my ($location, $medianr) = $solvable->lookup_location();
-	location, medianr = solvable.lookup_location()
-	location, medianr = solvable.lookup_location()
+	my ($location, $mediano) = $solvable->lookup_location();
+	location, mediano = solvable.lookup_location()
+	location, mediano = solvable.lookup_location()
 
 Return a tuple containing the on-media location and an optional
 media number for multi-part repositories (e.g. repositories
@@ -3520,6 +3520,21 @@ the same id.
 	string = data.lookup_str(solvid, keyname)
 	string = data.lookup_str(solvid, keyname)
 
+	const char *lookup_id(Id solvid, Id keyname)
+	my $string = $data->lookup_id($solvid, $keyname);
+	string = data.lookup_id(solvid, keyname)
+	string = data.lookup_id(solvid, keyname)
+
+	unsigned long long lookup_num(Id solvid, Id keyname, unsigned long long notfound = 0)
+	my $num = $data->lookup_num($solvid, $keyname);
+	num = data.lookup_num(solvid, keyname)
+	num = data.lookup_num(solvid, keyname)
+
+	bool lookup_void(Id solvid, Id keyname)
+	my $bool = $data->lookup_void($solvid, $keyname);
+	bool = data.lookup_void(solvid, keyname)
+	bool = data.lookup_void(solvid, keyname)
+
 	Id *lookup_idarray(Id solvid, Id keyname)
 	my @ids = $data->lookup_idarray($solvid, $keyname);
 	ids = data.lookup_idarray(solvid, keyname)
@@ -3536,15 +3551,25 @@ SOLVID_META solvid that stores repodata meta information.
 
 === DATA STORAGE METHODS ===
 
+	void set_str(Id solvid, Id keyname, const char *str);
+	$data->set_str($solvid, $keyname, $str);
+	data.set_str(solvid, keyname, str)
+	data.set_str(solvid, keyname, str)
+
 	void set_id(Id solvid, Id keyname, DepId id);
 	$data->set_id($solvid, $keyname, $id);
 	data.set_id(solvid, keyname, id)
 	data.set_id(solvid, keyname, id)
 
-	void set_str(Id solvid, Id keyname, const char *str);
-	$data->set_str($solvid, $keyname, $str);
-	data.set_str(solvid, keyname, str)
-	data.set_str(solvid, keyname, str)
+	void set_num(Id solvid, Id keyname, unsigned long long num);
+	$data->set_num($solvid, $keyname, $num);
+	data.set_num(solvid, keyname, num)
+	data.set_num(solvid, keyname, num)
+
+	void set_void(Id solvid, Id keyname);
+	$data->set_void($solvid, $keyname);
+	data.set_void(solvid, keyname)
+	data.set_void(solvid, keyname)
 
 	void set_poolstr(Id solvid, Id keyname, const char *str);
 	$data->set_poolstr($solvid, $keyname, $str);
@@ -3561,6 +3586,11 @@ SOLVID_META solvid that stores repodata meta information.
 	data.set_sourcepkg(solvid, sourcepkg)
 	data.set_sourcepkg(solvid, sourcepkg)
 
+	void set_location(Id solvid, unsigned int mediano, const char *location);
+	$data.set_location($solvid, $mediano, $location);
+	data.set_location(solvid, mediano, location)
+	data.set_location(solvid, mediano, location)
+
 	void add_idarray(Id solvid, Id keyname, DepId id);
 	$data->add_idarray($solvid, $keyname, $id);
 	data.add_idarray(solvid, keyname, id)
@@ -3575,6 +3605,11 @@ SOLVID_META solvid that stores repodata meta information.
 	$data->add_flexarray($solvid, $keyname, $handle);
 	data.add_flexarray(solvid, keyname, handle)
 	data.add_flexarray(solvid, keyname, handle)
+
+	void unset(Id solvid, Id keyname);
+	$data->unset($solvid, $keyname);
+	data.unset(solvid, keyname)
+	data.unset(solvid, keyname)
 
 Data storage methods. Probably only useful to store data in the special
 SOLVID_META solvid that stores repodata meta information. Note that
@@ -3612,9 +3647,9 @@ Back pointer to repository object.
 Create a Dataiterator at the position of the datapos object.
 
 	const char *lookup_deltalocation(unsigned int *OUTPUT);
-	my ($location, $medianr) = $datapos->lookup_deltalocation();
-	location, medianr = datapos.lookup_deltalocation()
-	location, medianr = datapos.lookup_deltalocation()
+	my ($location, $mediano) = $datapos->lookup_deltalocation();
+	location, mediano = datapos.lookup_deltalocation()
+	location, mediano = datapos.lookup_deltalocation()
 
 Return a tuple containing the on-media location and an optional media number
 for a delta rpm. This obviously only works if the data position points to

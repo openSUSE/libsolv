@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 06/15/2018
+.\"      Date: 09/14/2018
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "06/15/2018" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "09/14/2018" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -2392,8 +2392,8 @@ my \fI$string\fR \fB=\fR \fI$solvable\fR\fB\->lookup_str(\fR\fI$keyname\fR\fB)\f
 .nf
 \fBId lookup_id(Id\fR \fIkeyname\fR\fB)\fR
 my \fI$id\fR \fB=\fR \fI$solvable\fR\fB\->lookup_id(\fR\fI$keyname\fR\fB)\fR;
-\fIid\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_id(\fR\fIsolvid\fR\fB)\fR
-\fIid\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_id(\fR\fIsolvid\fR\fB)\fR
+\fIid\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_id(\fR\fIkeyname\fR\fB)\fR
+\fIid\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_id(\fR\fIkeyname\fR\fB)\fR
 .fi
 .if n \{\
 .RE
@@ -2403,7 +2403,7 @@ my \fI$id\fR \fB=\fR \fI$solvable\fR\fB\->lookup_id(\fR\fI$keyname\fR\fB)\fR;
 .RS 4
 .\}
 .nf
-\fBunsigned long long lookup_num(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, unsigned long long\fR \fInotfound\fR \fB= 0)\fR
+\fBunsigned long long lookup_num(Id\fR \fIkeyname\fR\fB, unsigned long long\fR \fInotfound\fR \fB= 0)\fR
 my \fI$num\fR \fB=\fR \fI$solvable\fR\fB\->lookup_num(\fR\fI$keyname\fR\fB)\fR;
 \fInum\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_num(\fR\fIkeyname\fR\fB)\fR
 \fInum\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_num(\fR\fIkeyname\fR\fB)\fR
@@ -2471,9 +2471,9 @@ Generic lookup methods\&. Retrieve data stored for the specific keyname\&. The l
 .\}
 .nf
 \fBconst char *lookup_location(unsigned int *\fR\fIOUTPUT\fR\fB)\fR;
-my \fB(\fR\fI$location\fR\fB,\fR \fI$medianr\fR\fB) =\fR \fI$solvable\fR\fB\->lookup_location()\fR;
-\fIlocation\fR\fB,\fR \fImedianr\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_location()\fR
-\fIlocation\fR\fB,\fR \fImedianr\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_location()\fR
+my \fB(\fR\fI$location\fR\fB,\fR \fI$mediano\fR\fB) =\fR \fI$solvable\fR\fB\->lookup_location()\fR;
+\fIlocation\fR\fB,\fR \fImediano\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_location()\fR
+\fIlocation\fR\fB,\fR \fImediano\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_location()\fR
 .fi
 .if n \{\
 .RE
@@ -5739,6 +5739,45 @@ my \fI$string\fR \fB=\fR \fI$data\fR\fB\->lookup_str(\fR\fI$solvid\fR\fB,\fR \fI
 .RS 4
 .\}
 .nf
+\fBconst char *lookup_id(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB)\fR
+my \fI$string\fR \fB=\fR \fI$data\fR\fB\->lookup_id(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB)\fR;
+\fIstring\fR \fB=\fR \fIdata\fR\fB\&.lookup_id(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
+\fIstring\fR \fB=\fR \fIdata\fR\fB\&.lookup_id(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBunsigned long long lookup_num(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, unsigned long long\fR \fInotfound\fR \fB= 0)\fR
+my \fI$num\fR \fB=\fR \fI$data\fR\fB\->lookup_num(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB)\fR;
+\fInum\fR \fB=\fR \fIdata\fR\fB\&.lookup_num(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
+\fInum\fR \fB=\fR \fIdata\fR\fB\&.lookup_num(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBbool lookup_void(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB)\fR
+my \fI$bool\fR \fB=\fR \fI$data\fR\fB\->lookup_void(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB)\fR;
+\fIbool\fR \fB=\fR \fIdata\fR\fB\&.lookup_void(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
+\fIbool\fR \fB=\fR \fIdata\fR\fB\&.lookup_void(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
 \fBId *lookup_idarray(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB)\fR
 my \fI@ids\fR \fB=\fR \fI$data\fR\fB\->lookup_idarray(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB)\fR;
 \fIids\fR \fB=\fR \fIdata\fR\fB\&.lookup_idarray(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
@@ -5768,6 +5807,19 @@ Lookup functions\&. Return the data element stored in the specified solvable\&. 
 .RS 4
 .\}
 .nf
+\fBvoid set_str(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, const char *\fR\fIstr\fR\fB)\fR;
+\fI$data\fR\fB\->set_str(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB,\fR \fI$str\fR\fB)\fR;
+\fIdata\fR\fB\&.set_str(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fIstr\fR\fB)\fR
+\fIdata\fR\fB\&.set_str(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fIstr\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
 \fBvoid set_id(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, DepId\fR \fIid\fR\fB)\fR;
 \fI$data\fR\fB\->set_id(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB,\fR \fI$id\fR\fB)\fR;
 \fIdata\fR\fB\&.set_id(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fIid\fR\fB)\fR
@@ -5781,10 +5833,23 @@ Lookup functions\&. Return the data element stored in the specified solvable\&. 
 .RS 4
 .\}
 .nf
-\fBvoid set_str(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, const char *\fR\fIstr\fR\fB)\fR;
-\fI$data\fR\fB\->set_str(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB,\fR \fI$str\fR\fB)\fR;
-\fIdata\fR\fB\&.set_str(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fIstr\fR\fB)\fR
-\fIdata\fR\fB\&.set_str(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fIstr\fR\fB)\fR
+\fBvoid set_num(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, unsigned long long\fR \fInum\fR\fB)\fR;
+\fI$data\fR\fB\->set_num(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB,\fR \fI$num\fR\fB)\fR;
+\fIdata\fR\fB\&.set_num(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fInum\fR\fB)\fR
+\fIdata\fR\fB\&.set_num(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fInum\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid set_void(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB)\fR;
+\fI$data\fR\fB\->set_void(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB)\fR;
+\fIdata\fR\fB\&.set_void(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
+\fIdata\fR\fB\&.set_void(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
 .fi
 .if n \{\
 .RE
@@ -5833,6 +5898,19 @@ Lookup functions\&. Return the data element stored in the specified solvable\&. 
 .RS 4
 .\}
 .nf
+\fBvoid set_location(Id\fR \fIsolvid\fR\fB, unsigned int\fR \fImediano\fR\fB, const char *\fR\fIlocation\fR\fB)\fR;
+\fI$data\fR\fB\&.set_location(\fR\fI$solvid\fR\fB,\fR \fI$mediano\fR\fB,\fR \fI$location\fR\fB)\fR;
+\fIdata\fR\fB\&.set_location(\fR\fIsolvid\fR\fB,\fR \fImediano\fR\fB,\fR \fIlocation\fR\fB)\fR
+\fIdata\fR\fB\&.set_location(\fR\fIsolvid\fR\fB,\fR \fImediano\fR\fB,\fR \fIlocation\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
 \fBvoid add_idarray(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, DepId\fR \fIid\fR\fB)\fR;
 \fI$data\fR\fB\->add_idarray(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB,\fR \fI$id\fR\fB)\fR;
 \fIdata\fR\fB\&.add_idarray(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fIid\fR\fB)\fR
@@ -5863,6 +5941,19 @@ my \fI$handle\fR \fB=\fR \fI$data\fR\fB\->new_handle()\fR;
 \fI$data\fR\fB\->add_flexarray(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB,\fR \fI$handle\fR\fB)\fR;
 \fIdata\fR\fB\&.add_flexarray(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fIhandle\fR\fB)\fR
 \fIdata\fR\fB\&.add_flexarray(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fIhandle\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid unset(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB)\fR;
+\fI$data\fR\fB\->unset(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB)\fR;
+\fIdata\fR\fB\&.unset(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
+\fIdata\fR\fB\&.unset(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
 .fi
 .if n \{\
 .RE
@@ -5910,9 +6001,9 @@ Create a Dataiterator at the position of the datapos object\&.
 .\}
 .nf
 \fBconst char *lookup_deltalocation(unsigned int *\fR\fIOUTPUT\fR\fB)\fR;
-my \fB(\fR\fI$location\fR\fB,\fR \fI$medianr\fR\fB) =\fR \fI$datapos\fR\fB\->lookup_deltalocation()\fR;
-\fIlocation\fR\fB,\fR \fImedianr\fR \fB=\fR \fIdatapos\fR\fB\&.lookup_deltalocation()\fR
-\fIlocation\fR\fB,\fR \fImedianr\fR \fB=\fR \fIdatapos\fR\fB\&.lookup_deltalocation()\fR
+my \fB(\fR\fI$location\fR\fB,\fR \fI$mediano\fR\fB) =\fR \fI$datapos\fR\fB\->lookup_deltalocation()\fR;
+\fIlocation\fR\fB,\fR \fImediano\fR \fB=\fR \fIdatapos\fR\fB\&.lookup_deltalocation()\fR
+\fIlocation\fR\fB,\fR \fImediano\fR \fB=\fR \fIdatapos\fR\fB\&.lookup_deltalocation()\fR
 .fi
 .if n \{\
 .RE

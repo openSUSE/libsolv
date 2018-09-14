@@ -3870,8 +3870,14 @@ rb_eval_string(
   void set_id(Id solvid, Id keyname, DepId id) {
     repodata_set_id(repo_id2repodata($self->repo, $self->id), solvid, keyname, id);
   }
+  void set_num(Id solvid, Id keyname, unsigned long long num) {
+    repodata_set_num(repo_id2repodata($self->repo, $self->id), solvid, keyname, num);
+  }
   void set_str(Id solvid, Id keyname, const char *str) {
     repodata_set_str(repo_id2repodata($self->repo, $self->id), solvid, keyname, str);
+  }
+  void set_void(Id solvid, Id keyname) {
+    repodata_set_void(repo_id2repodata($self->repo, $self->id), solvid, keyname);
   }
   void set_poolstr(Id solvid, Id keyname, const char *str) {
     repodata_set_poolstr(repo_id2repodata($self->repo, $self->id), solvid, keyname, str);
@@ -3890,8 +3896,24 @@ rb_eval_string(
   void set_sourcepkg(Id solvid, const char *sourcepkg) {
     repodata_set_sourcepkg(repo_id2repodata($self->repo, $self->id), solvid, sourcepkg);
   }
+  void set_location(Id solvid, unsigned int mediano, const char *location) {
+    repodata_set_location(repo_id2repodata($self->repo, $self->id), solvid, mediano, 0, location);
+  }
+  void unset(Id solvid, Id keyname) {
+    repodata_unset(repo_id2repodata($self->repo, $self->id), solvid, keyname);
+  }
   const char *lookup_str(Id solvid, Id keyname) {
     return repodata_lookup_str(repo_id2repodata($self->repo, $self->id), solvid, keyname);
+  }
+  Id lookup_id(Id solvid, Id keyname) {
+    return repodata_lookup_id(repo_id2repodata($self->repo, $self->id), solvid, keyname);
+  }
+  unsigned long long lookup_num(Id solvid, Id keyname, unsigned long long notfound = 0) {
+    unsigned long long v = 0;
+    return repodata_lookup_num(repo_id2repodata($self->repo, $self->id), solvid, keyname, &v) ? v : notfound;
+  }
+  bool lookup_void(Id solvid, Id keyname) {
+    return repodata_lookup_void(repo_id2repodata($self->repo, $self->id), solvid, keyname);
   }
   Queue lookup_idarray(Id solvid, Id keyname) {
     Queue r;
