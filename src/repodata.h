@@ -209,6 +209,7 @@ repodata_has_keyname(Repodata *data, Id keyname)
 /* search key <keyname> (all keys, if keyname == 0) for Id <solvid>
  * Call <callback> for each match */
 void repodata_search(Repodata *data, Id solvid, Id keyname, int flags, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, struct _KeyValue *kv), void *cbdata);
+void repodata_search_keyskip(Repodata *data, Id solvid, Id keyname, int flags, Id *keyskip, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, struct _KeyValue *kv), void *cbdata);
 
 /* Make sure the found KeyValue has the "str" field set. Return "str"
  * if valid, NULL if not possible */
@@ -232,6 +233,8 @@ const void *repodata_lookup_binary(Repodata *data, Id solvid, Id keyname, int *l
 /* internal, used in fileprovides code */
 const unsigned char *repodata_lookup_packed_dirstrarray(Repodata *data, Id solvid, Id keyname);
 
+/* internal, fill keyskip array with data */
+Id *repodata_fill_keyskip(Repodata *data, Id solvid, Id *keyskip);
 
 /*-----
  * data assignment functions
@@ -281,7 +284,7 @@ void repodata_add_dirstr(Repodata *data, Id solvid, Id keyname, Id dir, const ch
 void repodata_free_dircache(Repodata *data);
 
 
-/* Arrays */
+/* arrays */
 void repodata_add_idarray(Repodata *data, Id solvid, Id keyname, Id id);
 void repodata_add_poolstr_array(Repodata *data, Id solvid, Id keyname, const char *str);
 void repodata_add_fixarray(Repodata *data, Id solvid, Id keyname, Id ghandle);

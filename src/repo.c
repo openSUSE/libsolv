@@ -672,6 +672,7 @@ struct matchdata
   int flags;
   Datamatcher matcher;
   int stop;
+  Id *keyskip;
   int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv);
   void *callback_data;
 };
@@ -744,6 +745,7 @@ repo_search_md(Repo *repo, Id p, Id keyname, struct matchdata *md)
   Repodata *data;
   int i, flags;
   Solvable *s;
+  Id *keyskip;
 
   kv.parent = 0;
   md->stop = 0;
@@ -758,11 +760,10 @@ repo_search_md(Repo *repo, Id p, Id keyname, struct matchdata *md)
 	}
       return;
     }
-  else if (p < 0)
-    /* The callback only supports solvables, so we can't iterate over the extra things.  */
-    return;
+  if (p < 0 && p != SOLVID_META)
+    return;		/* SOLVID_POS not supported yet */
   flags = md->flags;
-  if (!(flags & SEARCH_NO_STORAGE_SOLVABLE))
+  if (p > 0 && !(flags & SEARCH_NO_STORAGE_SOLVABLE))
     {
       s = pool->solvables + p;
       switch(keyname)
@@ -866,11 +867,12 @@ repo_search_md(Repo *repo, Id p, Id keyname, struct matchdata *md)
       return;
     }
 
+  keyskip = repo_create_keyskip(repo, p, &md->keyskip);
   FOR_REPODATAS(repo, i, data)
     {
-      if (p < data->start || p >= data->end)
+      if (p != SOLVID_META && (p < data->start || p >= data->end))
 	continue;
-      repodata_search(data, p, keyname, md->flags, repo_matchvalue, md);
+      repodata_search_keyskip(data, p, keyname, md->flags, keyskip, repo_matchvalue, md);
       if (md->stop > SEARCH_NEXT_KEY)
 	break;
     }
@@ -893,6 +895,7 @@ repo_search(Repo *repo, Id p, Id keyname, const char *match, int flags, int (*ca
   repo_search_md(repo, p, keyname, &md);
   if (match)
     datamatcher_free(&md.matcher);
+  solv_free(md.keyskip);
 }
 
 Repodata *
@@ -995,6 +998,69 @@ repo_lookup_filelist_repodata(Repo *repo, Id entry, Datamatcher *matcher)
     }
   /* cannot use filtered filelist */
   return repo_lookup_repodata_opt(repo, entry, SOLVABLE_FILELIST);
+}
+
+
+/* the keyskip array has the following format:
+ * 0: keyname area size
+ * 1: repoid base
+ * 2: repoid end
+ * 3: entry for keyname 0
+ * 4: entry for keyname 1
+ * ...
+ */
+Id *
+repo_create_keyskip(Repo *repo, Id entry, Id **oldkeyskip)
+{
+  Repodata *data, *last = 0;
+  Id *keyskip;
+  int rdid, cnt = 0;
+
+  if (repo->nrepodata <= 2)
+    return 0;	/* just one repodata, nothing to filter */
+  keyskip = oldkeyskip ? *oldkeyskip : 0;
+  if (keyskip)
+    {
+      if (keyskip[1] >= 0x10000000)
+	keyskip = solv_free(keyskip);
+      else
+        keyskip[1] = keyskip[2];
+    }
+  FOR_REPODATAS(repo, rdid, data)
+    {
+      if (entry != SOLVID_META)
+	{
+	  if (data->state != REPODATA_AVAILABLE && data->state != REPODATA_LOADING)
+	    {
+	      if (data->state != REPODATA_STUB)
+		continue;
+	      repodata_load(data);
+	      if (data->state != REPODATA_AVAILABLE)
+		continue;
+	    }
+	  if ((entry < data->start || entry >= data->end))
+	    continue;
+	  if (!data->incoreoffset[entry - data->start])
+            continue;
+	}
+      if (last)
+        keyskip = repodata_fill_keyskip(last, entry, keyskip);
+      last = data;
+      cnt++;
+    }
+printf("repo_create_keyskip: cnt %d\n", cnt);
+  if (cnt <= 1)
+    {
+      if (oldkeyskip)
+	*oldkeyskip = keyskip;
+      return 0;
+    }
+  keyskip = repodata_fill_keyskip(last, entry, keyskip);
+  if (keyskip)
+    keyskip[2] = keyskip[1] + repo->nrepodata;
+  if (oldkeyskip)
+    *oldkeyskip = keyskip;
+  return keyskip;
 }
 
 const char *

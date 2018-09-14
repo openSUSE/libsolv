@@ -146,6 +146,8 @@ typedef struct _Dataiterator
   char *dupstr;
   int dupstrn;
 
+  Id *keyskip;
+  Id *oldkeyskip;
 } Dataiterator;
 
 

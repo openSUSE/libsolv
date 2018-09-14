@@ -630,6 +630,53 @@ find_key_data(Repodata *data, Id solvid, Id keyname, Repokey **keypp)
   return get_data(data, key, &dp, 0);
 }
 
+static const Id *
+repodata_lookup_schemakeys(Repodata *data, Id solvid)
+{
+  Id schema;
+  if (!maybe_load_repodata(data, 0))
+    return 0;
+  if (!solvid2data(data, solvid, &schema))
+    return 0;
+  return data->schemadata + data->schemata[schema];
+}
+
+static Id *
+alloc_keyskip()
+{
+  Id *keyskip = solv_calloc(3 + 256, sizeof(Id));
+  keyskip[0] = 256; 
+  keyskip[1] = keyskip[2] = 1; 
+  return keyskip;
+}
+
+Id *
+repodata_fill_keyskip(Repodata *data, Id solvid, Id *keyskip)
+{
+  const Id *keyp;
+  Id maxkeyname, value;
+  keyp = repodata_lookup_schemakeys(data, solvid);
+  if (!keyp)
+    return keyskip;	/* no keys for this solvid */
+  if (!keyskip)
+    keyskip = alloc_keyskip();
+  maxkeyname = keyskip[0];
+  value = keyskip[1] + data->repodataid;
+  for (; *keyp; keyp++)
+    {
+      Id keyname = data->keys[*keyp].name;
+      if (keyname >= maxkeyname)
+	{
+	  int newmax = (keyname | 255) + 1; 
+	  keyskip = solv_realloc2(keyskip, 3 + newmax, sizeof(Id));
+	  memset(keyskip + (3 + maxkeyname), 0, (newmax - maxkeyname) * sizeof(Id));
+	  keyskip[0] = maxkeyname = newmax;
+	}
+      keyskip[3 + keyname] = value;
+    }
+  return keyskip;
+}
+
 Id
 repodata_lookup_type(Repodata *data, Id solvid, Id keyname)
 {
@@ -955,7 +1002,7 @@ repodata_stringify(Pool *pool, Repodata *data, Repokey *key, KeyValue *kv, int f
 	kv->str = stringpool_id2str(&data->spool, kv->id);
       else
 	kv->str = pool_id2str(pool, kv->id);
-      if ((flags & SEARCH_SKIP_KIND) != 0 && key->storage == KEY_STORAGE_SOLVABLE)
+      if ((flags & SEARCH_SKIP_KIND) != 0 && key->storage == KEY_STORAGE_SOLVABLE && (key->name == SOLVABLE_NAME || key->type == REPOKEY_TYPE_IDARRAY))
 	{
 	  const char *s;
 	  for (s = kv->str; *s >= 'a' && *s <= 'z'; s++)
@@ -997,7 +1044,7 @@ struct subschema_data {
 
 /* search a specific repodata */
 void
-repodata_search(Repodata *data, Id solvid, Id keyname, int flags, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv), void *cbdata)
+repodata_search_keyskip(Repodata *data, Id solvid, Id keyname, int flags, Id *keyskip, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv), void *cbdata)
 {
   Id schema;
   Repokey *key;
@@ -1025,7 +1072,7 @@ repodata_search(Repodata *data, Id solvid, Id keyname, int flags, int (*callback
       dp = solvid2data(data, solvid, &schema);
       if (!dp)
 	return;
-      s = data->repo->pool->solvables + solvid;
+      s = solvid > 0 ? data->repo->pool->solvables + solvid : 0;
       kv.parent = 0;
     }
   keyp = data->schemadata + data->schemata[schema];
@@ -1047,8 +1094,14 @@ repodata_search(Repodata *data, Id solvid, Id keyname, int flags, int (*callback
     {
       stop = 0;
       key = data->keys + keyid;
-      ddp = get_data(data, key, &dp, *keyp ? 1 : 0);
+      ddp = get_data(data, key, &dp, *keyp && !onekey ? 1 : 0);
 
+      if (keyskip && (key->name >= keyskip[0] || keyskip[3 + key->name] != keyskip[1] + data->repodataid))
+	{
+	  if (onekey)
+	    return;
+	  continue;
+	}
       if (key->type == REPOKEY_TYPE_DELETED)
 	{
 	  if (onekey)
@@ -1082,7 +1135,7 @@ repodata_search(Repodata *data, Id solvid, Id keyname, int flags, int (*callback
 	      if (stop && stop != SEARCH_ENTERSUB)
 		break;
 	      if ((flags & SEARCH_SUB) != 0 || stop == SEARCH_ENTERSUB)
-	        repodata_search(data, SOLVID_SUBSCHEMA, 0, flags, callback, &subd);
+	        repodata_search_keyskip(data, SOLVID_SUBSCHEMA, 0, flags, 0, callback, &subd);
 	      ddp = data_skip_schema(data, ddp, schema);
 	      kv.entry++;
 	    }
@@ -1112,6 +1165,12 @@ repodata_search(Repodata *data, Id solvid, Id keyname, int flags, int (*callback
       if (onekey || stop > SEARCH_NEXT_KEY)
 	return;
     }
+}
+
+void
+repodata_search(Repodata *data, Id solvid, Id keyname, int flags, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv), void *cbdata)
+{
+  repodata_search_keyskip(data, solvid, keyname, flags, 0, callback, cbdata);
 }
 
 void
@@ -1383,6 +1442,10 @@ dataiterator_init_clone(Dataiterator *di, Dataiterator *from)
 	di->parents[i].kv.parent = &di->parents[i - 1].kv;
       di->kv.parent = &di->parents[di->nparents - 1].kv;
     }
+  if (di->oldkeyskip)
+    di->oldkeyskip = solv_memdup2(di->oldkeyskip, 3 + di->oldkeyskip[0], sizeof(Id));
+  if (di->keyskip)
+    di->keyskip = di->oldkeyskip;
 }
 
 int
@@ -1458,6 +1521,8 @@ dataiterator_free(Dataiterator *di)
     datamatcher_free(&di->matcher);
   if (di->dupstr)
     solv_free(di->dupstr);
+  if (di->oldkeyskip)
+    solv_free(di->oldkeyskip);
 }
 
 static unsigned char *
@@ -1514,24 +1579,28 @@ dataiterator_step(Dataiterator *di)
 	  /* FALLTHROUGH */
 
 	case di_entersolvable: di_entersolvable:
-	  if (di->repodataid)
+	  if (!di->repodataid)
+	    goto di_enterrepodata;	/* POS case, repodata is set */
+	  if (di->solvid > 0 && !(di->flags & SEARCH_NO_STORAGE_SOLVABLE) && (!di->keyname || (di->keyname >= SOLVABLE_NAME && di->keyname <= RPM_RPMDBID)) && di->nparents - di->rootlevel == di->nkeynames)
 	    {
-	      di->repodataid = 1;	/* reset repodata iterator */
-	      if (di->solvid > 0 && !(di->flags & SEARCH_NO_STORAGE_SOLVABLE) && (!di->keyname || (di->keyname >= SOLVABLE_NAME && di->keyname <= RPM_RPMDBID)) && di->nparents - di->rootlevel == di->nkeynames)
-		{
-		  extern Repokey repo_solvablekeys[RPM_RPMDBID - SOLVABLE_NAME + 1];
-		  di->key = repo_solvablekeys + (di->keyname ? di->keyname - SOLVABLE_NAME : 0);
-		  di->data = 0;
-		  goto di_entersolvablekey;
-		}
-	      if (di->keyname)
-		{
-		  di->data = di->keyname == SOLVABLE_FILELIST ? repo_lookup_filelist_repodata(di->repo, di->solvid, &di->matcher) : repo_lookup_repodata_opt(di->repo, di->solvid, di->keyname);
-		  if (!di->data)
-		    goto di_nextsolvable;
-		  di->repodataid = di->data - di->repo->repodata;
-		}
+	      extern Repokey repo_solvablekeys[RPM_RPMDBID - SOLVABLE_NAME + 1];
+	      di->key = repo_solvablekeys + (di->keyname ? di->keyname - SOLVABLE_NAME : 0);
+	      di->data = 0;
+	      goto di_entersolvablekey;
 	    }
+
+	  if (di->keyname)
+	    {
+	      di->data = di->keyname == SOLVABLE_FILELIST ? repo_lookup_filelist_repodata(di->repo, di->solvid, &di->matcher) : repo_lookup_repodata_opt(di->repo, di->solvid, di->keyname);
+	      if (!di->data)
+		goto di_nextsolvable;
+	      di->repodataid = di->data - di->repo->repodata;
+	      di->keyskip = 0;
+	      goto di_enterrepodata;
+	    }
+	di_leavesolvablekey:
+	  di->repodataid = 1;	/* reset repodata iterator */
+	  di->keyskip = repo_create_keyskip(di->repo, di->solvid, &di->oldkeyskip);
 	  /* FALLTHROUGH */
 
 	case di_enterrepodata: di_enterrepodata:
@@ -1588,6 +1657,8 @@ dataiterator_step(Dataiterator *di)
 	  else
 	    di->ddp = 0;
 	  if (!di->ddp)
+	    goto di_nextkey;
+	  if (di->keyskip && (di->key->name >= di->keyskip[0] || di->keyskip[3 + di->key->name] != di->keyskip[1] + di->data->repodataid))
 	    goto di_nextkey;
           if (di->key->type == REPOKEY_TYPE_DELETED)
 	    goto di_nextkey;
@@ -1715,7 +1786,7 @@ dataiterator_step(Dataiterator *di)
 	  if (di->keyname)
 	    goto di_nextsolvable;
 	  if (di->key->name == RPM_RPMDBID)	/* reached end of list? */
-	    goto di_enterrepodata;
+	    goto di_leavesolvablekey;
 	  di->key++;
 	  /* FALLTHROUGH */
 

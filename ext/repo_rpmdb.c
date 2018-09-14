@@ -1447,7 +1447,7 @@ solvable_copy_cb(void *vcbdata, Solvable *r, Repodata *fromdata, Repokey *key, K
       break;
     case REPOKEY_TYPE_DIRNUMNUMARRAY:
     case REPOKEY_TYPE_DIRSTRARRAY:
-      kv->id = copydir(data, fromdata, kv->id, cbdata->dircache);
+      kv->id = copydir(data, fromdata, kv->id, data->repodataid == 1 ? cbdata->dircache : 0);
       break;
     case REPOKEY_TYPE_FLEXARRAY:
       if (kv->eof == 2)
@@ -1473,13 +1473,14 @@ solvable_copy_cb(void *vcbdata, Solvable *r, Repodata *fromdata, Repokey *key, K
 }
 
 static void
-solvable_copy(Solvable *s, Solvable *r, Repodata *data, Id *dircache)
+solvable_copy(Solvable *s, Solvable *r, Repodata *data, Id *dircache, Id **oldkeyskip)
 {
   int p, i;
   Repo *repo = s->repo;
   Pool *pool = repo->pool;
   Repo *fromrepo = r->repo;
   struct solvable_copy_cbdata cbdata;
+  Id *keyskip;
 
   /* copy solvable data */
   s->name = r->name;
@@ -1513,11 +1514,11 @@ solvable_copy(Solvable *s, Solvable *r, Repodata *data, Id *dircache)
 #if 0
   repo_search(fromrepo, p, 0, 0, SEARCH_NO_STORAGE_SOLVABLE | SEARCH_SUB | SEARCH_ARRAYSENTINEL, solvable_copy_cb, &cbdata);
 #else
+  keyskip = repo_create_keyskip(repo, p, oldkeyskip);
   FOR_REPODATAS(fromrepo, i, data)
     {
       if (p >= data->start && p < data->end)
-        repodata_search(data, p, 0, SEARCH_SUB | SEARCH_ARRAYSENTINEL, solvable_copy_cb, &cbdata);
-      cbdata.dircache = 0;	/* only for first repodata */
+        repodata_search_keyskip(data, p, 0, SEARCH_SUB | SEARCH_ARRAYSENTINEL, keyskip, solvable_copy_cb, &cbdata);
     }
 #endif
 }
@@ -1732,6 +1733,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
   else
     {
       Id dircache[COPYDIR_DIRCACHE_SIZE];		/* see copydir */
+      Id *oldkeyskip = 0;
       struct rpmdbentry *entries = 0, *rp;
       int nentries = 0;
       char *namedata = 0;
@@ -1798,7 +1800,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
       for (i = 0, rp = entries; i < nentries; i++, rp++, s++)
 	{
 	  Id dbid = rp->rpmdbid;
-	  repo->rpmdbid[(s - pool->solvables) - repo->start] = rp->rpmdbid;
+	  repo->rpmdbid[(s - pool->solvables) - repo->start] = dbid;
 	  if (refhash)
 	    {
 	      h = dbid & refmask;
@@ -1813,7 +1815,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
 		  Solvable *r = ref->pool->solvables + ref->start + (id - 1);
 		  if (r->repo == ref)
 		    {
-		      solvable_copy(s, r, data, dircache);
+		      solvable_copy(s, r, data, dircache, &oldkeyskip);
 		      continue;
 		    }
 		}
@@ -1839,6 +1841,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
 	    }
 	}
 
+      solv_free(oldkeyskip);
       solv_free(entries);
       solv_free(namedata);
       solv_free(refhash);

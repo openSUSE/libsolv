@@ -178,6 +178,8 @@ void repo_unset(Repo *repo, Id p, Id keyname);
 
 void repo_internalize(Repo *repo);
 void repo_disable_paging(Repo *repo);
+Id *repo_create_keyskip(Repo *repo, Id entry, Id **oldkeyskip);
+
 
 /* iterator macros */
 #define FOR_REPO_SOLVABLES(r, p, s)						\

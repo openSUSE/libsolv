@@ -145,6 +145,7 @@ SOLV_1.0 {
 		repo_addid;
 		repo_addid_dep;
 		repo_create;
+		repo_create_keyskip;
 		repo_disable_paging;
 		repo_empty;
 		repo_fix_conflicts;
@@ -218,6 +219,7 @@ SOLV_1.0 {
 		repodata_new_handle;
 		repodata_schema2id;
 		repodata_search;
+		repodata_search_keyskip;
 		repodata_set_binary;
 		repodata_set_bin_checksum;
 		repodata_set_checksum;
