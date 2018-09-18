@@ -1070,11 +1070,63 @@ repodata_stringify(Pool *pool, Repodata *data, Repokey *key, KeyValue *kv, int f
 }
 
 
+/* this is an internal hack to pass the parent kv to repodata_search_keyskip */
 struct subschema_data {
-  Solvable *s;
   void *cbdata;
+  Id solvid;
   KeyValue *parent;
 };
+
+void
+repodata_search_arrayelement(Repodata *data, Id solvid, Id keyname, int flags, KeyValue *kv, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv), void *cbdata)
+{
+  struct subschema_data subd;
+  subd.solvid = solvid;
+  subd.cbdata = cbdata;
+  subd.parent = kv;
+  repodata_search_keyskip(data, SOLVID_SUBSCHEMA, keyname, flags, 0, callback, &subd);
+}
+
+static int
+repodata_search_array(Repodata *data, Id solvid, Id keyname, int flags, Repokey *key, KeyValue *kv, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv), void *cbdata)
+{
+  struct subschema_data subd;
+  Solvable *s = solvid > 0 ? data->repo->pool->solvables + solvid : 0;
+  unsigned char *dp = (unsigned char *)kv->str;
+  int stop;
+  Id schema = 0;
+
+  if (!dp || kv->entry != -1)
+    return 0;
+  subd.solvid = solvid;
+  subd.cbdata = cbdata;
+  subd.parent = kv;
+  while (++kv->entry < kv->num)
+    {
+      if (kv->entry)
+	dp = data_skip_schema(data, dp, schema);
+      if (kv->entry == 0 || key->type == REPOKEY_TYPE_FLEXARRAY)
+	dp = data_read_id(dp, &schema);
+      kv->id = schema;
+      kv->str = (const char *)dp;
+      kv->eof = kv->entry == kv->num - 1 ? 1 : 0;
+      stop = callback(cbdata, s, data, key, kv);
+      if (stop && stop != SEARCH_ENTERSUB)
+	return stop;
+      if ((flags & SEARCH_SUB) != 0 || stop == SEARCH_ENTERSUB)
+	repodata_search_keyskip(data, SOLVID_SUBSCHEMA, keyname, flags, 0, callback, &subd);
+    }
+  if ((flags & SEARCH_ARRAYSENTINEL) != 0)
+    {
+      if (kv->entry)
+	dp = data_skip_schema(data, dp, schema);
+      kv->id = 0;
+      kv->str = (const char *)dp;
+      kv->eof = 2;
+      return callback(cbdata, s, data, key, kv);
+    }
+  return 0;
+}
 
 /* search a specific repodata */
 void
@@ -1095,7 +1147,7 @@ repodata_search_keyskip(Repodata *data, Id solvid, Id keyname, int flags, Id *ke
     {
       struct subschema_data *subd = cbdata;
       cbdata = subd->cbdata;
-      s = subd->s;
+      solvid = subd->solvid;
       schema = subd->parent->id;
       dp = (unsigned char *)subd->parent->str;
       kv.parent = subd->parent;
@@ -1106,9 +1158,9 @@ repodata_search_keyskip(Repodata *data, Id solvid, Id keyname, int flags, Id *ke
       dp = solvid2data(data, solvid, &schema);
       if (!dp)
 	return;
-      s = solvid > 0 ? data->repo->pool->solvables + solvid : 0;
       kv.parent = 0;
     }
+  s = solvid > 0 ? data->repo->pool->solvables + solvid : 0;
   keyp = data->schemadata + data->schemata[schema];
   if (keyname)
     {
@@ -1144,45 +1196,11 @@ repodata_search_keyskip(Repodata *data, Id solvid, Id keyname, int flags, Id *ke
 	}
       if (key->type == REPOKEY_TYPE_FLEXARRAY || key->type == REPOKEY_TYPE_FIXARRAY)
 	{
-	  struct subschema_data subd;
-	  int nentries;
-	  Id schema = 0;
-
-	  subd.cbdata = cbdata;
-	  subd.s = s;
-	  subd.parent = &kv;
-	  ddp = data_read_id(ddp, &nentries);
-	  kv.num = nentries;
-	  kv.entry = 0;
-	  kv.eof = 0;
-          while (ddp && nentries > 0)
-	    {
-	      if (!--nentries)
-		kv.eof = 1;
-	      if (key->type == REPOKEY_TYPE_FLEXARRAY || !kv.entry)
-	        ddp = data_read_id(ddp, &schema);
-	      kv.id = schema;
-	      kv.str = (char *)ddp;
-	      stop = callback(cbdata, s, data, key, &kv);
-	      if (stop > SEARCH_NEXT_KEY)
-		return;
-	      if (stop && stop != SEARCH_ENTERSUB)
-		break;
-	      if ((flags & SEARCH_SUB) != 0 || stop == SEARCH_ENTERSUB)
-	        repodata_search_keyskip(data, SOLVID_SUBSCHEMA, 0, flags, 0, callback, &subd);
-	      ddp = data_skip_schema(data, ddp, schema);
-	      kv.entry++;
-	    }
-	  if (!nentries && (flags & SEARCH_ARRAYSENTINEL) != 0)
-	    {
-	      /* sentinel */
-	      kv.eof = 2;
-	      kv.str = (char *)ddp;
-	      stop = callback(cbdata, s, data, key, &kv);
-	      if (stop > SEARCH_NEXT_KEY)
-		return;
-	    }
-	  if (onekey)
+	  kv.entry = -1;
+	  ddp = data_read_id(ddp, (Id *)&kv.num);
+	  kv.str = (const char *)ddp;
+	  stop = repodata_search_array(data, solvid, 0, flags, key, &kv, callback, cbdata);
+	  if (onekey || stop > SEARCH_NEXT_KEY)
 	    return;
 	  continue;
 	}
@@ -1684,9 +1702,9 @@ dataiterator_step(Dataiterator *di)
 	    }
 	  else if (di->key->storage == KEY_STORAGE_INCORE)
 	    {
-	      di->ddp = di->dp;
+	      di->ddp = di->dp;		/* start of data */
 	      if (di->keyp[1] && (!di->keyname || (di->flags & SEARCH_SUB) != 0))
-		di->dp = data_skip_key(di->data, di->dp, di->key);
+		di->dp = data_skip_key(di->data, di->dp, di->key);	/* advance to next key */
 	    }
 	  else
 	    di->ddp = 0;
@@ -2855,18 +2873,18 @@ repodata_add_poolstr_array(Repodata *data, Id solvid, Id keyname,
 }
 
 void
-repodata_add_fixarray(Repodata *data, Id solvid, Id keyname, Id ghandle)
+repodata_add_fixarray(Repodata *data, Id solvid, Id keyname, Id handle)
 {
   repodata_add_array(data, solvid, keyname, REPOKEY_TYPE_FIXARRAY, 1);
-  data->attriddata[data->attriddatalen++] = ghandle;
+  data->attriddata[data->attriddatalen++] = handle;
   data->attriddata[data->attriddatalen++] = 0;
 }
 
 void
-repodata_add_flexarray(Repodata *data, Id solvid, Id keyname, Id ghandle)
+repodata_add_flexarray(Repodata *data, Id solvid, Id keyname, Id handle)
 {
   repodata_add_array(data, solvid, keyname, REPOKEY_TYPE_FLEXARRAY, 1);
-  data->attriddata[data->attriddatalen++] = ghandle;
+  data->attriddata[data->attriddatalen++] = handle;
   data->attriddata[data->attriddatalen++] = 0;
 }
 

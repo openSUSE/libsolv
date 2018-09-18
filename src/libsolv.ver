@@ -219,6 +219,7 @@ SOLV_1.0 {
 		repodata_new_handle;
 		repodata_schema2id;
 		repodata_search;
+		repodata_search_arrayelement;
 		repodata_search_keyskip;
 		repodata_set_binary;
 		repodata_set_bin_checksum;
