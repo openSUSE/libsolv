@@ -1411,21 +1411,17 @@ solvable_copy_cb(void *vcbdata, Solvable *r, Repodata *fromdata, Repokey *key, K
     case REPOKEY_TYPE_DIRSTRARRAY:
       kv->id = repodata_translate_dir(data, fromdata, kv->id, 1, fromdata->repodataid == 1 ? cbdata->dircache : 0);
       break;
-    case REPOKEY_TYPE_FLEXARRAY:
-      if (kv->eof == 2)
-	{
-	  assert(cbdata->subhandle);
-	  cbdata->handle = cbdata->subhandle;
-	  cbdata->subhandle = 0;
-	  break;
-	}
-      if (!kv->entry)
-        {
-	  assert(!cbdata->subhandle);
-	  cbdata->subhandle = cbdata->handle;
-	}
+    case REPOKEY_TYPE_FIXARRAY:
       cbdata->handle = repodata_new_handle(data);
-      repodata_add_flexarray(data, cbdata->subhandle, key->name, cbdata->handle);
+      repodata_add_fixarray(data, handle, key->name, cbdata->handle);
+      repodata_search_arrayelement(fromdata, 0, 0, 0, kv, &solvable_copy_cb, cbdata);
+      cbdata->handle = handle;
+      return 0;
+    case REPOKEY_TYPE_FLEXARRAY:
+      cbdata->handle = repodata_new_handle(data);
+      repodata_add_flexarray(data, handle, key->name, cbdata->handle);
+      repodata_search_arrayelement(fromdata, 0, 0, 0, kv, &solvable_copy_cb, cbdata);
+      cbdata->handle = handle;
       return 0;
     default:
       break;
@@ -1470,19 +1466,15 @@ solvable_copy(Solvable *s, Solvable *r, Repodata *data, Id *dircache, Id **oldke
     {
       Repodata *fromdata = repo_id2repodata(fromrepo, 1);
       if (p >= fromdata->start && p < fromdata->end)
-        repodata_search(fromdata, p, 0, SEARCH_SUB | SEARCH_ARRAYSENTINEL, solvable_copy_cb, &cbdata);
+        repodata_search(fromdata, p, 0, 0, solvable_copy_cb, &cbdata);
       return;
     }
-#if 0
-  repo_search(fromrepo, p, 0, 0, SEARCH_NO_STORAGE_SOLVABLE | SEARCH_SUB | SEARCH_ARRAYSENTINEL, solvable_copy_cb, &cbdata);
-#else
   keyskip = repo_create_keyskip(repo, p, oldkeyskip);
   FOR_REPODATAS(fromrepo, i, data)
     {
       if (p >= data->start && p < data->end)
-        repodata_search_keyskip(data, p, 0, SEARCH_SUB | SEARCH_ARRAYSENTINEL, keyskip, solvable_copy_cb, &cbdata);
+        repodata_search_keyskip(data, p, 0, 0, keyskip, solvable_copy_cb, &cbdata);
     }
-#endif
 }
 
 /* used to sort entries by package name that got returned in some database order */
