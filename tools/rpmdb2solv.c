@@ -61,6 +61,7 @@ main(int argc, char **argv)
   Repodata *data;
   int c, percent = 0;
   int nopacks = 0;
+  int add_changelog = 0;
   const char *root = 0;
   const char *basefile = 0;
   const char *refname = 0;
@@ -82,7 +83,7 @@ main(int argc, char **argv)
    * parse arguments
    */
   
-  while ((c = getopt(argc, argv, "APhnkxXb:r:p:o:")) >= 0)
+  while ((c = getopt(argc, argv, "ACPhnkxXb:r:p:o:")) >= 0)
     switch (c)
       {
       case 'h':
@@ -126,6 +127,9 @@ main(int argc, char **argv)
         pubkeys = 1;
         break;
 #endif
+      case 'C':
+	add_changelog = 1;
+	break;
       default:
 	usage(1);
       }
@@ -165,7 +169,12 @@ main(int argc, char **argv)
 
   if (!nopacks)
     {
-      if (repo_add_rpmdb_reffp(repo, reffp, REPO_USE_ROOTDIR | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE | (percent ? RPMDB_REPORT_PROGRESS : 0)))
+      int flags = REPO_USE_ROOTDIR | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE;
+      if (percent)
+	flags |= RPMDB_REPORT_PROGRESS;
+      if (add_changelog)
+	flags |= RPM_ADD_WITH_CHANGELOG;
+      if (repo_add_rpmdb_reffp(repo, reffp, flags))
 	{
 	  fprintf(stderr, "rpmdb2solv: %s\n", pool_errstr(pool));
 	  exit(1);
