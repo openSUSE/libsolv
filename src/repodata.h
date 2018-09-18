@@ -314,6 +314,7 @@ void repodata_disable_paging(Repodata *data);
 Id repodata_globalize_id(Repodata *data, Id id, int create);
 Id repodata_localize_id(Repodata *data, Id id, int create);
 Id repodata_translate_id(Repodata *data, Repodata *fromdata, Id id, int create);
+Id repodata_translate_dir_slow(Repodata *data, Repodata *fromdata, Id dir, int create, Id *cache);
 
 Id repodata_str2dir(Repodata *data, const char *dir, int create);
 const char *repodata_dir2str(Repodata *data, Id did, const char *suf);
@@ -329,6 +330,27 @@ const unsigned char *repodata_lookup_bin_checksum_uninternalized(Repodata *data,
 
 /* stats */
 unsigned int repodata_memused(Repodata *data);
+
+static inline Id
+repodata_translate_dir(Repodata *data, Repodata *fromdata, Id dir, int create, Id *cache)
+{
+  if (cache && dir && cache[(dir & 255) * 2] == dir)
+    return cache[(dir & 255) * 2 + 1];
+  return repodata_translate_dir_slow(data, fromdata, dir, create, cache);
+}
+
+static inline Id *
+repodata_create_dirtranscache(Repodata *data)
+{
+  return solv_calloc(256, sizeof(Id) * 2);
+}
+
+static inline Id *
+repodata_free_dirtranscache(Id *cache)
+{
+  return solv_free(cache);
+}
+
 
 #ifdef __cplusplus
 }

@@ -1385,44 +1385,6 @@ copydeps(Pool *pool, Repo *repo, Offset fromoff, Repo *fromrepo)
   return ido;
 }
 
-#define COPYDIR_DIRCACHE_SIZE 512
-
-static Id copydir_complex(Repodata *data, Repodata *fromdata, Id did, Id *cache);
-
-static inline Id
-copydir(Repodata *data, Repodata *fromdata, Id did, Id *cache)
-{
-  if (cache && did && cache[did & 255] == did)
-    return cache[(did & 255) + 256];
-  return copydir_complex(data, fromdata, did, cache);
-}
-
-static Id
-copydir_complex(Repodata *data, Repodata *fromdata, Id did, Id *cache)
-{
-  Id parent, compid;
-  if (!did)
-    {
-      /* make sure that the dirpool has an entry */
-      if (!data->dirpool.ndirs)
-        dirpool_add_dir(&data->dirpool, 0, 0, 1);
-      return 0;
-    }
-  parent = dirpool_parent(&fromdata->dirpool, did);
-  compid = dirpool_compid(&fromdata->dirpool, did);
-  if (parent)
-    parent = copydir(data, fromdata, parent, cache);
-  if (data->localpool || fromdata->localpool)
-    compid = repodata_translate_id(data, fromdata, compid, 1);
-  compid = dirpool_add_dir(&data->dirpool, parent, compid, 1);
-  if (cache)
-    {
-      cache[did & 255] = did;
-      cache[(did & 255) + 256] = compid;
-    }
-  return compid;
-}
-
 struct solvable_copy_cbdata {
   Repodata *data;
   Id handle;
@@ -1447,7 +1409,7 @@ solvable_copy_cb(void *vcbdata, Solvable *r, Repodata *fromdata, Repokey *key, K
       break;
     case REPOKEY_TYPE_DIRNUMNUMARRAY:
     case REPOKEY_TYPE_DIRSTRARRAY:
-      kv->id = copydir(data, fromdata, kv->id, data->repodataid == 1 ? cbdata->dircache : 0);
+      kv->id = repodata_translate_dir(data, fromdata, kv->id, 1, fromdata->repodataid == 1 ? cbdata->dircache : 0);
       break;
     case REPOKEY_TYPE_FLEXARRAY:
       if (kv->eof == 2)
@@ -1732,7 +1694,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
     }
   else
     {
-      Id dircache[COPYDIR_DIRCACHE_SIZE];		/* see copydir */
+      Id *dircache;
       Id *oldkeyskip = 0;
       struct rpmdbentry *entries = 0, *rp;
       int nentries = 0;
@@ -1740,8 +1702,6 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
       unsigned int refmask, h;
       Id id, *refhash;
       int res;
-
-      memset(dircache, 0, sizeof(dircache));
 
       /* get ids of installed rpms */
       entries = getinstalledrpmdbids(&state, "Name", 0, &nentries, &namedata, flags & RPMDB_KEEP_GPG_PUBKEY);
@@ -1797,6 +1757,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
       if (!repo->rpmdbid)
         repo->rpmdbid = repo_sidedata_create(repo, sizeof(Id));
 
+      dircache = repodata_create_dirtranscache(data);
       for (i = 0, rp = entries; i < nentries; i++, rp++, s++)
 	{
 	  Id dbid = rp->rpmdbid;
@@ -1829,6 +1790,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
 	      solv_free(entries);
 	      solv_free(namedata);
 	      solv_free(refhash);
+	      dircache = repodata_free_dirtranscache(dircache);
 	      return -1;
 	    }
 	  rpmhead2solv(pool, repo, data, s, state.rpmhead, flags | RPM_ADD_TRIGGERS);
@@ -1840,6 +1802,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
 		pool_debug(pool, SOLV_ERROR, "%%%% %d\n", done * 100 / count);
 	    }
 	}
+      dircache = repodata_free_dirtranscache(dircache);
 
       solv_free(oldkeyskip);
       solv_free(entries);

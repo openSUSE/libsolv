@@ -889,18 +889,52 @@ repodata_localize_id(Repodata *data, Id id, int create)
 Id
 repodata_translate_id(Repodata *data, Repodata *fromdata, Id id, int create)
 {
+  const char *s;
   if (!id || !data || !fromdata)
     return id;
-  if (!data->localpool || !fromdata->localpool)
+  if (data == fromdata || (!data->localpool && !fromdata->localpool))
+    return id;
+  if (fromdata->localpool)
+    s = stringpool_id2str(&fromdata->spool, id);
+  else
+    s = pool_id2str(data->repo->pool, id);
+  if (data->localpool)
+    return stringpool_str2id(&data->spool, s, create);
+  else
+    return pool_str2id(data->repo->pool, s, create);
+}
+
+Id
+repodata_translate_dir_slow(Repodata *data, Repodata *fromdata, Id dir, int create, Id *cache)
+{
+  Id parent, compid;
+  if (!dir)
     {
-      if (fromdata->localpool)
-	id = repodata_globalize_id(fromdata, id, create);
-      if (data->localpool)
-	id = repodata_localize_id(data, id, create);
-      return id;
+      /* make sure that the dirpool has an entry */
+      if (create && !data->dirpool.ndirs)
+        dirpool_add_dir(&data->dirpool, 0, 0, create);
+      return 0;
     }
-  /* localpool is set in both data and fromdata */
-  return stringpool_str2id(&data->spool, stringpool_id2str(&fromdata->spool, id), create);
+  parent = dirpool_parent(&fromdata->dirpool, dir);
+  if (parent)
+    {
+      if (!(parent = repodata_translate_dir(data, fromdata, parent, create, cache)))
+	return 0;
+    }
+  compid = dirpool_compid(&fromdata->dirpool, dir);
+  if (compid > 1 && (data->localpool || fromdata->localpool))
+    {
+      if (!(compid = repodata_translate_id(data, fromdata, compid, create)))
+	return 0;
+    }
+  if (!(compid = dirpool_add_dir(&data->dirpool, parent, compid, create)))
+    return 0;
+  if (cache)
+    {
+      cache[(dir & 255) * 2] = dir;
+      cache[(dir & 255) * 2 + 1] = compid;
+    }
+  return compid;
 }
 
 /* uninternalized lookups */
