@@ -879,6 +879,8 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
 	    data.error = pool_error(pool, SOLV_ERROR_UNSUPPORTED, "main solvable data must use incore storage %d", keys[i].storage);
 	  keys[i].storage = KEY_STORAGE_SOLVABLE;
 	}
+      if ((type == REPOKEY_TYPE_FIXARRAY || type == REPOKEY_TYPE_FLEXARRAY) && keys[i].storage != KEY_STORAGE_INCORE)
+	data.error = pool_error(pool, SOLV_ERROR_UNSUPPORTED, "flex/fixarrays must use incore storage\n");
       /* cannot handle rel idarrays in incore/vertical */
       if (type == REPOKEY_TYPE_REL_IDARRAY && keys[i].storage != KEY_STORAGE_SOLVABLE)
 	data.error = pool_error(pool, SOLV_ERROR_UNSUPPORTED, "type REL_IDARRAY is only supported for STORAGE_SOLVABLE");
@@ -1270,7 +1272,7 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
       keys[i].type = REPOKEY_TYPE_IDARRAY;
 
   for (i = 1; i < numkeys; i++)
-    if (keys[i].storage == KEY_STORAGE_VERTICAL_OFFSET)
+    if (keys[i].storage == KEY_STORAGE_VERTICAL_OFFSET && keys[i].size)
       break;
   if (i < numkeys && !data.error)
     {
