@@ -76,11 +76,6 @@ KNOWNID(REPOSITORY_EXTERNAL,		"repository:external"),
 KNOWNID(REPOSITORY_KEYS,		"repository:keys"),
 KNOWNID(REPOSITORY_LOCATION,		"repository:location"),
 
-/* file provides already added to our solvables */
-KNOWNID(REPOSITORY_ADDEDFILEPROVIDES,	"repository:addedfileprovides"),
-/* inode of the rpm database for rpm --rebuilddb detection */
-KNOWNID(REPOSITORY_RPMDBCOOKIE,		"repository:rpmdbcookie"),
-
 /* the known data types */
 KNOWNID(REPOKEY_TYPE_VOID,		"repokey:type:void"),
 KNOWNID(REPOKEY_TYPE_CONSTANT,		"repokey:type:constant"),
@@ -145,6 +140,8 @@ KNOWNID(SOLVABLE_CHANGELOG,		"solvable:changelog"),
 KNOWNID(SOLVABLE_CHANGELOG_AUTHOR,	"solvable:changelog:author"),
 KNOWNID(SOLVABLE_CHANGELOG_TIME,	"solvable:changelog:time"),
 KNOWNID(SOLVABLE_CHANGELOG_TEXT,	"solvable:changelog:text"),
+KNOWNID(SOLVABLE_INSTALLSTATUS,		"solvable:installstatus"),	/* debian install status */
+KNOWNID(SOLVABLE_PREREQ_IGNOREINST,	"solvable:prereq_ignoreinst"),	/* ignore these pre-requires for installed packages */
 
 /* stuff for solvables of type pattern */
 KNOWNID(SOLVABLE_CATEGORY,		"solvable:category"),
@@ -187,6 +184,7 @@ KNOWNID(PRODUCT_URL_TYPE,		"product:url:type"),
 KNOWNID(PRODUCT_FLAGS,			"product:flags"),		/* e.g. 'update', 'no_you' */
 KNOWNID(PRODUCT_PRODUCTLINE,		"product:productline"),		/* installed product only */
 KNOWNID(PRODUCT_REGISTER_TARGET,	"product:regtarget"),		/* installed and available product */
+KNOWNID(PRODUCT_REGISTER_FLAVOR,	"product:regflavor"),		/* installed and available product */
 KNOWNID(PRODUCT_REGISTER_RELEASE,	"product:regrelease"),		/* installed product only */
 KNOWNID(PRODUCT_UPDATES_REPOID,	        "product:updates:repoid"),
 KNOWNID(PRODUCT_UPDATES,	        "product:updates"),
@@ -204,21 +202,18 @@ KNOWNID(SUSETAGS_SHARE_NAME,		"susetags:share:name"),
 KNOWNID(SUSETAGS_SHARE_EVR,		"susetags:share:evr"),
 KNOWNID(SUSETAGS_SHARE_ARCH,		"susetags:share:arch"),
 
-/* timestamp then the repository was generated */
-KNOWNID(REPOSITORY_TIMESTAMP,		"repository:timestamp"),
-/* hint when the metadata could be outdated w/respect to generated timestamp */
-KNOWNID(REPOSITORY_EXPIRE,		"repository:expire"),
-/* which things does this repo provides updates for, if it does (array) */
-KNOWNID(REPOSITORY_UPDATES,		"repository:updates"),		/* obsolete? */
-/* which products this repository is supposed to be for (array) */
-KNOWNID(REPOSITORY_DISTROS,		"repository:distros"),
+KNOWNID(REPOSITORY_ADDEDFILEPROVIDES,	"repository:addedfileprovides"),	/* file provides already added to our solvables */
+KNOWNID(REPOSITORY_RPMDBCOOKIE,		"repository:rpmdbcookie"),	/* inode of the rpm database for rpm --rebuilddb detection */
+KNOWNID(REPOSITORY_FILTEREDFILELIST,	"repository:filteredfilelist"),	/* filelist in repository is filtered */
+KNOWNID(REPOSITORY_TIMESTAMP,		"repository:timestamp"),	/* timestamp then the repository was generated */
+KNOWNID(REPOSITORY_EXPIRE,		"repository:expire"),		/* hint when the metadata could be outdated w/respect to generated timestamp */
+KNOWNID(REPOSITORY_UPDATES,		"repository:updates"),		/* which things does this repo provides updates for, if it does (array) (obsolete?) */
+KNOWNID(REPOSITORY_DISTROS,		"repository:distros"),		/* which products this repository is supposed to be for (array) */
 KNOWNID(REPOSITORY_PRODUCT_LABEL,       "repository:product:label"),
 KNOWNID(REPOSITORY_PRODUCT_CPEID,	"repository:product:cpeid"),
 KNOWNID(REPOSITORY_REPOID,		"repository:repoid"),		/* obsolete? */
-/* keyword (tags) for this repository */
-KNOWNID(REPOSITORY_KEYWORDS,		"repository:keywords"),
-/* revision of the repository. arbitrary string */
-KNOWNID(REPOSITORY_REVISION,		"repository:revision"),
+KNOWNID(REPOSITORY_KEYWORDS,		"repository:keywords"),		/* keyword (tags) for this repository */
+KNOWNID(REPOSITORY_REVISION,		"repository:revision"),		/* revision of the repository. arbitrary string */
 KNOWNID(REPOSITORY_TOOLVERSION,		"repository:toolversion"),
 
 KNOWNID(DELTA_PACKAGE_NAME,		"delta:pkgname"),
@@ -255,13 +250,6 @@ KNOWNID(SIGNATURE_ISSUER,	        "signature:issuer"),
 KNOWNID(SIGNATURE_TIME,	        	"signature:time"),
 KNOWNID(SIGNATURE_EXPIRES,	        "signature:expires"),
 KNOWNID(SIGNATURE_DATA,		        "signature:data"),
-
-KNOWNID(PRODUCT_REGISTER_FLAVOR,	"product:regflavor"),		/* installed and available product */
-
-KNOWNID(SOLVABLE_INSTALLSTATUS,		"solvable:installstatus"),	/* debian install status */
-
-KNOWNID(SOLVABLE_PREREQ_IGNOREINST,	"solvable:prereq_ignoreinst"),	/* ignore these pre-requires for installed packages */
-KNOWNID(REPOSITORY_FILTEREDFILELIST,	"repository:filteredfilelist"),	/* filelist in repository is filtered */
 
 KNOWNID(ID_NUM_INTERNAL,		0)
 
