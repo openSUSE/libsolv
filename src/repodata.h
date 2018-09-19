@@ -343,13 +343,13 @@ repodata_translate_dir(Repodata *data, Repodata *fromdata, Id dir, int create, I
 static inline Id *
 repodata_create_dirtranscache(Repodata *data)
 {
-  return solv_calloc(256, sizeof(Id) * 2);
+  return (Id *)solv_calloc(256, sizeof(Id) * 2);
 }
 
 static inline Id *
 repodata_free_dirtranscache(Id *cache)
 {
-  return solv_free(cache);
+  return (Id *)solv_free(cache);
 }
 
 
