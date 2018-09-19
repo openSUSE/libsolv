@@ -1065,11 +1065,11 @@ repo_create_keyskip(Repo *repo, Id entry, Id **oldkeyskip)
 const char *
 repo_lookup_str(Repo *repo, Id entry, Id keyname)
 {
-  Pool *pool = repo->pool;
   Repodata *data;
 
   if (entry >= 0)
     {
+      Pool *pool = repo->pool;
       switch (keyname)
 	{
 	case SOLVABLE_NAME:
@@ -1091,7 +1091,6 @@ unsigned long long
 repo_lookup_num(Repo *repo, Id entry, Id keyname, unsigned long long notfound)
 {
   Repodata *data;
-  unsigned long long value;
 
   if (entry >= 0)
     {
@@ -1103,7 +1102,7 @@ repo_lookup_num(Repo *repo, Id entry, Id keyname, unsigned long long notfound)
 	}
     }
   data = repo_lookup_repodata_opt(repo, entry, keyname);
-  return data && repodata_lookup_num(data, entry, keyname, &value) ? value : notfound;
+  return data ? repodata_lookup_num(data, entry, keyname, notfound) : notfound;
 }
 
 Id

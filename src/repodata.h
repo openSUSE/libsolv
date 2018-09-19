@@ -225,7 +225,7 @@ void repodata_free_filelistfilter(Repodata *data);
 Id repodata_lookup_type(Repodata *data, Id solvid, Id keyname);
 Id repodata_lookup_id(Repodata *data, Id solvid, Id keyname);
 const char *repodata_lookup_str(Repodata *data, Id solvid, Id keyname);
-int repodata_lookup_num(Repodata *data, Id solvid, Id keyname, unsigned long long *value);
+unsigned long long repodata_lookup_num(Repodata *data, Id solvid, Id keyname, unsigned long long notfound);
 int repodata_lookup_void(Repodata *data, Id solvid, Id keyname);
 const unsigned char *repodata_lookup_bin_checksum(Repodata *data, Id solvid, Id keyname, Id *typep);
 int repodata_lookup_idarray(Repodata *data, Id solvid, Id keyname, Queue *q);

@@ -733,32 +733,28 @@ repodata_lookup_str(Repodata *data, Id solvid, Id keyname)
   return pool_id2str(data->repo->pool, id);
 }
 
-int
-repodata_lookup_num(Repodata *data, Id solvid, Id keyname, unsigned long long *value)
+unsigned long long
+repodata_lookup_num(Repodata *data, Id solvid, Id keyname, unsigned long long notfound)
 {
   unsigned char *dp;
   Repokey *key;
   unsigned int high, low;
 
-  *value = 0;
   dp = find_key_data(data, solvid, keyname, &key);
   if (!dp)
-    return 0;
+    return notfound;
   switch (key->type)
     {
     case REPOKEY_TYPE_NUM:
       data_read_num64(dp, &low, &high);
-      *value = (unsigned long long)high << 32 | low;
-      return 1;
+      return (unsigned long long)high << 32 | low;
     case REPOKEY_TYPE_U32:
       data_read_u32(dp, &low);
-      *value = low;
-      return 1;
+      return low;
     case REPOKEY_TYPE_CONSTANT:
-      *value = key->size;
-      return 1;
+      return key->size;
     default:
-      return 0;
+      return notfound;
     }
 }
 

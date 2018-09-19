@@ -3909,8 +3909,7 @@ rb_eval_string(
     return repodata_lookup_id(repo_id2repodata($self->repo, $self->id), solvid, keyname);
   }
   unsigned long long lookup_num(Id solvid, Id keyname, unsigned long long notfound = 0) {
-    unsigned long long v = 0;
-    return repodata_lookup_num(repo_id2repodata($self->repo, $self->id), solvid, keyname, &v) ? v : notfound;
+    return repodata_lookup_num(repo_id2repodata($self->repo, $self->id), solvid, keyname, notfound);
   }
   bool lookup_void(Id solvid, Id keyname) {
     return repodata_lookup_void(repo_id2repodata($self->repo, $self->id), solvid, keyname);
