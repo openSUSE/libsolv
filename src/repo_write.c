@@ -773,6 +773,7 @@ collect_data_cb(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, KeyVal
     xd = cbdata->extdata + 0;		/* incore buffer */
   switch(key->type)
     {
+      case REPOKEY_TYPE_DELETED:
       case REPOKEY_TYPE_VOID:
       case REPOKEY_TYPE_CONSTANT:
       case REPOKEY_TYPE_CONSTANTID:

@@ -859,7 +859,7 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
 	type = idmap[type];
       else if ((flags & REPO_LOCALPOOL) != 0)
         type = pool_str2id(pool, stringpool_id2str(spool, type), 1);
-      if (type < REPOKEY_TYPE_VOID || type > REPOKEY_TYPE_FLEXARRAY)
+      if (type < REPOKEY_TYPE_VOID || type > REPOKEY_TYPE_DELETED)
 	{
 	  data.error = pool_error(pool, SOLV_ERROR_UNSUPPORTED, "unsupported data type '%s'", pool_id2str(pool, type));
 	  type = REPOKEY_TYPE_VOID;

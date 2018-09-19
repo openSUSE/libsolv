@@ -58,7 +58,7 @@ tool_write(Repo *repo, FILE *fp)
   repowriter_set_keyfilter(writer, keyfilter_solv, 0);
   if (repowriter_write(writer, fp) != 0)
     {
-      fprintf(stderr, "repo write failed\n");
+      fprintf(stderr, "repo write failed: %s\n", pool_errstr(repo->pool));
       exit(1);
     }
   if (fflush(fp))

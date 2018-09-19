@@ -144,6 +144,7 @@ data_fetch(unsigned char *dp, KeyValue *kv, Repokey *key)
   switch (key->type)
     {
     case REPOKEY_TYPE_VOID:
+    case REPOKEY_TYPE_DELETED:
       return dp;
     case REPOKEY_TYPE_CONSTANT:
       kv->num2 = 0;
