@@ -29,13 +29,11 @@ static void
 usage(int status)
 {
   fprintf(stderr, "\nUsage:\n"
-          "susetags2solv [-b <base>][-c <content>][-d <descrdir>][-h][-n <name>]\n"
+          "susetags2solv [-c <content>][-d <descrdir>][-h][-n <name>]\n"
 	  "  reads a 'susetags' repository from <stdin> and writes a .solv file to <stdout>\n"
-	  "  -b <base>: save as multiple files starting with <base>\n"
 	  "  -c <contentfile> : parse given contentfile (for product information)\n"
           "  -d <descrdir> : do not read from stdin, but use data in descrdir\n"
 	  "  -h : print help & exit\n"
-	  "  -n <name>: save attributes as <name>.attr\n"
 	 );
    exit(status);
 }
@@ -61,9 +59,7 @@ int
 main(int argc, char **argv)
 {
   const char *contentfile = 0;
-  const char *attrname = 0;
   const char *descrdir = 0;
-  const char *basefile = 0;
   const char *query = 0;
   const char *mergefile = 0;
   Id defvendor = 0;
@@ -75,24 +71,18 @@ main(int argc, char **argv)
   Pool *pool;
   Repo *repo;
 
-  while ((c = getopt(argc, argv, "hn:c:d:b:q:M:X")) >= 0)
+  while ((c = getopt(argc, argv, "hc:d:q:M:X")) >= 0)
     {
       switch (c)
 	{
 	case 'h':
 	  usage(0);
 	  break;
-	case 'n':
-	  attrname = optarg;
-	  break;
 	case 'c':
 	  contentfile = optarg;
 	  break;
 	case 'd':
 	  descrdir = optarg;
-	  break;
-	case 'b':
-	  basefile = optarg;
 	  break;
 	case 'q':
 	  query = optarg;
@@ -130,20 +120,6 @@ main(int argc, char **argv)
 	}
       defvendor = repo_lookup_id(repo, SOLVID_META, SUSETAGS_DEFAULTVENDOR);
       fclose(fp);
-    }
-
-  if (attrname)
-    {
-      /* ensure '.attr' suffix */
-      const char *dot = strrchr(attrname, '.');
-      if (!dot || strcmp(dot, ".attr"))
-      {
-	int len = strlen (attrname);
-	char *newname = (char *)malloc(len + 6); /* alloc for <attrname>+'.attr'+'\0' */
-	strcpy (newname, attrname);
-	strcpy (newname+len, ".attr");
-	attrname = newname;
-      }
     }
 
   /*
@@ -311,7 +287,7 @@ main(int argc, char **argv)
   if (query)
     doquery(pool, repo, query);
   else
-    tool_write(repo, basefile, attrname);
+    tool_write(repo, stdout);
   pool_free(pool);
   exit(0);
 }

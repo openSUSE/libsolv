@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, Novell Inc.
+ * Copyright (c) 2012, Novell Inc.);
  *
  * This program is licensed under the BSD license, read LICENSE.BSD
  * for further information
@@ -104,7 +104,7 @@ main(int argc, char **argv)
       fclose(fp);
     }
   repo_internalize(repo);
-  tool_write(repo, 0, 0);
+  tool_write(repo, stdout);
   pool_free(pool);
   exit(0);
 }

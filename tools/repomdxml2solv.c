@@ -115,7 +115,7 @@ main(int argc, char **argv)
   if (query)
     doquery(pool, repo, query);
   else
-    tool_write(repo, 0, 0);
+    tool_write(repo, stdout);
   pool_free(pool);
   exit(0);
 }

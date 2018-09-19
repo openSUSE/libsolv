@@ -60,13 +60,10 @@ main(int argc, char **argv)
   const char *basefile = 0;
   int is_repo = 0;
 
-  while ((c = getopt(argc, argv, "0b:m:r")) >= 0)
+  while ((c = getopt(argc, argv, "0:m:r")) >= 0)
     {
       switch(c)
 	{
-	case 'b':
-	  basefile = optarg;
-	  break;
 	case 'm':
 	  manifest = optarg;
 	  break;
@@ -150,7 +147,7 @@ main(int argc, char **argv)
 	}
     }
   repo_internalize(repo);
-  tool_write(repo, basefile, 0);
+  tool_write(repo, stdout);
   pool_free(pool);
   for (c = 0; c < ndebs; c++)
     free((char *)debs[c]);

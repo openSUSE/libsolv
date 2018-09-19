@@ -57,16 +57,12 @@ main(int argc, char **argv)
   Repo *repo;
   FILE *fp;
   char buf[4096], *p;
-  const char *basefile = 0;
   int flags = 0;
 
-  while ((c = getopt(argc, argv, "0b:m:i")) >= 0)
+  while ((c = getopt(argc, argv, "0:m:i")) >= 0)
     {
       switch(c)
 	{
-	case 'b':
-	  basefile = optarg;
-	  break;
 	case 'm':
 	  manifest = optarg;
 	  break;
@@ -124,7 +120,7 @@ main(int argc, char **argv)
 	res = 1;
       }
   repo_internalize(repo);
-  tool_write(repo, basefile, 0);
+  tool_write(repo, stdout);
   pool_free(pool);
   for (c = 0; c < npkgs; c++)
     solv_free((char *)pkgs[c]);

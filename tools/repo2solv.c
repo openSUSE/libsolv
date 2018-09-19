@@ -827,12 +827,7 @@ main(int argc, char **argv)
   if (add_auto)
     repo_add_autopattern(repo, 0);
 #endif
-  tool_write(repo, 0, 0);
-  if (fflush(stdout))
-    {
-      perror("fflush");
-      exit(1);
-    }
+  tool_write(repo, stdout);
   pool_free(pool);
   solv_free(dir);
   exit(res);

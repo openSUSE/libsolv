@@ -43,7 +43,6 @@ usage(int status)
   fprintf(stderr, "\nUsage:\n"
 	  "rpmdb2solv [-n] [-b <basefile>] [-p <productsdir>] [-r <root>]\n"
 	  " -n : No packages, do not read rpmdb, useful to only parse products\n"
-	  " -b <basefile> : Write .solv to <basefile>.solv instead of stdout\n"
 	  " -p <productsdir> : Scan <productsdir> for .prod files, representing installed products\n"
 	  " -r <root> : Prefix rpmdb path and <productsdir> with <root>\n"
 	  " -o <solv> : Write .solv to file instead of stdout\n"
@@ -63,7 +62,6 @@ main(int argc, char **argv)
   int nopacks = 0;
   int add_changelog = 0;
   const char *root = 0;
-  const char *basefile = 0;
   const char *refname = 0;
 #ifdef ENABLE_SUSEREPO
   char *proddir = 0;
@@ -83,7 +81,7 @@ main(int argc, char **argv)
    * parse arguments
    */
   
-  while ((c = getopt(argc, argv, "ACPhnkxXb:r:p:o:")) >= 0)
+  while ((c = getopt(argc, argv, "ACPhnkxXr:p:o:")) >= 0)
     switch (c)
       {
       case 'h':
@@ -91,9 +89,6 @@ main(int argc, char **argv)
 	break;
       case 'r':
         root = optarg;
-        break;
-      case 'b':
-        basefile = optarg;
         break;
       case 'n':
 	nopacks = 1;
@@ -229,7 +224,7 @@ main(int argc, char **argv)
     repo_add_autopattern(repo, ADD_NO_AUTOPRODUCTS);
 #endif
 
-  tool_write(repo, basefile, 0);
+  tool_write(repo, stdout);
   pool_free(pool);
   exit(0);
 }

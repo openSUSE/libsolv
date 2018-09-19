@@ -70,7 +70,7 @@ main(int argc, char **argv)
 	  exit(1);
 	}
     }
-  tool_write(repo, 0, 0);
+  tool_write(repo, stdout);
   pool_free(pool);
   exit(0);
 }
