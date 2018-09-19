@@ -184,13 +184,18 @@ write_info(Repo *repo, FILE *fp, int (*keyfilter)(Repo *repo, Repokey *key, void
 {
   Id h;
   Queue keyq;
+  Repowriter *writer;
 
   queue_init(&keyq);
-  if (repo_write_filtered(repo, fp, keyfilter, kfdata, &keyq) != 0)
+  writer = repowriter_create(repo);
+  repowriter_set_keyfilter(writer, keyfilter, kfdata);
+  repowriter_set_keyqueue(writer, &keyq);
+  if (repowriter_write(writer, fp) != 0)
     {
-      fprintf(stderr, "repo_write failed\n");
+      fprintf(stderr, "repo write failed\n");
       exit(1);
     }
+  repowriter_free(writer);
   h = repodata_new_handle(info);
   if (keyq.count)
     repodata_set_idarray(info, h, REPOSITORY_KEYS, &keyq);
@@ -210,6 +215,7 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
   int i, j, k, l;
   struct keyfilter_data kd;
   Queue addedfileprovides;
+  Repowriter *writer;
 
   memset(&kd, 0, sizeof(kd));
   info = repo_add_repodata(repo, 0);
@@ -308,9 +314,11 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
       kd.languages = languages;
       kd.nlanguages = nlanguages;
       repodata_internalize(info);
-      if (repo_write_filtered(repo, fp, keyfilter_other, &kd, 0) != 0)
+      writer = repowriter_create(repo);
+      repowriter_set_keyfilter(writer, keyfilter_other, &kd);
+      if (repowriter_write(writer, fp) != 0)
 	{
-	  fprintf(stderr, "repo_write failed\n");
+	  fprintf(stderr, "repo write failed\n");
 	  exit(1);
 	}
       if (fclose(fp) != 0)
@@ -318,10 +326,12 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
 	  perror("fclose");
 	  exit(1);
 	}
+      repowriter_free(writer);
       for (i = 0; i < nlanguages; i++)
 	free(languages[i]);
       solv_free(languages);
       repodata_free(info);
+      return;
     }
   if (attrname)
     {
@@ -333,10 +343,18 @@ tool_write(Repo *repo, const char *basename, const char *attrname)
       kd.haveexternal = 1;
     }
   repodata_internalize(info);
-  if (repo_write_filtered(repo, stdout, keyfilter_solv, &kd, 0) != 0)
+  writer = repowriter_create(repo);
+  repowriter_set_keyfilter(writer, keyfilter_solv, &kd);
+  if (repowriter_write(writer, stdout) != 0)
     {
-      fprintf(stderr, "repo_write failed\n");
+      fprintf(stderr, "repo write failed\n");
       exit(1);
     }
+  if (fflush(stdout))
+    {
+      perror("fflush");
+      exit(1);
+    }
+  repowriter_free(writer);
   repodata_free(info);
 }

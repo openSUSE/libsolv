@@ -178,7 +178,6 @@ SOLV_1.0 {
 		repo_sidedata_create;
 		repo_unset;
 		repo_write;
-		repo_write_filtered;
 		repo_write_stdkeyfilter;
 		repodata_add_dirnumnum;
 		repodata_add_dirstr;
@@ -246,8 +245,15 @@ SOLV_1.0 {
 		repodata_unset;
 		repodata_unset_uninternalized;
 		repodata_write;
-		repodata_write_filtered;
 		repopagestore_compress_page;
+		repowriter_create;
+		repowriter_free;
+		repowriter_set_flags;
+		repowriter_set_keyfilter;
+		repowriter_set_keyqueue;
+		repowriter_set_repodatarange;
+		repowriter_set_solvablerange;
+		repowriter_write;
 		selection_add;
 		selection_filter;
 		selection_make;
