@@ -1048,7 +1048,6 @@ repo_create_keyskip(Repo *repo, Id entry, Id **oldkeyskip)
       last = data;
       cnt++;
     }
-printf("repo_create_keyskip: cnt %d\n", cnt);
   if (cnt <= 1)
     {
       if (oldkeyskip)

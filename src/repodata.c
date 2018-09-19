@@ -1188,7 +1188,7 @@ repodata_search_keyskip(Repodata *data, Id solvid, Id keyname, int flags, Id *ke
 	    return;
 	  continue;
 	}
-      if (key->type == REPOKEY_TYPE_DELETED)
+      if (key->type == REPOKEY_TYPE_DELETED && !(flags & SEARCH_KEEP_TYPE_DELETED))
 	{
 	  if (onekey)
 	    return;
@@ -1712,7 +1712,7 @@ dataiterator_step(Dataiterator *di)
 	    goto di_nextkey;
 	  if (di->keyskip && (di->key->name >= di->keyskip[0] || di->keyskip[3 + di->key->name] != di->keyskip[1] + di->data->repodataid))
 	    goto di_nextkey;
-          if (di->key->type == REPOKEY_TYPE_DELETED)
+          if (di->key->type == REPOKEY_TYPE_DELETED && !(di->flags & SEARCH_KEEP_TYPE_DELETED))
 	    goto di_nextkey;
 	  if (di->key->type == REPOKEY_TYPE_FIXARRAY || di->key->type == REPOKEY_TYPE_FLEXARRAY)
 	    goto di_enterarray;
@@ -2954,7 +2954,6 @@ repodata_unset_uninternalized(Repodata *data, Id solvid, Id keyname)
   *pp = 0;
 }
 
-/* XXX: does not work correctly, needs fix in iterators! */
 void
 repodata_unset(Repodata *data, Id solvid, Id keyname)
 {

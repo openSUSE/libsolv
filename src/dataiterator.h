@@ -52,7 +52,7 @@ typedef struct _KeyValue {
 #define SEARCH_SUB			(1<<9)
 #define SEARCH_ARRAYSENTINEL		(1<<10)
 #define SEARCH_DISABLED_REPOS		(1<<11)
-#define SEARCH_COMPLETE_FILELIST	(1<<12)		/* ignored, this is the default */
+#define SEARCH_KEEP_TYPE_DELETED	(1<<12)		/* only has effect if no keyname is given */
 
 /* stringification flags */
 #define SEARCH_SKIP_KIND		(1<<16)
@@ -64,6 +64,9 @@ typedef struct _KeyValue {
 
 /* dataiterator internal */
 #define SEARCH_THISSOLVID		(1<<31)
+
+/* obsolete */
+#define SEARCH_COMPLETE_FILELIST	0		/* ignored, this is the default */
 
 /*
  * Datamatcher: match a string against a query

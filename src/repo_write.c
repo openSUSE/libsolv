@@ -1176,6 +1176,7 @@ repowriter_write(Repowriter *writer, FILE *fp)
   unsigned int solv_flags;
   Id *oldkeyskip = 0;
   Id *keyskip = 0;
+  int searchflags = 0;
 
   Id id, *sp;
 
@@ -1496,6 +1497,10 @@ for (i = 1; i < target.nkeys; i++)
 
 /********************************************************************/
 
+  searchflags = SEARCH_SUB|SEARCH_ARRAYSENTINEL;
+  if ((writer->flags & REPOWRITER_KEEP_TYPE_DELETED) != 0)
+    searchflags |= SEARCH_KEEP_TYPE_DELETED;
+
   /* set needed count of all strings and rels,
    * find which keys are used in the solvables
    * put all strings in own spool
@@ -1523,7 +1528,7 @@ for (i = 1; i < target.nkeys; i++)
 	continue;
       cbdata.keymap = keymap + keymapstart[j];
       cbdata.lastdirid = 0;		/* clear dir mapping cache */
-      repodata_search_keyskip(data, SOLVID_META, 0, SEARCH_SUB|SEARCH_ARRAYSENTINEL, keyskip, collect_needed_cb, &cbdata);
+      repodata_search_keyskip(data, SOLVID_META, 0, searchflags, keyskip, collect_needed_cb, &cbdata);
     }
   needid = cbdata.needid;		/* maybe relocated */
   sp = cbdata.sp;
@@ -1560,7 +1565,7 @@ for (i = 1; i < target.nkeys; i++)
 		continue;
 	      cbdata.keymap = keymap + keymapstart[j];
 	      cbdata.lastdirid = 0;
-	      repodata_search_keyskip(data, i, 0, SEARCH_SUB|SEARCH_ARRAYSENTINEL, keyskip, collect_needed_cb, &cbdata);
+	      repodata_search_keyskip(data, i, 0, searchflags, keyskip, collect_needed_cb, &cbdata);
 	    }
 	  needid = cbdata.needid;		/* maybe relocated */
 	}
@@ -1795,7 +1800,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
 	continue;
       cbdata.keymap = keymap + keymapstart[j];
       cbdata.lastdirid = 0;
-      repodata_search_keyskip(data, SOLVID_META, 0, SEARCH_SUB|SEARCH_ARRAYSENTINEL, keyskip, collect_data_cb, &cbdata);
+      repodata_search_keyskip(data, SOLVID_META, 0, searchflags, keyskip, collect_data_cb, &cbdata);
     }
 
   if (xd->len - cbdata.lastlen > cbdata.maxdata)
@@ -1835,7 +1840,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
 		    continue;
 		  cbdata.keymap = keymap + keymapstart[j];
 		  cbdata.lastdirid = 0;
-		  repodata_search_keyskip(data, i, 0, SEARCH_SUB|SEARCH_ARRAYSENTINEL, keyskip, collect_data_cb, &cbdata);
+		  repodata_search_keyskip(data, i, 0, searchflags, keyskip, collect_data_cb, &cbdata);
 		}
 	    }
 	  if (xd->len - cbdata.lastlen > cbdata.maxdata)
@@ -2009,7 +2014,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
 		    continue;
 		  cbdata.keymap = keymap + keymapstart[j];
 		  cbdata.lastdirid = 0;
-		  repodata_search_keyskip(data, i, 0, SEARCH_SUB|SEARCH_ARRAYSENTINEL, keyskip, collect_data_cb, &cbdata);
+		  repodata_search_keyskip(data, i, 0, searchflags, keyskip, collect_data_cb, &cbdata);
 		}
 	      if (xd->len > 1024 * 1024)
 		{
