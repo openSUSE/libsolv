@@ -202,12 +202,10 @@ SOLV_1.0 {
 		repodata_key2id;
 		repodata_localize_id;
 		repodata_lookup_bin_checksum;
-		repodata_lookup_bin_checksum_uninternalized;
 		repodata_lookup_binary;
-		repodata_lookup_dirstrarray_uninternalized;
 		repodata_lookup_id;
-		repodata_lookup_id_uninternalized;
 		repodata_lookup_idarray;
+		repodata_lookup_kv_uninternalized;
 		repodata_lookup_num;
 		repodata_lookup_str;
 		repodata_lookup_type;
@@ -220,6 +218,7 @@ SOLV_1.0 {
 		repodata_search;
 		repodata_search_arrayelement;
 		repodata_search_keyskip;
+		repodata_search_uninternalized;
 		repodata_set_binary;
 		repodata_set_bin_checksum;
 		repodata_set_checksum;

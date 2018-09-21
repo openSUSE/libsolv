@@ -603,17 +603,18 @@ static void
 fill_cshash_from_new_solvables(struct parsedata *pd)
 {
   Pool *pool = pd->pool;
-  Id cstype = 0;
-  unsigned const char *cs;
-  int i;
+  int i, l;
+  KeyValue kv;
+  Repokey *key;
 
   for (i = pd->first; i < pool->nsolvables; i++)
     {
       if (pool->solvables[i].repo != pd->repo)
 	continue;
-      cs = repodata_lookup_bin_checksum_uninternalized(pd->data, i, SOLVABLE_CHECKSUM, &cstype);
-      if (cs)
-	put_in_cshash(pd, cs, solv_chksum_len(cstype), i);
+      if ((key = repodata_lookup_kv_uninternalized(pd->data, i, SOLVABLE_CHECKSUM, &kv)) == 0)
+	continue;
+      if ((l = solv_chksum_len(key->type)) != 0)
+	put_in_cshash(pd, (const unsigned char *)kv.str, l, i);
     }
 }
 

@@ -933,86 +933,121 @@ repodata_translate_dir_slow(Repodata *data, Repodata *fromdata, Id dir, int crea
   return compid;
 }
 
-/* uninternalized lookups */
+/************************************************************************
+ * uninternalized lookup / search
+ */
 
-Id
-repodata_lookup_id_uninternalized(Repodata *data, Id solvid, Id keyname, Id voidid)
+static void
+data_fetch_uninternalized(Repodata *data, Repokey *key, Id value, KeyValue *kv)
 {
-  Id *ap;
-  if (!data->attrs)
-    return 0;
-  ap = data->attrs[solvid - data->start];
-  if (!ap)
-    return 0;
-  for (; *ap; ap += 2)
+  Id *array;
+  kv->eof = 1;
+  switch (key->type)
     {
-      if (data->keys[*ap].name != keyname)
-	continue;
-      if (data->keys[*ap].type == REPOKEY_TYPE_VOID)
-	return voidid;
-      if (data->keys[*ap].type == REPOKEY_TYPE_ID)
-	return ap[1];
-      return 0;
-    }
-  return 0;
-}
-
-/* returns the basename, stores the dir id in didp */
-const char *
-repodata_lookup_dirstrarray_uninternalized(Repodata *data, Id solvid, Id keyname, Id *didp, Id *iterp)
-{
-  Id *ap, did;
-  Id iter = *iterp;
-  if (iter == 0)	/* find key data */
-    {
-      if (!data->attrs)
-	return 0;
-      ap = data->attrs[solvid - data->start];
-      if (!ap)
-	return 0;
-      for (; *ap; ap += 2)
-	if (data->keys[*ap].name == keyname && data->keys[*ap].type == REPOKEY_TYPE_DIRSTRARRAY)
-	  break;
-      if (!*ap)
-	return 0;
-      iter = ap[1];
-    }
-  did = *didp;
-  for (ap = data->attriddata + iter; *ap; ap += 2)
-    {
-      if (did && ap[0] != did)
-	continue;
-      *didp = ap[0];
-      *iterp = ap - data->attriddata + 2;
-      return (const char *)data->attrdata + ap[1];
-    }
-  *iterp = 0;
-  return 0;
-}
-
-const unsigned char *
-repodata_lookup_bin_checksum_uninternalized(Repodata *data, Id solvid, Id keyname, Id *typep)
-{
-  Id *ap;
-  if (!data->attrs)
-    return 0;
-  ap = data->attrs[solvid - data->start];
-  if (!ap)
-    return 0;
-  for (; *ap; ap += 2)
-    {
-      if (data->keys[*ap].name != keyname)
-	continue;
-      switch (data->keys[*ap].type)
+    case REPOKEY_TYPE_STR:
+      kv->str = (const char *)data->attrdata + value;
+      return;
+    case REPOKEY_TYPE_CONSTANT:
+      kv->num2 = 0;
+      kv->num = key->size;
+      return;
+    case REPOKEY_TYPE_CONSTANTID:
+      kv->id = key->size;
+      return;
+    case REPOKEY_TYPE_NUM:
+      kv->num2 = 0;
+      kv->num = value;
+      if (value & 0x80000000)
 	{
-	  case_CHKSUM_TYPES:
-	    *typep = data->keys[*ap].type;
-	    return (const unsigned char *)data->attrdata + ap[1];
-	  default:
-	    break;
+	  kv->num = (unsigned int)data->attrnum64data[value ^ 0x80000000];
+	  kv->num2 = (unsigned int)(data->attrnum64data[value ^ 0x80000000] >> 32);
 	}
+      return;
+    case_CHKSUM_TYPES:
+      kv->num = 0;	/* not stringified */
+      kv->str = (const char *)data->attrdata + value;
+      return;
+    case REPOKEY_TYPE_IDARRAY:
+      array = data->attriddata + (value + kv->entry);
+      kv->id = array[0];
+      kv->eof = array[1] ? 0 : 1;
+      return;
+    case REPOKEY_TYPE_DIRSTRARRAY:
+      kv->num = 0;	/* not stringified */
+      array = data->attriddata + (value + kv->entry * 2);
+      kv->id = array[0];
+      kv->str = (const char *)data->attrdata + array[1];
+      kv->eof = array[2] ? 0 : 1;
+      return;
+    case REPOKEY_TYPE_DIRNUMNUMARRAY:
+      array = data->attriddata + (value + kv->entry * 3);
+      kv->id = array[0];
+      kv->num = array[1];
+      kv->num2 = array[2];
+      kv->eof = array[3] ? 0 : 1;
+      return;
+    case REPOKEY_TYPE_FIXARRAY:
+    case REPOKEY_TYPE_FLEXARRAY:
+      array = data->attriddata + (value + kv->entry);
+      kv->id = array[0];		/* the handle */
+      kv->eof = array[1] ? 0 : 1;
+      return;
+    default:
+      kv->id = value;
+      return;
+    }
+}
+
+Repokey *
+repodata_lookup_kv_uninternalized(Repodata *data, Id solvid, Id keyname, KeyValue *kv)
+{
+  Id *ap;
+  if (!data->attrs || solvid < data->start || solvid >= data->end)
+    return 0;
+  ap = data->attrs[solvid - data->start];
+  if (!ap)
+    return 0;
+  for (; *ap; ap += 2)
+    {
+      Repokey *key = data->keys + *ap;
+      if (key->name != keyname)
+	continue;
+      data_fetch_uninternalized(data, key, ap[1], kv);
+      return key;
     }
   return 0;
+}
+
+void
+repodata_search_uninternalized(Repodata *data, Id solvid, Id keyname, int flags, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv), void *cbdata)
+{
+  Id *ap;
+  int stop;
+  Solvable *s;
+  KeyValue kv;
+
+  if (!data->attrs || solvid < data->start || solvid >= data->end)
+    return;
+  ap = data->attrs[solvid - data->start];
+  if (!ap)
+    return;
+  for (; *ap; ap += 2)
+    {
+      Repokey *key = data->keys + *ap;
+      if (keyname && key->name != keyname)
+	continue;
+      s = solvid > 0 ? data->repo->pool->solvables + solvid : 0;
+      kv.entry = 0;
+      do
+	{
+	  data_fetch_uninternalized(data, key, ap[1], &kv);
+	  stop = callback(cbdata, s, data, key, &kv);
+	  kv.entry++;
+	}
+      while (!kv.eof && !stop);
+      if (keyname || stop > SEARCH_NEXT_KEY)
+	return;
+    }
 }
 
 /************************************************************************

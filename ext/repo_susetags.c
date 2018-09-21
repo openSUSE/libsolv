@@ -333,7 +333,16 @@ lookup_shared_id(Repodata *data, Id p, Id keyname, Id voidid, int uninternalized
 	return r;
     }
   if (uninternalized)
-    return repodata_lookup_id_uninternalized(data, p, keyname, voidid);
+    {
+      KeyValue kv;
+      Repokey *key = repodata_lookup_kv_uninternalized(data, p, keyname, &kv);
+      if (!key)
+        return 0;
+      if (key->type == REPOKEY_TYPE_VOID)
+	return voidid;
+      if (key->type == REPOKEY_TYPE_ID)
+	return kv.id;
+    }
   return 0;
 }
 

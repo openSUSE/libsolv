@@ -324,10 +324,9 @@ void repodata_set_location(Repodata *data, Id solvid, int medianr, const char *d
 void repodata_set_deltalocation(Repodata *data, Id handle, int medianr, const char *dir, const char *file);
 void repodata_set_sourcepkg(Repodata *data, Id solvid, const char *sourcepkg);
 
-/* uninternalized data lookup */
-Id repodata_lookup_id_uninternalized(Repodata *data, Id solvid, Id keyname, Id voidid);
-const char *repodata_lookup_dirstrarray_uninternalized(Repodata *data, Id solvid, Id keyname, Id *didp, Id *iterp);
-const unsigned char *repodata_lookup_bin_checksum_uninternalized(Repodata *data, Id solvid, Id keyname, Id *typep);
+/* uninternalized data lookup / search */
+Repokey *repodata_lookup_kv_uninternalized(Repodata *data, Id solvid, Id keyname, struct _KeyValue *kv);
+void repodata_search_uninternalized(Repodata *data, Id solvid, Id keyname, int flags, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, struct _KeyValue *kv), void *cbdata);
 
 /* stats */
 unsigned int repodata_memused(Repodata *data);
