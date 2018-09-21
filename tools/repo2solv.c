@@ -404,7 +404,7 @@ read_susetags_repo(Repo *repo, const char *dir)
   filename = susetags_find(files, nfiles, "packages");
   if (filename && (fp = susetags_open(ddir, filename, &tmp, 1)) != 0)
     {
-      if (repo_add_susetags(repo, fp, defvendor, 0, REPO_NO_INTERNALIZE|SUSETAGS_RECORD_SHARES))
+      if (repo_add_susetags(repo, fp, defvendor, 0, SUSETAGS_RECORD_SHARES))
 	{
 	  fprintf(stderr, "%s: %s\n", tmp, pool_errstr(pool));
 	  exit(1);
