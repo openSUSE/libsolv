@@ -197,7 +197,7 @@ main(int argc, char **argv)
 		  perror(fn);
 		  exit(1);
 		}
-	      if (repo_add_susetags(repo, fp, defvendor, 0, flags | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE))
+	      if (repo_add_susetags(repo, fp, defvendor, 0, flags | REPO_REUSE_REPODATA | REPO_NO_INTERNALIZE | SUSETAGS_RECORD_SHARES))
 		{
 		  fprintf(stderr, "susetags2solv: %s: %s\n", fnp, pool_errstr(pool));
 		  exit(1);
