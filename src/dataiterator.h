@@ -62,7 +62,8 @@ typedef struct _KeyValue {
 #define SEARCH_FILES			(1<<17)
 #define SEARCH_CHECKSUMS		(1<<18)
 
-/* dataiterator internal */
+/* internal */
+#define SEARCH_SUBSCHEMA		(1<<30)
 #define SEARCH_THISSOLVID		(1<<31)
 
 /* obsolete */

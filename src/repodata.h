@@ -143,7 +143,6 @@ typedef struct _Repodata {
 
 #define SOLVID_META		-1
 #define SOLVID_POS		-2
-#define SOLVID_SUBSCHEMA	-3		/* internal! */
 
 
 /*-----

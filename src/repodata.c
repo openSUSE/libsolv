@@ -967,6 +967,9 @@ data_fetch_uninternalized(Repodata *data, Repokey *key, Id value, KeyValue *kv)
       kv->num = 0;	/* not stringified */
       kv->str = (const char *)data->attrdata + value;
       return;
+    case REPOKEY_TYPE_BINARY:
+      kv->str = (const char *)data_read_id(data->attrdata + value, (Id *)&kv->num);
+      return;
     case REPOKEY_TYPE_IDARRAY:
       array = data->attriddata + (value + kv->entry);
       kv->id = array[0];
@@ -1111,17 +1114,12 @@ struct subschema_data {
 void
 repodata_search_arrayelement(Repodata *data, Id solvid, Id keyname, int flags, KeyValue *kv, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv), void *cbdata)
 {
-  struct subschema_data subd;
-  subd.solvid = solvid;
-  subd.cbdata = cbdata;
-  subd.parent = kv;
-  repodata_search_keyskip(data, SOLVID_SUBSCHEMA, keyname, flags, 0, callback, &subd);
+  repodata_search_keyskip(data, solvid, keyname, flags | SEARCH_SUBSCHEMA, (Id *)kv, callback, cbdata);
 }
 
 static int
 repodata_search_array(Repodata *data, Id solvid, Id keyname, int flags, Repokey *key, KeyValue *kv, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv), void *cbdata)
 {
-  struct subschema_data subd;
   Solvable *s = solvid > 0 ? data->repo->pool->solvables + solvid : 0;
   unsigned char *dp = (unsigned char *)kv->str;
   int stop;
@@ -1129,9 +1127,6 @@ repodata_search_array(Repodata *data, Id solvid, Id keyname, int flags, Repokey 
 
   if (!dp || kv->entry != -1)
     return 0;
-  subd.solvid = solvid;
-  subd.cbdata = cbdata;
-  subd.parent = kv;
   while (++kv->entry < kv->num)
     {
       if (kv->entry)
@@ -1145,7 +1140,7 @@ repodata_search_array(Repodata *data, Id solvid, Id keyname, int flags, Repokey 
       if (stop && stop != SEARCH_ENTERSUB)
 	return stop;
       if ((flags & SEARCH_SUB) != 0 || stop == SEARCH_ENTERSUB)
-	repodata_search_keyskip(data, SOLVID_SUBSCHEMA, keyname, flags, 0, callback, &subd);
+        repodata_search_keyskip(data, solvid, keyname, flags | SEARCH_SUBSCHEMA, (Id *)kv, callback, cbdata);
     }
   if ((flags & SEARCH_ARRAYSENTINEL) != 0)
     {
@@ -1174,14 +1169,13 @@ repodata_search_keyskip(Repodata *data, Id solvid, Id keyname, int flags, Id *ke
 
   if (!maybe_load_repodata(data, keyname))
     return;
-  if (solvid == SOLVID_SUBSCHEMA)
+  if ((flags & SEARCH_SUBSCHEMA) != 0)
     {
-      struct subschema_data *subd = cbdata;
-      cbdata = subd->cbdata;
-      solvid = subd->solvid;
-      schema = subd->parent->id;
-      dp = (unsigned char *)subd->parent->str;
-      kv.parent = subd->parent;
+      flags ^= SEARCH_SUBSCHEMA;
+      kv.parent = (KeyValue *)keyskip;
+      keyskip = 0;
+      schema = kv.parent->id;
+      dp = (unsigned char *)kv.parent->str;
     }
   else
     {
