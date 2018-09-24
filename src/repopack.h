@@ -205,8 +205,14 @@ data_fetch(unsigned char *dp, KeyValue *kv, Repokey *key)
       return data_read_ideof(dp, (Id *)&kv->num2, &kv->eof);
     case REPOKEY_TYPE_FIXARRAY:
     case REPOKEY_TYPE_FLEXARRAY:
-      kv->entry = -1;
-      dp = data_read_id(dp, (Id *)&kv->num);	/* number of elements */
+      if (!kv->entry)
+	{
+          dp = data_read_id(dp, (Id *)&kv->num);	/* number of elements */
+	  if (!kv->num)
+	    return 0;		/* illegal */
+	}
+      if (!kv->entry || key->type == REPOKEY_TYPE_FLEXARRAY)
+        dp = data_read_id(dp, &kv->id);	/* schema */
       kv->str = (const char *)dp;
       return dp;
     default:
