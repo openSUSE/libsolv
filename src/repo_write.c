@@ -847,16 +847,14 @@ collect_data_cb(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, KeyVal
 	if (cbdata->owndirpool)
 	  id = putinowndirpool(cbdata, data, id);
 	id = cbdata->dirused[id];
-	if (cbdata->filelistmode > 0)
+	if (cbdata->filelistmode)
 	  {
-	    /* postpone adding to xd, just update len */
+	    /* postpone adding to xd, just update len to get the correct offsets into the incore data*/
 	    xd->len += data_addideof_len(id) + strlen(kv->str) + 1;
 	    break;
 	  }
 	data_addideof(xd, id, kv->eof);
 	data_addblob(xd, (unsigned char *)kv->str, strlen(kv->str) + 1);
-	if (cbdata->filelistmode < 0)	/* in second pass of filelist mode */
-	  return 0;
 	break;
       case REPOKEY_TYPE_FIXARRAY:
       case REPOKEY_TYPE_FLEXARRAY:
@@ -885,7 +883,29 @@ collect_data_cb(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, KeyVal
   return 0;
 }
 
-void
+/* special version of collect_data_cb that collects just one single REPOKEY_TYPE_DIRSTRARRAY vertical data */
+static int
+collect_filelist_cb(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, KeyValue *kv)
+{
+  struct cbdata *cbdata = vcbdata;
+  int rm;
+  Id id;
+  struct extdata *xd;
+
+  rm = cbdata->keymap[key - data->keys];
+  if (!rm)
+    return SEARCH_NEXT_KEY;	/* we do not want this one */
+  id = kv->id;
+  if (cbdata->owndirpool)
+    id = putinowndirpool(cbdata, data, id);
+  id = cbdata->dirused[id];
+  xd = cbdata->extdata + rm;	/* vertical buffer */
+  data_addideof(xd, id, kv->eof);
+  data_addblob(xd, (unsigned char *)kv->str, strlen(kv->str) + 1);
+  return 0;
+}
+
+static void
 collect_data_solvable(struct cbdata *cbdata, Solvable *s, Id *keymap)
 {
   Repo *repo = s->repo;
@@ -1215,7 +1235,8 @@ repowriter_write(Repowriter *writer, FILE *fp)
 
   struct extdata *xd;
 
-  Id type_constantid = REPOKEY_TYPE_CONSTANTID;
+  Id type_constantid = 0;
+  Id type_dirstrarray = 0;
 
 
   memset(&cbdata, 0, sizeof(cbdata));
@@ -1370,7 +1391,7 @@ repowriter_write(Repowriter *writer, FILE *fp)
 		  continue;
 		}
 	    }
-	  if (data->state != REPODATA_AVAILABLE)
+	  if (data->state != REPODATA_AVAILABLE && data->state != REPODATA_LOADING)
 	    {
 	      /* too bad! */
 	      keymap[n] = 0;
@@ -1482,17 +1503,23 @@ for (i = 1; i < target.nkeys; i++)
       for (i = 1, key = target.keys + i; i < target.nkeys; i++, key++)
 	{
 	  key->name = stringpool_str2id(spool, pool_id2str(pool, key->name), 1);
+	  id = stringpool_str2id(spool, pool_id2str(pool, key->type), 1);
 	  if (key->type == REPOKEY_TYPE_CONSTANTID)
 	    {
-	      key->type = stringpool_str2id(spool, pool_id2str(pool, key->type), 1);
-	      type_constantid = key->type;
+	      type_constantid = id;
 	      key->size = stringpool_str2id(spool, pool_id2str(pool, key->size), 1);
 	    }
-	  else
-	    key->type = stringpool_str2id(spool, pool_id2str(pool, key->type), 1);
+	  if (key->type == REPOKEY_TYPE_DIRSTRARRAY)
+	    type_dirstrarray = id;
+	  key->type = id;
 	}
       if (poolusage == 2)
 	stringpool_freehash(spool);	/* free some mem */
+    }
+  else
+    {
+      type_constantid = REPOKEY_TYPE_CONSTANTID;
+      type_dirstrarray = REPOKEY_TYPE_DIRSTRARRAY;
     }
 
 
@@ -1818,8 +1845,8 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
 	{
 	  for (i = 1; i < target.nkeys; i++)
 	    if (target.keys[i].storage == KEY_STORAGE_VERTICAL_OFFSET)
-	      cbdata.filelistmode |= cbdata.filelistmode == 0 && target.keys[i].type == REPOKEY_TYPE_DIRSTRARRAY ? 1 : 2;
-	    else if (target.keys[i].type == REPOKEY_TYPE_DIRSTRARRAY)
+	      cbdata.filelistmode |= cbdata.filelistmode == 0 && target.keys[i].type == type_dirstrarray? 1 : 2;
+	    else if (target.keys[i].type == type_dirstrarray)
 	      cbdata.filelistmode = 2;
 	  if (cbdata.filelistmode != 1)
 	    cbdata.filelistmode = 0;
@@ -1997,10 +2024,10 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
 	}
       else
 	{
-	  /* ok, just this single extdata, which is a filelist */
+	  /* ok, just this single extdata, which is of type REPOKEY_TYPE_DIRSTRARRAY */
 	  xd = cbdata.extdata + i;
 	  xd->len = 0;
-	  cbdata.filelistmode = -1;	/* mark that we are writing */
+	  /* remove all keys from the keymap but this one */
 	  for (j = 0; j < nkeymap; j++)
 	    if (keymap[j] != i)
 	      keymap[j] = 0;
@@ -2015,7 +2042,7 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
 		    continue;
 		  cbdata.keymap = keymap + keymapstart[j];
 		  cbdata.lastdirid = 0;
-		  repodata_search_keyskip(data, i, 0, searchflags, keyskip, collect_data_cb, &cbdata);
+		  repodata_search_keyskip(data, i, 0, searchflags, keyskip, collect_filelist_cb, &cbdata);
 		}
 	      if (xd->len > 1024 * 1024)
 		{
