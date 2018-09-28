@@ -2957,7 +2957,9 @@ add_update_target(Solver *solv, Id p, Id how)
   Pool *pool = solv->pool;
   Solvable *s = pool->solvables + p;
   Repo *installed = solv->installed;
-  Id pi, pip;
+  Id pi, pip, identicalp;
+  int startcnt, endcnt;
+
   if (!solv->update_targets)
     {
       solv->update_targets = solv_calloc(1, sizeof(Queue));
@@ -2968,6 +2970,8 @@ add_update_target(Solver *solv, Id p, Id how)
       queue_push2(solv->update_targets, p, p);
       return;
     }
+  identicalp = 0;
+  startcnt = solv->update_targets->count;
   FOR_PROVIDES(pi, pip, s->name)
     {
       Solvable *si = pool->solvables + pi;
@@ -2982,9 +2986,9 @@ add_update_target(Solver *solv, Id p, Id how)
       if (how & SOLVER_CLEANDEPS)
 	add_cleandeps_updatepkg(solv, pi);
       queue_push2(solv->update_targets, pi, p);
-      /* check if it's ok to keep the installed package */
+      /* remember an installed package that is identical to p */
       if (s->evr == si->evr && solvable_identical(s, si))
-        queue_push2(solv->update_targets, pi, pi);
+	identicalp = pi;
     }
   if (s->obsoletes)
     {
@@ -3013,6 +3017,12 @@ add_update_target(Solver *solv, Id p, Id how)
 	      queue_push2(solv->update_targets, pi, p);
 	    }
 	}
+    }
+  /* also allow upgrading to an identical installed package */
+  if (identicalp)
+    {
+      for (endcnt = solv->update_targets->count; startcnt < endcnt; startcnt += 2)
+	queue_push2(solv->update_targets, solv->update_targets->elements[startcnt], identicalp);
     }
 }
 
