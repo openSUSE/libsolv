@@ -38,7 +38,7 @@ typedef struct needid {
 } NeedId;
 
 
-#define RELOFF(id) (needid[0].map + GETRELID(id))
+#define NEEDIDOFF(id) (ISRELDEP(id) ? (needid[0].map + GETRELID(id)) : id)
 
 /*
  * increment need Id
@@ -49,44 +49,22 @@ typedef struct needid {
  *
  */
 
-static void
-incneedid(Pool *pool, Id id, NeedId *needid)
+static inline void
+incneedid(Id id, NeedId *needid)
 {
-  while (ISRELDEP(id))
-    {
-      Reldep *rd = GETRELDEP(pool, id);
-      needid[RELOFF(id)].need++;
-      if (ISRELDEP(rd->evr))
-	incneedid(pool, rd->evr, needid);
-      else
-	needid[rd->evr].need++;
-      id = rd->name;
-    }
-  needid[id].need++;
+  needid[NEEDIDOFF(id)].need++;
 }
 
 static int
-incneedidarray(Pool *pool, Id *idarray, NeedId *needid)
+incneedidarray(Id *idarray, NeedId *needid)
 {
   Id id;
   int n = 0;
 
-  if (!idarray)
-    return 0;
   while ((id = *idarray++) != 0)
     {
       n++;
-      while (ISRELDEP(id))
-	{
-	  Reldep *rd = GETRELDEP(pool, id);
-	  needid[RELOFF(id)].need++;
-	  if (ISRELDEP(rd->evr))
-	    incneedid(pool, rd->evr, needid);
-	  else
-	    needid[rd->evr].need++;
-	  id = rd->name;
-	}
-      needid[id].need++;
+      needid[NEEDIDOFF(id)].need++;
     }
   return n + 1;
 }
@@ -248,7 +226,7 @@ write_idarray(Repodata *data, Pool *pool, NeedId *needid, Id *ids)
     {
       id = *ids++;
       if (needid)
-        id = needid[ISRELDEP(id) ? RELOFF(id) : id].need;
+        id = needid[NEEDIDOFF(id)].need;
       if (id >= 64)
 	id = (id & 63) | ((id & ~63) << 1);
       if (!*ids)
@@ -272,6 +250,7 @@ struct cbdata {
 
   Stringpool *ownspool;
   Dirpool *owndirpool;
+  int clonepool;	/* are the pool ids cloned into ownspool? */
 
   Id *keymap;		/* keymap for this repodata */
 
@@ -410,7 +389,7 @@ data_adddepids(struct extdata *xd, Pool *pool, NeedId *needid, Id *ids, Id marke
     {
       Id id = ids[len];
       if (needid)
-        id = needid[ISRELDEP(id) ? RELOFF(id) : id].need;
+        id = needid[NEEDIDOFF(id)].need;
       lids[len] = id;
     }
   if (ids[len])
@@ -423,7 +402,7 @@ data_adddepids(struct extdata *xd, Pool *pool, NeedId *needid, Id *ids, Id marke
 	{
 	  Id id = ids[len];
 	  if (needid)
-            id = needid[ISRELDEP(id) ? RELOFF(id) : id].need;
+            id = needid[NEEDIDOFF(id)].need;
 	  sids[len] = id;
 	}
     }
@@ -492,7 +471,7 @@ data_adddepids(struct extdata *xd, Pool *pool, NeedId *needid, Id *ids, Id marke
   while ((id = *ids++) != 0)
     {
       if (needid)
-        id = needid[ISRELDEP(id) ? RELOFF(id) : id].need;
+        id = needid[NEEDIDOFF(id)].need;
       data_addideof(xd, id, *ids ? 0 : 1);
     }
 }
@@ -552,7 +531,7 @@ putinowndirpool_slow(struct cbdata *cbdata, Repodata *data, Dirpool *dp, Id dir)
   if (parent)
     parent = putinowndirpool_slow(cbdata, data, dp, parent);
   compid = dirpool_compid(dp, dir);
-  if (cbdata->ownspool && compid > 1)
+  if (cbdata->ownspool && compid > 1 && (!cbdata->clonepool || data->localpool))
     compid = putinownpool(cbdata, data, compid);
   return dirpool_add_dir(cbdata->owndirpool, parent, compid, 1);
 }
@@ -622,9 +601,9 @@ collect_needed_cb(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, KeyV
       case REPOKEY_TYPE_ID:
       case REPOKEY_TYPE_IDARRAY:
 	id = kv->id;
-	if (!ISRELDEP(id) && cbdata->ownspool && id > 1)
+	if (!ISRELDEP(id) && cbdata->ownspool && id > 1 && (!cbdata->clonepool || data->localpool))
 	  id = putinownpool(cbdata, data, id);
-	incneedid(cbdata->pool, id, cbdata->needid);
+	incneedid(id, cbdata->needid);
 	break;
       case REPOKEY_TYPE_DIR:
       case REPOKEY_TYPE_DIRNUMNUMARRAY:
@@ -668,7 +647,6 @@ collect_needed_solvable(struct cbdata *cbdata, Solvable *s, Id *keymap)
 {
   /* set schema info, keep in sync with collect_data_solvable */
   Repo *repo = s->repo;
-  Pool *pool = repo->pool;
   Id *sp = cbdata->sp;
   NeedId *needid = cbdata->needid;
   Repodata *target = cbdata->target;
@@ -697,42 +675,42 @@ collect_needed_solvable(struct cbdata *cbdata, Solvable *s, Id *keymap)
   if (s->provides && keymap[SOLVABLE_PROVIDES])
     {
       *sp++ = keymap[SOLVABLE_PROVIDES];
-      target->keys[keymap[SOLVABLE_PROVIDES]].size += incneedidarray(pool, idarraydata + s->provides, needid);
+      target->keys[keymap[SOLVABLE_PROVIDES]].size += incneedidarray(idarraydata + s->provides, needid);
     }
   if (s->obsoletes && keymap[SOLVABLE_OBSOLETES])
     {
       *sp++ = keymap[SOLVABLE_OBSOLETES];
-      target->keys[keymap[SOLVABLE_OBSOLETES]].size += incneedidarray(pool, idarraydata + s->obsoletes, needid);
+      target->keys[keymap[SOLVABLE_OBSOLETES]].size += incneedidarray(idarraydata + s->obsoletes, needid);
     }
   if (s->conflicts && keymap[SOLVABLE_CONFLICTS])
     {
       *sp++ = keymap[SOLVABLE_CONFLICTS];
-      target->keys[keymap[SOLVABLE_CONFLICTS]].size += incneedidarray(pool, idarraydata + s->conflicts, needid);
+      target->keys[keymap[SOLVABLE_CONFLICTS]].size += incneedidarray(idarraydata + s->conflicts, needid);
     }
   if (s->requires && keymap[SOLVABLE_REQUIRES])
     {
       *sp++ = keymap[SOLVABLE_REQUIRES];
-      target->keys[keymap[SOLVABLE_REQUIRES]].size += incneedidarray(pool, idarraydata + s->requires, needid);
+      target->keys[keymap[SOLVABLE_REQUIRES]].size += incneedidarray(idarraydata + s->requires, needid);
     }
   if (s->recommends && keymap[SOLVABLE_RECOMMENDS])
     {
       *sp++ = keymap[SOLVABLE_RECOMMENDS];
-      target->keys[keymap[SOLVABLE_RECOMMENDS]].size += incneedidarray(pool, idarraydata + s->recommends, needid);
+      target->keys[keymap[SOLVABLE_RECOMMENDS]].size += incneedidarray(idarraydata + s->recommends, needid);
     }
   if (s->suggests && keymap[SOLVABLE_SUGGESTS])
     {
       *sp++ = keymap[SOLVABLE_SUGGESTS];
-      target->keys[keymap[SOLVABLE_SUGGESTS]].size += incneedidarray(pool, idarraydata + s->suggests, needid);
+      target->keys[keymap[SOLVABLE_SUGGESTS]].size += incneedidarray(idarraydata + s->suggests, needid);
     }
   if (s->supplements && keymap[SOLVABLE_SUPPLEMENTS])
     {
       *sp++ = keymap[SOLVABLE_SUPPLEMENTS];
-      target->keys[keymap[SOLVABLE_SUPPLEMENTS]].size += incneedidarray(pool, idarraydata + s->supplements, needid);
+      target->keys[keymap[SOLVABLE_SUPPLEMENTS]].size += incneedidarray(idarraydata + s->supplements, needid);
     }
   if (s->enhances && keymap[SOLVABLE_ENHANCES])
     {
       *sp++ = keymap[SOLVABLE_ENHANCES];
-      target->keys[keymap[SOLVABLE_ENHANCES]].size += incneedidarray(pool, idarraydata + s->enhances, needid);
+      target->keys[keymap[SOLVABLE_ENHANCES]].size += incneedidarray(idarraydata + s->enhances, needid);
     }
   if (repo->rpmdbid && keymap[RPM_RPMDBID])
     {
@@ -780,18 +758,18 @@ collect_data_cb(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, KeyVal
 	break;
       case REPOKEY_TYPE_ID:
 	id = kv->id;
-	if (!ISRELDEP(id) && cbdata->ownspool && id > 1)
+	if (!ISRELDEP(id) && cbdata->ownspool && id > 1 && (!cbdata->clonepool || data->localpool))
 	  id = putinownpool(cbdata, data, id);
         needid = cbdata->needid;
-	id = needid[ISRELDEP(id) ? RELOFF(id) : id].need;
+	id = needid[NEEDIDOFF(id)].need;
 	data_addid(xd, id);
 	break;
       case REPOKEY_TYPE_IDARRAY:
 	id = kv->id;
-	if (!ISRELDEP(id) && cbdata->ownspool && id > 1)
+	if (!ISRELDEP(id) && cbdata->ownspool && id > 1 && (!cbdata->clonepool || data->localpool))
 	  id = putinownpool(cbdata, data, id);
         needid = cbdata->needid;
-	id = needid[ISRELDEP(id) ? RELOFF(id) : id].need;
+	id = needid[NEEDIDOFF(id)].need;
 	data_addideof(xd, id, kv->eof);
 	break;
       case REPOKEY_TYPE_STR:
@@ -1191,7 +1169,7 @@ repowriter_write(Repowriter *writer, FILE *fp)
   Pool *pool = repo->pool;
   int i, j, n;
   Solvable *s;
-  NeedId *needid;
+  NeedId *needid, *needidp;
   int nstrings, nrels;
   unsigned int sizeid;
   unsigned int solv_flags;
@@ -1447,6 +1425,8 @@ repowriter_write(Repowriter *writer, FILE *fp)
   /* 1: use global pool */
   /* 2: use repodata local pool */
   /* 3: need own pool */
+  if (poolusage != 3)
+    clonepool = 0;
   if (poolusage == 3)
     {
       spool = &target.spool;
@@ -1456,6 +1436,7 @@ repowriter_write(Repowriter *writer, FILE *fp)
 	{
 	  stringpool_free(spool);
 	  stringpool_clone(spool, &pool->ss);
+	  cbdata.clonepool = 1;
 	}
       cbdata.ownspool = spool;
     }
@@ -1483,6 +1464,7 @@ repowriter_write(Repowriter *writer, FILE *fp)
 #if 0
 fprintf(stderr, "poolusage: %d\n", poolusage);
 fprintf(stderr, "dirpoolusage: %d\n", dirpoolusage);
+fprintf(stderr, "clonepool: %d\n", clonepool);
 fprintf(stderr, "nkeys: %d\n", target.nkeys);
 for (i = 1; i < target.nkeys; i++)
   fprintf(stderr, "  %2d: %s[%d] %d %d %d\n", i, pool_id2str(pool, target.keys[i].name), target.keys[i].name, target.keys[i].type, target.keys[i].size, target.keys[i].storage);
@@ -1659,7 +1641,8 @@ for (i = 1; i < target.nkeys; i++)
     keymap[i] = keyused[keymap[i]];
   keyused = solv_free(keyused);
 
-  /* increment needid of the used keys, they are already mapped to
+
+  /* increment needid of the keys, they are already mapped to
    * the correct string pool  */
   for (i = 1; i < target.nkeys; i++)
     {
@@ -1668,6 +1651,72 @@ for (i = 1; i < target.nkeys; i++)
       needid[target.keys[i].name].need++;
       needid[target.keys[i].type].need++;
     }
+
+/********************************************************************/
+
+  /* increment need id of all relations
+   * if we refer to another relation, make sure that the
+   * need value is it is bigger than our value so that
+   * ordering works.
+   */
+  for (i = pool->nrels - 1, needidp = needid + (reloff + i); i > 0; i--, needidp--)
+    if (needidp->need)
+      break;
+  if (i)
+    {
+      /* we have some relations with a non-zero need */
+      Reldep *rd;
+
+      for (rd = pool->rels + i; i > 1; i--, rd--)
+	{
+	  int need = needid[reloff + i].need;
+	  if (!need)
+	    continue;
+	  id = rd->name;
+	  if (ISRELDEP(id))
+	    {
+	      id = GETRELID(id);
+	      if (needid[reloff + id].need < need + 1)
+		needid[reloff + id].need = need + 1;
+	    }
+	  else
+	    {
+	      if (cbdata.ownspool && id > 1 && !cbdata.clonepool)
+		{
+		  id = stringpool_str2id(cbdata.ownspool, pool_id2str(pool, id), 1);
+		  if (id >= cbdata.needid[0].map)
+		    {
+		      grow_needid(&cbdata, id);
+		      needid = cbdata.needid;		/* we relocated */
+		      reloff = needid[0].map;		/* we have a new offset */
+		    }
+		}
+	      needid[id].need++;
+	    }
+
+	  id = rd->evr;
+	  if (ISRELDEP(id))
+	    {
+	      id = GETRELID(id);
+	      if (needid[reloff + id].need < need + 1)
+		needid[reloff + id].need = need + 1;
+	    }
+	  else
+	    {
+	      if (cbdata.ownspool && id > 1 && !cbdata.clonepool)
+		{
+		  id = stringpool_str2id(cbdata.ownspool, pool_id2str(pool, id), 1);
+		  if (id >= cbdata.needid[0].map)
+		    {
+		      grow_needid(&cbdata, id);
+		      needid = cbdata.needid;		/* we relocated */
+		      reloff = needid[0].map;		/* we have a new offset */
+		    }
+		}
+	      needid[id].need++;
+	    }
+	}
+  }
 
 /********************************************************************/
 
@@ -1954,8 +2003,8 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
   for (i = 0; i < nrels; i++)
     {
       Reldep *ran = pool->rels + (needid[reloff + i].map - reloff);
-      write_id(&target, needid[ISRELDEP(ran->name) ? RELOFF(ran->name) : ran->name].need);
-      write_id(&target, needid[ISRELDEP(ran->evr) ? RELOFF(ran->evr) : ran->evr].need);
+      write_id(&target, needid[NEEDIDOFF(ran->name)].need);
+      write_id(&target, needid[NEEDIDOFF(ran->evr)].need);
       write_u8(&target, ran->flags);
     }
 
