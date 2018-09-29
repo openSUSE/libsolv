@@ -1171,7 +1171,7 @@ repowriter_write(Repowriter *writer, FILE *fp)
   Stringpool *spool;
   Dirpool *dirpool;
 
-  Id mainschema;
+  Id mainschema, *mainschemakeys;
 
   struct extdata *xd;
 
@@ -1511,7 +1511,8 @@ for (i = 1; i < target.nkeys; i++)
       target.keys[keymap[REPOSITORY_SOLVABLES]].size++;
     }
   *sp = 0;
-  mainschema = repodata_schema2id(cbdata.target, cbdata.schema + 1, 1);
+  /* stash away main schema (including terminating zero) */
+  mainschemakeys = solv_memdup2(cbdata.schema + 1, sp - cbdata.schema, sizeof(Id));
 
   /* collect data for all solvables */
   solvschemata = solv_calloc(repo->nsolvables, sizeof(Id));	/* allocate upper bound */
@@ -1551,22 +1552,13 @@ for (i = 1; i < target.nkeys; i++)
 
   if (repo->nsolvables && !anysolvableused)
     {
-      /* strip off solvable from the main schema */
-      target.keys[keymap[REPOSITORY_SOLVABLES]].size = 0;
-      sp = cbdata.schema + 1;
-      for (i = 0; target.schemadata[target.schemata[mainschema] + i]; i++)
-	{
-	  *sp = target.schemadata[target.schemata[mainschema] + i];
-	  if (*sp != keymap[REPOSITORY_SOLVABLES])
-	    sp++;
-	}
-      assert(target.schemadatalen == target.schemata[mainschema] + i + 1);
-      *sp = 0;
-      target.schemadatalen = target.schemata[mainschema];
-      target.nschemata--;
-      repodata_free_schemahash(&target);
-      mainschema = repodata_schema2id(cbdata.target, cbdata.schema + 1, 1);
+      /* strip off REPOSITORY_SOLVABLES from the main schema */
+      for (sp = mainschemakeys; *sp; sp++)
+	;
+      sp[-1] = 0;	/* strip last entry */
     }
+  mainschema = repodata_schema2id(cbdata.target, mainschemakeys, 1);
+  mainschemakeys = solv_free(mainschemakeys);
 
 /********************************************************************/
 
