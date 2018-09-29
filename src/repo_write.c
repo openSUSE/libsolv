@@ -536,31 +536,6 @@ putinowndirpool(struct cbdata *cbdata, Repodata *data, Id dir)
 }
 
 /*
- * collect usage information about the dirs
- * 1: dir used, no child of dir used
- * 2: dir used as parent of another used dir
- */
-static inline void
-setdirused(struct cbdata *cbdata, Dirpool *dp, Id dir)
-{
-  if (cbdata->dirused[dir])
-    return;
-  cbdata->dirused[dir] = 1;
-  while ((dir = dirpool_parent(dp, dir)) != 0)
-    {
-      if (cbdata->dirused[dir] == 2)
-	return;
-      if (cbdata->dirused[dir])
-        {
-	  cbdata->dirused[dir] = 2;
-	  return;
-        }
-      cbdata->dirused[dir] = 2;
-    }
-  cbdata->dirused[0] = 2;
-}
-
-/*
  * pass 1 callback:
  * collect key/id/dirid usage information, create needed schemas
  */
@@ -601,7 +576,7 @@ collect_needed_cb(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, KeyV
 	if (cbdata->owndirpool)
 	  putinowndirpool(cbdata, data, id);
 	else
-	  setdirused(cbdata, &data->dirpool, id);
+	  cbdata->dirused[id] = 1;
 	break;
       case REPOKEY_TYPE_FIXARRAY:
       case REPOKEY_TYPE_FLEXARRAY:
@@ -1707,40 +1682,48 @@ for (i = 1; i < target.nkeys; i++)
 
 /********************************************************************/
 
-  if (dirpool && cbdata.dirused && !cbdata.dirused[0])
-    {
-      /* no dirs used at all */
-      cbdata.dirused = solv_free(cbdata.dirused);
-      dirpool = 0;
-    }
-
   /* increment need id for used dir components */
-  if (dirpool)
+  if (cbdata.owndirpool)
     {
       /* if we have own dirpool, all entries in it are used.
 	 also, all comp ids are already mapped by putinowndirpool(),
 	 so we can simply increment needid.
 	 (owndirpool != 0, dirused == 0, dirpooldata == 0) */
+      for (i = 1; i < dirpool->ndirs; i++)
+	{
+	  id = dirpool->dirs[i];
+	  if (id <= 0)
+	    continue;
+	  needid[id].need++;
+	}
+    }
+  else if (dirpool)
+    {
+      Id parent;
       /* else we re-use a dirpool of repodata "dirpooldata".
 	 dirused tells us which of the ids are used.
 	 we need to map comp ids if we generate a new pool.
 	 (owndirpool == 0, dirused != 0, dirpooldata != 0) */
-      for (i = 1; i < dirpool->ndirs; i++)
+      for (i = dirpool->ndirs - 1; i > 0; i--)
 	{
-#if 0
-fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
-#endif
-	  if (cbdata.dirused && !cbdata.dirused[i])
+	  if (!cbdata.dirused[i])
 	    continue;
+	  parent = dirpool_parent(dirpool, i);	/* always < i */
+	  cbdata.dirused[parent] = 2;		/* 2: used as parent */
 	  id = dirpool->dirs[i];
 	  if (id <= 0)
 	    continue;
-	  if (dirpooldata && cbdata.ownspool && id > 1)
+	  if (cbdata.ownspool && id > 1 && (!cbdata.clonepool || dirpooldata->localpool))
 	    {
 	      id = putinownpool(&cbdata, dirpooldata, id);
 	      needid = cbdata.needid;
 	    }
 	  needid[id].need++;
+	}
+      if (!cbdata.dirused[0])
+	{
+          cbdata.dirused = solv_free(cbdata.dirused);
+          dirpool = 0;
 	}
     }
 
@@ -1817,7 +1800,10 @@ fprintf(stderr, "dir %d used %d\n", i, cbdata.dirused ? cbdata.dirused[i] : 1);
        * we will change this in the second step below */
       /* (dirpooldata and dirused are 0 if we have our own dirpool) */
       if (cbdata.dirused && !cbdata.dirused[1])
-	cbdata.dirused[1] = 1;	/* always want / entry */
+	{
+	  cbdata.dirused[1] = 1;	/* always want / entry */
+	  cbdata.dirused[0] = 2;	/* always want / entry */
+	}
       dirmap = solv_calloc(dirpool->ndirs, sizeof(Id));
       dirmap[0] = 0;
       ndirmap = traverse_dirs(dirpool, dirmap, 1, dirpool_child(dirpool, 0), cbdata.dirused);
