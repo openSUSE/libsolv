@@ -748,9 +748,6 @@ repodata_lookup_num(Repodata *data, Id solvid, Id keyname, unsigned long long no
     case REPOKEY_TYPE_NUM:
       data_read_num64(dp, &low, &high);
       return (unsigned long long)high << 32 | low;
-    case REPOKEY_TYPE_U32:
-      data_read_u32(dp, &low);
-      return low;
     case REPOKEY_TYPE_CONSTANT:
       return key->size;
     default:

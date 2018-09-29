@@ -1218,12 +1218,9 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
 	    }
 	  /* FALLTHROUGH */
 	default:
-	  if (id == RPM_RPMDBID && s && (keys[key].type == REPOKEY_TYPE_U32 || keys[key].type == REPOKEY_TYPE_NUM))
+	  if (id == RPM_RPMDBID && s && keys[key].type == REPOKEY_TYPE_NUM)
 	    {
-	      if (keys[key].type == REPOKEY_TYPE_U32)
-	        dp = data_read_u32(dp, (unsigned int *)&id);
-	      else
-	        dp = data_read_id_max(dp, &id, 0, 0, &data);
+	      dp = data_read_id_max(dp, &id, 0, 0, &data);
 	      if (!repo->rpmdbid)
 		repo->rpmdbid = repo_sidedata_create(repo, sizeof(Id));
 	      repo->rpmdbid[(s - pool->solvables) - repo->start] = id;

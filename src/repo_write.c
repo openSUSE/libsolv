@@ -486,17 +486,6 @@ data_addblob(struct extdata *xd, unsigned char *blob, int len)
   xd->len += len;
 }
 
-static inline void
-data_addu32(struct extdata *xd, unsigned int num)
-{
-  unsigned char d[4];
-  d[0] = num >> 24;
-  d[1] = num >> 16;
-  d[2] = num >> 8;
-  d[3] = num;
-  data_addblob(xd, d, 4);
-}
-
 /* grow needid array so that it contains the specified id */
 static void
 grow_needid(struct cbdata *cbdata, Id id)
@@ -793,8 +782,6 @@ collect_data_cb(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, KeyVal
       case REPOKEY_TYPE_SHA512:
 	data_addblob(xd, (unsigned char *)kv->str, SIZEOF_SHA512);
 	break;
-      case REPOKEY_TYPE_U32:
-	data_addu32(xd, kv->num);
 	break;
       case REPOKEY_TYPE_NUM:
 	data_addid64(xd, kv->num, kv->num2);

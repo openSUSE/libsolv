@@ -129,13 +129,6 @@ data_read_ideof(unsigned char *dp, Id *idp, int *eof)
 }
 
 static inline unsigned char *
-data_read_u32(unsigned char *dp, unsigned int *nump)
-{
-  *nump = (dp[0] << 24) | (dp[1] << 16) | (dp[2] << 8) | dp[3];
-  return dp + 4;
-}
-
-static inline unsigned char *
 data_fetch(unsigned char *dp, KeyValue *kv, Repokey *key)
 {
   kv->eof = 1;
@@ -161,9 +154,6 @@ data_fetch(unsigned char *dp, KeyValue *kv, Repokey *key)
       return data_read_id(dp, &kv->id);
     case REPOKEY_TYPE_NUM:
       return data_read_num64(dp, &kv->num, &kv->num2);
-    case REPOKEY_TYPE_U32:
-      kv->num2 = 0;
-      return data_read_u32(dp, &kv->num);
     case REPOKEY_TYPE_MD5:
       kv->num = 0;	/* not stringified yet */
       kv->str = (const char *)dp;
@@ -237,8 +227,6 @@ data_skip(unsigned char *dp, int type)
       while ((*dp & 0x80) != 0)
         dp++;
       return dp + 1;
-    case REPOKEY_TYPE_U32:
-      return dp + 4;
     case REPOKEY_TYPE_MD5:
       return dp + SIZEOF_MD5;
     case REPOKEY_TYPE_SHA1:
