@@ -1176,7 +1176,6 @@ repowriter_write(Repowriter *writer, FILE *fp)
   struct extdata *xd;
 
   Id type_constantid = 0;
-  Id type_dirstrarray = 0;
 
 
   memset(&cbdata, 0, sizeof(cbdata));
@@ -1212,11 +1211,11 @@ repowriter_write(Repowriter *writer, FILE *fp)
 	  if (i < SOLVABLE_PROVIDES)
 	    keyd.type = REPOKEY_TYPE_ID;
 	  else if (i < RPM_RPMDBID)
-    #ifdef USE_REL_IDARRAY
+#ifdef USE_REL_IDARRAY
 	    keyd.type = REPOKEY_TYPE_REL_IDARRAY;
-    #else
+#else
 	    keyd.type = REPOKEY_TYPE_IDARRAY;
-    #endif
+#endif
 	  else
 	    keyd.type = REPOKEY_TYPE_NUM;
 	  keyd.size = 0;
@@ -1432,41 +1431,6 @@ for (i = 1; i < target.nkeys; i++)
   fprintf(stderr, "  %2d: %s[%d] %d %d %d\n", i, pool_id2str(pool, target.keys[i].name), target.keys[i].name, target.keys[i].type, target.keys[i].size, target.keys[i].storage);
 #endif
 
-  /* copy keys if requested */
-  if (writer->keyq)
-    {
-      queue_empty(writer->keyq);
-      for (i = 1; i < target.nkeys; i++)
-	queue_push2(writer->keyq, target.keys[i].name, target.keys[i].type);
-    }
-
-  if (poolusage > 1)
-    {
-      /* put all the keys we need in our string pool */
-      /* put mapped ids right into target.keys */
-      for (i = 1, key = target.keys + i; i < target.nkeys; i++, key++)
-	{
-	  key->name = stringpool_str2id(spool, pool_id2str(pool, key->name), 1);
-	  id = stringpool_str2id(spool, pool_id2str(pool, key->type), 1);
-	  if (key->type == REPOKEY_TYPE_CONSTANTID)
-	    {
-	      type_constantid = id;
-	      key->size = stringpool_str2id(spool, pool_id2str(pool, key->size), 1);
-	    }
-	  if (key->type == REPOKEY_TYPE_DIRSTRARRAY)
-	    type_dirstrarray = id;
-	  key->type = id;
-	}
-      if (poolusage == 2)
-	stringpool_freehash(spool);	/* free some mem */
-    }
-  else
-    {
-      type_constantid = REPOKEY_TYPE_CONSTANTID;
-      type_dirstrarray = REPOKEY_TYPE_DIRSTRARRAY;
-    }
-
-
 /********************************************************************/
 
   searchflags = SEARCH_SUB|SEARCH_ARRAYSENTINEL;
@@ -1481,6 +1445,12 @@ for (i = 1; i < target.nkeys; i++)
   reloff = spool->nstrings;
   if (cbdata.ownspool)
     reloff = (reloff + NEEDID_BLOCK) & ~NEEDID_BLOCK;
+  else if (poolusage == 2)
+    {
+      /* we'll need to put the key data into the spool,
+       * so leave some room. 3 * nkeys is an upper bound */
+      reloff += 3 * target.nkeys;
+    }
 
   needid = calloc(reloff + pool->nrels, sizeof(*needid));
   needid[0].map = reloff;	/* remember size in case we need to grow */
@@ -1571,21 +1541,11 @@ for (i = 1; i < target.nkeys; i++)
     {
       if (!keyused[i])
 	continue;
-      keyused[i] = n;
       if (i != n)
-	{
-	  target.keys[n] = target.keys[i];
-	  if (writer->keyq)
-	    {
-	      writer->keyq->elements[2 * n - 2] = writer->keyq->elements[2 * i - 2];
-	      writer->keyq->elements[2 * n - 1] = writer->keyq->elements[2 * i - 1];
-	    }
-	}
-      n++;
+	target.keys[n] = target.keys[i];
+      keyused[i] = n++;
     }
   target.nkeys = n;
-  if (writer->keyq)
-    queue_truncate(writer->keyq, 2 * n - 2);
 
   /* update schema data to the new key ids */
   for (i = 1; i < (int)target.schemadatalen; i++)
@@ -1595,9 +1555,59 @@ for (i = 1; i < target.nkeys; i++)
     keymap[i] = keyused[keymap[i]];
   keyused = solv_free(keyused);
 
+  /* copy keys if requested */
+  if (writer->keyq)
+    {
+      queue_empty(writer->keyq);
+      for (i = 1; i < target.nkeys; i++)
+	queue_push2(writer->keyq, target.keys[i].name, target.keys[i].type);
+    }
 
-  /* increment needid of the keys, they are already mapped to
-   * the correct string pool  */
+/********************************************************************/
+
+  /* check if we can do the special filelist memory optimization */
+  /* we do the check before the keys are mapped */
+  if (anysolvableused && anyrepodataused)
+    {
+      for (i = 1; i < target.nkeys; i++)
+	if (target.keys[i].storage == KEY_STORAGE_VERTICAL_OFFSET)
+	  cbdata.filelistmode |= cbdata.filelistmode == 0 && target.keys[i].type == REPOKEY_TYPE_DIRSTRARRAY ? 1 : 2;
+	else if (target.keys[i].type == REPOKEY_TYPE_DIRSTRARRAY)
+	  cbdata.filelistmode = 2;
+      if (cbdata.filelistmode != 1)
+	cbdata.filelistmode = 0;
+    }
+
+/********************************************************************/
+
+  if (poolusage > 1)
+    {
+      /* put all the keys in our string pool */
+      /* put mapped ids right into target.keys */
+      for (i = 1, key = target.keys + i; i < target.nkeys; i++, key++)
+	{
+	  key->name = stringpool_str2id(spool, pool_id2str(pool, key->name), 1);
+	  id = stringpool_str2id(spool, pool_id2str(pool, key->type), 1);
+	  if (key->type == REPOKEY_TYPE_CONSTANTID)
+	    {
+	      type_constantid = id;
+	      key->size = stringpool_str2id(spool, pool_id2str(pool, key->size), 1);
+	    }
+	  key->type = id;
+	}
+      if (poolusage == 2)
+	stringpool_freehash(spool);	/* free some mem */
+      if (cbdata.ownspool && spool->nstrings > needid[0].map)
+	{
+	  grow_needid(&cbdata, spool->nstrings - 1);
+	  needid = cbdata.needid;		/* we relocated */
+	  reloff = needid[0].map;		/* we have a new offset */
+	}
+    }
+  else
+    type_constantid = REPOKEY_TYPE_CONSTANTID;
+
+  /* increment needid of the keys */
   for (i = 1; i < target.nkeys; i++)
     {
       if (target.keys[i].type == type_constantid)
@@ -1737,13 +1747,9 @@ for (i = 1; i < target.nkeys; i++)
   for (i = 1; i < reloff + pool->nrels; i++)
     needid[i].map = i;
 
-#if 0
-  solv_sort(needid + 1, spool->nstrings - 1, sizeof(*needid), needid_cmp_need_s, spool);
-#else
   /* make first entry '' */
   needid[1].need = 1;
   solv_sort(needid + 2, spool->nstrings - 2, sizeof(*needid), needid_cmp_need_s, spool);
-#endif
   solv_sort(needid + reloff, pool->nrels, sizeof(*needid), needid_cmp_need, 0);
   /* now needid is in new order, needid[newid].map -> oldid */
 
@@ -1853,18 +1859,6 @@ for (i = 1; i < target.nkeys; i++)
     {
       data_addid(xd, nsolvables);	/* FLEXARRAY nentries */
       cbdata.doingsolvables = 1;
-
-      /* check if we can do the special filelist memory optimization */
-      if (anyrepodataused)
-	{
-	  for (i = 1; i < target.nkeys; i++)
-	    if (target.keys[i].storage == KEY_STORAGE_VERTICAL_OFFSET)
-	      cbdata.filelistmode |= cbdata.filelistmode == 0 && target.keys[i].type == type_dirstrarray? 1 : 2;
-	    else if (target.keys[i].type == type_dirstrarray)
-	      cbdata.filelistmode = 2;
-	  if (cbdata.filelistmode != 1)
-	    cbdata.filelistmode = 0;
-	}
 
       for (i = solvablestart, s = pool->solvables + i, n = 0; i < solvableend; i++, s++)
 	{
