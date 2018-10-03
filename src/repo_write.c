@@ -694,7 +694,7 @@ collect_data_cb(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, KeyVal
 {
   struct cbdata *cbdata = vcbdata;
   int rm;
-  Id id;
+  Id id, storage;
   struct extdata *xd;
   NeedId *needid;
 
@@ -704,15 +704,15 @@ collect_data_cb(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, KeyVal
   rm = cbdata->keymap[key - data->keys];
   if (!rm)
     return SEARCH_NEXT_KEY;	/* we do not want this one */
+  storage = cbdata->target->keys[rm].storage;
 
-  if (cbdata->target->keys[rm].storage == KEY_STORAGE_VERTICAL_OFFSET)
+  xd = cbdata->extdata + 0;		/* incore buffer */
+  if (storage == KEY_STORAGE_VERTICAL_OFFSET)
     {
-      xd = cbdata->extdata + rm;	/* vertical buffer */
+      xd += rm;		/* vertical buffer */
       if (cbdata->vstart == -1)
         cbdata->vstart = xd->len;
     }
-  else
-    xd = cbdata->extdata + 0;		/* incore buffer */
   switch(key->type)
     {
       case REPOKEY_TYPE_DELETED:
@@ -787,7 +787,7 @@ collect_data_cb(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, KeyVal
 	if (cbdata->owndirpool)
 	  id = putinowndirpool(cbdata, data, id);
 	id = cbdata->dirused[id];
-	if (cbdata->filelistmode)
+	if (rm == cbdata->filelistmode)
 	  {
 	    /* postpone adding to xd, just update len to get the correct offsets into the incore data*/
 	    xd->len += data_addideof_len(id) + strlen(kv->str) + 1;
@@ -813,7 +813,7 @@ collect_data_cb(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, KeyVal
 	cbdata->target->error = pool_error(cbdata->pool, -1, "unknown type for %d: %d\n", key->name, key->type);
 	break;
     }
-  if (cbdata->target->keys[rm].storage == KEY_STORAGE_VERTICAL_OFFSET && kv->eof)
+  if (storage == KEY_STORAGE_VERTICAL_OFFSET && kv->eof)
     {
       /* we can re-use old data in the blob here! */
       data_addid(cbdata->extdata + 0, cbdata->vstart);			/* add offset into incore data */
@@ -833,7 +833,7 @@ collect_filelist_cb(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, Ke
   struct extdata *xd;
 
   rm = cbdata->keymap[key - data->keys];
-  if (!rm)
+  if (rm != cbdata->filelistmode)
     return SEARCH_NEXT_KEY;	/* we do not want this one */
   id = kv->id;
   if (cbdata->owndirpool)
@@ -1456,7 +1456,7 @@ for (i = 1; i < target.nkeys; i++)
   needid[0].map = reloff;	/* remember size in case we need to grow */
 
   cbdata.needid = needid;
-  cbdata.schema = solv_calloc(target.nkeys + 1, sizeof(Id));
+  cbdata.schema = solv_calloc(target.nkeys + 2, sizeof(Id));
 
   /* create main schema */
   cbdata.sp = cbdata.schema + 1;
@@ -1565,17 +1565,23 @@ for (i = 1; i < target.nkeys; i++)
 
 /********************************************************************/
 
-  /* check if we can do the special filelist memory optimization */
-  /* we do the check before the keys are mapped */
+  /* check if we can do the special filelist memory optimization
+   * we do the check before the keys are mapped.
+   * The optimization is done if there is just one vertical key and
+   * it is of type REPOKEY_TYPE_DIRSTRARRAY */
   if (anysolvableused && anyrepodataused)
     {
       for (i = 1; i < target.nkeys; i++)
-	if (target.keys[i].storage == KEY_STORAGE_VERTICAL_OFFSET)
-	  cbdata.filelistmode |= cbdata.filelistmode == 0 && target.keys[i].type == REPOKEY_TYPE_DIRSTRARRAY ? 1 : 2;
-	else if (target.keys[i].type == REPOKEY_TYPE_DIRSTRARRAY)
-	  cbdata.filelistmode = 2;
-      if (cbdata.filelistmode != 1)
-	cbdata.filelistmode = 0;
+	{
+	  if (target.keys[i].storage != KEY_STORAGE_VERTICAL_OFFSET)
+	    continue;
+	  if (target.keys[i].type != REPOKEY_TYPE_DIRSTRARRAY || cbdata.filelistmode != 0)
+	    {
+	      cbdata.filelistmode = 0;
+	      break;
+	    }
+	  cbdata.filelistmode = i;
+	}
     }
 
 /********************************************************************/
@@ -1601,7 +1607,6 @@ for (i = 1; i < target.nkeys; i++)
 	{
 	  grow_needid(&cbdata, spool->nstrings - 1);
 	  needid = cbdata.needid;		/* we relocated */
-	  reloff = needid[0].map;		/* we have a new offset */
 	}
     }
   else
@@ -1623,6 +1628,7 @@ for (i = 1; i < target.nkeys; i++)
    * need value is it is bigger than our value so that
    * ordering works.
    */
+  reloff = needid[0].map;
   for (i = pool->nrels - 1, needidp = needid + (reloff + i); i > 0; i--, needidp--)
     if (needidp->need)
       break;
@@ -1850,7 +1856,6 @@ for (i = 1; i < target.nkeys; i++)
       cbdata.lastdirid = 0;
       repodata_search_keyskip(data, SOLVID_META, 0, searchflags, keyskip, collect_data_cb, &cbdata);
     }
-
   if (xd->len - cbdata.lastlen > cbdata.maxdata)
     cbdata.maxdata = xd->len - cbdata.lastlen;
   cbdata.lastlen = xd->len;
@@ -2005,21 +2010,24 @@ for (i = 1; i < target.nkeys; i++)
   for (i = 1; i < target.nschemata; i++)
     write_idarray(&target, pool, 0, repodata_id2schema(&target, i));
 
-/********************************************************************/
-
+  /*
+   * write incore data
+   */
   write_id(&target, cbdata.maxdata);
   write_id(&target, cbdata.extdata[0].len);
   if (cbdata.extdata[0].len)
     write_blob(&target, cbdata.extdata[0].buf, cbdata.extdata[0].len);
   solv_free(cbdata.extdata[0].buf);
 
-  /* do we have vertical data? */
+  /*
+   * write vertical data if we have any
+   */
   for (i = 1; i < target.nkeys; i++)
     if (cbdata.extdata[i].len)
       break;
   if (i < target.nkeys)
     {
-      /* yes, write it in pages */
+      /* have vertical data, write it in pages */
       unsigned char vpage[REPOPAGE_BLOBSIZE];
       int lpage = 0;
 
@@ -2032,13 +2040,18 @@ for (i = 1; i < target.nkeys; i++)
 	}
       else
 	{
-	  /* ok, just this single extdata, which is of type REPOKEY_TYPE_DIRSTRARRAY */
+	  /* ok, just one single extdata which is of type REPOKEY_TYPE_DIRSTRARRAY */
 	  xd = cbdata.extdata + i;
 	  xd->len = 0;
-	  /* remove all keys from the keymap but this one */
-	  for (j = 0; j < nkeymap; j++)
-	    if (keymap[j] != i)
-	      keymap[j] = 0;
+	  keyskip = create_keyskip(repo, SOLVID_META, repodataused, &oldkeyskip);
+	  FOR_REPODATAS(repo, j, data)
+	    {
+	      if (!repodataused[j])
+		continue;
+	      cbdata.keymap = keymap + keymapstart[j];
+	      cbdata.lastdirid = 0;
+	      repodata_search_keyskip(data, SOLVID_META, 0, searchflags, keyskip, collect_filelist_cb, &cbdata);
+	    }
 	  for (i = solvablestart, s = pool->solvables + i; i < solvableend; i++, s++)
 	    {
 	      if (s->repo != repo)
