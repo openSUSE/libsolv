@@ -120,6 +120,7 @@ SOLV_1.0 {
 		pool_trivial_installable_multiversionmap;
 		pool_vendor2mask;
 		pool_whatmatchesdep;
+		pool_whatmatchessolvable;
 		pool_whatcontainsdep;
 		queue_alloc_one;
 		queue_alloc_one_head;

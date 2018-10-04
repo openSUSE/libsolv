@@ -348,6 +348,7 @@ static inline Id *pool_whatprovides_ptr(Pool *pool, Id d)
 
 void pool_whatmatchesdep(Pool *pool, Id keyname, Id dep, Queue *q, int marker);
 void pool_whatcontainsdep(Pool *pool, Id keyname, Id dep, Queue *q, int marker);
+void pool_whatmatchessolvable(Pool *pool, Id keyname, Id solvid, Queue *q, int marker);
 void pool_set_whatprovides(Pool *pool, Id id, Id providers);
 
 

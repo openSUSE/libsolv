@@ -169,6 +169,40 @@ find_repo(const char *name, Pool *pool, struct repoinfo *repoinfos, int nrepoinf
   return 0;
 }
 
+static int
+selection_alldeps(Pool *pool, Queue *selection, const char *name, int flags, int keyname, int marker)
+{
+  int i, j, r;
+  Queue pkgs, q;
+
+  queue_empty(selection);
+  queue_init(&q);
+  r = selection_make(pool, &q, name, flags);
+  if (!q.count)
+    {
+      queue_free(&q);
+      return 0;
+    }
+  queue_init(&pkgs);
+  selection_solvables(pool, &q, &pkgs);
+  for (i = 0; i < pkgs.count; i++)
+    {
+      queue_empty(&q);
+      pool_whatmatchessolvable(pool, keyname, pkgs.elements[i], &q, marker);
+      for (j = 0; j < q.count; j++)
+	if (q.elements[j] != pkgs.elements[i])
+	  queue_pushunique(selection, q.elements[j]);
+    }
+  queue_free(&q);
+  j = selection->count;
+  queue_insertn(selection, 0, j, 0);
+  for (i = 0; i < j; i++)
+    {
+      selection->elements[2 * i] = SOLVER_SOLVABLE | SOLVER_NOAUTOSET;
+      selection->elements[2 * i + 1] = selection->elements[i + j];
+    }
+  return j ? r : 0;
+}
 
 #define MODE_LIST        0
 #define MODE_INSTALL     1
@@ -227,6 +261,7 @@ main(int argc, char **argv)
   char *rootdir = 0;
   char *keyname = 0;
   int keyname_depstr = 0;
+  int keyname_alldeps = 0;		/* dnf repoquesy --alldeps */
   int debuglevel = 0;
   int answer, acnt = 0;
   char *testcase = 0;
@@ -316,9 +351,15 @@ main(int argc, char **argv)
 	  argc--;
 	  argv++;
 	}
+      else if (argc > 1 && !strcmp(argv[1], "--alldeps"))
+	{
+	  keyname_alldeps = 1;		/* dnf repoquesy --alldeps */
+	  argc--;
+	  argv++;
+	}
       else if (argc > 1 && !strcmp(argv[1], "--depstr"))
 	{
-	  keyname_depstr = 1;
+	  keyname_depstr = 1;	/* do literal matching instead of dep intersection */
 	  argc--;
 	  argv++;
 	}
@@ -541,6 +582,8 @@ main(int argc, char **argv)
 	flags |= SELECTION_MATCH_DEPSTR;
       if (!keyname)
         rflags = selection_make(pool, &job2, argv[i], flags);
+      else if (keyname_alldeps)
+        rflags = selection_alldeps(pool, &job2, argv[i], flags, pool_str2id(pool, keyname, 1), 0);
       else
         rflags = selection_make_matchdeps(pool, &job2, argv[i], flags, pool_str2id(pool, keyname, 1), 0);
       if (repofilter.count)
@@ -554,6 +597,8 @@ main(int argc, char **argv)
 	  flags |= SELECTION_NOCASE;
 	  if (!keyname)
             rflags = selection_make(pool, &job2, argv[i], flags);
+	  else if (keyname_alldeps)
+	    rflags = selection_alldeps(pool, &job2, argv[i], flags, pool_str2id(pool, keyname, 1), 0);
 	  else
 	    rflags = selection_make_matchdeps(pool, &job2, argv[i], flags, pool_str2id(pool, keyname, 1), 0);
 	  if (repofilter.count)
