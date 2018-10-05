@@ -169,31 +169,25 @@ find_repo(const char *name, Pool *pool, struct repoinfo *repoinfos, int nrepoinf
   return 0;
 }
 
-static int
-selection_alldeps(Pool *pool, Queue *selection, const char *name, int flags, int keyname, int marker)
+static void
+selection_alldeps(Pool *pool, Queue *selection, int keyname, int marker)
 {
-  int i, j, r;
   Queue pkgs, q;
+  int i, j;
 
-  queue_empty(selection);
-  queue_init(&q);
-  r = selection_make(pool, &q, name, flags);
-  if (!q.count)
-    {
-      queue_free(&q);
-      return 0;
-    }
   queue_init(&pkgs);
-  selection_solvables(pool, &q, &pkgs);
+  queue_init(&q);
+  selection_solvables(pool, selection, &pkgs);
+  queue_empty(selection);
   for (i = 0; i < pkgs.count; i++)
     {
       queue_empty(&q);
       pool_whatmatchessolvable(pool, keyname, pkgs.elements[i], &q, marker);
       for (j = 0; j < q.count; j++)
-	if (q.elements[j] != pkgs.elements[i])
-	  queue_pushunique(selection, q.elements[j]);
+        queue_pushunique(selection, q.elements[j]);
     }
   queue_free(&q);
+  queue_free(&pkgs);
   j = selection->count;
   queue_insertn(selection, 0, j, 0);
   for (i = 0; i < j; i++)
@@ -201,7 +195,6 @@ selection_alldeps(Pool *pool, Queue *selection, const char *name, int flags, int
       selection->elements[2 * i] = SOLVER_SOLVABLE | SOLVER_NOAUTOSET;
       selection->elements[2 * i + 1] = selection->elements[i + j];
     }
-  return j ? r : 0;
 }
 
 #define MODE_LIST        0
@@ -580,10 +573,8 @@ main(int argc, char **argv)
 	flags |= SELECTION_FILELIST | (mode == MODE_ERASE ? SELECTION_INSTALLED_ONLY : 0);
       if (keyname && keyname_depstr)
 	flags |= SELECTION_MATCH_DEPSTR;
-      if (!keyname)
+      if (!keyname || keyname_alldeps)
         rflags = selection_make(pool, &job2, argv[i], flags);
-      else if (keyname_alldeps)
-        rflags = selection_alldeps(pool, &job2, argv[i], flags, pool_str2id(pool, keyname, 1), 0);
       else
         rflags = selection_make_matchdeps(pool, &job2, argv[i], flags, pool_str2id(pool, keyname, 1), 0);
       if (repofilter.count)
@@ -595,10 +586,8 @@ main(int argc, char **argv)
       if (!job2.count)
 	{
 	  flags |= SELECTION_NOCASE;
-	  if (!keyname)
+	  if (!keyname || keyname_alldeps)
             rflags = selection_make(pool, &job2, argv[i], flags);
-	  else if (keyname_alldeps)
-	    rflags = selection_alldeps(pool, &job2, argv[i], flags, pool_str2id(pool, keyname, 1), 0);
 	  else
 	    rflags = selection_make_matchdeps(pool, &job2, argv[i], flags, pool_str2id(pool, keyname, 1), 0);
 	  if (repofilter.count)
@@ -619,6 +608,8 @@ main(int argc, char **argv)
         printf("[using file list match for '%s']\n", argv[i]);
       if (rflags & SELECTION_PROVIDES)
 	printf("[using capability match for '%s']\n", argv[i]);
+      if (keyname && keyname_alldeps)
+        selection_alldeps(pool, &job2, pool_str2id(pool, keyname, 1), 0);
       queue_insertn(&job, job.count, job2.count, job2.elements);
       queue_free(&job2);
     }
