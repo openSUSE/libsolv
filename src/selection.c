@@ -1431,6 +1431,137 @@ matchdep(Pool *pool, Id id, char *rname, int rflags, Id revr, int flags)
 }
 
 static int
+selection_make_matchsolvable_common_limited(Pool *pool, Queue *selection, Queue *solvidq, Id solvid, int flags, int keyname, int marker, struct limiter *limiter)
+{
+  Id *wp;
+  Map m, missc;
+  int reloff, boff;
+  int li, i, j;
+  Id p;
+  Queue q;
+
+  if (solvidq)
+    {
+      map_init(&m, pool->nsolvables);
+      for (i = 0; i < solvidq->count; i++)
+	MAPSET(&m, solvidq->elements[i]);
+    }
+  queue_init(&q);
+  reloff = pool->ss.nstrings;
+  map_init(&missc, reloff + pool->nrels);
+  for (li = limiter->start; li < limiter->end; li++)
+    {
+      Solvable *s;
+      p = limiter->mapper ? limiter->mapper[li] : li;
+      if (solvidq && MAPTST(&m, p))
+	continue;
+      if (!solvidq && p == solvid)
+	continue;
+      s = pool->solvables + p;
+      if (!s->repo || (limiter->repofilter && s->repo != limiter->repofilter))
+	continue;
+      if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
+	{
+	  if (!(flags & SELECTION_SOURCE_ONLY) && !(flags & SELECTION_WITH_SOURCE))
+	    continue;
+	  if (!(flags & SELECTION_WITH_DISABLED) && pool_disabled_solvable(pool, s))
+	    continue;
+	}
+      else
+	{
+	  if ((flags & SELECTION_SOURCE_ONLY) != 0)
+	    continue;
+	  if (s->repo != pool->installed)
+	    {
+	      if (!(flags & SELECTION_WITH_DISABLED) && pool_disabled_solvable(pool, s))
+		continue;
+	      if (!(flags & SELECTION_WITH_BADARCH) && pool_badarch_solvable(pool, s))
+		continue;
+	    }
+	}
+      if (q.count)
+	queue_empty(&q);
+      repo_lookup_deparray(s->repo, p, keyname, &q, marker);
+      if (!q.count)
+	continue;
+      for (i = 0; i < q.count; i++)
+	{
+	  Id dep = q.elements[i];
+	  boff = ISRELDEP(dep) ? reloff + GETRELID(dep) : dep;
+	  if (MAPTST(&missc, boff))
+	    continue;
+	  if (ISRELDEP(dep))
+	    {
+	      Reldep *rd = GETRELDEP(pool, dep);
+	      if (!ISRELDEP(rd->name) && rd->flags < 8)
+		{
+		  /* do pre-filtering on the base */
+		  if (MAPTST(&missc, rd->name))
+		    continue;
+		  wp = pool_whatprovides_ptr(pool, rd->name);
+		  if (solvidq)
+		    {
+		      for (wp = pool_whatprovides_ptr(pool, dep); *wp; wp++)
+			if (MAPTST(&m, *wp))
+			  break;
+		    }
+		  else
+		    {
+		      for (wp = pool_whatprovides_ptr(pool, dep); *wp; wp++)
+			if (*wp == solvid)
+			  break;
+		    }
+		  if (!*wp)
+		    {
+		      /* the base does not include solvid, no need to check the complete dep */
+		      MAPSET(&missc, rd->name);
+		      MAPSET(&missc, boff);
+		      continue;
+		    }
+		}
+	    }
+	  wp = pool_whatprovides_ptr(pool, dep);
+	  if (solvidq)
+	    {
+	      for (wp = pool_whatprovides_ptr(pool, dep); *wp; wp++)
+		if (MAPTST(&m, *wp))
+		  break;
+	    }
+	  else
+	    {
+	      for (wp = pool_whatprovides_ptr(pool, dep); *wp; wp++)
+		if (*wp == solvid)
+		  break;
+	    }
+	  if (*wp)
+	    {
+	      queue_push(selection, p);
+	      break;
+	    }
+	  MAPSET(&missc, boff);
+	}
+    }
+  queue_free(&q);
+  map_free(&missc);
+  if (solvidq)
+    map_free(&m);
+  if (!selection->count)
+    return 0;
+
+  /* convert package list to selection */
+  j = selection->count;
+  queue_insertn(selection, 0, selection->count, 0);
+  for (i = 0; i < selection->count; )
+    {
+      selection->elements[i++] = SOLVER_SOLVABLE | SOLVER_NOAUTOSET;
+      selection->elements[i++] = selection->elements[j++];
+    }
+  if ((flags & SELECTION_FLAT) != 0)
+    selection_flatten(pool, selection);
+  return SELECTION_PROVIDES;
+}
+
+static int
 selection_make_matchdeps_common_limited(Pool *pool, Queue *selection, const char *name, Id dep, int flags, int keyname, int marker, struct limiter *limiter)
 {
   int li, i, j;
@@ -1448,6 +1579,9 @@ selection_make_matchdeps_common_limited(Pool *pool, Queue *selection, const char
     return 0;
   if (name && dep)
     return 0;
+
+  if ((flags & SELECTION_MATCH_SOLVABLE) != 0)
+    return selection_make_matchsolvable_common_limited(pool, selection, (Queue *)name, dep, flags, keyname, marker, limiter);
 
   if ((flags & SELECTION_MATCH_DEPSTR) != 0)
     flags &= ~SELECTION_REL;
@@ -1558,7 +1692,8 @@ selection_make_matchdeps_common_limited(Pool *pool, Queue *selection, const char
 	  queue_push(selection, p);
 	  continue;
 	}
-      queue_empty(&q);
+      if (q.count)
+        queue_empty(&q);
       repo_lookup_deparray(s->repo, p, keyname, &q, marker);
       if (!q.count)
 	continue;
@@ -1706,6 +1841,18 @@ int
 selection_make_matchdepid(Pool *pool, Queue *selection, Id dep, int flags, int keyname, int marker)
 {
   return selection_make_matchdeps_common(pool, selection, 0, dep, flags, keyname, marker);
+}
+
+int
+selection_make_matchsolvable(Pool *pool, Queue *selection, Id solvid, int flags, int keyname, int marker)
+{
+  return selection_make_matchdeps_common(pool, selection, 0, solvid, flags | SELECTION_MATCH_SOLVABLE, keyname, marker);
+}
+
+int
+selection_make_matchsolvablelist(Pool *pool, Queue *selection, Queue *solvidq, int flags, int keyname, int marker)
+{
+  return selection_make_matchdeps_common(pool, selection, (const char *)solvidq, 0, flags | SELECTION_MATCH_SOLVABLE, keyname, marker);
 }
 
 static inline int

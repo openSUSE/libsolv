@@ -52,16 +52,20 @@ extern "C" {
 #define SELECTION_SUBTRACT		(2 << 28)
 #define SELECTION_FILTER		(3 << 28)
 
-#define SELECTION_MODEBITS		(3 << 28)	/* internal */
 
 /* extra SELECTION_FILTER bits */
 #define SELECTION_FILTER_KEEP_IFEMPTY	(1 << 30)
 #define SELECTION_FILTER_SWAPPED	(1 << 31)
 
+/* internal */
+#define SELECTION_MATCH_SOLVABLE	(1 << 27)
+#define SELECTION_MODEBITS		(3 << 28)
 
 extern int  selection_make(Pool *pool, Queue *selection, const char *name, int flags);
 extern int  selection_make_matchdeps(Pool *pool, Queue *selection, const char *name, int flags, int keyname, int marker);
 extern int  selection_make_matchdepid(Pool *pool, Queue *selection, Id dep, int flags, int keyname, int marker);
+extern int selection_make_matchsolvable(Pool *pool, Queue *selection, Id solvid, int flags, int keyname, int marker);
+extern int selection_make_matchsolvablelist(Pool *pool, Queue *selection, Queue *solvidq, int flags, int keyname, int marker);
 
 extern void selection_filter(Pool *pool, Queue *sel1, Queue *sel2);
 extern void selection_add(Pool *pool, Queue *sel1, Queue *sel2);

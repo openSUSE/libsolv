@@ -169,34 +169,6 @@ find_repo(const char *name, Pool *pool, struct repoinfo *repoinfos, int nrepoinf
   return 0;
 }
 
-static void
-selection_alldeps(Pool *pool, Queue *selection, int keyname, int marker)
-{
-  Queue pkgs, q;
-  int i, j;
-
-  queue_init(&pkgs);
-  queue_init(&q);
-  selection_solvables(pool, selection, &pkgs);
-  queue_empty(selection);
-  for (i = 0; i < pkgs.count; i++)
-    {
-      queue_empty(&q);
-      pool_whatmatchessolvable(pool, keyname, pkgs.elements[i], &q, marker);
-      for (j = 0; j < q.count; j++)
-        queue_pushunique(selection, q.elements[j]);
-    }
-  queue_free(&q);
-  queue_free(&pkgs);
-  j = selection->count;
-  queue_insertn(selection, 0, j, 0);
-  for (i = 0; i < j; i++)
-    {
-      selection->elements[2 * i] = SOLVER_SOLVABLE | SOLVER_NOAUTOSET;
-      selection->elements[2 * i + 1] = selection->elements[i + j];
-    }
-}
-
 #define MODE_LIST        0
 #define MODE_INSTALL     1
 #define MODE_ERASE       2
@@ -609,7 +581,13 @@ main(int argc, char **argv)
       if (rflags & SELECTION_PROVIDES)
 	printf("[using capability match for '%s']\n", argv[i]);
       if (keyname && keyname_alldeps)
-        selection_alldeps(pool, &job2, pool_str2id(pool, keyname, 1), 0);
+	{
+	  Queue q;
+	  queue_init(&q);
+	  selection_solvables(pool, &job2, &q);
+	  selection_make_matchsolvablelist(pool, &job2, &q, 0, pool_str2id(pool, keyname, 1), 0);
+	  queue_free(&q);
+	}
       queue_insertn(&job, job.count, job2.count, job2.elements);
       queue_free(&job2);
     }

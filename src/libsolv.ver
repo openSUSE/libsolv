@@ -259,6 +259,8 @@ SOLV_1.0 {
 		selection_make;
 		selection_make_matchdepid;
 		selection_make_matchdeps;
+		selection_make_matchsolvable;
+		selection_make_matchsolvablelist;
 		selection_solvables;
 		solv_bin2hex;
 		solv_calloc;
