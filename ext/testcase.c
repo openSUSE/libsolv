@@ -174,6 +174,9 @@ static struct selflags2str {
   { SELECTION_MATCH_DEPSTR, "depstr" },
   { SELECTION_WITH_DISABLED, "withdisabled" },
   { SELECTION_WITH_BADARCH, "withbadarch" },
+  { SELECTION_ADD, "add" },
+  { SELECTION_SUBTRACT, "subtract" },
+  { SELECTION_FILTER, "filter" },
   { 0, 0 }
 };
 
@@ -1127,11 +1130,15 @@ testcase_str2job(Pool *pool, const char *str, Id *whatp)
   return job;
 }
 
+#define SELECTIONJOB_MATCHDEPS		1
+#define SELECTIONJOB_MATCHDEPID		2
+#define SELECTIONJOB_MATCHSOLVABLE	3
+
 static int
-addselectionjob(Pool *pool, char **pieces, int npieces, Queue *jobqueue, int keyname)
+addselectionjob(Pool *pool, char **pieces, int npieces, Queue *jobqueue, int type, int keyname)
 {
   Id job;
-  int i, r;
+  int i, r = 0;
   int selflags;
   Queue sel;
   char *sp;
@@ -1161,12 +1168,20 @@ addselectionjob(Pool *pool, char **pieces, int npieces, Queue *jobqueue, int key
     if (*sp == 0)
       *sp = ' ';
   queue_init(&sel);
-  if (keyname > 0)
-    r = selection_make_matchdeps(pool, &sel, pieces[2], selflags, keyname, 0);
-  else if (keyname < 0)
-    r = selection_make_matchdepid(pool, &sel, testcase_str2dep(pool, pieces[2]), selflags, -keyname, 0);
-  else
+  if (selflags & (SELECTION_ADD | SELECTION_SUBTRACT | SELECTION_FILTER))
+    {
+      for (i = 0; i < jobqueue->count; i += 2)
+	queue_push2(&sel, jobqueue->elements[i] & (SOLVER_SELECTMASK | SOLVER_SETMASK), jobqueue->elements[i + 1]);
+      queue_empty(jobqueue);
+    }
+  if (!type)
     r = selection_make(pool, &sel, pieces[2], selflags);
+  else if (type == SELECTIONJOB_MATCHDEPS)
+    r = selection_make_matchdeps(pool, &sel, pieces[2], selflags, keyname, 0);
+  else if (type == SELECTIONJOB_MATCHDEPID)
+    r = selection_make_matchdepid(pool, &sel, testcase_str2dep(pool, pieces[2]), selflags, keyname, 0);
+  else if (type == SELECTIONJOB_MATCHSOLVABLE)
+    r = selection_make_matchsolvable(pool, &sel, testcase_str2solvid(pool, pieces[2]), selflags, keyname, 0);
   for (i = 0; i < sel.count; i += 2)
     queue_push2(jobqueue, job | sel.elements[i], sel.elements[i + 1]);
   queue_free(&sel);
@@ -2735,19 +2750,25 @@ testcase_read(Pool *pool, FILE *fp, const char *testcase, Queue *job, char **res
 	    }
 	  if (npieces >= 3 && !strcmp(pieces[2], "selection"))
 	    {
-	      addselectionjob(pool, pieces + 1, npieces - 1, job, 0);
+	      addselectionjob(pool, pieces + 1, npieces - 1, job, 0, 0);
 	      continue;
 	    }
 	  if (npieces >= 4 && !strcmp(pieces[2], "selection_matchdeps"))
 	    {
 	      pieces[2] = pieces[1];
-	      addselectionjob(pool, pieces + 2, npieces - 2, job, pool_str2id(pool, pieces[3], 1));
+	      addselectionjob(pool, pieces + 2, npieces - 2, job, SELECTIONJOB_MATCHDEPS, pool_str2id(pool, pieces[3], 1));
 	      continue;
 	    }
 	  if (npieces >= 4 && !strcmp(pieces[2], "selection_matchdepid"))
 	    {
 	      pieces[2] = pieces[1];
-	      addselectionjob(pool, pieces + 2, npieces - 2, job, -pool_str2id(pool, pieces[3], 1));
+	      addselectionjob(pool, pieces + 2, npieces - 2, job, SELECTIONJOB_MATCHDEPID, pool_str2id(pool, pieces[3], 1));
+	      continue;
+	    }
+	  if (npieces >= 4 && !strcmp(pieces[2], "selection_matchsolvable"))
+	    {
+	      pieces[2] = pieces[1];
+	      addselectionjob(pool, pieces + 2, npieces - 2, job, SELECTIONJOB_MATCHSOLVABLE, pool_str2id(pool, pieces[3], 1));
 	      continue;
 	    }
 	  /* rejoin */
