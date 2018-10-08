@@ -552,12 +552,12 @@ static void *zchunkopen(const char *path, const char *mode, int fd)
     }
   if (*mode != 'w')
     {
-      if(!zck_init_read(f, fd);
+      if(!zck_init_read(f, fd))
         return 0;
     }
    else
     {
-      if(!zck_init_write(f, fd);
+      if(!zck_init_write(f, fd))
         return 0;
     }
   return cookieopen(f, mode, cookie_zckread, cookie_zckwrite, cookie_zckclose);
