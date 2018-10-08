@@ -58,7 +58,6 @@ extern "C" {
 #define SELECTION_FILTER_SWAPPED	(1 << 31)
 
 /* internal */
-#define SELECTION_MATCH_SOLVABLE	(1 << 27)
 #define SELECTION_MODEBITS		(3 << 28)
 
 extern int  selection_make(Pool *pool, Queue *selection, const char *name, int flags);

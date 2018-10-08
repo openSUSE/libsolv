@@ -89,6 +89,7 @@ selection_solvables(Pool *pool, Queue *selection, Queue *pkgs)
   for (i = 0; i < selection->count; i += 2)
     {
       Id select = selection->elements[i] & SOLVER_SELECTMASK;
+      Id id = selection->elements[i + 1];
       if (select == SOLVER_SOLVABLE_ALL)
 	{
 	  FOR_POOL_SOLVABLES(p)
@@ -97,16 +98,18 @@ selection_solvables(Pool *pool, Queue *selection, Queue *pkgs)
       if (select == SOLVER_SOLVABLE_REPO)
 	{
 	  Solvable *s;
-	  Repo *repo = pool_id2repo(pool, selection->elements[i + 1]);
+	  Repo *repo = pool_id2repo(pool, id);
 	  if (repo)
 	    {
 	      FOR_REPO_SOLVABLES(repo, p, s)
 	        queue_push(pkgs, p);
 	    }
 	}
+      else if (select == SOLVER_SOLVABLE)
+	queue_push(pkgs, id);
       else
 	{
-	  FOR_JOB_SELECT(p, pp, select, selection->elements[i + 1])
+	  FOR_JOB_SELECT(p, pp, select, id)
 	    queue_push(pkgs, p);
 	}
     }
@@ -260,7 +263,7 @@ selection_filter_rel(Pool *pool, Queue *selection, Id relflags, Id relevr)
 /* limit a selection to to repository */
 /* prunes empty jobs */
 static void
-selection_filter_repo(Pool *pool, Queue *selection, Repo *repo)
+selection_filter_repo(Pool *pool, Queue *selection, Repo *repo, int setflags)
 {
   Queue q;
   int i, j;
@@ -285,7 +288,12 @@ selection_filter_repo(Pool *pool, Queue *selection, Repo *repo)
       else if (select == SOLVER_SOLVABLE_REPO)
 	{
 	  if (id != repo->repoid)
-	    select = 0;
+	    continue;
+	}
+      else if (select == SOLVER_SOLVABLE)
+	{
+	  if (pool->solvables[id].repo != repo)
+	    continue;
 	}
       else
 	{
@@ -299,11 +307,11 @@ selection_filter_repo(Pool *pool, Queue *selection, Repo *repo)
 	      else
 		queue_push(&q, p);
 	    }
-	  if (bad || !q.count)
+	  if (!q.count)
+	    continue;
+	  if (bad)
 	    {
-	      if (!q.count)
-		select = 0;		/* prune empty jobs */
-	      else if (q.count == 1)
+	      if (q.count == 1)
 		{
 		  select = SOLVER_SOLVABLE | SOLVER_NOAUTOSET;
 		  id = q.elements[0];
@@ -315,8 +323,6 @@ selection_filter_repo(Pool *pool, Queue *selection, Repo *repo)
 		}
 	    }
 	}
-      if (!select)
-	continue;	/* job is now empty */
       if (select == SOLVER_SOLVABLE_REPO)
 	{
 	  Id p;
@@ -326,7 +332,7 @@ selection_filter_repo(Pool *pool, Queue *selection, Repo *repo)
 	  if (!p)
 	    continue;	/* repo is empty */
 	}
-      selection->elements[j++] = select | (selection->elements[i] & ~SOLVER_SELECTMASK) | SOLVER_SETREPO;
+      selection->elements[j++] = select | (selection->elements[i] & ~SOLVER_SELECTMASK) | setflags;
       selection->elements[j++] = id;
     }
   queue_truncate(selection, j);
@@ -704,6 +710,34 @@ selection_name_id(Pool *pool, Queue *selection, Id id, int flags)
   return 0;
 }
 
+/* does not check SELECTION_INSTALLED_ONLY, as it is normally done
+ * by other means */
+static inline int
+solvable_matches_selection_flags(Pool *pool, Solvable *s, int flags)
+{
+  if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
+    {
+      if (!(flags & SELECTION_SOURCE_ONLY) && !(flags & SELECTION_WITH_SOURCE))
+	return 0;
+      /* source package are never installed and never have a bad arch */
+      if (!(flags & SELECTION_WITH_DISABLED) && pool_disabled_solvable(pool, s))
+	return 0;
+    }
+  else
+    {
+      if ((flags & SELECTION_SOURCE_ONLY) != 0)
+	return 0;
+      if (s->repo != pool->installed)
+	{
+	  if (!(flags & SELECTION_WITH_DISABLED) && pool_disabled_solvable(pool, s))
+	    return 0;
+	  if (!(flags & SELECTION_WITH_BADARCH) && pool_badarch_solvable(pool, s))
+	    return 0;
+	}
+    }
+  return 1;
+}
+
 /* match the name of a package */
 /* note that for SELECTION_INSTALLED_ONLY the result is not trimmed */
 static int
@@ -743,20 +777,8 @@ selection_name(Pool *pool, Queue *selection, const char *name, int flags)
       Solvable *s = pool->solvables + p;
       if ((flags & SELECTION_INSTALLED_ONLY) != 0 && s->repo != pool->installed)
 	continue;
-      if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
-	{
-	  if (!(flags & SELECTION_SOURCE_ONLY) && !(flags & SELECTION_WITH_SOURCE))
-	    continue;
-	  if (!(flags & SELECTION_WITH_DISABLED) && pool_disabled_solvable(pool, s))
-	    continue;
-	}
-      else if (s->repo != pool->installed)
-	{
-	  if (!(flags & SELECTION_WITH_DISABLED) && pool_disabled_solvable(pool, s))
-	    continue;
-	  if (!(flags & SELECTION_WITH_BADARCH) && pool_badarch_solvable(pool, s))
-	    continue;
-	}
+      if (!solvable_matches_selection_flags(pool, s, flags))
+	continue;
       id = s->name;
       n = pool_id2str(pool, id);
       if (flags & SELECTION_SKIP_KIND)
@@ -946,25 +968,8 @@ selection_filelist(Pool *pool, Queue *selection, const char *name, int flags)
       Solvable *s = pool->solvables + di.solvid;
       if (!s->repo)
 	continue;
-      if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
-	{
-	  if (!(flags & SELECTION_SOURCE_ONLY) && !(flags & SELECTION_WITH_SOURCE))
-	    continue;
-	  if (!(flags & SELECTION_WITH_DISABLED) && pool_disabled_solvable(pool, s))
-	    continue;
-	}
-      else
-	{
-	  if ((flags & SELECTION_SOURCE_ONLY) != 0)
-	    continue;
-	  if (s->repo != pool->installed)
-	    {
-	      if (!(flags & SELECTION_WITH_DISABLED) && pool_disabled_solvable(pool, s))
-		continue;
-	      if (!(flags & SELECTION_WITH_BADARCH) && pool_badarch_solvable(pool, s))
-		continue;
-	    }
-	}
+      if (!solvable_matches_selection_flags(pool, s, flags))
+	continue;
       if ((flags & SELECTION_FLAT) != 0)
 	{
 	  /* don't bother with the complex stuff */
@@ -1291,46 +1296,57 @@ selection_extrabits(Pool *pool, Queue *selection, int flags)
   return needflags;
 }
 
+static int
+selection_combine(Pool *pool, Queue *sel1, Queue *sel2, int flags, int ret)
+{
+  if ((flags & SELECTION_MODEBITS) == SELECTION_ADD)
+    selection_add(pool, sel1, sel2);
+  else if ((flags & SELECTION_MODEBITS) == SELECTION_SUBTRACT)
+    selection_subtract(pool, sel1, sel2);
+  else if ((flags & SELECTION_MODEBITS) == SELECTION_FILTER)
+    {
+      if (ret || !(flags & SELECTION_FILTER_KEEP_IFEMPTY))
+	{
+	  if ((flags & SELECTION_FILTER_SWAPPED) != 0)
+	    {
+	      selection_filter(pool, sel2, sel1);
+	      queue_free(sel1);
+	      queue_init_clone(sel1, sel2);
+	    }
+	  else
+	    selection_filter(pool, sel1, sel2);
+	}
+    }
+  else	/* SELECTION_REPLACE */
+    {
+      queue_free(sel1);
+      queue_init_clone(sel1, sel2);
+    }
+  queue_free(sel2);
+  return ret;
+}
+
 int
 selection_make(Pool *pool, Queue *selection, const char *name, int flags)
 {
   int ret = 0;
-  if ((flags & SELECTION_MODEBITS) != 0)
+  if ((flags & SELECTION_MODEBITS) != SELECTION_REPLACE)
     {
       Queue q;
 
-      queue_init(&q);
       if ((flags & SELECTION_MODEBITS) == SELECTION_SUBTRACT || (flags & SELECTION_MODEBITS) == SELECTION_FILTER)
 	{
 	  if (!selection->count)
-	    {
-	      queue_free(&q);
-	      return 0;
-	    }
+	    return 0;
 	  if ((flags & (SELECTION_WITH_DISABLED | SELECTION_WITH_BADARCH | SELECTION_WITH_SOURCE)) != 0)
 	    {
 	      /* try to drop expensive extra bits */
 	      flags = (flags & ~(SELECTION_WITH_DISABLED | SELECTION_WITH_BADARCH | SELECTION_WITH_SOURCE)) | selection_extrabits(pool, selection, flags);
 	    }
 	}
+      queue_init(&q);
       ret = selection_make(pool, &q, name, flags & ~SELECTION_MODEBITS);
-      if ((flags & SELECTION_MODEBITS) == SELECTION_ADD)
-	selection_add(pool, selection, &q);
-      else if ((flags & SELECTION_MODEBITS) == SELECTION_SUBTRACT)
-	selection_subtract(pool, selection, &q);
-      else if (ret || !(flags & SELECTION_FILTER_KEEP_IFEMPTY))
-	{
-	  if ((flags & SELECTION_FILTER_SWAPPED) != 0)
-	    {
-	      selection_filter(pool, &q, selection);
-	      queue_free(selection);
-	      queue_init_clone(selection, &q);
-	    }
-	  else
-	    selection_filter(pool, selection, &q);
-	}
-      queue_free(&q);
-      return ret;
+      return selection_combine(pool, selection, &q, flags, ret);
     }
   queue_empty(selection);
   if ((flags & SELECTION_INSTALLED_ONLY) != 0 && !pool->installed)
@@ -1348,36 +1364,12 @@ selection_make(Pool *pool, Queue *selection, const char *name, int flags)
 
   /* now do result filtering */
   if (ret && (flags & SELECTION_INSTALLED_ONLY) != 0)
-    selection_filter_repo(pool, selection, pool->installed);
+    selection_filter_repo(pool, selection, pool->installed, SOLVER_SETREPO);
 
   /* flatten if requested */
   if (ret && (flags & SELECTION_FLAT) != 0)
     selection_flatten(pool, selection);
   return selection->count ? ret : 0;
-}
-
-struct limiter {
-  int start;	/* either 2 or repofilter->start */
-  int end;	/* either nsolvables or repofilter->end */
-  Id *mapper;
-  Repo *repofilter;
-};
-
-/* add matching src packages to simple SOLVABLE_NAME selections */
-static void
-setup_limiter(Pool *pool, int flags, struct limiter *limiter)
-{
-  limiter->start = 2;
-  limiter->end = pool->nsolvables;
-  limiter->mapper = 0;
-  limiter->repofilter = 0;
-  if ((flags & SELECTION_INSTALLED_ONLY) != 0)
-    {
-      Repo *repo = pool->installed;
-      limiter->repofilter = repo;
-      limiter->start = repo ? repo->start : 0;
-      limiter->end = repo ? repo->end : 0;
-    }
 }
 
 static int
@@ -1430,15 +1422,40 @@ matchdep(Pool *pool, Id id, char *rname, int rflags, Id revr, int flags)
   return matchdep_str(rname, pool_id2str(pool, id), flags);
 }
 
+struct limiter {
+  int start;	/* either 2 or repofilter->start */
+  int end;	/* either nsolvables or repofilter->end */
+  Repo *repofilter;
+  Id *mapper;
+  Queue qlimit;
+};
+
+
 static int
-selection_make_matchsolvable_common_limited(Pool *pool, Queue *selection, Queue *solvidq, Id solvid, int flags, int keyname, int marker, struct limiter *limiter)
+selection_make_matchsolvable_common(Pool *pool, Queue *selection, Queue *solvidq, Id solvid, int flags, int keyname, int marker, struct limiter *limiter)
 {
-  Id *wp;
   Map m, missc;
-  int reloff, boff;
+  int reloff;
   int li, i, j;
   Id p;
   Queue q;
+
+  if ((flags & SELECTION_MODEBITS) != SELECTION_REPLACE)
+    {
+      int ret;
+      Queue q;
+      queue_init(&q);
+      ret = selection_make_matchsolvable_common(pool, &q, solvidq, solvid, flags & ~SELECTION_MODEBITS, keyname, marker, limiter);
+      return selection_combine(pool, selection, &q, flags, ret);
+    }
+
+  queue_empty(selection);
+  if (!limiter->end)
+    return 0;
+  if (!solvidq && !solvid)
+    return 0;
+  if (solvidq && solvid)
+    return 0;
 
   if (solvidq)
     {
@@ -1460,101 +1477,25 @@ selection_make_matchsolvable_common_limited(Pool *pool, Queue *selection, Queue 
       s = pool->solvables + p;
       if (!s->repo || (limiter->repofilter && s->repo != limiter->repofilter))
 	continue;
-      if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
-	{
-	  if (!(flags & SELECTION_SOURCE_ONLY) && !(flags & SELECTION_WITH_SOURCE))
-	    continue;
-	  if (!(flags & SELECTION_WITH_DISABLED) && pool_disabled_solvable(pool, s))
-	    continue;
-	}
-      else
-	{
-	  if ((flags & SELECTION_SOURCE_ONLY) != 0)
-	    continue;
-	  if (s->repo != pool->installed)
-	    {
-	      if (!(flags & SELECTION_WITH_DISABLED) && pool_disabled_solvable(pool, s))
-		continue;
-	      if (!(flags & SELECTION_WITH_BADARCH) && pool_badarch_solvable(pool, s))
-		continue;
-	    }
-	}
-      if (q.count)
-	queue_empty(&q);
-      repo_lookup_deparray(s->repo, p, keyname, &q, marker);
-      if (!q.count)
+      if (!solvable_matches_selection_flags(pool, s, flags))
 	continue;
-      for (i = 0; i < q.count; i++)
-	{
-	  Id dep = q.elements[i];
-	  boff = ISRELDEP(dep) ? reloff + GETRELID(dep) : dep;
-	  if (MAPTST(&missc, boff))
-	    continue;
-	  if (ISRELDEP(dep))
-	    {
-	      Reldep *rd = GETRELDEP(pool, dep);
-	      if (!ISRELDEP(rd->name) && rd->flags < 8)
-		{
-		  /* do pre-filtering on the base */
-		  if (MAPTST(&missc, rd->name))
-		    continue;
-		  wp = pool_whatprovides_ptr(pool, rd->name);
-		  if (solvidq)
-		    {
-		      for (wp = pool_whatprovides_ptr(pool, dep); *wp; wp++)
-			if (MAPTST(&m, *wp))
-			  break;
-		    }
-		  else
-		    {
-		      for (wp = pool_whatprovides_ptr(pool, dep); *wp; wp++)
-			if (*wp == solvid)
-			  break;
-		    }
-		  if (!*wp)
-		    {
-		      /* the base does not include solvid, no need to check the complete dep */
-		      MAPSET(&missc, rd->name);
-		      MAPSET(&missc, boff);
-		      continue;
-		    }
-		}
-	    }
-	  wp = pool_whatprovides_ptr(pool, dep);
-	  if (solvidq)
-	    {
-	      for (wp = pool_whatprovides_ptr(pool, dep); *wp; wp++)
-		if (MAPTST(&m, *wp))
-		  break;
-	    }
-	  else
-	    {
-	      for (wp = pool_whatprovides_ptr(pool, dep); *wp; wp++)
-		if (*wp == solvid)
-		  break;
-	    }
-	  if (*wp)
-	    {
-	      queue_push(selection, p);
-	      break;
-	    }
-	  MAPSET(&missc, boff);
-	}
+      if (solvable_matchessolvable_int(s, keyname, marker, solvid, solvidq ? &m : 0, &q, &missc, reloff))
+        queue_push(selection, p);
     }
   queue_free(&q);
   map_free(&missc);
   if (solvidq)
     map_free(&m);
-  if (!selection->count)
-    return 0;
 
   /* convert package list to selection */
+  if (!selection->count)
+    return 0;
   j = selection->count;
   queue_insertn(selection, 0, selection->count, 0);
-  for (i = 0; i < selection->count; )
+  for (i = 0; i < selection->count; i += 2)
     {
-      selection->elements[i++] = SOLVER_SOLVABLE | SOLVER_NOAUTOSET;
-      selection->elements[i++] = selection->elements[j++];
+      selection->elements[i] = SOLVER_SOLVABLE | SOLVER_NOAUTOSET;
+      selection->elements[i + 1] = selection->elements[j++];
     }
   if ((flags & SELECTION_FLAT) != 0)
     selection_flatten(pool, selection);
@@ -1562,7 +1503,7 @@ selection_make_matchsolvable_common_limited(Pool *pool, Queue *selection, Queue 
 }
 
 static int
-selection_make_matchdeps_common_limited(Pool *pool, Queue *selection, const char *name, Id dep, int flags, int keyname, int marker, struct limiter *limiter)
+selection_make_matchdeps_common(Pool *pool, Queue *selection, const char *name, Id dep, int flags, int keyname, int marker, struct limiter *limiter)
 {
   int li, i, j;
   int ret = 0;
@@ -1572,6 +1513,14 @@ selection_make_matchdeps_common_limited(Pool *pool, Queue *selection, const char
   Id p;
   Queue q;
 
+  if ((flags & SELECTION_MODEBITS) != SELECTION_REPLACE)
+    {
+      Queue q;
+      queue_init(&q);
+      ret = selection_make_matchdeps_common(pool, &q, name, dep, flags & ~SELECTION_MODEBITS, keyname, marker, limiter);
+      return selection_combine(pool, selection, &q, flags, ret);
+    }
+
   queue_empty(selection);
   if (!limiter->end)
     return 0;
@@ -1579,9 +1528,6 @@ selection_make_matchdeps_common_limited(Pool *pool, Queue *selection, const char
     return 0;
   if (name && dep)
     return 0;
-
-  if ((flags & SELECTION_MATCH_SOLVABLE) != 0)
-    return selection_make_matchsolvable_common_limited(pool, selection, (Queue *)name, dep, flags, keyname, marker, limiter);
 
   if ((flags & SELECTION_MATCH_DEPSTR) != 0)
     flags &= ~SELECTION_REL;
@@ -1639,25 +1585,8 @@ selection_make_matchdeps_common_limited(Pool *pool, Queue *selection, const char
       s = pool->solvables + p;
       if (!s->repo || (limiter->repofilter && s->repo != limiter->repofilter))
 	continue;
-      if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
-	{
-	  if (!(flags & SELECTION_SOURCE_ONLY) && !(flags & SELECTION_WITH_SOURCE))
-	    continue;
-	  if (!(flags & SELECTION_WITH_DISABLED) && pool_disabled_solvable(pool, s))
-	    continue;
-	}
-      else
-        {
-	  if ((flags & SELECTION_SOURCE_ONLY) != 0)
-	    continue;
-	  if (s->repo != pool->installed)
-	    {
-	      if (!(flags & SELECTION_WITH_DISABLED) && pool_disabled_solvable(pool, s))
-		continue;
-	      if (!(flags & SELECTION_WITH_BADARCH) && pool_badarch_solvable(pool, s))
-		continue;
-	    }
-	}
+      if (!solvable_matches_selection_flags(pool, s, flags))
+	continue;
       if (keyname == SOLVABLE_NAME)			/* nevr match hack */
 	{
 	  if (dep)
@@ -1732,16 +1661,16 @@ selection_make_matchdeps_common_limited(Pool *pool, Queue *selection, const char
     }
   queue_free(&q);
   solv_free(rname);
-  if (!selection->count)
-    return 0;
 
   /* convert package list to selection */
+  if (!selection->count)
+    return 0;
   j = selection->count;
   queue_insertn(selection, 0, selection->count, 0);
-  for (i = 0; i < selection->count; )
+  for (i = 0; i < selection->count; i += 2)
     {
-      selection->elements[i++] = SOLVER_SOLVABLE | SOLVER_NOAUTOSET;
-      selection->elements[i++] = selection->elements[j++];
+      selection->elements[i] = SOLVER_SOLVABLE | SOLVER_NOAUTOSET;
+      selection->elements[i + 1] = selection->elements[j++];
     }
 
   if ((flags & SELECTION_FLAT) != 0)
@@ -1749,75 +1678,56 @@ selection_make_matchdeps_common_limited(Pool *pool, Queue *selection, const char
   return ret | (keyname == SOLVABLE_NAME ? SELECTION_NAME : SELECTION_PROVIDES);
 }
 
-static int
-selection_make_matchdeps_common(Pool *pool, Queue *selection, const char *name, Id dep, int flags, int keyname, int marker)
+static void
+setup_limiter(Pool *pool, Queue *selection, int flags, struct limiter *limiter)
 {
-  struct limiter limiter;
-
-  setup_limiter(pool, flags, &limiter);
-  if ((flags & SELECTION_MODEBITS) != SELECTION_REPLACE)
+  limiter->start = 2;
+  limiter->end = pool->nsolvables;
+  limiter->mapper = 0;
+  limiter->repofilter = 0;
+  if ((flags & SELECTION_INSTALLED_ONLY) != 0)
     {
-      int ret;
-      Queue q, qlimit;
-      queue_init(&q);
-      queue_init(&qlimit);
-      /* deal with special filter cases */
-      if ((flags & SELECTION_MODEBITS) == SELECTION_FILTER && selection->count == 2 && limiter.end)
-	{
-	  if ((selection->elements[0] & SOLVER_SELECTMASK) == SOLVER_SOLVABLE_ALL)
-	    flags = (flags & ~SELECTION_MODEBITS) | SELECTION_REPLACE;
-	  else if ((selection->elements[0] & SOLVER_SELECTMASK) == SOLVER_SOLVABLE_REPO)
-	    {
-	      Repo *repo = pool_id2repo(pool, selection->elements[1]);
-	      if (limiter.repofilter && repo != limiter.repofilter)
-		repo = 0;
-	      limiter.repofilter = repo;
-	      limiter.start = repo ? repo->start : 0;
-	      limiter.end = repo ? repo->end : 0;
-	      flags = (flags & ~SELECTION_MODEBITS) | SELECTION_REPLACE;
-	    }
-	}
-      if (limiter.end && ((flags & SELECTION_MODEBITS) == SELECTION_SUBTRACT || (flags & SELECTION_MODEBITS) == SELECTION_FILTER))
-	{
-	  selection_solvables(pool, selection, &qlimit);
-	  limiter.start = 0;
-	  limiter.end = qlimit.count;
-	  limiter.mapper = qlimit.elements;
-	}
-      ret = selection_make_matchdeps_common_limited(pool, &q, name, dep, flags & ~SELECTION_MODEBITS, keyname, marker, &limiter);
-      queue_free(&qlimit);
-      if ((flags & SELECTION_MODEBITS) == SELECTION_ADD)
-	selection_add(pool, selection, &q);
-      else if ((flags & SELECTION_MODEBITS) == SELECTION_SUBTRACT)
-	selection_subtract(pool, selection, &q);
-      else if ((flags & SELECTION_MODEBITS) == SELECTION_FILTER)
-	{
-          if (ret || !(flags & SELECTION_FILTER_KEEP_IFEMPTY))
-	    {
-	      if ((flags & SELECTION_FILTER_SWAPPED) != 0)
-		{
-		  selection_filter(pool, &q, selection);
-		  queue_free(selection);
-		  queue_init_clone(selection, &q);
-		}
-	      else
-		selection_filter(pool, selection, &q);
-	    }
-	}
-      else if (ret || !(flags & SELECTION_FILTER_KEEP_IFEMPTY))
-	{
-	  /* special filter case from above */
-	  int i;
-	  Id f = selection->elements[0] & ~(SOLVER_SELECTMASK|SOLVER_NOAUTOSET);	/* job, jobflags, setflags */
-	  queue_free(selection);
-	  queue_init_clone(selection, &q);
-	  for (i = 0; i < selection->count; i += 2)
-	    selection->elements[i] = (selection->elements[i] & (SOLVER_SELECTMASK | SOLVER_SETMASK)) | f;
-	}
-      queue_free(&q);
-      return ret;
+      Repo *repo = pool->installed;
+      limiter->repofilter = repo;
+      limiter->start = repo ? repo->start : 0;
+      limiter->end = repo ? repo->end : 0;
     }
-  return selection_make_matchdeps_common_limited(pool, selection, name, dep, flags, keyname, marker, &limiter);
+  if ((flags & SELECTION_MODEBITS) != SELECTION_SUBTRACT && (flags & SELECTION_MODEBITS) != SELECTION_FILTER)
+    return;
+  /* the result will be limited to the first selection */
+  if (!selection->count)
+    limiter->start = limiter->end = 0;
+  if (!limiter->end)
+    return;
+  /* check for special cases where we do not need to call selection_solvables() */
+  if (selection->count == 2 && (selection->elements[0] & SOLVER_SELECTMASK) == SOLVER_SOLVABLE_ALL)
+    return;
+  if (selection->count == 2 && (selection->elements[0] & SOLVER_SELECTMASK) == SOLVER_SOLVABLE_REPO)
+    {
+      Repo *repo = pool_id2repo(pool, selection->elements[1]);
+      if (limiter->repofilter && repo != limiter->repofilter)
+	repo = 0;
+      limiter->repofilter = repo;
+      limiter->start = repo ? repo->start : 0;
+      limiter->end = repo ? repo->end : 0;
+      return;
+    }
+  /* convert selection into a package list and use it in the limiter */
+  queue_init(&limiter->qlimit);
+  selection_solvables(pool, selection, &limiter->qlimit);
+  limiter->start = 0;
+  limiter->end = limiter->qlimit.count;
+  if (!limiter->qlimit.count)
+    queue_free(&limiter->qlimit);
+  else
+    limiter->mapper = limiter->qlimit.elements;
+}
+
+static void
+free_limiter(struct limiter *limiter)
+{
+  if (limiter->mapper)
+    queue_free(&limiter->qlimit);
 }
 
 /*
@@ -1831,7 +1741,12 @@ selection_make_matchdeps_common(Pool *pool, Queue *selection, const char *name, 
 int
 selection_make_matchdeps(Pool *pool, Queue *selection, const char *name, int flags, int keyname, int marker)
 {
-  return selection_make_matchdeps_common(pool, selection, name, 0, flags, keyname, marker);
+  struct limiter limiter;
+  int ret;
+  setup_limiter(pool, selection, flags, &limiter);
+  ret = selection_make_matchdeps_common(pool, selection, name, 0, flags, keyname, marker, &limiter);
+  free_limiter(&limiter);
+  return ret;
 }
 
 /*
@@ -1840,19 +1755,34 @@ selection_make_matchdeps(Pool *pool, Queue *selection, const char *name, int fla
 int
 selection_make_matchdepid(Pool *pool, Queue *selection, Id dep, int flags, int keyname, int marker)
 {
-  return selection_make_matchdeps_common(pool, selection, 0, dep, flags, keyname, marker);
+  struct limiter limiter;
+  int ret;
+  setup_limiter(pool, selection, flags, &limiter);
+  ret = selection_make_matchdeps_common(pool, selection, 0, dep, flags, keyname, marker, &limiter);
+  free_limiter(&limiter);
+  return ret;
 }
 
 int
 selection_make_matchsolvable(Pool *pool, Queue *selection, Id solvid, int flags, int keyname, int marker)
 {
-  return selection_make_matchdeps_common(pool, selection, 0, solvid, flags | SELECTION_MATCH_SOLVABLE, keyname, marker);
+  struct limiter limiter;
+  int ret;
+  setup_limiter(pool, selection, flags, &limiter);
+  ret = selection_make_matchsolvable_common(pool, selection, 0, solvid, flags, keyname, marker, &limiter);
+  free_limiter(&limiter);
+  return ret;
 }
 
 int
 selection_make_matchsolvablelist(Pool *pool, Queue *selection, Queue *solvidq, int flags, int keyname, int marker)
 {
-  return selection_make_matchdeps_common(pool, selection, (const char *)solvidq, 0, flags | SELECTION_MATCH_SOLVABLE, keyname, marker);
+  struct limiter limiter;
+  int ret;
+  setup_limiter(pool, selection, flags, &limiter);
+  ret = selection_make_matchsolvable_common(pool, selection, solvidq, 0, flags, keyname, marker, &limiter);
+  free_limiter(&limiter);
+  return ret;
 }
 
 static inline int
@@ -1889,7 +1819,9 @@ selection_filter_map(Pool *pool, Queue *sel, Map *m, int setflags)
   for (i = j = 0; i < sel->count; i += 2)
     {
       Id select = sel->elements[i] & SOLVER_SELECTMASK;
-      queue_empty(&q);
+      Id id = sel->elements[i + 1];
+      if (q.count)
+        queue_empty(&q);
       miss = 0;
       if (select == SOLVER_SOLVABLE_ALL)
 	{
@@ -1904,7 +1836,7 @@ selection_filter_map(Pool *pool, Queue *sel, Map *m, int setflags)
       else if (select == SOLVER_SOLVABLE_REPO)
 	{
 	  Solvable *s;
-	  Repo *repo = pool_id2repo(pool, sel->elements[i + 1]);
+	  Repo *repo = pool_id2repo(pool, id);
 	  if (repo)
 	    {
 	      FOR_REPO_SOLVABLES(repo, p, s)
@@ -1916,9 +1848,18 @@ selection_filter_map(Pool *pool, Queue *sel, Map *m, int setflags)
 		}
 	    }
 	}
+      else if (select == SOLVER_SOLVABLE)
+	{
+	  if (!map_tst(m, id))
+	    continue;
+	  sel->elements[j] = sel->elements[i] | setflags;
+	  sel->elements[j + 1] = id;
+          j += 2;
+	  continue;
+	}
       else
 	{
-	  FOR_JOB_SELECT(p, pp, select, sel->elements[i + 1])
+	  FOR_JOB_SELECT(p, pp, select, id)
 	    {
 	      if (map_tst(m, p))
 	        queue_pushunique(&q, p);
@@ -1931,7 +1872,7 @@ selection_filter_map(Pool *pool, Queue *sel, Map *m, int setflags)
       if (!miss)
 	{
 	  sel->elements[j] = sel->elements[i] | setflags;
-	  sel->elements[j + 1] = sel->elements[i + 1];
+	  sel->elements[j + 1] = id;
 	}
       else if (q.count > 1)
 	{
@@ -1958,6 +1899,7 @@ selection_filter_int(Pool *pool, Queue *sel1, Queue *sel2, int invert)
   Map m2;
   Id setflags = 0;
 
+  /* handle special cases */
   if (!sel1->count || !sel2->count)
     {
       if (invert && !sel2->count)
@@ -1968,11 +1910,35 @@ selection_filter_int(Pool *pool, Queue *sel1, Queue *sel2, int invert)
   if (sel1->count == 2 && (sel1->elements[0] & SOLVER_SELECTMASK) == SOLVER_SOLVABLE_ALL && !invert)
     {
       /* XXX: not 100% correct, but very useful */
-      p = sel1->elements[0] & ~(SOLVER_SELECTMASK | SOLVER_SETMASK);	/* job & jobflags */
+      setflags = sel1->elements[0] & ~(SOLVER_SELECTMASK | SOLVER_SETMASK);	/* job & jobflags */
       queue_free(sel1);
       queue_init_clone(sel1, sel2);
       for (i = 0; i < sel1->count; i += 2)
-        sel1->elements[i] = (sel1->elements[i] & (SOLVER_SELECTMASK | SOLVER_SETMASK)) | p ;
+        sel1->elements[i] = (sel1->elements[i] & (SOLVER_SELECTMASK | SOLVER_SETMASK)) | setflags;
+      return;
+    }
+  if (sel1->count == 2 && (sel1->elements[0] & SOLVER_SELECTMASK) == SOLVER_SOLVABLE_REPO && !invert)
+    {
+      Repo *repo = pool_id2repo(pool, sel1->elements[1]);
+      setflags = sel1->elements[0] & ~(SOLVER_SELECTMASK | SOLVER_NOAUTOSET);	/* job, jobflags, setflags */
+      queue_free(sel1);
+      queue_init_clone(sel1, sel2);
+      for (i = 0; i < sel1->count; i += 2)
+        sel1->elements[i] &= SOLVER_SELECTMASK | SOLVER_SETMASK;	/* remove job and jobflags */
+      selection_filter_repo(pool, sel1, repo, setflags);
+      return;
+    }
+  if (sel2->count == 2 && (sel2->elements[0] & SOLVER_SELECTMASK) == SOLVER_SOLVABLE_ALL)
+    {
+      if (invert)
+	queue_empty(sel1);
+      return;
+    }
+  if (sel2->count == 2 && (sel2->elements[0] & SOLVER_SELECTMASK) == SOLVER_SOLVABLE_REPO && !invert)
+    {
+      Repo *repo = pool_id2repo(pool, sel2->elements[1]);
+      setflags = sel2->elements[0] & (SOLVER_SETMASK & ~SOLVER_NOAUTOSET);
+      selection_filter_repo(pool, sel1, repo, setflags);
       return;
     }
 
@@ -2044,7 +2010,7 @@ selection_filter_int(Pool *pool, Queue *sel1, Queue *sel2, int invert)
   if (invert)
     map_invertall(&m2);
   if (sel2->count == 2)
-    setflags = sel2->elements[0] & SOLVER_SETMASK & ~SOLVER_NOAUTOSET;
+    setflags = sel2->elements[0] & (SOLVER_SETMASK & ~SOLVER_NOAUTOSET);
   selection_filter_map(pool, sel1, &m2, setflags);
   map_free(&m2);
 }
