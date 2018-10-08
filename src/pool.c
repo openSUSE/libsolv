@@ -1491,11 +1491,10 @@ pool_whatcontainsdep(Pool *pool, Id keyname, Id dep, Queue *q, int marker)
 void
 pool_whatmatchessolvable(Pool *pool, Id keyname, Id solvid, Queue *q, int marker)
 {
-  Id p, *wp;
+  Id p;
   Queue qq;
-  int i;
   Map missc;		/* cache for misses */
-  int reloff, boff;
+  int reloff;
 
   queue_empty(q);
   queue_init(&qq);
@@ -1510,47 +1509,8 @@ pool_whatmatchessolvable(Pool *pool, Id keyname, Id solvid, Queue *q, int marker
 	continue;
       if (s->repo != pool->installed && !pool_installable(pool, s))
 	continue;
-      if (qq.count)
-	queue_empty(&qq);
-      solvable_lookup_deparray(s, keyname, &qq, marker);
-      for (i = 0; i < qq.count; i++)
-	{
-	  Id dep = qq.elements[i];
-	  boff = ISRELDEP(dep) ? reloff + GETRELID(dep) : dep;
-	  if (MAPTST(&missc, boff))
-	    continue;
-	  if (ISRELDEP(dep))
-	    {
-	      Reldep *rd = GETRELDEP(pool, dep);
-	      if (!ISRELDEP(rd->name) && rd->flags < 8)
-		{
-		  /* do pre-filtering on the base */
-		  if (MAPTST(&missc, rd->name))
-		    continue;
-		  wp = pool_whatprovides_ptr(pool, rd->name);
-		  for (wp = pool_whatprovides_ptr(pool, dep); *wp; wp++)
-		    if (*wp == solvid)
-		      break;
-		  if (!*wp)
-		    {
-		      /* the base does not include solvid, no need to check the complete dep */
-		      MAPSET(&missc, rd->name);
-		      MAPSET(&missc, boff);
-		      continue;
-		    }
-		}
-	    }
-	  wp = pool_whatprovides_ptr(pool, dep);
-	  for (wp = pool_whatprovides_ptr(pool, dep); *wp; wp++)
-	    if (*wp == solvid)
-	      break;
-	  if (*wp)
-	    {
-	      queue_push(q, p);
-	      break;
-	    }
-	  MAPSET(&missc, boff);
-	}
+      if (solvable_matchessolvable_int(s, keyname, marker, solvid, 0, &qq, &missc, reloff))
+        queue_push(q, p);
     }
   map_free(&missc);
   queue_free(&qq);

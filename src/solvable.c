@@ -613,3 +613,67 @@ solvable_matchesdep(Solvable *s, Id keyname, Id dep, int marker)
   queue_free(&q);
   return i;
 }
+
+int
+solvable_matchessolvable_int(Solvable *s, Id keyname, int marker, Id solvid, Map *solvidmap, Queue *depq, Map *missc, int reloff)
+{
+  Pool *pool = s->repo->pool;
+  int i, boff;
+  Id *wp;
+
+  if (depq->count)
+    queue_empty(depq);
+  solvable_lookup_deparray(s, keyname, depq, marker);
+  for (i = 0; i < depq->count; i++)
+    {
+      Id dep = depq->elements[i];
+      boff = ISRELDEP(dep) ? reloff + GETRELID(dep) : dep;
+      if (MAPTST(missc, boff))
+	continue;
+      if (ISRELDEP(dep))
+	{
+	  Reldep *rd = GETRELDEP(pool, dep);
+	  if (!ISRELDEP(rd->name) && rd->flags < 8)
+	    {
+	      /* do pre-filtering on the base */
+	      if (MAPTST(missc, rd->name))
+		continue;
+	      wp = pool_whatprovides_ptr(pool, rd->name);
+	      if (solvidmap)
+		{
+		  for (; *wp; wp++)
+		    if (MAPTST(solvidmap, *wp))
+		      break;
+		}
+	      else
+		{
+		  for (; *wp; wp++)
+		    if (*wp == solvid)
+		      break;
+		}
+	      if (!*wp)
+		{
+		  /* the base does not include solvid, no need to check the complete dep */
+		  MAPSET(missc, rd->name);
+		  MAPSET(missc, boff);
+		  continue;
+		}
+	    }
+	}
+      wp = pool_whatprovides_ptr(pool, dep);
+      if (solvidmap)
+	{
+	  for (; *wp; wp++)
+	    if (MAPTST(solvidmap, *wp))
+	      return 1;
+	}
+      else
+	{
+	  for (; *wp; wp++)
+	    if (*wp == solvid)
+	      return 1;
+	}
+      MAPSET(missc, boff);
+    }
+  return 0;
+}

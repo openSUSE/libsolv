@@ -79,7 +79,12 @@ void solvable_unset(Solvable *s, Id keyname);
 
 int solvable_identical(Solvable *s1, Solvable *s2);
 Id solvable_selfprovidedep(Solvable *s);
+
 int solvable_matchesdep(Solvable *s, Id keyname, Id dep, int marker);
+
+/* internal */
+int solvable_matchessolvable_int(Solvable *s, Id keyname, int marker, Id solvid, Map *solvidmap, Queue *depq, Map *missc, int reloff);
+
 
 /* weird suse stuff */
 int solvable_is_irrelevant_patch(Solvable *s, Map *installedmap);
