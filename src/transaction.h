@@ -115,7 +115,7 @@ extern void transaction_classify_pkgs(Transaction *trans, int mode, Id type, Id 
    packages is returned */
 extern int transaction_installedresult(Transaction *trans, Queue *installedq);
 
-int transaction_calc_installsizechange(Transaction *trans);
+long long transaction_calc_installsizechange(Transaction *trans);
 void transaction_calc_duchanges(Transaction *trans, struct _DUChanges *mps, int nmps);
 
 

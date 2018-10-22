@@ -3727,7 +3727,7 @@ rb_eval_string(
   int steptype(XSolvable *s, int mode) {
     return transaction_type($self, s->id, mode);
   }
-  int calc_installsizechange() {
+  long long calc_installsizechange() {
     return transaction_calc_installsizechange($self);
   }
   void order(int flags=0) {

@@ -787,7 +787,7 @@ rerunsolver:
 #if defined(SUSE)
   showdiskusagechanges(trans);
 #endif
-  printf("install size change: %d K\n", transaction_calc_installsizechange(trans));
+  printf("install size change: %lld K\n", transaction_calc_installsizechange(trans));
   printf("\n");
 
   acnt = solver_alternatives_count(solv);

@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 09/14/2018
+.\"      Date: 10/22/2018
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "09/14/2018" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "10/22/2018" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -5049,7 +5049,7 @@ For installed packages, returns all of the packages that replace us\&. For to be
 .RS 4
 .\}
 .nf
-\fBint calc_installsizechange()\fR;
+\fBlong long calc_installsizechange()\fR;
 my \fI$change\fR \fB=\fR \fI$trans\fR\fB\->calc_installsizechange()\fR;
 \fIchange\fR \fB=\fR \fItrans\fR\fB\&.calc_installsizechange()\fR
 \fIchange\fR \fB=\fR \fItrans\fR\fB\&.calc_installsizechange()\fR

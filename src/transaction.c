@@ -828,11 +828,11 @@ transaction_make_installedmap(Transaction *trans, Map *installedmap)
     }
 }
 
-int
+long long
 transaction_calc_installsizechange(Transaction *trans)
 {
   Map installedmap;
-  int change;
+  long long change;
 
   transaction_make_installedmap(trans, &installedmap);
   change = pool_calc_installsizechange(trans->pool, &installedmap);

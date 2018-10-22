@@ -3128,7 +3128,7 @@ be installed packages, returns all of the packages that the new package
 replaces. The special ``other'' solvable is always the first entry of the
 returned array.
 
-	int calc_installsizechange();
+	long long calc_installsizechange();
 	my $change = $trans->calc_installsizechange();
 	change = trans.calc_installsizechange()
 	change = trans.calc_installsizechange()
