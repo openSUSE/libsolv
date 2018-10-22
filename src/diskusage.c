@@ -308,7 +308,7 @@ pool_calc_duchanges(Pool *pool, Map *installedmap, DUChanges *mps, int nmps)
 	{
 	  if (MAPTST(installedmap, sp))
 	    continue;
-	  if (ignoredu.map && MAPTST(&ignoredu, sp - oldinstalled->start))
+	  if (ignoredu.size && MAPTST(&ignoredu, sp - oldinstalled->start))
 	    continue;
 	  repo_search(oldinstalled, sp, SOLVABLE_DISKUSAGE, 0, 0, solver_fill_DU_cb, &cbd);
 	}

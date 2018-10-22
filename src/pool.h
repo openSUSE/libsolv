@@ -376,8 +376,8 @@ const char *pool_lookup_deltalocation(Pool *pool, Id entry, unsigned int *median
 
 typedef struct _DUChanges {
   const char *path;
-  int kbytes;
-  int files;
+  long long kbytes;
+  long long files;
   int flags;
 } DUChanges;
 

@@ -130,7 +130,7 @@ showdiskusagechanges(Transaction *trans)
   duc[3].path = "/etc";
   transaction_calc_duchanges(trans, duc, 4);
   for (i = 0; i < 4; i++)
-    printf("duchanges %s: %d K  %d inodes\n", duc[i].path, duc[i].kbytes, duc[i].files);
+    printf("duchanges %s: %lld K  %lld inodes\n", duc[i].path, duc[i].kbytes, duc[i].files);
 }
 #endif
 
