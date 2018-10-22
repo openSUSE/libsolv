@@ -24,7 +24,7 @@
 extern "C" {
 #endif
 
-typedef struct _Repo {
+typedef struct s_Repo {
   const char *name;		/* name pointer */
   Id repoid;			/* our id */
   void *appdata;		/* application private pointer */

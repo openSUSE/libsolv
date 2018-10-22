@@ -19,7 +19,7 @@
 extern "C" {
 #endif
 
-typedef struct _Map {
+typedef struct s_Map {
   unsigned char *map;
   int size;
 } Map;

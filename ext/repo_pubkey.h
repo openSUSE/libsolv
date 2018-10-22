@@ -19,7 +19,7 @@ extern int repo_add_keyring(Repo *repo, FILE *fp, int flags);
 extern int repo_add_keydir(Repo *repo, const char *keydir, const char *suffix, int flags);
 
 /* signature parsing */
-typedef struct _solvsig {
+typedef struct s_Solvsig {
   unsigned char *sigpkt;
   int sigpktl;
   Id htype;

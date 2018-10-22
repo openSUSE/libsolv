@@ -11,7 +11,7 @@
 #define REPOPAGE_BLOBBITS 15
 #define REPOPAGE_BLOBSIZE (1 << REPOPAGE_BLOBBITS)
 
-typedef struct _Attrblobpage
+typedef struct s_Attrblobpage
 {
   /* page_size == 0 means the page is not backed by some file storage.
      Otherwise it is L*2+(compressed ? 1 : 0), with L being the data
@@ -20,7 +20,7 @@ typedef struct _Attrblobpage
   unsigned int page_size;
 } Attrblobpage;
 
-typedef struct _Repopagestore {
+typedef struct s_Repopagestore {
   int pagefd;		/* file descriptor we're paging from */
   long file_offset;	/* pages in file start here */
 

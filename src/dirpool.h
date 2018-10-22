@@ -15,7 +15,7 @@
 extern "C" {
 #endif
 
-typedef struct _Dirpool {
+typedef struct s_Dirpool {
   Id *dirs;
   int ndirs;
   Id *dirtraverse;

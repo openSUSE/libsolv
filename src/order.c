@@ -23,14 +23,14 @@
 #include "repo.h"
 #include "util.h"
 
-struct _TransactionElement {
+struct s_TransactionElement {
   Id p;		/* solvable id */
   Id edges;	/* pointer into edges data */
   Id mark;
 };
 
-struct _TransactionOrderdata {
-  struct _TransactionElement *tes;
+struct s_TransactionOrderdata {
+  struct s_TransactionElement *tes;
   int ntes;
   Id *invedgedata;
   int ninvedgedata;
@@ -57,7 +57,7 @@ struct _TransactionOrderdata {
 void
 transaction_clone_orderdata(Transaction *trans, Transaction *srctrans)
 {
-  struct _TransactionOrderdata *od = srctrans->orderdata;
+  struct s_TransactionOrderdata *od = srctrans->orderdata;
   if (!od)
     return;
   trans->orderdata = solv_calloc(1, sizeof(*trans->orderdata));
@@ -77,7 +77,7 @@ transaction_free_orderdata(Transaction *trans)
 {
   if (trans->orderdata)
     {
-      struct _TransactionOrderdata *od = trans->orderdata;
+      struct s_TransactionOrderdata *od = trans->orderdata;
       od->tes = solv_free(od->tes);
       od->invedgedata = solv_free(od->invedgedata);
       if (od->cycles)
@@ -91,7 +91,7 @@ transaction_free_orderdata(Transaction *trans)
 
 struct orderdata {
   Transaction *trans;
-  struct _TransactionElement *tes;
+  struct s_TransactionElement *tes;
   int ntes;
   Id *edgedata;
   int nedgedata;
@@ -106,7 +106,7 @@ static int
 addteedge(struct orderdata *od, int from, int to, int type)
 {
   int i;
-  struct _TransactionElement *te;
+  struct s_TransactionElement *te;
 
   if (from == to)
     return 0;
@@ -154,7 +154,7 @@ addedge(struct orderdata *od, Id from, Id to, int type)
   Transaction *trans = od->trans;
   Pool *pool = trans->pool;
   Solvable *s;
-  struct _TransactionElement *te;
+  struct s_TransactionElement *te;
   int i;
 
   /* printf("addedge %d %d type %d\n", from, to, type); */
@@ -531,7 +531,7 @@ breakcycle(struct orderdata *od, Id *cycle)
   Pool *pool = od->trans->pool;
   Id ddegmin, ddegmax, ddeg;
   int k, l;
-  struct _TransactionElement *te;
+  struct s_TransactionElement *te;
 
   l = 0;
   ddegmin = ddegmax = 0;
@@ -604,7 +604,7 @@ dump_tes(struct orderdata *od)
   Pool *pool = od->trans->pool;
   int i, j;
   Queue obsq;
-  struct _TransactionElement *te, *te2;
+  struct s_TransactionElement *te, *te2;
 
   queue_init(&obsq);
   for (i = 1, te = od->tes + i; i < od->ntes; i++, te++)
@@ -632,7 +632,7 @@ dump_tes(struct orderdata *od)
 static void
 reachable(struct orderdata *od, Id i)
 {
-  struct _TransactionElement *te = od->tes + i;
+  struct s_TransactionElement *te = od->tes + i;
   int j, k;
 
   if (te->mark != 0)
@@ -660,7 +660,7 @@ addcycleedges(struct orderdata *od, Id *cycle, Queue *todo)
   Transaction *trans = od->trans;
   Pool *pool = trans->pool;
 #endif
-  struct _TransactionElement *te;
+  struct s_TransactionElement *te;
   int i, j, k, tail;
   int head;
 
@@ -780,7 +780,7 @@ transaction_order(Transaction *trans, int flags)
   Solvable *s;
   int i, j, k, numte, numedge;
   struct orderdata od;
-  struct _TransactionElement *te;
+  struct s_TransactionElement *te;
   Queue todo, obsq, samerepoq, uninstq;
   int cycstart, cycel;
   Id *cycle;
@@ -795,7 +795,7 @@ transaction_order(Transaction *trans, int flags)
   /* free old data if present */
   if (trans->orderdata)
     {
-      struct _TransactionOrderdata *od = trans->orderdata;
+      struct s_TransactionOrderdata *od = trans->orderdata;
       od->tes = solv_free(od->tes);
       od->invedgedata = solv_free(od->invedgedata);
       trans->orderdata = solv_free(trans->orderdata);
@@ -1069,7 +1069,7 @@ printf("do %s [%d]\n", pool_solvid2str(pool, te->p), temedianr[i]);
       s = pool->solvables + te->p;
       for (j = te->edges; od.invedgedata[j]; j++)
 	{
-	  struct _TransactionElement *te2 = od.tes + od.invedgedata[j];
+	  struct s_TransactionElement *te2 = od.tes + od.invedgedata[j];
 	  assert(te2->mark > 0);
 	  if (--te2->mark == 0)
 	    {
@@ -1103,7 +1103,7 @@ printf("free %s [%d]\n", pool_solvid2str(pool, te2->p), temedianr[od.invedgedata
 
   if ((flags & (SOLVER_TRANSACTION_KEEP_ORDERDATA | SOLVER_TRANSACTION_KEEP_ORDERCYCLES)) != 0)
     {
-      struct _TransactionOrderdata *tod;
+      struct s_TransactionOrderdata *tod;
       trans->orderdata = tod = solv_calloc(1, sizeof(*trans->orderdata));
       if ((flags & SOLVER_TRANSACTION_KEEP_ORDERCYCLES) != 0)
 	{
@@ -1137,8 +1137,8 @@ int
 transaction_order_add_choices(Transaction *trans, Id chosen, Queue *choices)
 {
   int i, j;
-  struct _TransactionOrderdata *od = trans->orderdata;
-  struct _TransactionElement *te;
+  struct s_TransactionOrderdata *od = trans->orderdata;
+  struct s_TransactionElement *te;
 
   if (!od)
      return choices->count;
@@ -1349,7 +1349,7 @@ transaction_check_order(Transaction *trans)
 void
 transaction_order_get_cycleids(Transaction *trans, Queue *q, int minseverity)
 {
-  struct _TransactionOrderdata *od = trans->orderdata;
+  struct s_TransactionOrderdata *od = trans->orderdata;
   Queue *cq;
   int i, cid, ncycles;
 
@@ -1377,7 +1377,7 @@ transaction_order_get_cycleids(Transaction *trans, Queue *q, int minseverity)
 int
 transaction_order_get_cycle(Transaction *trans, Id cid, Queue *q)
 {
-  struct _TransactionOrderdata *od = trans->orderdata;
+  struct s_TransactionOrderdata *od = trans->orderdata;
   Queue *cq;
   int cmin, cmax, severity;
   int ncycles;

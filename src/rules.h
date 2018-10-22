@@ -35,7 +35,7 @@ extern "C" {
  * possible. Do not add new members unless there is no other way.
  */
 
-typedef struct _Rule {
+typedef struct s_Rule {
   Id p;		/* first literal in rule */
   Id d;		/* Id offset into 'list of providers terminated by 0' as used by whatprovides; pool->whatprovides + d */
 		/* in case of binary rules, d == 0, w1 == p, w2 == other literal */
@@ -76,14 +76,14 @@ typedef enum {
 
 #define SOLVER_RULE_TYPEMASK    0xff00
 
-struct _Solver;
+struct s_Solver;
 
 /*-------------------------------------------------------------------
  * disable rule
  */
 
 static inline void
-solver_disablerule(struct _Solver *solv, Rule *r)
+solver_disablerule(struct s_Solver *solv, Rule *r)
 {
   if (r->d >= 0)
     r->d = -r->d - 1;
@@ -94,64 +94,64 @@ solver_disablerule(struct _Solver *solv, Rule *r)
  */
 
 static inline void
-solver_enablerule(struct _Solver *solv, Rule *r)
+solver_enablerule(struct s_Solver *solv, Rule *r)
 {
   if (r->d < 0)
     r->d = -r->d - 1;
 }
 
-extern Rule *solver_addrule(struct _Solver *solv, Id p, Id p2, Id d);
-extern void solver_unifyrules(struct _Solver *solv);
-extern int solver_rulecmp(struct _Solver *solv, Rule *r1, Rule *r2);
-extern void solver_shrinkrules(struct _Solver *solv, int nrules);
+extern Rule *solver_addrule(struct s_Solver *solv, Id p, Id p2, Id d);
+extern void solver_unifyrules(struct s_Solver *solv);
+extern int solver_rulecmp(struct s_Solver *solv, Rule *r1, Rule *r2);
+extern void solver_shrinkrules(struct s_Solver *solv, int nrules);
 
 /* pkg rules */
-extern void solver_addpkgrulesforsolvable(struct _Solver *solv, Solvable *s, Map *m);
-extern void solver_addpkgrulesforweak(struct _Solver *solv, Map *m);
-extern void solver_addpkgrulesforlinked(struct _Solver *solv, Map *m);
-extern void solver_addpkgrulesforupdaters(struct _Solver *solv, Solvable *s, Map *m, int allow_all);
+extern void solver_addpkgrulesforsolvable(struct s_Solver *solv, Solvable *s, Map *m);
+extern void solver_addpkgrulesforweak(struct s_Solver *solv, Map *m);
+extern void solver_addpkgrulesforlinked(struct s_Solver *solv, Map *m);
+extern void solver_addpkgrulesforupdaters(struct s_Solver *solv, Solvable *s, Map *m, int allow_all);
 
 /* update/feature rules */
-extern void solver_addfeaturerule(struct _Solver *solv, Solvable *s);
-extern void solver_addupdaterule(struct _Solver *solv, Solvable *s);
+extern void solver_addfeaturerule(struct s_Solver *solv, Solvable *s);
+extern void solver_addupdaterule(struct s_Solver *solv, Solvable *s);
 
 /* infarch rules */
-extern void solver_addinfarchrules(struct _Solver *solv, Map *addedmap);
+extern void solver_addinfarchrules(struct s_Solver *solv, Map *addedmap);
 
 /* dup rules */
-extern void solver_createdupmaps(struct _Solver *solv);
-extern void solver_freedupmaps(struct _Solver *solv);
-extern void solver_addduprules(struct _Solver *solv, Map *addedmap);
+extern void solver_createdupmaps(struct s_Solver *solv);
+extern void solver_freedupmaps(struct s_Solver *solv);
+extern void solver_addduprules(struct s_Solver *solv, Map *addedmap);
 
 /* choice rules */
-extern void solver_addchoicerules(struct _Solver *solv);
-extern void solver_disablechoicerules(struct _Solver *solv, Rule *r);
+extern void solver_addchoicerules(struct s_Solver *solv);
+extern void solver_disablechoicerules(struct s_Solver *solv, Rule *r);
 
 /* best rules */
-extern void solver_addbestrules(struct _Solver *solv, int havebestinstalljobs);
+extern void solver_addbestrules(struct s_Solver *solv, int havebestinstalljobs);
 
 /* yumobs rules */
-extern void solver_addyumobsrules(struct _Solver *solv);
+extern void solver_addyumobsrules(struct s_Solver *solv);
 
 /* policy rule disabling/reenabling */
-extern void solver_disablepolicyrules(struct _Solver *solv);
-extern void solver_reenablepolicyrules(struct _Solver *solv, int jobidx);
-extern void solver_reenablepolicyrules_cleandeps(struct _Solver *solv, Id pkg);
+extern void solver_disablepolicyrules(struct s_Solver *solv);
+extern void solver_reenablepolicyrules(struct s_Solver *solv, int jobidx);
+extern void solver_reenablepolicyrules_cleandeps(struct s_Solver *solv, Id pkg);
 
 /* rule info */
-extern int solver_allruleinfos(struct _Solver *solv, Id rid, Queue *rq);
-extern SolverRuleinfo solver_ruleinfo(struct _Solver *solv, Id rid, Id *fromp, Id *top, Id *depp);
-extern SolverRuleinfo solver_ruleclass(struct _Solver *solv, Id rid);
-extern void solver_ruleliterals(struct _Solver *solv, Id rid, Queue *q);
-extern int  solver_rule2jobidx(struct _Solver *solv, Id rid);
-extern Id   solver_rule2job(struct _Solver *solv, Id rid, Id *whatp);
-extern Id   solver_rule2solvable(struct _Solver *solv, Id rid);
-extern void solver_rule2rules(struct _Solver *solv, Id rid, Queue *q, int recursive);
-extern Id   solver_rule2pkgrule(struct _Solver *solv, Id rid);
+extern int solver_allruleinfos(struct s_Solver *solv, Id rid, Queue *rq);
+extern SolverRuleinfo solver_ruleinfo(struct s_Solver *solv, Id rid, Id *fromp, Id *top, Id *depp);
+extern SolverRuleinfo solver_ruleclass(struct s_Solver *solv, Id rid);
+extern void solver_ruleliterals(struct s_Solver *solv, Id rid, Queue *q);
+extern int  solver_rule2jobidx(struct s_Solver *solv, Id rid);
+extern Id   solver_rule2job(struct s_Solver *solv, Id rid, Id *whatp);
+extern Id   solver_rule2solvable(struct s_Solver *solv, Id rid);
+extern void solver_rule2rules(struct s_Solver *solv, Id rid, Queue *q, int recursive);
+extern Id   solver_rule2pkgrule(struct s_Solver *solv, Id rid);
 
 /* orphan handling */
-extern void solver_breakorphans(struct _Solver *solv);
-extern void solver_check_brokenorphanrules(struct _Solver *solv, Queue *dq);
+extern void solver_breakorphans(struct s_Solver *solv);
+extern void solver_check_brokenorphanrules(struct s_Solver *solv, Queue *dq);
 
 
 /* legacy */

@@ -19,7 +19,7 @@
 #include "sha1.h"
 #include "sha2.h"
 
-struct _Chksum {
+struct s_Chksum {
   Id type;
   int done;
   unsigned char result[64];

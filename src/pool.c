@@ -1602,7 +1602,7 @@ pool_setdebuglevel(Pool *pool, int level)
   pool->debugmask = mask;
 }
 
-void pool_setdebugcallback(Pool *pool, void (*debugcallback)(struct _Pool *, void *data, int type, const char *str), void *debugcallbackdata)
+void pool_setdebugcallback(Pool *pool, void (*debugcallback)(struct s_Pool *, void *data, int type, const char *str), void *debugcallbackdata)
 {
   pool->debugcallback = debugcallback;
   pool->debugcallbackdata = debugcallbackdata;
@@ -1613,20 +1613,20 @@ void pool_setdebugmask(Pool *pool, int mask)
   pool->debugmask = mask;
 }
 
-void pool_setloadcallback(Pool *pool, int (*cb)(struct _Pool *, struct _Repodata *, void *), void *loadcbdata)
+void pool_setloadcallback(Pool *pool, int (*cb)(struct s_Pool *, struct s_Repodata *, void *), void *loadcbdata)
 {
   pool->loadcallback = cb;
   pool->loadcallbackdata = loadcbdata;
 }
 
-void pool_setnamespacecallback(Pool *pool, Id (*cb)(struct _Pool *, void *, Id, Id), void *nscbdata)
+void pool_setnamespacecallback(Pool *pool, Id (*cb)(struct s_Pool *, void *, Id, Id), void *nscbdata)
 {
   pool->nscallback = cb;
   pool->nscallbackdata = nscbdata;
 }
 
 void
-pool_search(Pool *pool, Id p, Id key, const char *match, int flags, int (*callback)(void *cbdata, Solvable *s, struct _Repodata *data, struct _Repokey *key, struct _KeyValue *kv), void *cbdata)
+pool_search(Pool *pool, Id p, Id key, const char *match, int flags, int (*callback)(void *cbdata, Solvable *s, struct s_Repodata *data, struct s_Repokey *key, struct s_KeyValue *kv), void *cbdata)
 {
   if (p)
     {

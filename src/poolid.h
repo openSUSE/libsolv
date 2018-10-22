@@ -24,7 +24,7 @@ extern "C" {
  * Ids with relation
  */
 
-typedef struct _Reldep {
+typedef struct s_Reldep {
   Id name;		/* "package" */
   Id evr;		/* "0:42-3" */
   int flags;		/* operation/relation, see REL_x in pool.h */

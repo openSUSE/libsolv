@@ -14,8 +14,8 @@
 extern "C" {
 #endif
 
-struct _Chksum;
-typedef struct _Chksum Chksum;
+struct s_Chksum;
+typedef struct s_Chksum Chksum;
 
 Chksum *solv_chksum_create(Id type);
 Chksum *solv_chksum_create_clone(Chksum *chk);

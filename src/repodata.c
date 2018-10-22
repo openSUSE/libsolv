@@ -3692,7 +3692,7 @@ repodata_stub_loader(Repodata *data)
   Repo *repo = data->repo;
   Pool *pool = repo->pool;
   int r, i;
-  struct _Pool_tmpspace oldtmpspace;
+  struct s_Pool_tmpspace oldtmpspace;
   Datapos oldpos;
 
   if (!pool->loadcallback)

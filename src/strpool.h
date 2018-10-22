@@ -17,7 +17,7 @@ extern "C" {
 #define STRID_NULL  0
 #define STRID_EMPTY 1
 
-struct _Stringpool
+struct s_Stringpool
 {
   Offset *strings;            /* table of offsets into stringspace, indexed by Id: Id -> Offset */
   int nstrings;               /* number of ids in strings table */

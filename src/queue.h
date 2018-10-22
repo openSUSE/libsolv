@@ -19,7 +19,7 @@
 extern "C" {
 #endif
 
-typedef struct _Queue {
+typedef struct s_Queue {
   Id *elements;		/* pointer to elements */
   int count;		/* current number of elements in queue */
   Id *alloc;		/* this is whats actually allocated, elements > alloc if shifted */

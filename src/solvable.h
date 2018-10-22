@@ -23,15 +23,15 @@
 extern "C" {
 #endif
 
-struct _Repo;
+struct s_Repo;
 
-typedef struct _Solvable {
+typedef struct s_Solvable {
   Id name;
   Id arch;
   Id evr;			/* epoch:version-release */
   Id vendor;
 
-  struct _Repo *repo;		/* repo we belong to */
+  struct s_Repo *repo;		/* repo we belong to */
 
   /* dependencies are offsets into repo->idarraydata */
   Offset provides;		/* terminated with Id 0 */
@@ -90,7 +90,7 @@ int solvable_matchessolvable_int(Solvable *s, Id keyname, int marker, Id solvid,
 int solvable_is_irrelevant_patch(Solvable *s, Map *installedmap);
 int solvable_trivial_installable_map(Solvable *s, Map *installedmap, Map *conflictsmap, Map *multiversionmap);
 int solvable_trivial_installable_queue(Solvable *s, Queue *installed, Map *multiversionmap);
-int solvable_trivial_installable_repo(Solvable *s, struct _Repo *installed, Map *multiversionmap);
+int solvable_trivial_installable_repo(Solvable *s, struct s_Repo *installed, Map *multiversionmap);
 
 #ifdef __cplusplus
 }

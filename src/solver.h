@@ -26,11 +26,11 @@
 extern "C" {
 #endif
 
-struct _Solver {
+struct s_Solver {
   Pool *pool;				/* back pointer to pool */
   Queue job;				/* copy of the job we're solving */
 
-  int (*solution_callback)(struct _Solver *solv, void *data);
+  int (*solution_callback)(struct s_Solver *solv, void *data);
   void *solution_callback_data;
 
   int pooljobcnt;			/* number of pooljob entries in job queue */
@@ -211,7 +211,7 @@ struct _Solver {
 #endif	/* LIBSOLV_INTERNAL */
 };
 
-typedef struct _Solver Solver;
+typedef struct s_Solver Solver;
 
 /*
  * queue commands

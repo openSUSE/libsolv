@@ -478,7 +478,7 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
   int oldnstrings = pool->ss.nstrings;
   int oldnrels = pool->nrels;
 
-  struct _Stringpool *spool;
+  struct s_Stringpool *spool;
 
   Repodata *parent = 0;
   Repodata data;

@@ -51,12 +51,12 @@
  * uintXX_t (from inttypes.h), you may need to define things by hand
  * for your system:
  */
-typedef struct _SHA256_CTX {
+typedef struct s_SHA256_CTX {
 	uint32_t	state[8];
 	uint64_t	bitcount;
 	uint32_t        buffer[SHA256_BLOCK_LENGTH/4];
 } SHA256_CTX;
-typedef struct _SHA512_CTX {
+typedef struct s_SHA512_CTX {
 	uint64_t	state[8];
 	uint64_t	bitcount[2];
 	uint64_t	buffer[SHA512_BLOCK_LENGTH/8];

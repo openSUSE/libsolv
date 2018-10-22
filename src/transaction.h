@@ -21,12 +21,12 @@
 extern "C" {
 #endif
 
-struct _Pool;
-struct _DUChanges;
-struct _TransactionOrderdata;
+struct s_Pool;
+struct s_DUChanges;
+struct s_TransactionOrderdata;
 
-typedef struct _Transaction {
-  struct _Pool *pool;		/* back pointer to pool */
+typedef struct s_Transaction {
+  struct s_Pool *pool;		/* back pointer to pool */
 
   Queue steps;			/* the transaction steps */
 
@@ -36,7 +36,7 @@ typedef struct _Transaction {
   Map transactsmap;
   Map multiversionmap;
 
-  struct _TransactionOrderdata *orderdata;
+  struct s_TransactionOrderdata *orderdata;
 #endif
 
 } Transaction;
@@ -92,8 +92,8 @@ typedef struct _Transaction {
 #define SOLVER_ORDERCYCLE_NORMAL		1
 #define SOLVER_ORDERCYCLE_CRITICAL		2
 
-extern Transaction *transaction_create(struct _Pool *pool);
-extern Transaction *transaction_create_decisionq(struct _Pool *pool, Queue *decisionq, Map *multiversionmap);
+extern Transaction *transaction_create(struct s_Pool *pool);
+extern Transaction *transaction_create_decisionq(struct s_Pool *pool, Queue *decisionq, Map *multiversionmap);
 extern Transaction *transaction_create_clone(Transaction *srctrans);
 extern void transaction_free(Transaction *trans);
 
@@ -116,7 +116,7 @@ extern void transaction_classify_pkgs(Transaction *trans, int mode, Id type, Id 
 extern int transaction_installedresult(Transaction *trans, Queue *installedq);
 
 long long transaction_calc_installsizechange(Transaction *trans);
-void transaction_calc_duchanges(Transaction *trans, struct _DUChanges *mps, int nmps);
+void transaction_calc_duchanges(Transaction *trans, struct s_DUChanges *mps, int nmps);
 
 
 

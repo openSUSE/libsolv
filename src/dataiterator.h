@@ -20,9 +20,9 @@
 extern "C" {
 #endif
 
-struct _Repo;
+struct s_Repo;
 
-typedef struct _KeyValue {
+typedef struct s_KeyValue {
   Id id;
   const char *str;
   unsigned int num;
@@ -31,7 +31,7 @@ typedef struct _KeyValue {
   int entry;	/* array entry, starts with 0 */
   int eof;	/* last entry reached */
 
-  struct _KeyValue *parent;
+  struct s_KeyValue *parent;
 } KeyValue;
 
 #define SOLV_KV_NUM64(kv) (((unsigned long long)((kv)->num2)) << 32 | (kv)->num)
@@ -72,7 +72,7 @@ typedef struct _KeyValue {
 /*
  * Datamatcher: match a string against a query
  */
-typedef struct _Datamatcher {
+typedef struct s_Datamatcher {
   int flags;		/* see matcher flags above */
   const char *match;	/* the query string */
   void *matchdata;	/* e.g. compiled regexp */
@@ -100,14 +100,14 @@ int  datamatcher_checkbasename(Datamatcher *ma, const char *str);
  *      dosomething(di.solvid, di.key, di.kv);
  *    dataiterator_free(&di);
  */
-typedef struct _Dataiterator
+typedef struct s_Dataiterator
 {
   int state;
   int flags;
 
   Pool *pool;
-  struct _Repo *repo;
-  struct _Repodata *data;
+  struct s_Repo *repo;
+  struct s_Repodata *data;
 
   /* data pointers */
   unsigned char *dp;
@@ -116,7 +116,7 @@ typedef struct _Dataiterator
   Id *keyp;
 
   /* the result */
-  struct _Repokey *key;
+  struct s_Repokey *key;
   KeyValue kv;
 
   /* our matcher */
@@ -165,9 +165,9 @@ typedef struct _Dataiterator
  * keyname: if non-null, limit search to this keyname
  * match:   if non-null, limit search to this match
  */
-int  dataiterator_init(Dataiterator *di, Pool *pool, struct _Repo *repo, Id p, Id keyname, const char *match, int flags);
+int  dataiterator_init(Dataiterator *di, Pool *pool, struct s_Repo *repo, Id p, Id keyname, const char *match, int flags);
 void dataiterator_init_clone(Dataiterator *di, Dataiterator *from);
-void dataiterator_set_search(Dataiterator *di, struct _Repo *repo, Id p);
+void dataiterator_set_search(Dataiterator *di, struct s_Repo *repo, Id p);
 void dataiterator_set_keyname(Dataiterator *di, Id keyname);
 int  dataiterator_set_match(Dataiterator *di, const char *match, int flags);
 
@@ -181,7 +181,7 @@ void dataiterator_skip_attribute(Dataiterator *di);
 void dataiterator_skip_solvable(Dataiterator *di);
 void dataiterator_skip_repo(Dataiterator *di);
 void dataiterator_jump_to_solvid(Dataiterator *di, Id solvid);
-void dataiterator_jump_to_repo(Dataiterator *di, struct _Repo *repo);
+void dataiterator_jump_to_repo(Dataiterator *di, struct s_Repo *repo);
 void dataiterator_entersub(Dataiterator *di);
 void dataiterator_clonepos(Dataiterator *di, Dataiterator *from);
 void dataiterator_seek(Dataiterator *di, int whence);

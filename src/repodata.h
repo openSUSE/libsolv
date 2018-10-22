@@ -34,10 +34,10 @@ extern "C" {
 #define SIZEOF_SHA384	48
 #define SIZEOF_SHA512	64
 
-struct _Repo;
-struct _KeyValue;
+struct s_Repo;
+struct s_KeyValue;
 
-typedef struct _Repokey {
+typedef struct s_Repokey {
   Id name;
   Id type;			/* REPOKEY_TYPE_xxx */
   unsigned int size;
@@ -66,13 +66,13 @@ struct dircache;
 #define REPODATA_FILELIST_FILTERED	1
 #define REPODATA_FILELIST_EXTENSION	2
 
-typedef struct _Repodata {
+typedef struct s_Repodata {
   Id repodataid;		/* our id */
-  struct _Repo *repo;		/* back pointer to repo */
+  struct s_Repo *repo;		/* back pointer to repo */
 
   int state;			/* available, stub or error */
 
-  void (*loadcallback)(struct _Repodata *);
+  void (*loadcallback)(struct s_Repodata *);
 
   int start;			/* start of solvables this repodata is valid for */
   int end;			/* last solvable + 1 of this repodata */
@@ -148,7 +148,7 @@ typedef struct _Repodata {
 /*-----
  * management functions
  */
-void repodata_initdata(Repodata *data, struct _Repo *repo, int localpool);
+void repodata_initdata(Repodata *data, struct s_Repo *repo, int localpool);
 void repodata_freedata(Repodata *data);
 
 void repodata_free(Repodata *data);
@@ -207,13 +207,13 @@ repodata_has_keyname(Repodata *data, Id keyname)
 
 /* search key <keyname> (all keys, if keyname == 0) for Id <solvid>
  * Call <callback> for each match */
-void repodata_search(Repodata *data, Id solvid, Id keyname, int flags, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, struct _KeyValue *kv), void *cbdata);
-void repodata_search_keyskip(Repodata *data, Id solvid, Id keyname, int flags, Id *keyskip, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, struct _KeyValue *kv), void *cbdata);
-void repodata_search_arrayelement(Repodata *data, Id solvid, Id keyname, int flags, struct _KeyValue *kv, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, struct _KeyValue *kv), void *cbdata);
+void repodata_search(Repodata *data, Id solvid, Id keyname, int flags, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, struct s_KeyValue *kv), void *cbdata);
+void repodata_search_keyskip(Repodata *data, Id solvid, Id keyname, int flags, Id *keyskip, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, struct s_KeyValue *kv), void *cbdata);
+void repodata_search_arrayelement(Repodata *data, Id solvid, Id keyname, int flags, struct s_KeyValue *kv, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, struct s_KeyValue *kv), void *cbdata);
 
 /* Make sure the found KeyValue has the "str" field set. Return "str"
  * if valid, NULL if not possible */
-const char *repodata_stringify(Pool *pool, Repodata *data, Repokey *key, struct _KeyValue *kv, int flags);
+const char *repodata_stringify(Pool *pool, Repodata *data, Repokey *key, struct s_KeyValue *kv, int flags);
 
 /* filelist filter support */
 void repodata_set_filelisttype(Repodata *data, int filelisttype);
@@ -291,7 +291,7 @@ void repodata_add_fixarray(Repodata *data, Id solvid, Id keyname, Id ghandle);
 void repodata_add_flexarray(Repodata *data, Id solvid, Id keyname, Id ghandle);
 
 /* generic */
-void repodata_set_kv(Repodata *data, Id solvid, Id keyname, Id keytype, struct _KeyValue *kv);
+void repodata_set_kv(Repodata *data, Id solvid, Id keyname, Id keytype, struct s_KeyValue *kv);
 void repodata_unset(Repodata *data, Id solvid, Id keyname);
 void repodata_unset_uninternalized(Repodata *data, Id solvid, Id keyname);
 
@@ -324,8 +324,8 @@ void repodata_set_deltalocation(Repodata *data, Id handle, int medianr, const ch
 void repodata_set_sourcepkg(Repodata *data, Id solvid, const char *sourcepkg);
 
 /* uninternalized data lookup / search */
-Repokey *repodata_lookup_kv_uninternalized(Repodata *data, Id solvid, Id keyname, struct _KeyValue *kv);
-void repodata_search_uninternalized(Repodata *data, Id solvid, Id keyname, int flags, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, struct _KeyValue *kv), void *cbdata);
+Repokey *repodata_lookup_kv_uninternalized(Repodata *data, Id solvid, Id keyname, struct s_KeyValue *kv);
+void repodata_search_uninternalized(Repodata *data, Id solvid, Id keyname, int flags, int (*callback)(void *cbdata, Solvable *s, Repodata *data, Repokey *key, struct s_KeyValue *kv), void *cbdata);
 
 /* stats */
 unsigned int repodata_memused(Repodata *data);

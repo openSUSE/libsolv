@@ -22,7 +22,7 @@
 extern "C" {
 #endif
 
-typedef struct _Repowriter {
+typedef struct s_Repowriter {
   Repo *repo;
   int flags;
   int repodatastart;
