@@ -544,8 +544,8 @@ selection_addextra_provides(Pool *pool, Queue *selection, const char *name, int 
 }
 
 /* this is the fast path of selection_provides: the id for the name
- * is known and thus we can quickly check the existance of a
- * package with that provides */
+ * is known and thus we can use the whatprovides data to quickly
+ * check the existance of a package with that provides */
 static int
 selection_provides_id(Pool *pool, Queue *selection, Id id, int flags)
 {
@@ -556,20 +556,18 @@ selection_provides_id(Pool *pool, Queue *selection, Id id, int flags)
       Solvable *s = pool->solvables + p;
       if ((flags & SELECTION_INSTALLED_ONLY) != 0 && s->repo != pool->installed)
 	continue;
-      break;
-    }
-  if (p)
-    {
       queue_push2(selection, SOLVER_SOLVABLE_PROVIDES, id);
       return SELECTION_PROVIDES;
     }
 
   if ((flags & (SELECTION_WITH_BADARCH | SELECTION_WITH_DISABLED)) != 0)
     {
+      /* misuse selection_addextra to test if there is an extra package
+       * that provides the id */
       queue_push2(selection, SOLVER_SOLVABLE_PROVIDES, id);
       selection_addextra(pool, selection, flags);
       if (selection->elements[0] == SOLVER_SOLVABLE_PROVIDES)
-	queue_empty(selection);
+	queue_empty(selection);		/* no extra package found */
       else
 	{
           selection->elements[0] = SOLVER_SOLVABLE_PROVIDES;
@@ -581,7 +579,6 @@ selection_provides_id(Pool *pool, Queue *selection, Id id, int flags)
   return 0;
 }
 
-/* add missing provides matchers to the selection */
 /* match the provides of a package */
 /* note that we only return raw SOLVER_SOLVABLE_PROVIDES jobs
  * so that the selection can be modified later. */
@@ -625,7 +622,7 @@ selection_provides(Pool *pool, Queue *selection, const char *name, int flags)
   for (id = 1; id < pool->ss.nstrings; id++)
     {
       /* do we habe packages providing this id? */
-      if (!pool->whatprovides[id] || pool->whatprovides[id] == 1)
+      if ((!pool->whatprovides[id] && pool->addedfileprovides == 2) || pool->whatprovides[id] == 1)
 	continue;
       n = pool_id2str(pool, id);
       if ((doglob ? fnmatch(name, n, globflags) : nocase ? strcasecmp(name, n) : strcmp(name, n)) == 0)
@@ -635,6 +632,13 @@ selection_provides(Pool *pool, Queue *selection, const char *name, int flags)
 	      FOR_PROVIDES(p, pp, id)
 		if (pool->solvables[p].repo == pool->installed)
 		  break;
+	      if (!p)
+		continue;
+	    }
+	  else if (!pool->whatprovides[id])
+	    {
+	      FOR_PROVIDES(p, pp, id)
+		break;
 	      if (!p)
 		continue;
 	    }
