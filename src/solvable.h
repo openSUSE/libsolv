@@ -51,7 +51,7 @@ typedef struct _Solvable {
 Id solvable_lookup_type(Solvable *s, Id keyname);
 Id solvable_lookup_id(Solvable *s, Id keyname);
 unsigned long long solvable_lookup_num(Solvable *s, Id keyname, unsigned long long notfound);
-unsigned int solvable_lookup_sizek(Solvable *s, Id keyname, unsigned int notfound);
+unsigned long long solvable_lookup_sizek(Solvable *s, Id keyname, unsigned long long notfound);
 const char *solvable_lookup_str(Solvable *s, Id keyname);
 const char *solvable_lookup_str_poollang(Solvable *s, Id keyname);
 const char *solvable_lookup_str_lang(Solvable *s, Id keyname, const char *lang, int usebase);

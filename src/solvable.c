@@ -257,14 +257,14 @@ solvable_lookup_num(Solvable *s, Id keyname, unsigned long long notfound)
   return repo_lookup_num(s->repo, s - s->repo->pool->solvables, keyname, notfound);
 }
 
-unsigned int
-solvable_lookup_sizek(Solvable *s, Id keyname, unsigned int notfound)
+unsigned long long
+solvable_lookup_sizek(Solvable *s, Id keyname, unsigned long long notfound)
 {
   unsigned long long size;
   if (!s->repo)
     return notfound;
-  size = solvable_lookup_num(s, keyname, (unsigned long long)notfound << 10);
-  return (unsigned int)((size + 1023) >> 10);
+  size = solvable_lookup_num(s, keyname, (unsigned long long)-1);
+  return size == (unsigned long long)-1 ? notfound : ((size + 1023) >> 10);
 }
 
 int

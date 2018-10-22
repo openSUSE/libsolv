@@ -384,7 +384,7 @@ typedef struct _DUChanges {
 
 void pool_create_state_maps(Pool *pool, Queue *installed, Map *installedmap, Map *conflictsmap);
 void pool_calc_duchanges(Pool *pool, Map *installedmap, DUChanges *mps, int nmps);
-int  pool_calc_installsizechange(Pool *pool, Map *installedmap);
+long long pool_calc_installsizechange(Pool *pool, Map *installedmap);
 
 void pool_add_fileconflicts_deps(Pool *pool, Queue *conflicts);
 
