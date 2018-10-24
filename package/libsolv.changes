@@ -1,4 +1,13 @@
 -------------------------------------------------------------------
+Wed Oct 24 10:48:56 CEST 2018 - mls@suse.de
+
+- new repowriter interface
+- new selection_make_matchsolvable function
+- dropped support of REPOKEY_TYPE_U32
+- bindings: Selection.flags is now an attribute
+- bump version to 0.7.0
+
+-------------------------------------------------------------------
 Thu Aug  9 17:09:41 CEST 2018 - mls@suse.de
 
 - refactor arch handling

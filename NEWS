@@ -2,6 +2,24 @@
 This file contains the major changes between
 libsolv versions:
 
+Version 0.7.0
+- soname bump to "1"
+- incompatible API changes:
+  * bindings: Selection.flags is now an attribute
+  * repodata_lookup_num now works like the other lookup_num functions
+- new functions:
+  * selection_make_matchsolvable
+  * selection_make_matchsolvablelist
+  * pool_whatmatchessolvable
+  * repodata_search_arrayelement
+  * repodata_lookup_kv_uninternalized
+  * repodata_search_uninternalized
+  * repodata_translate_dir
+- new repowriter interface to write solv files allowing better
+  control over what gets written
+- support for filtered file lists with a custom filter
+- dropped support of (since a long time unused) REPOKEY_TYPE_U32
+
 Version 0.6.35
 - new configuration options:
   * ENABLE_ZSTD_COMPRESSION: support zstd compression
