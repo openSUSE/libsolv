@@ -1780,20 +1780,20 @@ Intersect the result of the match to the current selection instead of replacing 
 
 Back pointer to pool.
 
-=== METHODS ===
+	int flags;				/* read only */
+	$sel->{flags}
+	flags = sel.flags
+	flags = sel.flags
 
-	int flags()
-	my $flags = $sel->flags();
-	flags = sel.flags()
-	flags = sel.flags()
-
-Return the result flags of the selection. The flags are a subset
+The result flags of the selection. The flags are a subset
 of the ones used when creating the selection, they describe which
 method was used to get the result. For example, if you create the
 selection with ``SELECTION_NAME | SELECTION_PROVIDES'', the resulting
 flags will either be SELECTION_NAME or SELECTION_PROVIDES depending
 if there was a package that matched the name or not. If there was
 no match at all, the flags will be zero.
+
+=== METHODS ===
 
 	bool isempty()
 	$sel->isempty()
