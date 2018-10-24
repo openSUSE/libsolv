@@ -13,11 +13,6 @@
 
 - write more manpages
 
-- bindings: selection.flags() should be a attribute and not a method
-
-- rename repodata_lookup_id_uninternalized to repodata_lookup_id_voidid_uninternalized
-  and add a notfound argument
-
 IDEAS:
 
 drop SEARCH_FILES and add SEARCH_BASENAME instead?

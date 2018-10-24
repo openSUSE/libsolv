@@ -717,9 +717,9 @@ for arg in args:
         if sel.isempty():
             print("nothing matches '%s'" % arg)
             sys.exit(1)
-        if sel.flags() & solv.Selection.SELECTION_FILELIST:
+        if sel.flags & solv.Selection.SELECTION_FILELIST:
             print("[using file list match for '%s']" % arg)
-        if sel.flags() & solv.Selection.SELECTION_PROVIDES:
+        if sel.flags & solv.Selection.SELECTION_PROVIDES:
             print("[using capability match for '%s']" % arg)
         jobs += sel.jobs(cmdactionmap[cmd])
 

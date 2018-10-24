@@ -954,6 +954,7 @@ typedef int Id;
 
 typedef struct {
   Pool* const pool;
+  int const flags;
 } Selection;
 
 typedef struct {
@@ -1287,9 +1288,6 @@ typedef struct {
   ~Selection() {
     queue_free(&$self->q);
     solv_free($self);
-  }
-  int flags() {
-    return $self->flags;
   }
 #ifdef SWIGRUBY
   %rename("isempty?") isempty;
