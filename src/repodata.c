@@ -3758,7 +3758,6 @@ repodata_create_stubs(Repodata *data)
   Dataiterator di;
   Id xkeyname = 0;
   int i, cnt = 0;
-  int filelisttype = data->filelisttype;
 
   dataiterator_init(&di, pool, repo, SOLVID_META, REPOSITORY_EXTERNAL, 0, 0);
   while (dataiterator_step(&di))
@@ -3798,7 +3797,7 @@ repodata_create_stubs(Repodata *data)
 	  else
 	    {
 	      repodata_add_stubkey(sdata, xkeyname, di.kv.id);
-	      if (xkeyname == SOLVABLE_FILELIST && filelisttype == REPODATA_FILELIST_FILTERED)
+	      if (xkeyname == SOLVABLE_FILELIST)
 	        repodata_set_filelisttype(sdata, REPODATA_FILELIST_EXTENSION);
 	      xkeyname = 0;
 	    }
