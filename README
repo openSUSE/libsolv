@@ -1,7 +1,7 @@
 This is libsolv, a free package dependency solver using a satisfiability
 algorithm.
 
-This code is based on two major, but independent, blocks:
+The code is based on two major, but independent, blocks:
 
  1. Using a dictionary approach to store and retrieve package
     and dependency information.
@@ -29,13 +29,16 @@ Supported repository formats:
   - red carpet helix format
   - haiku
 
+Build instructions
+==================
+
 Requires: cmake 2.4.x
 
-mkdir build
-cd build
-cmake ..
-make
+    mkdir build
+    cd build
+    cmake ..
+    make
 
-To create a package:
-make srcpackage
-see package/
+////
+vim: syntax=asciidoc
+////
