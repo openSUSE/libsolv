@@ -16,12 +16,14 @@ problems. It also takes advantage of the repository storage to
 minimize memory usage.
 
 Supported package formats:
+
   - rpm/rpm5
   - deb
   - arch linux
   - haiku
 
 Supported repository formats:
+
   - rpmmd (primary, filelists, comps, deltainfo/presto, updateinfo)
   - susetags, suse product formats
   - mandriva/mageia (synthesis, info, files)
