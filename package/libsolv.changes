@@ -1,4 +1,12 @@
 -------------------------------------------------------------------
+Wed Oct 31 13:50:22 CET 2018 - mls@suse.de
+
+- fix nasty off-by-one error in repo_write
+- also copy pattern categories from the rpm that defines the
+  pattern [fate#323785]
+- bump version to 0.7.1
+
+-------------------------------------------------------------------
 Wed Oct 24 10:48:56 CEST 2018 - mls@suse.de
 
 - new repowriter interface

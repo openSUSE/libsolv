@@ -2,6 +2,9 @@
 This file contains the major changes between
 libsolv versions:
 
+Version 0.7.1
+- fix nasty off-by-one error in repo_write
+
 Version 0.7.0
 - soname bump to "1"
 - incompatible API changes:
