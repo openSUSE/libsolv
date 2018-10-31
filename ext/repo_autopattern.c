@@ -82,6 +82,33 @@ datestr2timestamp(const char *date)
   return timegm(&tm);
 }
 
+/* we just look at the repodata keys and do not iterate
+ * over the solvables, because iterating would mean a
+ * load of stub repodata areas */
+static void
+find_langkeys(Repo *repo, Id keyname, Queue *q)
+{
+  Pool *pool = repo->pool;
+  int rid;
+  int i;
+  const char *keyname_str;
+  size_t keyname_len;
+
+  keyname_str = pool_id2str(pool, keyname);
+  keyname_len = strlen(keyname_str);
+  queue_empty(q);
+  for (rid = 1; rid < repo->nrepodata; rid++)
+    {
+      Repodata *data = repo_id2repodata(repo, rid);
+      for (i = 1; i < data->nkeys; i++)
+	{
+	  const char *s = pool_id2str(pool, data->keys[i].name);
+	  if (!strncmp(s, keyname_str, keyname_len) && s[keyname_len] == ':')
+	    queue_pushunique(q, data->keys[i].name);
+	}
+    }
+}
+
 int
 repo_add_autopattern(Repo *repo, int flags)
 {
@@ -94,6 +121,7 @@ repo_add_autopattern(Repo *repo, int flags)
   Id pattern_id, product_id;
   Id autopattern_id = 0, autoproduct_id = 0;
   int i, j;
+  Queue categorykeys;
 
   queue_init(&patq);
   queue_init(&patq2);
@@ -105,6 +133,8 @@ repo_add_autopattern(Repo *repo, int flags)
 
   pattern_id = pool_str2id(pool, "pattern()", 9);
   product_id = pool_str2id(pool, "product()", 9);
+
+  queue_init(&categorykeys);
   FOR_REPO_SOLVABLES(repo, p, s)
     {
       const char *n = pool_id2str(pool, s->name);
@@ -158,6 +188,11 @@ repo_add_autopattern(Repo *repo, int flags)
 		  }
 	      }
 	}
+    }
+  if (patq2.count)
+    {
+      find_langkeys(repo, SOLVABLE_CATEGORY, &categorykeys);
+      queue_unshift(&categorykeys, SOLVABLE_CATEGORY);
     }
   for (i = 0; i < patq2.count; i += 2)
     {
@@ -273,9 +308,17 @@ repo_add_autopattern(Repo *repo, int flags)
 		repodata_set_str(data, s2 - pool->solvables, SOLVABLE_ISVISIBLE, newname);
 	    }
 	}
+      /* also try to copy the pattern category from the solvable */
+      for (j = 0; j < categorykeys.count; j++)
+	{
+	  Id catkey = categorykeys.elements[j];
+	  if ((str = solvable_lookup_str(s, catkey)) != 0)
+	    repodata_set_str(data, s2 - pool->solvables, catkey, str);
+	}
     }
   queue_free(&patq);
   queue_free(&patq2);
+  queue_free(&categorykeys);
 
   if ((flags & ADD_NO_AUTOPRODUCTS) != 0)
     queue_empty(&prdq2);
