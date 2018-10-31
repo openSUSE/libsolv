@@ -1637,7 +1637,7 @@ for (i = 1; i < target.nkeys; i++)
       /* we have some relations with a non-zero need */
       Reldep *rd;
 
-      for (rd = pool->rels + i; i > 1; i--, rd--)
+      for (rd = pool->rels + i; i > 0; i--, rd--)
 	{
 	  int need = needid[reloff + i].need;
 	  if (!need)
