@@ -1131,6 +1131,11 @@ typedef struct {
   int const count;
 } TransactionClass;
 
+typedef struct {
+  unsigned char *map;
+  int size;
+} Map;
+
 %extend SolvFp {
   ~SolvFp() {
     if ($self->fp)
@@ -1973,6 +1978,45 @@ typedef struct {
     Queue q;
     queue_init_clone(&q, &$self->pooljobs);
     return q;
+  }
+
+  %typemap(out) Queue get_considered Queue2Array(Id, 1, *idp);
+  %newobject get_considered;
+#ifdef SWIGPYTHON
+  %typemap(out) Id { if ($1) $result = (PyObject *)Py_True; else $result = (PyObject *)Py_False; }
+#endif /* SWIGPYTHON */
+  Queue get_considered(void) {
+    Queue q;
+    queue_init(&q);
+    if (!$self->considered) return q;
+    int size = $self->considered->size << 3;
+    /* can't optimize size with unsigned short cause queue_insertn uses Id inside */
+    Id *tmp = (Id *)malloc(size * sizeof(Id));
+    for(int i = 0; i < size; i++) {
+      tmp[i] = (Id)map_tst($self->considered, i);
+    }
+    queue_insertn(&q, 0, size, tmp);
+    return q;
+  }
+
+  void set_considered(Queue considered) {
+    Map tmp;
+    if ($self->considered) {
+      map_free($self->considered);
+      $self->considered = (Map *)solv_free($self->considered);
+    }
+    /* a considered reset */
+    if (!considered.count) return;
+    map_init(&tmp, considered.count);
+    for (int i = 0; i < considered.count; i++) {
+      if (considered.elements[i]) map_set(&tmp, i);
+    }
+    $self->considered = (Map *)solv_malloc(sizeof(Map));
+    map_init($self->considered, $self->nsolvables);
+    for (int i = 0; i < $self->nsolvables; i++) {
+      map_set($self->considered, i);
+    }
+    map_and($self->considered, (const Map *)&tmp);
   }
 
 #if defined(SWIGPYTHON)
