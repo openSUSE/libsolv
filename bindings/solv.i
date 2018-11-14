@@ -1963,6 +1963,35 @@ typedef struct {
     return sel;
   }
 
+  Queue get_considered_list() {
+    Queue q;
+    queue_init(&q);
+    int i;
+    for (i = 2; i < $self->nsolvables; i++) {
+      if (!$self->solvables[i].repo)
+        continue;
+      if (!$self->considered || MAPTST($self->considered, i))
+        queue_push(&q, i);
+    }
+    return q;
+  }
+
+  void set_considered_list(Queue q) {
+    int i;
+    Id p;
+    if (!$self->considered) {
+      $self->considered = solv_calloc(1, sizeof(Map));
+      map_init($self->considered, $self->nsolvables);
+    }
+    map_empty($self->considered);
+    MAPSET($self->considered, 1);
+    for (i = 0; i < q.count; i++) {
+      p = q.elements[i];
+      if (p > 0 && p < $self->nsolvables)
+        MAPSET($self->considered, p);
+    }
+  }
+
   void setpooljobs_helper(Queue jobs) {
     queue_free(&$self->pooljobs);
     queue_init_clone(&$self->pooljobs, &jobs);
