@@ -329,13 +329,6 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
     }
 }
 
-static void
-errorCallback(struct solv_xmlparser *xmlp, const char *errstr, unsigned int line, unsigned int column)
-{
-  struct parsedata *pd = xmlp->userdata;
-  pd->ret = pool_error(pd->pool, -1, "repo_repomdxml: %s at line %u:%u", errstr, line, column);
-}
-
 int
 repo_add_repomdxml(Repo *repo, FILE *fp, int flags)
 {
@@ -350,9 +343,9 @@ repo_add_repomdxml(Repo *repo, FILE *fp, int flags)
   pd.pool = pool;
   pd.repo = repo;
   pd.data = data;
-  solv_xmlparser_init(&pd.xmlp, stateswitches, &pd, startElement, endElement, errorCallback);
-
-  solv_xmlparser_parse(&pd.xmlp, fp);
+  solv_xmlparser_init(&pd.xmlp, stateswitches, &pd, startElement, endElement);
+  if (solv_xmlparser_parse(&pd.xmlp, fp) != SOLV_XMLPARSER_OK)
+    pd.ret = pool_error(pd.pool, -1, "repo_repomdxml: %s at line %u:%u", pd.xmlp.errstr, pd.xmlp.line, pd.xmlp.column);
   solv_xmlparser_free(&pd.xmlp);
 
   if (!(flags & REPO_NO_INTERNALIZE))

@@ -291,19 +291,6 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
     }
 }
 
-static void
-errorCallback(struct solv_xmlparser *xmlp, const char *errstr, unsigned int line, unsigned int column)
-{
-  struct parsedata *pd = xmlp->userdata;
-  pool_debug(pd->pool, SOLV_ERROR, "%s: %s at line %u:%u\n", pd->filename, errstr, line, column);
-  if (pd->solvable)
-    {   
-      repo_free_solvable(pd->repo, pd->solvable - pd->pool->solvables, 1); 
-      pd->solvable = 0;
-    }   
-}
-
-
 int
 repo_add_code11_products(Repo *repo, const char *dirpath, int flags)
 {
@@ -318,7 +305,7 @@ repo_add_code11_products(Repo *repo, const char *dirpath, int flags)
   pd.pool = repo->pool;
   pd.data = data;
 
-  solv_xmlparser_init(&pd.xmlp, stateswitches, &pd, startElement, endElement, errorCallback);
+  solv_xmlparser_init(&pd.xmlp, stateswitches, &pd, startElement, endElement);
 
   if (flags & REPO_USE_ROOTDIR)
     dirpath = pool_prepend_rootdir(repo->pool, dirpath);
@@ -358,7 +345,11 @@ repo_add_code11_products(Repo *repo, const char *dirpath, int flags)
 	  pd.ctime = (unsigned int)st.st_ctime;
 	  pd.filename = fullpath;
 	  pd.basename = entry->d_name;
-	  solv_xmlparser_parse(&pd.xmlp, fp);
+	  if (solv_xmlparser_parse(&pd.xmlp, fp) != SOLV_XMLPARSER_OK)
+	    {
+	      pool_debug(pd.pool, SOLV_ERROR, "%s: %s at line %u:%u\n", pd.filename, pd.xmlp.errstr, pd.xmlp.line, pd.xmlp.column);
+	      pd.solvable = solvable_free(pd.solvable, 1);
+	    }
 	  fclose(fp);
 	}
       closedir(dir);

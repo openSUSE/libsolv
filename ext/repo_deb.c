@@ -499,7 +499,7 @@ repo_add_debpackages(Repo *repo, FILE *fp, int flags)
       s = pool_id2solvable(pool, repo_add_solvable(repo));
       control2solvable(s, data, buf);
       if (!s->name)
-	repo_free_solvable(repo, s - pool->solvables, 1);
+	s = solvable_free(s, 1);
       if (l > ll)
         memmove(buf, p + 1, l - ll);
       l -= ll;
@@ -511,7 +511,7 @@ repo_add_debpackages(Repo *repo, FILE *fp, int flags)
       s = pool_id2solvable(pool, repo_add_solvable(repo));
       control2solvable(s, data, buf);
       if (!s->name)
-	repo_free_solvable(repo, s - pool->solvables, 1);
+	s = solvable_free(s, 1);
     }
   solv_free(buf);
   if (!(flags & REPO_NO_INTERNALIZE))

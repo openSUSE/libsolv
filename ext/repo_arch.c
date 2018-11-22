@@ -444,8 +444,7 @@ repo_add_arch_pkg(Repo *repo, const char *fn, int flags)
   if (s && !s->name)
     {
       pool_error(pool, -1, "%s: package has no name", fn);
-      repo_free_solvable(repo, s - pool->solvables, 1);
-      s = 0;
+      s = solvable_free(s, 1);
     }
   if (s)
     {
@@ -728,7 +727,7 @@ finishsolvable(Repo *repo, Solvable *s)
     return;
   if (!s->name)
     {
-      repo_free_solvable(repo, s - pool->solvables, 1);
+      solvable_free(s, 1);
       return;
     }
   if (!s->arch)

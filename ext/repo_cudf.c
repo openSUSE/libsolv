@@ -224,10 +224,7 @@ repo_add_cudf(Repo *repo, Repo *installedrepo, FILE *fp, Queue *job, int flags)
       if (!*buf)
 	{
 	  if (s && !repo && !isinstalled)
-	    {
-	      repo_free_solvable(repo, s - pool->solvables, 1);
-	      s = 0;
-	    }
+	    s = solvable_free(s, 1);
 	  if (s)
 	    finishpackage(pool, s, keep, job);
 	  s = 0;
@@ -323,10 +320,7 @@ repo_add_cudf(Repo *repo, Repo *installedrepo, FILE *fp, Queue *job, int flags)
 		{
 		  isinstalled = 1;
 		  if (!installedrepo)
-		    {
-		      repo_free_solvable(repo, s - pool->solvables, 1);
-		      s = 0;
-		    }
+		    s = solvable_free(s, 1);
 		  else if (s->repo != installedrepo)
 		    {
 		      copysolvabledata(pool, s, installedrepo);
@@ -371,10 +365,7 @@ repo_add_cudf(Repo *repo, Repo *installedrepo, FILE *fp, Queue *job, int flags)
 	}
     }
   if (s && !repo && !isinstalled)
-    {
-      repo_free_solvable(repo, s - pool->solvables, 1);
-      s = 0;
-    }
+    s = solvable_free(s, 1);
   if (s)
     finishpackage(pool, s, keep, job);
   solv_free(buf);

@@ -674,14 +674,6 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
     }
 }
 
-static void
-errorCallback(struct solv_xmlparser *xmlp, const char *errstr, unsigned int line, unsigned int column)
-{
-  struct parsedata *pd = xmlp->userdata;
-  pd->ret = pool_error(pd->pool, -1, "%s at line %u", errstr, line);
-}
-
-
 /*-------------------------------------------------------------------*/
 
 /*
@@ -706,14 +698,14 @@ repo_add_helix(Repo *repo, FILE *fp, int flags)
   pd.pool = pool;
   pd.repo = repo;
   pd.data = data;
-  solv_xmlparser_init(&pd.xmlp, stateswitches, &pd, startElement, endElement, errorCallback);
 
   pd.evrspace = (char *)solv_malloc(256);
   pd.aevrspace = 256;
   pd.levrspace = 1;
 
-  solv_xmlparser_init(&pd.xmlp, stateswitches, &pd, startElement, endElement, errorCallback);
-  solv_xmlparser_parse(&pd.xmlp, fp);
+  solv_xmlparser_init(&pd.xmlp, stateswitches, &pd, startElement, endElement);
+  if (solv_xmlparser_parse(&pd.xmlp, fp) != SOLV_XMLPARSER_OK)
+    pd.ret = pool_error(pd.pool, -1, "repo_helix: %s at line %u", pd.xmlp.errstr, pd.xmlp.line);
   solv_xmlparser_free(&pd.xmlp);
 
   solv_free(pd.evrspace);

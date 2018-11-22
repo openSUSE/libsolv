@@ -206,14 +206,6 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
     }
 }
 
-static void
-errorCallback(struct solv_xmlparser *xmlp, const char *errstr, unsigned int line, unsigned int column)
-{
-  struct parsedata *pd = xmlp->userdata;
-  pool_debug(pd->pool, SOLV_ERROR, "repo_comps: %s at line %u:%u\n", errstr, line, column);
-}
-
-
 int
 repo_add_comps(Repo *repo, FILE *fp, int flags)
 {
@@ -226,8 +218,9 @@ repo_add_comps(Repo *repo, FILE *fp, int flags)
   pd.repo = repo;
   pd.pool = repo->pool;
   pd.data = data;
-  solv_xmlparser_init(&pd.xmlp, stateswitches, &pd, startElement, endElement, errorCallback);
-  solv_xmlparser_parse(&pd.xmlp, fp);
+  solv_xmlparser_init(&pd.xmlp, stateswitches, &pd, startElement, endElement);
+  if (solv_xmlparser_parse(&pd.xmlp, fp) != SOLV_XMLPARSER_OK)
+    pool_debug(pd.pool, SOLV_ERROR, "repo_comps: %s at line %u:%u\n", pd.xmlp.errstr, pd.xmlp.line, pd.xmlp.column);
   solv_xmlparser_free(&pd.xmlp);
   join_freemem(&pd.jd);
 

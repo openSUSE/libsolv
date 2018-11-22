@@ -420,19 +420,6 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
     }
 }
 
-static void
-errorCallback(struct solv_xmlparser *xmlp, const char *errstr, unsigned int line, unsigned int column)
-{
-  struct parsedata *pd = xmlp->userdata;
-  pool_debug(pd->pool, SOLV_ERROR, "repo_appdata: %s at line %u:%u\n", errstr, line, column);
-  pd->ret = -1;
-  if (pd->solvable)
-    {   
-      repo_free_solvable(pd->repo, pd->solvable - pd->pool->solvables, 1); 
-      pd->solvable = 0;
-    }
-}
-
 static int
 repo_add_appdata_fn(Repo *repo, FILE *fp, int flags, const char *filename, Queue *owners)
 {
@@ -448,8 +435,13 @@ repo_add_appdata_fn(Repo *repo, FILE *fp, int flags, const char *filename, Queue
   pd.filename = filename;
   pd.owners = owners;
 
-  solv_xmlparser_init(&pd.xmlp, stateswitches, &pd, startElement, endElement, errorCallback);
-  solv_xmlparser_parse(&pd.xmlp, fp);
+  solv_xmlparser_init(&pd.xmlp, stateswitches, &pd, startElement, endElement);
+  if (solv_xmlparser_parse(&pd.xmlp, fp) != SOLV_XMLPARSER_OK)
+    {
+      pool_debug(pd.pool, SOLV_ERROR, "repo_appdata: %s at line %u:%u\n", pd.xmlp.errstr, pd.xmlp.line, pd.xmlp.column);
+      pd.ret = -1;
+      pd.solvable = solvable_free(pd.solvable, 1);
+    }
   solv_xmlparser_free(&pd.xmlp);
 
   solv_free(pd.desktop_file);

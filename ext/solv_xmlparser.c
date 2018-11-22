@@ -132,8 +132,7 @@ solv_xmlparser_init(struct solv_xmlparser *xmlp,
     struct solv_xmlparser_element *elements,
     void *userdata,
     void (*startelement)(struct solv_xmlparser *, int state, const char *name, const char **atts),
-    void (*endelement)(struct solv_xmlparser *, int state, char *content),
-    void (*errorhandler)(struct solv_xmlparser *, const char *errstr, unsigned int line, unsigned int column))
+    void (*endelement)(struct solv_xmlparser *, int state, char *content))
 {
   int i, nstates, nelements;
   struct solv_xmlparser_element *el;
@@ -169,7 +168,6 @@ solv_xmlparser_init(struct solv_xmlparser *xmlp,
   xmlp->userdata = userdata;
   xmlp->startelement = startelement;
   xmlp->endelement = endelement;
-  xmlp->errorhandler = errorhandler;
 }
 
 void
@@ -178,6 +176,16 @@ solv_xmlparser_free(struct solv_xmlparser *xmlp)
   xmlp->elementhelper = solv_free(xmlp->elementhelper);
   queue_free(&xmlp->elementq);
   xmlp->content = solv_free(xmlp->content);
+  xmlp->errstr = solv_free(xmlp->errstr);
+}
+
+static void
+set_error(struct solv_xmlparser *xmlp, const char *errstr, unsigned int line, unsigned int column)
+{
+  solv_free(xmlp->errstr);
+  xmlp->errstr = solv_strdup(errstr);
+  xmlp->line = line;
+  xmlp->column = column;
 }
 
 #ifdef WITH_LIBXML2
@@ -197,7 +205,8 @@ free_parser(struct solv_xmlparser *xmlp)
   xmlp->parser = 0;
 }
 
-static xmlParserCtxtPtr create_parser_ctx(struct solv_xmlparser *xmlp, char *buf, int l)
+static xmlParserCtxtPtr
+create_parser_ctx(struct solv_xmlparser *xmlp, char *buf, int l)
 {
   xmlSAXHandler sax;
   memset(&sax, 0, sizeof(sax));
@@ -216,7 +225,7 @@ parse_block(struct solv_xmlparser *xmlp, char *buf, int l)
       xmlp->parser = create_parser_ctx(xmlp, buf, l2);
       if (!xmlp->parser)
 	{
-	  xmlp->errorhandler(xmlp, "could not create parser", 0, 0);
+	  set_error(xmlp, "could not create parser", 0, 0);
 	  return 0;
 	}
       buf += l2;
@@ -227,7 +236,7 @@ parse_block(struct solv_xmlparser *xmlp, char *buf, int l)
   if (xmlParseChunk(xmlp->parser, buf, l, l == 0 ? 1 : 0))
     {
       xmlErrorPtr err = xmlCtxtGetLastError(xmlp->parser);
-      xmlp->errorhandler(xmlp, err->message, err->line, err->int2);
+      set_error(xmlp, err->message, err->line, err->int2);
       return 0;
     }
   return 1;
@@ -265,9 +274,7 @@ parse_block(struct solv_xmlparser *xmlp, char *buf, int l)
 {
   if (XML_Parse(xmlp->parser, buf, l, l == 0) == XML_STATUS_ERROR)
     {
-      unsigned int line = XML_GetCurrentLineNumber(xmlp->parser);
-      unsigned int column = XML_GetCurrentColumnNumber(xmlp->parser);
-      xmlp->errorhandler(xmlp, XML_ErrorString(XML_GetErrorCode(xmlp->parser)), line, column);
+      set_error(xmlp, XML_ErrorString(XML_GetErrorCode(xmlp->parser)), XML_GetCurrentLineNumber(xmlp->parser), XML_GetCurrentColumnNumber(xmlp->parser));
       return 0;
     }
   return 1;
@@ -281,11 +288,11 @@ solv_xmlparser_lineno(struct solv_xmlparser *xmlp)
 
 #endif
 
-void
+int
 solv_xmlparser_parse(struct solv_xmlparser *xmlp, FILE *fp)
 {
   char buf[8192];
-  int l;
+  int l, ret = SOLV_XMLPARSER_OK;
 
   xmlp->state = 0;
   xmlp->unknowncnt = 0;
@@ -295,16 +302,20 @@ solv_xmlparser_parse(struct solv_xmlparser *xmlp, FILE *fp)
 
   if (!create_parser(xmlp))
     {
-      xmlp->errorhandler(xmlp, "could not create xml parser", 0, 0);
-      return;
+      set_error(xmlp, "could not create parser", 0, 0);
+      return SOLV_XMLPARSER_ERROR;
     }
   for (;;)
     {
       l = fread(buf, 1, sizeof(buf), fp);
       if (!parse_block(xmlp, buf, l) || !l)
-	break;
+	{
+	  ret = SOLV_XMLPARSER_ERROR;
+	  break;
+	}
     }
   free_parser(xmlp);
+  return ret;
 }
 
 char *

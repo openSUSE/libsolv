@@ -517,8 +517,7 @@ repo_add_content(Repo *repo, FILE *fp, int flags)
   if (s && !s->name)
     {
       pool_debug(pool, SOLV_ERROR, "repo_content: 'content' incomplete, no product solvable created!\n");
-      repo_free_solvable(repo, s - pool->solvables, 1);
-      s = 0;
+      s = solvable_free(s, 1);
     }
   if (s)
     {

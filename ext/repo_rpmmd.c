@@ -1091,13 +1091,6 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
     }
 }
 
-static void
-errorCallback(struct solv_xmlparser *xmlp, const char *errstr, unsigned int line, unsigned int column)
-{
-  struct parsedata *pd = xmlp->userdata;
-  pd->ret = pool_error(pd->pool, -1, "repo_rpmmd: %s at line %u:%u", errstr, line, column);
-}
-
 
 /*-----------------------------------------------*/
 
@@ -1135,8 +1128,9 @@ repo_add_rpmmd(Repo *repo, FILE *fp, const char *language, int flags)
       fill_cshash_from_repo(&pd);
     }
 
-  solv_xmlparser_init(&pd.xmlp, stateswitches, &pd, startElement, endElement, errorCallback);
-  solv_xmlparser_parse(&pd.xmlp, fp);
+  solv_xmlparser_init(&pd.xmlp, stateswitches, &pd, startElement, endElement);
+  if (solv_xmlparser_parse(&pd.xmlp, fp) != SOLV_XMLPARSER_OK)
+    pd.ret = pool_error(pool, -1, "repo_rpmmd: %s at line %u:%u", pd.xmlp.errstr, pd.xmlp.line, pd.xmlp.column);
   solv_xmlparser_free(&pd.xmlp);
 
   solv_free(pd.lastdirstr);

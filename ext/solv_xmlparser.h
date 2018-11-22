@@ -8,6 +8,9 @@ struct solv_xmlparser_element {
 
 struct solv_xmlparser {
   void *userdata;
+  char *errstr;
+  unsigned int line;
+  unsigned int column;
 
   int state;
   int docontent;
@@ -24,11 +27,13 @@ struct solv_xmlparser {
 
   void (*startelement)(struct solv_xmlparser *xmlp, int state, const char *name, const char **atts);
   void (*endelement)(struct solv_xmlparser *xmlp, int state, char *content);
-  void (*errorhandler)(struct solv_xmlparser *xmlp, const char *errstr, unsigned int line, unsigned int column);
 
   Id *elementhelper;
   void *parser;
 };
+
+#define SOLV_XMLPARSER_OK	0
+#define SOLV_XMLPARSER_ERROR	-1
 
 static inline const char *
 solv_xmlparser_find_attr(const char *txt, const char **atts)
@@ -41,11 +46,10 @@ solv_xmlparser_find_attr(const char *txt, const char **atts)
 
 extern void solv_xmlparser_init(struct solv_xmlparser *xmlp, struct solv_xmlparser_element *elements, void *userdata,
     void (*startelement)(struct solv_xmlparser *xmlp, int state, const char *name, const char **atts),
-    void (*endelement)(struct solv_xmlparser *xmlp, int state, char *content),
-    void (*errorhandler)(struct solv_xmlparser *xmlp, const char *errstr, unsigned int line, unsigned int column));
+    void (*endelement)(struct solv_xmlparser *xmlp, int state, char *content));
 
 extern void solv_xmlparser_free(struct solv_xmlparser *xmlp);
-extern void solv_xmlparser_parse(struct solv_xmlparser *xmlp, FILE *fp);
+extern int solv_xmlparser_parse(struct solv_xmlparser *xmlp, FILE *fp);
 unsigned int solv_xmlparser_lineno(struct solv_xmlparser *xmlp);
 char *solv_xmlparser_contentspace(struct solv_xmlparser *xmlp, int l);
 

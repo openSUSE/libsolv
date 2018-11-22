@@ -1661,9 +1661,8 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
       if (s)
 	{
 	  /* oops, could not reuse. free it instead */
-          repo_free_solvable(repo, s - pool->solvables, 1);
+          s = solvable_free(s, 1);
 	  solvend--;
-	  s = 0;
 	}
       /* now sort all solvables in the new solvstart..solvend block */
       if (solvend - solvstart > 1)
@@ -2044,7 +2043,7 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
   s = pool_id2solvable(pool, repo_add_solvable(repo));
   if (!rpmhead2solv(pool, repo, data, s, state.rpmhead, flags & ~(RPM_ADD_WITH_HDRID | RPM_ADD_WITH_PKGID)))
     {
-      repo_free_solvable(repo, s - pool->solvables, 1);
+      s = solvable_free(s, 1);
       solv_chksum_free(chksumh, 0);
       headfree(state.rpmhead);
       return 0;
@@ -2096,7 +2095,7 @@ repo_add_rpm_handle(Repo *repo, void *rpmhandle, int flags)
   s = pool_id2solvable(pool, repo_add_solvable(repo));
   if (!rpmhead2solv(pool, repo, data, s, rpmhead, flags))
     {
-      repo_free_solvable(repo, s - pool->solvables, 1);
+      s = solvable_free(s, 1);
       return 0;
     }
   if (!(flags & REPO_NO_INTERNALIZE))
