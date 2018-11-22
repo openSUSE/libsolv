@@ -1068,7 +1068,7 @@ testcase_str2job(Pool *pool, const char *str, Id *whatp)
       Queue q;
       job |= SOLVER_SOLVABLE_ONE_OF;
       queue_init(&q);
-      if (npieces > 3 && strcmp(pieces[2], "nothing") != 0)
+      if (npieces > 2 && strcmp(pieces[2], "nothing") != 0)
 	{
 	  for (i = 2; i < npieces; i++)
 	    {
