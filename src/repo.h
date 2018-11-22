@@ -123,6 +123,14 @@ static inline int pool_installable(const Pool *pool, Solvable *s)
   return 1;
 }
 
+/* not in solvable.h because we need the repo definition */
+static inline Solvable *solvable_free(Solvable *s, int reuseids)
+{
+  if (s && s->repo)
+    repo_free_solvable(s->repo, s - s->repo->pool->solvables, reuseids);
+  return 0;
+}
+
 /* search callback values */
 #define SEARCH_NEXT_KEY         1
 #define SEARCH_NEXT_SOLVABLE    2
