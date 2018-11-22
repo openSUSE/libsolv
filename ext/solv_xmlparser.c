@@ -308,11 +308,13 @@ solv_xmlparser_parse(struct solv_xmlparser *xmlp, FILE *fp)
   for (;;)
     {
       l = fread(buf, 1, sizeof(buf), fp);
-      if (!parse_block(xmlp, buf, l) || !l)
+      if (!parse_block(xmlp, buf, l))
 	{
 	  ret = SOLV_XMLPARSER_ERROR;
 	  break;
 	}
+      if (!l)
+	break;
     }
   free_parser(xmlp);
   return ret;

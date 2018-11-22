@@ -441,7 +441,7 @@ repo_add_updateinfoxml(Repo *repo, FILE *fp, int flags)
   pd.repo = repo;
   pd.data = data;
   solv_xmlparser_init(&pd.xmlp, stateswitches, &pd, startElement, endElement);
-  solv_xmlparser_parse(&pd.xmlp, fp);
+  if (solv_xmlparser_parse(&pd.xmlp, fp) != SOLV_XMLPARSER_OK)
     pd.ret = pool_error(pool, -1, "repo_updateinfoxml: %s at line %u:%u", pd.xmlp.errstr, pd.xmlp.line, pd.xmlp.column);
   solv_xmlparser_free(&pd.xmlp);
   join_freemem(&pd.jd);
