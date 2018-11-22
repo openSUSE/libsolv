@@ -181,6 +181,76 @@ solver_dep_fulfilled_cplx(Solver *solv, Reldep *rd)
   return 0;
 }
 
+static int
+solver_dep_fulfilled_complex_func(Solver *solv, Reldep *rd, int (*dep_fullfilled)(Solver *, Id))
+{
+  Pool *pool = solv->pool;
+  int r1, r2;
+  if (rd->flags == REL_COND)
+    {
+      if (ISRELDEP(rd->evr))
+	{
+	  Reldep *rd2 = GETRELDEP(pool, rd->evr);
+	  if (rd2->flags == REL_ELSE)
+	    {
+	      r1 = dep_fullfilled(solv, rd2->name);
+	      if (r1)
+		{
+		  r2 = dep_fullfilled(solv, rd->name);
+		  return r2 && r1 == 2 ? 2 : r2;
+		}
+	      return dep_fullfilled(solv, rd2->evr);
+	    }
+	}
+      r1 = dep_fullfilled(solv, rd->name);
+      r2 = !dep_fullfilled(solv, rd->evr);
+      if (!r1 && !r2)
+	return 0;
+      return r1 == 2 ? 2 : 1;
+    }
+  if (rd->flags == REL_UNLESS)
+    {
+      if (ISRELDEP(rd->evr))
+	{
+	  Reldep *rd2 = GETRELDEP(pool, rd->evr);
+	  if (rd2->flags == REL_ELSE)
+	    {
+	      r1 = dep_fullfilled(solv, rd2->name);
+	      if (r1)
+		{
+		  r2 = dep_fullfilled(solv, rd2->evr);
+		  return r2 && r1 == 2 ? 2 : r2;
+		}
+	      return dep_fullfilled(solv, rd->name);
+	    }
+	}
+      /* A AND NOT(B) */
+      r1 = dep_fullfilled(solv, rd->name);
+      r2 = !dep_fullfilled(solv, rd->evr);
+      if (!r1 || !r2)
+	return 0;
+      return r1 == 2 ? 2 : 1;
+    }
+  if (rd->flags == REL_AND)
+    {
+      r1 = dep_fullfilled(solv, rd->name);
+      if (!r1)
+	return 0;
+      r2 = dep_fullfilled(solv, rd->evr);
+      if (!r2)
+	return 0;
+      return r1 == 2 || r2 == 2 ? 2 : 1;
+    }
+  if (rd->flags == REL_OR)
+    {
+      r1 = dep_fullfilled(solv, rd->name);
+      r2 = dep_fullfilled(solv, rd->evr);
+      if (!r1 && !r2)
+	return 0;
+      return r1 == 2 || r2 == 2 ? 2 : 1;
+    }
+  return 0;
+}
 
 /* mirrors solver_dep_fulfilled, but returns 2 if a new package
  * was involved */
@@ -194,71 +264,8 @@ solver_dep_fulfilled_alreadyinstalled(Solver *solv, Id dep)
   if (ISRELDEP(dep))
     {
       Reldep *rd = GETRELDEP(pool, dep);
-      if (rd->flags == REL_COND)
-	{
-	  int r1, r2;
-	  if (ISRELDEP(rd->evr))
-	    {
-	      Reldep *rd2 = GETRELDEP(pool, rd->evr);
-	      if (rd2->flags == REL_ELSE)
-		{
-		  r1 = solver_dep_fulfilled_alreadyinstalled(solv, rd2->name);
-		  if (r1)
-		    {
-		      r2 = solver_dep_fulfilled_alreadyinstalled(solv, rd->name);
-		      return r2 && r1 == 2 ? 2 : r2;
-		    }
-		  return solver_dep_fulfilled_alreadyinstalled(solv, rd2->evr);
-		}
-	    }
-	  r1 = solver_dep_fulfilled_alreadyinstalled(solv, rd->name);
-	  r2 = !solver_dep_fulfilled_alreadyinstalled(solv, rd->evr);
-	  if (!r1 && !r2)
-	    return 0;
-          return r1 == 2 ? 2 : 1;
-	}
-      if (rd->flags == REL_UNLESS)
-	{
-	  int r1, r2;
-	  if (ISRELDEP(rd->evr))
-	    {
-	      Reldep *rd2 = GETRELDEP(pool, rd->evr);
-	      if (rd2->flags == REL_ELSE)
-		{
-		  r1 = solver_dep_fulfilled_alreadyinstalled(solv, rd2->name);
-		  if (r1)
-		    {
-		      r2 = solver_dep_fulfilled_alreadyinstalled(solv, rd2->evr);
-		      return r2 && r1 == 2 ? 2 : r2;
-		    }
-		  return solver_dep_fulfilled_alreadyinstalled(solv, rd->name);
-		}
-	    }
-	  /* A AND NOT(B) */
-	  r1 = solver_dep_fulfilled_alreadyinstalled(solv, rd->name);
-	  r2 = !solver_dep_fulfilled_alreadyinstalled(solv, rd->evr);
-	  if (!r1 || !r2)
-	    return 0;
-          return r1 == 2 ? 2 : 1;
-	}
-      if (rd->flags == REL_AND)
-        {
-	  int r2, r1 = solver_dep_fulfilled_alreadyinstalled(solv, rd->name);
-          if (!r1)
-            return 0;
-	  r2 = solver_dep_fulfilled_alreadyinstalled(solv, rd->evr);
-	  if (!r2)
-	    return 0;
-          return r1 == 2 || r2 == 2 ? 2 : 1;
-        }
-      if (rd->flags == REL_OR)
-	{
-	  int r2, r1 = solver_dep_fulfilled_alreadyinstalled(solv, rd->name);
-	  r2 = solver_dep_fulfilled_alreadyinstalled(solv, rd->evr);
-	  if (!r1 && !r2)
-	    return 0;
-          return r1 == 2 || r2 == 2 ? 2 : 1;
-	}
+      if (rd->flags == REL_COND || rd->flags == REL_UNLESS || rd->flags == REL_AND || rd->flags == REL_OR)
+	return solver_dep_fulfilled_complex_func(solv, rd, solver_dep_fulfilled_alreadyinstalled);
       if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_SPLITPROVIDES)
         return solver_splitprovides(solv, rd->evr, 0) ? 2 : 0;
       if (rd->flags == REL_NAMESPACE && solv->installsuppdepq)
@@ -282,14 +289,42 @@ solver_dep_fulfilled_alreadyinstalled(Solver *solv, Id dep)
   return r;
 }
 
+static int
+solver_dep_fulfilled_namespace(Solver *solv, Id dep)
+{
+  Pool *pool = solv->pool;
+  Id p, pp;
+  int r = 1;
+
+  if (ISRELDEP(dep))
+    {
+      Reldep *rd = GETRELDEP(pool, dep);
+      if (rd->flags == REL_COND || rd->flags == REL_UNLESS || rd->flags == REL_AND || rd->flags == REL_OR)
+	return solver_dep_fulfilled_complex_func(solv, rd, solver_dep_fulfilled_namespace);
+      if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_SPLITPROVIDES)
+        return solver_splitprovides(solv, rd->evr, 0) ? 2 : 0;
+      if (rd->flags == REL_NAMESPACE)
+	r = 2;
+    }
+  FOR_PROVIDES(p, pp, dep)
+    if (solv->decisionmap[p] > 0)
+      return r;
+  return 0;
+}
+
 int
 solver_is_supplementing_alreadyinstalled(Solver *solv, Solvable *s)
 {
   Id sup, *supp;
   supp = s->repo->idarraydata + s->supplements;
   while ((sup = *supp++) != 0)
-    if (solver_dep_fulfilled_alreadyinstalled(solv, sup) == 2)
+    {
+      if (!solv->addalreadyrecommended && solver_dep_fulfilled_alreadyinstalled(solv, sup) != 2)
+	continue;
+      if (solv->only_namespace_recommended && solver_dep_fulfilled_namespace(solv, sup) != 2)
+	continue;
       return 1;
+    }
   return 0;
 }
 /*

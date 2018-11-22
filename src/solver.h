@@ -167,6 +167,7 @@ struct s_Solver {
   int urpmreorder;			/* true: do special urpm package reordering */
   int strongrecommends;			/* true: create weak rules for recommends */
   int install_also_updates;		/* true: do not prune install job rules to installed packages */
+  int only_namespace_recommended;	/* true: only install packages recommended by namespace */
 
   int process_orphans;			/* true: do special orphan processing */
   Map dupmap;				/* dup to those packages */
@@ -317,6 +318,7 @@ typedef struct s_Solver Solver;
 #define SOLVER_FLAG_FOCUS_BEST			24
 #define SOLVER_FLAG_STRONG_RECOMMENDS		25
 #define SOLVER_FLAG_INSTALL_ALSO_UPDATES	26
+#define SOLVER_FLAG_ONLY_NAMESPACE_RECOMMENDED	27
 
 #define GET_USERINSTALLED_NAMES			(1 << 0)	/* package names instead of ids */
 #define GET_USERINSTALLED_INVERTED		(1 << 1)	/* autoinstalled */

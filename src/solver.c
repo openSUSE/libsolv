@@ -1443,6 +1443,8 @@ solver_get_flag(Solver *solv, int flag)
     return solv->strongrecommends;
   case SOLVER_FLAG_INSTALL_ALSO_UPDATES:
     return solv->install_also_updates;
+  case SOLVER_FLAG_ONLY_NAMESPACE_RECOMMENDED:
+    return solv->only_namespace_recommended;
   default:
     break;
   }
@@ -1532,6 +1534,9 @@ solver_set_flag(Solver *solv, int flag, int value)
     break;
   case SOLVER_FLAG_INSTALL_ALSO_UPDATES:
     solv->install_also_updates = value;
+    break;
+  case SOLVER_FLAG_ONLY_NAMESPACE_RECOMMENDED:
+    solv->only_namespace_recommended = value;
     break;
   default:
     break;
@@ -2090,9 +2095,10 @@ resolve_weak(Solver *solv, int level, int disablerules, Queue *dq, Queue *dqs, i
 	{
 	  /* installed, check for recommends */
 	  Id *recp, rec, pp, p;
+	  if (solv->only_namespace_recommended)
+	    continue;
 	  if (!solv->addalreadyrecommended && s->repo == solv->installed)
 	    continue;
-	  /* XXX need to special case AND ? */
 	  if (s->recommends)
 	    {
 	      recp = s->repo->idarraydata + s->recommends;
@@ -2186,7 +2192,7 @@ resolve_weak(Solver *solv, int level, int disablerules, Queue *dq, Queue *dqs, i
     }
 
   /* filter out all already supplemented packages if requested */
-  if (!solv->addalreadyrecommended && dqs->count)
+  if ((!solv->addalreadyrecommended || solv->only_namespace_recommended) && dqs->count)
     {
       /* filter out old supplements */
       for (i = j = 0; i < dqs->count; i++)
@@ -3245,7 +3251,7 @@ solver_solve(Solver *solv, Queue *job)
   POOL_DEBUG(SOLV_DEBUG_STATS, "allowuninstall=%d, allowdowngrade=%d, allownamechange=%d, allowarchchange=%d, allowvendorchange=%d\n", solv->allowuninstall, solv->allowdowngrade, solv->allownamechange, solv->allowarchchange, solv->allowvendorchange);
   POOL_DEBUG(SOLV_DEBUG_STATS, "promoteepoch=%d, forbidselfconflicts=%d\n", pool->promoteepoch, pool->forbidselfconflicts);
   POOL_DEBUG(SOLV_DEBUG_STATS, "obsoleteusesprovides=%d, implicitobsoleteusesprovides=%d, obsoleteusescolors=%d, implicitobsoleteusescolors=%d\n", pool->obsoleteusesprovides, pool->implicitobsoleteusesprovides, pool->obsoleteusescolors, pool->implicitobsoleteusescolors);
-  POOL_DEBUG(SOLV_DEBUG_STATS, "dontinstallrecommended=%d, addalreadyrecommended=%d\n", solv->dontinstallrecommended, solv->addalreadyrecommended);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "dontinstallrecommended=%d, addalreadyrecommended=%d onlynamespacerecommended=%d\n", solv->dontinstallrecommended, solv->addalreadyrecommended, solv->only_namespace_recommended);
 
   /* create whatprovides if not already there */
   if (!pool->whatprovides)
