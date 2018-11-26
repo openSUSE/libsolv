@@ -82,18 +82,6 @@ solv_vercmp_rpm(const char *s1, const char *q1, const char *s2, const char *q2)
       while (s2 < q2 && !(*s2 >= '0' && *s2 <= '9') &&
           !(*s2 >= 'a' && *s2 <= 'z') && !(*s2 >= 'A' && *s2 <= 'Z') && *s2 != '~' && *s2 != '^')
 	s2++;
-      if (s1 < q1 && *s1 == '^')
-	{
-	  if (s2 < q2 && *s2 == '^')
-	    {
-	      s1++;
-	      s2++;
-	      continue;
-	    }
-	  return s2 < q2 ? -1 : 1;
-	}
-      if (s2 < q2 && *s2 == '^')
-	return s1 < q1 ? 1 : -1;
       if (s1 < q1 && *s1 == '~')
         {
 	  if (s2 < q2 && *s2 == '~')
@@ -106,6 +94,18 @@ solv_vercmp_rpm(const char *s1, const char *q1, const char *s2, const char *q2)
         }
       if (s2 < q2 && *s2 == '~')
 	return 1;
+      if (s1 < q1 && *s1 == '^')
+	{
+	  if (s2 < q2 && *s2 == '^')
+	    {
+	      s1++;
+	      s2++;
+	      continue;
+	    }
+	  return s2 < q2 ? -1 : 1;
+	}
+      if (s2 < q2 && *s2 == '^')
+	return s1 < q1 ? 1 : -1;
       if (s1 >= q1 || s2 >= q2)
 	break;
       if ((*s1 >= '0' && *s1 <= '9') || (*s2 >= '0' && *s2 <= '9'))
