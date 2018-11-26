@@ -15,6 +15,7 @@
 #include "pool.h"
 #include "poolarch.h"
 #include "poolvendor.h"
+#include "evr.h"
 #include "repo.h"
 #include "repo_solv.h"
 #include "solver.h"
@@ -2966,6 +2967,14 @@ testcase_read(Pool *pool, FILE *fp, const char *testcase, Queue *job, char **res
 	      break;
 	    }
 	  queue_push(&autoinstq, pool_str2id(pool, pieces[2], 1));
+	}
+      else if (!strcmp(pieces[0], "evrcmp") && npieces == 3)
+	{
+	  Id evr1 = pool_str2id(pool, pieces[1], 1);
+	  Id evr2 = pool_str2id(pool, pieces[2], 1);
+	  int r = pool_evrcmp(pool, evr1, evr2, EVRCMP_COMPARE);
+	  r = r < 0 ? REL_LT : r > 0 ? REL_GT : REL_EQ;
+	  queue_push2(job, SOLVER_NOOP | SOLVER_SOLVABLE_PROVIDES, pool_rel2id(pool, evr1, evr2, r, 1));
 	}
       else
 	{
