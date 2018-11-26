@@ -327,6 +327,23 @@ solver_is_supplementing_alreadyinstalled(Solver *solv, Solvable *s)
     }
   return 0;
 }
+
+int
+solver_is_namespace_dep_slow(Solver *solv, Reldep *rd)
+{
+  Pool *pool = solv->pool;
+  for (;;)
+    {
+      if (rd->flags == REL_NAMESPACE)
+	return 1;
+      if (ISRELDEP(rd->name) && solver_is_namespace_dep_slow(solv, GETRELDEP(pool, rd->name)))
+	return 1;
+      if (!ISRELDEP(rd->evr))
+	return 0;
+      rd = GETRELDEP(pool, rd->evr);
+    }
+}
+
 /*
  * add all installed packages that package p obsoletes to Queue q.
  * Package p is not installed. Also, we know that if

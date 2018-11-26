@@ -21,6 +21,7 @@ extern int solver_dep_possible_slow(Solver *solv, Id dep, Map *m);
 extern int solver_dep_fulfilled_cplx(Solver *solv, Reldep *rd);
 extern int solver_is_supplementing_alreadyinstalled(Solver *solv, Solvable *s);
 extern void solver_intersect_obsoleted(Solver *solv, Id p, Queue *q, int qstart, Map *m);
+extern int solver_is_namespace_dep_slow(Solver *solv, Reldep *rd);
 
 extern void solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded);
 extern int solver_check_cleandeps_mistakes(Solver *solv);
@@ -89,6 +90,23 @@ solver_is_enhancing(Solver *solv, Solvable *s)
   while ((enh = *enhp++) != 0)
     if (solver_dep_fulfilled(solv, enh))
       return 1;
+  return 0;
+}
+
+static inline int
+solver_is_namespace_dep(Solver *solv, Id dep)
+{
+  Pool *pool = solv->pool;
+  Reldep *rd;
+  if (!ISRELDEP(dep))
+    return 0;
+  rd = GETRELDEP(pool, dep);
+  if (rd->flags == REL_NAMESPACE)
+    return 1;
+  if (ISRELDEP(rd->name))
+    return solver_is_namespace_dep_slow(solv, rd);
+  if (ISRELDEP(rd->evr))
+    return solver_is_namespace_dep_slow(solv, GETRELDEP(pool, rd->evr));
   return 0;
 }
 

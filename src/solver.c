@@ -2095,8 +2095,6 @@ resolve_weak(Solver *solv, int level, int disablerules, Queue *dq, Queue *dqs, i
 	{
 	  /* installed, check for recommends */
 	  Id *recp, rec, pp, p;
-	  if (solv->only_namespace_recommended)
-	    continue;
 	  if (!solv->addalreadyrecommended && s->repo == solv->installed)
 	    continue;
 	  if (s->recommends)
@@ -2104,6 +2102,9 @@ resolve_weak(Solver *solv, int level, int disablerules, Queue *dq, Queue *dqs, i
 	      recp = s->repo->idarraydata + s->recommends;
 	      while ((rec = *recp++) != 0)
 		{
+		  /* cheat: we just look if there is REL_NAMESPACE in the dep */
+		  if (solv->only_namespace_recommended && !solver_is_namespace_dep(solv, rec))
+		    continue;
 #ifdef ENABLE_COMPLEX_DEPS
 		  if (pool_is_complex_dep(pool, rec))
 		    {
