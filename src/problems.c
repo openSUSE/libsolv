@@ -247,10 +247,23 @@ solver_autouninstall(Solver *solv, int start)
       if (v >= solv->updaterules && v < solv->updaterules_end)
 	{
 	  Rule *r;
+	  Id p = solv->installed->start + (v - solv->updaterules);
 	  if (m && !MAPTST(m, v - solv->updaterules))
 	    continue;
-	  if (pool->considered && !MAPTST(pool->considered, solv->installed->start + (v - solv->updaterules)))
+	  if (pool->considered && !MAPTST(pool->considered, p))
 	    continue;	/* do not uninstalled disabled packages */
+	  if (solv->bestrules_pkg && solv->bestrules_end > solv->bestrules)
+	    {
+	      int j;
+	      for (j = start + 1; j < solv->problems.count - 1; j++)
+		{
+		  Id vv = solv->problems.elements[j];
+		  if (vv >= solv->bestrules && vv < solv->bestrules_end && solv->bestrules_pkg[vv - solv->bestrules] == p)
+		    break;
+		}
+	      if (j < solv->problems.count - 1)
+		continue;	/* best rule involved, do not uninstall */
+	    }
 	  /* check if identical to feature rule, we don't like that (except for orphans) */
 	  r = solv->rules + solv->featurerules + (v - solv->updaterules);
 	  if (!r->p)
@@ -262,7 +275,7 @@ solver_autouninstall(Solver *solv, int start)
 	      if (solv->keep_orphans)
 		{
 		  r = solv->rules + v;
-		  if (!r->d && !r->w2 && r->p == (solv->installed->start + (v - solv->updaterules)))
+		  if (!r->d && !r->w2 && r->p == p)
 		    {
 		      lastfeature = v;
 		      lastupdate = 0;
