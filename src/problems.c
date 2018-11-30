@@ -249,6 +249,8 @@ solver_autouninstall(Solver *solv, int start)
 	  Rule *r;
 	  if (m && !MAPTST(m, v - solv->updaterules))
 	    continue;
+	  if (pool->considered && !MAPTST(pool->considered, solv->installed->start + (v - solv->updaterules)))
+	    continue;	/* do not uninstalled disabled packages */
 	  /* check if identical to feature rule, we don't like that (except for orphans) */
 	  r = solv->rules + solv->featurerules + (v - solv->updaterules);
 	  if (!r->p)
