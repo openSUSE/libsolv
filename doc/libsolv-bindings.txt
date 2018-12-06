@@ -45,7 +45,7 @@ tied arrays so that it is possible to iterate with a for() statement:
 As a downside of this approach, iterator objects cannot have attributes.
 
 If an array needs to be passed to a method it is usually done by reference,
-if a method returns an array it returns it on the stack:
+if a method returns an array it returns it on the perl stack:
 
 	my @problems = $solver->solve(\@jobs);
 
@@ -93,7 +93,7 @@ __repr__ method to ease debugging.
 	print dep
 	print repr(repo)
 
-Constants are attributes of the classes:
+Constants are attributes of the corresponding classes:
 
 	pool.set_flag(solv.Pool.POOL_FLAG_OBSOLETEUSESCOLORS, 1);
 
@@ -183,7 +183,7 @@ Some objects also support a ``=='' method for equality tests, and a
 Swig implements all constants as numeric variables, constants belonging
 to a libsolv class are prefixed with the class name:
 
-	TCL $pool set_flag $solv::Pool_POOL_FLAG_OBSOLETEUSESCOLORS  1
+	TCL $pool set_flag $solv::Pool_POOL_FLAG_OBSOLETEUSESCOLORS 1
 	TCL puts [$solvable lookup_str $solv::SOLVABLE_SUMMARY]
 	
 
@@ -218,10 +218,10 @@ like an extra Solvable that has the Id SOLVID_META.
 *SOLVID_POS*::
 Use the data position stored inside of the pool instead of accessing
 some solvable by Id. The bindings have the Datapos objects as an
-abstraction mechanism, so you do not need this constant.
+abstraction mechanism, so you most likely do not need this constant.
 
 Constant string Ids
-  
+
 *ID_NULL*::
 Always zero
 
@@ -300,7 +300,7 @@ in old rpm versions, modern systems should never need this.
 *POOL_FLAG_FORBIDSELFCONFLICTS*::
 Disallow the installation of packages that conflict with themselves.
 Debian always allows self-conflicting packages, rpm used to forbid
-them but switched to also allowing them recently.
+them but switched to also allowing them since rpm-4.9.0.
 
 *POOL_FLAG_OBSOLETEUSESPROVIDES*::
 Make obsolete type dependency match against provides instead of
@@ -315,10 +315,10 @@ with the same name, rpm-5 switched to also removing packages
 providing the same name.
 
 *POOL_FLAG_OBSOLETEUSESCOLORS*::
-Rpm's multilib implementation (used in RedHat and Fedora)
-distinguishes between 32bit and 64bit packages (the terminology
-is that they have a different color). If obsoleteusescolors is
-set, packages with different colors will not obsolete each other.
+Rpm's multilib implementation distinguishes between 32bit and 64bit
+packages (the terminology is that they have a different color).
+If obsoleteusescolors is set, packages with different colors will
+not obsolete each other.
 
 *POOL_FLAG_IMPLICITOBSOLETEUSESCOLORS*::
 Same as POOL_FLAG_OBSOLETEUSESCOLORS, but used to find out if
@@ -328,9 +328,9 @@ false and POOL_FLAG_IMPLICITOBSOLETEUSESCOLORS should be true
 (this is the default if FEDORA is defined when libsolv is compiled).
 
 *POOL_FLAG_NOINSTALLEDOBSOLETES*::
-New versions of rpm consider the obsoletes of installed packages
-when checking for dependency, thus you may not install a package
-that is obsoleted by some other installed package, unless you
+Since version 4.9.0 rpm considers the obsoletes of installed packages
+when checking for dependency conflicts, thus you may not install a
+package that is obsoleted by some other installed package unless you
 also erase the other package.
 
 *POOL_FLAG_HAVEDISTEPOCH*::
@@ -339,7 +339,7 @@ version comparison if the epoch/version/release of two packages
 are the same.
 
 *POOL_FLAG_NOOBSOLETESMULTIVERSION*::
-If a package is installed in multiversionmode, rpm used to ignore
+If a package is installed in multiversion mode, rpm used to ignore
 both the implicit obsoletes and the obsolete dependency of a
 package. This was changed to ignoring just the implicit obsoletes,
 thus you may install multiple versions of the same name, but
@@ -393,7 +393,7 @@ value, the more output is generated.
 Set/get a pool specific flag. The flags define how the system works, e.g. how
 the package manager treats obsoletes. The default flags should be sane for most
 applications, but in some cases you may want to tweak a flag, for example if
-you want to solv package dependencies for some other system than yours.
+you want to solve package dependencies for some other system.
 
 	void set_rootdir(const char *rootdir)
 	$pool->set_rootdir(rootdir);
@@ -475,7 +475,8 @@ repository is loaded and addfileprovides is called.
 	pool.createwhatprovides()
 
 Create the internal ``whatprovides'' hash over all of the provides of all
-packages. This method must be called before doing any lookups on provides.
+installable packages. This method must be called before doing any lookups on
+provides.
 It's encouraged to do it right after all repos are set up, usually right after
 the call to addfileprovides().
 
@@ -509,14 +510,14 @@ for more information.
 	pool.set_namespaceproviders(ns, evr, True)
 	pool.set_namespaceproviders(ns, evr, true)
 
-Manually set an namespace provides entry in the whatprovides index.
+Manually set a namespace provides entry in the whatprovides index.
 
 	void flush_namespaceproviders(DepId ns, DepId evr)
-        $pool->flush_namespaceproviders($ns, $evr);
-        $pool.flush_namespaceproviders(ns, evr)
-        $pool.flush_namespaceproviders(ns, evr)
+	$pool->flush_namespaceproviders($ns, $evr);
+	$pool.flush_namespaceproviders(ns, evr)
+	$pool.flush_namespaceproviders(ns, evr)
 
-Flush the cache of all namespacprovudes matching the specified namespace
+Flush the cache of all namespaceprovides matching the specified namespace
 dependency. You can use zero as a wildcard argument.
 
 	bool isknownarch(DepId id)
@@ -538,8 +539,8 @@ Create a new solver object.
 	job = pool.Job(how, what)
 	job = pool.Job(how, what)
 
-Create a new Job object. Kind of low level, in most cases you would use a
-Selection or Dep job constructor instead.
+Create a new Job object. Kind of low level, in most cases you would
+instead use a Selection or Dep job constructor.
 
 	Selection Selection()
 	my $sel = $pool->Selection();
@@ -572,7 +573,7 @@ selection.
 	sel = pool.matchdeps(name, flags, keyname)
 
 Create a selection by matching package dependencies against the specified string.
-This can be used if you want to match other dependency types than "provides".
+This can be used if you want to match other dependency types than ``provides''.
 
 	Selection matchdepid(DepId dep, int flags, Id keyname, Id marker = -1)
 	my $sel = $pool->matchdepid(dep, $flags, $keyname);
@@ -596,8 +597,8 @@ matching.
 
 Get/Set fixed jobs stored in the pool. Those jobs are automatically appended to
 all solver jobs, they are meant for fixed configurations like which packages
-can be multiversion installed, which packages were userinstalled or must not be
-erased.
+can be multiversion installed, which packages were userinstalled, or which
+packages must not be erased.
 
 	void set_loadcallback(Callable *callback)
 	$pool->setloadcallback(\&callbackfunction);
@@ -733,7 +734,7 @@ pool and _create_ is false, zero is returned.
 	id = pool.rel2id(nameid, evrid, flags)
 
 Create a ``relational'' dependency. Such dependencies consist of a name part,
-the _flags_ describing the relation, and a version part. The flags are:
+_flags_ describing the relation, and a version part. The flags are:
 
 	$solv::REL_EQ | $solv::REL_GT | $solv::REL_LT
 	solv.REL_EQ | solv.REL_GT | solv.REL_LT
@@ -790,8 +791,9 @@ The id of this dependency.
 	reldep = dep.Rel(flags, evrdep)
 	reldep = dep.Rel(flags, evrdep)
 
-Create a relational dependency from to string dependencies and a flags
-argument. See the pool's rel2id method for a description of the flags.
+Create a relational dependency from the caller dependency, the flags,
+and a dependency describing the ``version'' part.
+See the pool's rel2id method for a description of the flags.
 
 	Selection Selection_name(int setflags = 0)
 	my $sel = $dep->Selection_name();
@@ -829,7 +831,7 @@ Same as calling the str() method.
 	if dep1 == dep2:
 	if dep1 == dep2
 
-The dependencies are equal if they are part of the same pool and have the same
+Two dependencies are equal if they are part of the same pool and have the same
 ids.
 
 
@@ -908,7 +910,7 @@ timestamp.
 
 *REPO_REUSE_REPODATA*::
 Reuse the last repository data area (``repodata'') instead of creating a
-new one.
+new area.
 
 *REPO_NO_INTERNALIZE*::
 Do not internalize the added repository data. This is useful if
@@ -2192,7 +2194,7 @@ Allow the solver to downgrade packages without asking for confirmation
 Allow the solver to change the architecture of an installed package
 without asking for confirmation. Note that changes to/from noarch
 are always considered to be allowed.
-  
+
 *SOLVER_FLAG_ALLOW_VENDORCHANGE*::
 Allow the solver to change the vendor of an installed package
 without asking for confirmation. Each vendor is part of one or more
@@ -2251,7 +2253,7 @@ Install recommended or supplemented packages even if they have no
 connection to the current transaction. You can use this feature
 to implement a simple way for the user to install new recommended
 packages that were not available in the past.
-  
+
 *SOLVER_FLAG_NO_INFARCHCHECK*::
 Turn off the inferior architecture checking that is normally done
 by the solver. Normally, the solver allows only the installation
@@ -3023,7 +3025,7 @@ Use this flag if you want to map OBSOLETE elements to the UPGRADE type.
 *SOLVER_TRANSACTION_MERGE_ARCHCHANGES*::
 Do not add extra categories for every architecture change, instead cumulate
 them in one category.
-  
+
 *SOLVER_TRANSACTION_MERGE_VENDORCHANGES*::
 Do not add extra categories for every vendor change, instead cumulate
 them in one category.
