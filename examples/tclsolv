@@ -636,10 +636,10 @@ foreach arg $::argv {
     puts "nothing matches '$arg'"
     exit 1
   }
-  if {[$sel flags] & $solv::Selection_SELECTION_FILELIST} {
+  if {[$sel cget -flags] & $solv::Selection_SELECTION_FILELIST} {
     puts "\[using file list match for '$arg']"
   }
-  if {[$sel flags] & $solv::Selection_SELECTION_PROVIDES} {
+  if {[$sel cget -flags] & $solv::Selection_SELECTION_PROVIDES} {
     puts "\[using capability match for '$arg']"
   }
   lappend jobs {*}[$sel jobs $cmdactionmap($cmd)]
