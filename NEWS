@@ -2,6 +2,14 @@
 This file contains the major changes between
 libsolv versions:
 
+Version 0.7.2
+- bug fixes:
+  * do not autouninstall packages because of forcebest updates
+- new features:
+  * support rpm's new '^' version separator
+  * support set/get_considered_list in bindings
+  * new experimental SOLVER_FLAG_ONLY_NAMESPACE_RECOMMENDED flag
+
 Version 0.7.1
 - fix nasty off-by-one error in repo_write
 

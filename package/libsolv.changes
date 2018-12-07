@@ -1,4 +1,14 @@
 -------------------------------------------------------------------
+Fri Dec  7 15:10:46 CET 2018 - mls@suse.de
+
+- do not autouninstall packages because of forcebest updates
+- support rpm's new '^' version separator
+- support set/get_considered_list in bindings
+- new experimental SOLVER_FLAG_ONLY_NAMESPACE_RECOMMENDED flag
+  [fate#325513]
+- bump version to 0.7.2
+
+-------------------------------------------------------------------
 Wed Oct 31 13:50:22 CET 2018 - mls@suse.de
 
 - fix nasty off-by-one error in repo_write
