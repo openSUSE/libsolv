@@ -88,23 +88,6 @@ typedef struct {
 }
 
 #if defined(SWIGPYTHON)
-%typemap(in) Queue {
-  /* Check if is a list */
-  if (PyList_Check($input)) {
-    int size = PyList_Size($input);
-    int i = 0;
-    for (i = 0; i < size; i++) {
-      PyObject *o = PyList_GetItem($input,i);
-      int v;
-      int e = SWIG_AsVal_int(o, &v);
-      if (!SWIG_IsOK(e))
-        SWIG_exception_fail(SWIG_ArgError(e), "list must contain only integers");
-      queue_push(&$1, v);
-    }
-  } else {
-    SWIG_exception_fail(SWIG_TypeError, "list must contain only integers");
-  }
-}
 
 %typemap(out) Queue {
   int i;
@@ -115,7 +98,7 @@ typedef struct {
   $result = o;
 }
 
-%define Queue2Array(type, step, con) %{
+%define Queue2Array(type, step, con) %{ {
   int i;
   int cnt = $1.count / step;
   Id *idp = $1.elements;
@@ -131,30 +114,47 @@ typedef struct {
     }
   queue_free(&$1);
   $result = o;
+}
 %}
+%enddef
 
+%define Array2Queue(asval_meth,typestr) %{ {
+  int i, size;
+  if (!PyList_Check($input))
+    SWIG_exception_fail(SWIG_TypeError, "argument $argnum is not a list");
+  size = PyList_Size($input);
+  for (i = 0; i < size; i++) {
+    PyObject *o = PyList_GetItem($input,i);
+    int v;
+    int e = asval_meth(o, &v);
+    if (!SWIG_IsOK(e))
+      SWIG_exception_fail(SWIG_ArgError(e), "list in argument $argnum must contain only" typestr);
+    queue_push(&$1, v);
+  }
+}
+%}
+%enddef
+
+%define ObjArray2Queue(type, obj2queue) %{ {
+  int i, size;
+  if (!PyList_Check($input))
+    SWIG_exception_fail(SWIG_TypeError, "argument $argnum is not a list");
+  size = PyList_Size($input);
+  for (i = 0; i < size; i++) {
+    PyObject *o = PyList_GetItem($input,i);
+    type obj;
+    int e = SWIG_ConvertPtr(o, (void **)&obj, $descriptor(type), 0 | 0);
+    if (!SWIG_IsOK(e))
+      SWIG_exception_fail(SWIG_ArgError(e), "list in argument $argnum must contain only "`type`);
+    obj2queue;
+  }
+}
+%}
 %enddef
 
 #endif  /* SWIGPYTHON */
 
 #if defined(SWIGPERL)
-%typemap(in) Queue {
-  AV *av;
-  int i, size;
-  if (!SvROK($input) || SvTYPE(SvRV($input)) != SVt_PVAV)
-    SWIG_croak("Argument $argnum is not an array reference.");
-  av = (AV*)SvRV($input);
-  size = av_len(av);
-  for (i = 0; i <= size; i++) {
-    SV **sv = av_fetch(av, i, 0);
-    int v;
-    int e = SWIG_AsVal_int(*sv, &v);
-    if (!SWIG_IsOK(e)) {
-      SWIG_croak("list must contain only integers");
-    }
-    queue_push(&$1, v);
-  }
-}
 /* AV *o = newAV();
  * av_push(o, SvREFCNT_inc(SWIG_From_int($1.elements[i])));
  * $result = newRV_noinc((SV*)o); argvi++;
@@ -170,7 +170,7 @@ typedef struct {
   $result = 0;
 }
 
-%define Queue2Array(type, step, con) %{
+%define Queue2Array(type, step, con) %{ {
   int i;
   int cnt = $1.count / step;
   Id *idp = $1.elements;
@@ -188,6 +188,45 @@ typedef struct {
     }
   queue_free(&$1);
   $result = 0;
+}
+%}
+%enddef
+
+%define Array2Queue(asval_meth,typestr) %{ {
+  AV *av;
+  int i, size;
+  if (!SvROK($input) || SvTYPE(SvRV($input)) != SVt_PVAV)
+    SWIG_croak("argument $argnum is not an array reference.");
+  av = (AV*)SvRV($input);
+  size = av_len(av);
+  for (i = 0; i <= size; i++) {
+    SV **sv = av_fetch(av, i, 0);
+    int v;
+    int e = asval_meth(*sv, &v);
+    if (!SWIG_IsOK(e))
+      SWIG_croak("array in argument $argnum must contain only " typestr);
+    queue_push(&$1, v);
+  }
+}
+%}
+%enddef
+
+%define ObjArray2Queue(type, obj2queue) %{ {
+  AV *av;
+  int i, size;
+  if (!SvROK($input) || SvTYPE(SvRV($input)) != SVt_PVAV)
+    SWIG_croak("argument $argnum is not an array reference.");
+  av = (AV*)SvRV($input);
+  size = av_len(av);
+  for (i = 0; i <= size; i++) {
+    SV **sv = av_fetch(av, i, 0);
+    type obj;
+    int e = SWIG_ConvertPtr(*sv, (void **)&obj, $descriptor(type), 0 | 0);
+    if (!SWIG_IsOK(e))
+      SWIG_exception_fail(SWIG_ArgError(e), "list in argument $argnum must contain only "`type`);
+    obj2queue;
+  }
+}
 %}
 %enddef
 
@@ -195,21 +234,6 @@ typedef struct {
 
 
 #if defined(SWIGRUBY)
-%typemap(in) Queue {
-  int size, i;
-  VALUE *o, ary;
-  ary = rb_Array($input);
-  size = RARRAY_LEN(ary);
-  i = 0;
-  o = RARRAY_PTR(ary);
-  for (i = 0; i < size; i++, o++) {
-    int v;
-    int e = SWIG_AsVal_int(*o, &v);
-    if (!SWIG_IsOK(e))
-      SWIG_exception_fail(SWIG_TypeError, "list must contain only integers");
-    queue_push(&$1, v);
-  }
-}
 %typemap(out) Queue {
   int i;
   VALUE o = rb_ary_new2($1.count);
@@ -218,13 +242,8 @@ typedef struct {
   queue_free(&$1);
   $result = o;
 }
-%typemap(arginit) Queue {
-  queue_init(&$1);
-}
-%typemap(freearg) Queue {
-  queue_free(&$1);
-}
-%define Queue2Array(type, step, con) %{
+
+%define Queue2Array(type, step, con) %{ {
   int i;
   int cnt = $1.count / step;
   Id *idp = $1.elements;
@@ -240,32 +259,49 @@ typedef struct {
     }
   queue_free(&$1);
   $result = o;
+}
+%}
+%enddef
+
+%define Array2Queue(asval_meth,typestr) %{ {
+  int size, i;
+  VALUE *o, ary;
+  ary = rb_Array($input);
+  size = RARRAY_LEN(ary);
+  i = 0;
+  o = RARRAY_PTR(ary);
+  for (i = 0; i < size; i++, o++) {
+    int v;
+    int e = asval_meth(*o, &v);
+    if (!SWIG_IsOK(e))
+      SWIG_exception_fail(SWIG_TypeError, "list in argument $argnum must contain only " typestr);
+    queue_push(&$1, v);
+  }
+}
+%}
+%enddef
+
+%define ObjArray2Queue(type, obj2queue) %{ {
+  int size, i;
+  VALUE *o, ary;
+  ary = rb_Array($input);
+  size = RARRAY_LEN(ary);
+  i = 0;
+  o = RARRAY_PTR(ary);
+  for (i = 0; i < size; i++, o++) {
+    type obj;
+    int e = SWIG_ConvertPtr(*o, (void **)&obj, $descriptor(type), 0 | 0);
+    if (!SWIG_IsOK(e))
+      SWIG_exception_fail(SWIG_ArgError(e), "list in argument $argnum must contain only "`type`);
+    obj2queue;
+  }
+}
 %}
 %enddef
 
 #endif  /* SWIGRUBY */
 
 #if defined(SWIGTCL)
-%typemap(in) Queue {
-  /* Check if is a list */
-  int size = 0;
-  int i = 0;
-
-  if (TCL_OK != Tcl_ListObjLength(interp, $input, &size))
-    SWIG_exception_fail(SWIG_TypeError, "argument is not a list");
-  for (i = 0; i < size; i++) {
-    Tcl_Obj *o = NULL;
-    int e, v;
-
-    if (TCL_OK != Tcl_ListObjIndex(interp, $input, i, &o))
-      SWIG_exception_fail(SWIG_IndexError, "failed to retrieve a list member");
-    e = SWIG_AsVal_int SWIG_TCL_CALL_ARGS_2(o, &v);
-    if (!SWIG_IsOK(e))
-      SWIG_exception_fail(SWIG_ArgError(e), "list must contain only integers");
-    queue_push(&$1, v);
-  }
-}
-
 %typemap(out) Queue {
   Tcl_Obj *objvx[$1.count];
   int i;
@@ -297,35 +333,55 @@ typedef struct {
     }
     queue_free(&$1);
     Tcl_SetObjResult(interp, Tcl_NewListObj(cnt, objvx));
-  }
+ }
 %}
-
 %enddef
 
-%typemap(in) Queue solvejobs {
-  /* Check if is a list */
+%define Array2Queue(asval_meth,typestr) %{ {
   int size = 0;
   int i = 0;
-
   if (TCL_OK != Tcl_ListObjLength(interp, $input, &size))
-    SWIG_exception_fail(SWIG_TypeError, "argument is not a list");
+    SWIG_exception_fail(SWIG_TypeError, "argument $argnum is not a list");
   for (i = 0; i < size; i++) {
     Tcl_Obj *o = NULL;
-    void *jp;
-    Job *j;
-    int e;
+    int e, v;
 
     if (TCL_OK != Tcl_ListObjIndex(interp, $input, i, &o))
       SWIG_exception_fail(SWIG_IndexError, "failed to retrieve a list member");
-    e = SWIG_ConvertPtr(o, &jp ,SWIGTYPE_p_Job, 0 |  0 );
+    e = SWIG_AsVal_int SWIG_TCL_CALL_ARGS_2(o, &v);
     if (!SWIG_IsOK(e))
-      SWIG_exception_fail(SWIG_ArgError(e), "list member is not a Job");
-    j = (Job *)jp;
-    queue_push2(&$1, j->how, j->what);
+      SWIG_exception_fail(SWIG_ArgError(e), "list in argument $argnum must contain only " typestr);
+    queue_push(&$1, v);
   }
 }
+%}
+%enddef
+
+%define ObjArray2Queue(type, obj2queue) %{ {
+  int size = 0;
+  int i = 0;
+  if (TCL_OK != Tcl_ListObjLength(interp, $input, &size))
+    SWIG_exception_fail(SWIG_TypeError, "argument $argnum is not a list");
+  for (i = 0; i < size; i++) {
+    Tcl_Obj *o = NULL;
+    type obj;
+    int e;
+    if (TCL_OK != Tcl_ListObjIndex(interp, $input, i, &o))
+      SWIG_exception_fail(SWIG_IndexError, "failed to retrieve a list member");
+    e = SWIG_ConvertPtr(o, (void **)&obj, $descriptor(type), 0 | 0);
+    if (!SWIG_IsOK(e))
+      SWIG_exception_fail(SWIG_ArgError(e), "list in argument $argnum must contain only "`type`);
+    obj2queue;
+  }
+}
+%}
+%enddef
 
 #endif  /* SWIGTCL */
+
+%typemap(in) Queue Array2Queue(SWIG_AsVal_int, "integers")
+%typemap(in) Queue solvejobs ObjArray2Queue(Job *, queue_push2(&$1, obj->how, obj->what))
+
 
 
 #if defined(SWIGPERL)
@@ -1992,9 +2048,9 @@ typedef struct {
     }
   }
 
-  void setpooljobs_helper(Queue jobs) {
+  void setpooljobs(Queue solvejobs) {
     queue_free(&$self->pooljobs);
-    queue_init_clone(&$self->pooljobs, &jobs);
+    queue_init_clone(&$self->pooljobs, &solvejobs);
   }
   %typemap(out) Queue getpooljobs Queue2Array(Job *, 2, new_Job(arg1, id, idp[1]));
   %newobject getpooljobs;
@@ -2004,36 +2060,6 @@ typedef struct {
     return q;
   }
 
-#if defined(SWIGPYTHON)
-  %pythoncode {
-    def setpooljobs(self, jobs):
-      j = []
-      for job in jobs: j += [job.how, job.what]
-      self.setpooljobs_helper(j)
-  }
-#endif
-#if defined(SWIGPERL)
-  %perlcode {
-    sub solv::Solver::setpooljobs {
-      my ($self, $jobs) = @_;
-      my @j = map {($_->{'how'}, $_->{'what'})} @$jobs;
-      return $self->setpooljobs_helper(\@j);
-    }
-  }
-#endif
-#if defined(SWIGRUBY)
-%init %{
-rb_eval_string(
-    "class Solv::Pool\n"
-    "  def setpooljobs(jobs)\n"
-    "    jl = []\n"
-    "    jobs.each do |j| ; jl << j.how << j.what ; end\n"
-    "    setpooljobs_helper(jl)\n"
-    "  end\n"
-    "end\n"
-  );
-%}
-#endif
 }
 
 %extend Repo {
@@ -3454,49 +3480,7 @@ rb_eval_string(
   int get_flag(int flag) {
     return solver_get_flag($self, flag);
   }
-#if defined(SWIGPYTHON)
-  %pythoncode {
-    def solve(self, jobs):
-      j = []
-      for job in jobs: j += [job.how, job.what]
-      return self.solve_helper(j)
-  }
-#endif
-#if defined(SWIGPERL)
-  %perlcode {
-    sub solv::Solver::solve {
-      my ($self, $jobs) = @_;
-      my @j = map {($_->{'how'}, $_->{'what'})} @$jobs;
-      return $self->solve_helper(\@j);
-    }
-  }
-#endif
-#if defined(SWIGRUBY)
-%init %{
-rb_eval_string(
-    "class Solv::Solver\n"
-    "  def solve(jobs)\n"
-    "    jl = []\n"
-    "    jobs.each do |j| ; jl << j.how << j.what ; end\n"
-    "    solve_helper(jl)\n"
-    "  end\n"
-    "end\n"
-  );
-%}
-#endif
-  %typemap(out) Queue solve_helper Queue2Array(Problem *, 1, new_Problem(arg1, id));
-  %newobject solve_helper;
-  Queue solve_helper(Queue jobs) {
-    Queue q;
-    int i, cnt;
-    queue_init(&q);
-    solver_solve($self, &jobs);
-    cnt = solver_problem_count($self);
-    for (i = 1; i <= cnt; i++)
-      queue_push(&q, i);
-    return q;
-  }
-#if defined(SWIGTCL)
+
   %typemap(out) Queue solve Queue2Array(Problem *, 1, new_Problem(arg1, id));
   %newobject solve;
   Queue solve(Queue solvejobs) {
@@ -3509,7 +3493,6 @@ rb_eval_string(
       queue_push(&q, i);
     return q;
   }
-#endif
 
   %newobject transaction;
   Transaction *transaction() {
