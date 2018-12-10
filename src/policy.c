@@ -454,86 +454,18 @@ prefer_suggested(Solver *solv, Queue *plist)
 }
 
 static int
-sort_by_favorq_cmp(const void *ap, const void *bp, void *dp)
+sort_by_favor_cmp(const void *ap, const void *bp, void *dp)
 {
   const Id *a = ap, *b = bp, *d = dp;
   return d[b[0]] - d[a[0]];
-}
-
-static void
-sort_by_favorq(Queue *favorq, Id *el, int cnt)
-{
-  int i;
-  /* map to offsets into favorq */
-  for (i = 0; i < cnt; i++)
-    {
-      Id p = el[i];
-      /* lookup p in sorted favorq */
-      int med = 0, low = 0;
-      int high = favorq->count / 2;
-      while (low != high)
-	{
-	  med = (low + high) / 2;
-	  Id pp = favorq->elements[2 * med];
-	  if (pp < p)
-	    low = med;
-	  else if (pp > p)
-	    high = med;
-	  else
-	    break;
-	}
-      while(med && favorq->elements[2 * med - 2] == p)
-	med--;
-      if (favorq->elements[2 * med] == p)
-        el[i] = 2 * med + 1;
-      else
-        el[i] = 0;	/* hmm */
-    }
-  /* sort by position */
-  solv_sort(el, cnt, sizeof(Id), sort_by_favorq_cmp, favorq->elements);
-  /* map back */
-  for (i = 0; i < cnt; i++)
-    if (el[i])
-      el[i] = favorq->elements[el[i] - 1];
 }
 
 /* bring favored packages to front and disfavored packages to back */
 void
 policy_prefer_favored(Solver *solv, Queue *plist)
 {
-  int i, fav, disfav, count;
-  if (!solv->favormap.size)
-    return;
-  for (i = fav = disfav = 0, count = plist->count; i < count; i++)
-    {
-      Id p = plist->elements[i];
-      if (!MAPTST(&solv->favormap, p))
-	continue;
-      if (solv->isdisfavormap.size && MAPTST(&solv->isdisfavormap, p))
-	{
-	  /* disfavored package. bring to back */
-	 if (i < plist->count - 1)
-	    {
-	      memmove(plist->elements + i, plist->elements + i + 1, (plist->count - 1 - i) * sizeof(Id));
-	      plist->elements[plist->count - 1] = p;
-	    }
-	  i--;
-	  count--;
-	  disfav++;
-	}
-      else
-	{
-	  /* favored package. bring to front */
-	  if (i > fav)
-	    memmove(plist->elements + fav + 1, plist->elements + fav, (i - fav) * sizeof(Id));
-	  plist->elements[fav++] = p;
-	}
-    }
-  /* if we have multiple favored/disfavored packages, sort by favorq index */
-  if (fav > 1)
-    sort_by_favorq(solv->favorq, plist->elements, fav);
-  if (disfav > 1)
-    sort_by_favorq(solv->favorq, plist->elements + plist->count - disfav, disfav);
+  if (solv->favormap && plist->count > 1)
+    solv_sort(plist->elements, plist->count, sizeof(Id), sort_by_favor_cmp, solv->favormap);
 }
 
 /*
@@ -1300,6 +1232,37 @@ urpm_reorder(Solver *solv, Queue *plist)
   queue_truncate(plist, count);
 }
 
+/* support multiple favor groups by calling policy_filter_unwanted on
+ * each of them and combining the result */
+static void
+policy_filter_unwanted_favored(Solver *solv, Queue *plist, int mode)
+{
+  int i, j, f;
+  Queue qin, qprune;
+  queue_init_clone(&qin, plist);
+  queue_empty(plist);
+  /* sort by favor group */
+  solv_sort(qin.elements, qin.count, sizeof(Id), sort_by_favor_cmp, solv->favormap);
+  /* go over groups */
+  queue_init(&qprune);
+  for (i = 0; i < qin.count; i = j)
+    {
+      /* find end of group */
+      f = solv->favormap[qin.elements[i]];
+      for (j = i + 1; j < qin.count; j++)
+	if (solv->favormap[qin.elements[j]] != f)
+	  break;
+      /* prune this group */
+      queue_empty(&qprune);
+      queue_insertn(&qprune, 0, j, qin.elements);
+      policy_filter_unwanted(solv, &qprune, mode | POLICY_MODE_FAVOR_REC);
+      for (i = 0; i < qprune.count; i++)
+	if (solv->favormap[qprune.elements[i]] == f)
+	  queue_push(plist, qprune.elements[i]);
+    }
+  queue_free(&qprune);
+  queue_free(&qin);
+}
 
 /*
  *  POLICY_MODE_CHOOSE:     default, do all pruning steps
@@ -1320,6 +1283,21 @@ policy_filter_unwanted(Solver *solv, Queue *plist, int mode)
       prefer_suggested(solv, plist);
       policy_prefer_favored(solv, plist);
       return;
+    }
+  if (mode & POLICY_MODE_FAVOR_REC)
+    mode ^= POLICY_MODE_FAVOR_REC;
+  else if (solv->favormap && plist->count > 1)
+    {
+      /* check if we have multiple favor groups */
+      int i, f = solv->favormap[plist->elements[0]];
+      for (i = 1; i < plist->count; i++)
+	if (solv->favormap[plist->elements[i]] != f)
+	  break;
+      if (i < plist->count)
+	{
+	  policy_filter_unwanted_favored(solv, plist, mode);
+	  return;
+	}
     }
   if (plist->count > 1)
     {

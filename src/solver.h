@@ -202,8 +202,8 @@ struct s_Solver {
   int allowuninstall_all;
 
   Queue *favorq;
-  Map favormap;				/* favored / disfavored packages */
-  Map isdisfavormap;
+  Id *favormap;				/* favor job index, > 0: favored, < 0: disfavored */
+  int havedisfavored;			/* do we have disfavored packages? */
 
   int installedpos;			/* for resolve_installed */
   int do_extra_reordering;		/* reorder for future installed packages */

@@ -21,6 +21,7 @@ extern "C" {
 #define POLICY_MODE_SUGGEST	2
 #define POLICY_MODE_CHOOSE_NOREORDER	3	/* internal, do not use */
 #define POLICY_MODE_SUPPLEMENT	4	/* internal, do not use */
+#define POLICY_MODE_FAVOR_REC	(1 << 30)	/* internal, do not use */
 
 
 #define POLICY_ILLEGAL_DOWNGRADE	1

@@ -243,7 +243,7 @@ makeruledecisions(Solver *solv, int disablerules)
 		    continue;
 		  if (solv->weakrulemap.size && MAPTST(&solv->weakrulemap, i))     /* weak: silently ignore */
 		    continue;
-		    
+
 		  POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, " - disabling rule #%d\n", i);
 		  solver_printruleclass(solv, SOLV_DEBUG_UNSOLVABLE, solv->rules + i);
 		  solver_recordproblem(solv, i);
@@ -1370,9 +1370,8 @@ solver_free(Solver *solv)
   map_free(&solv->droporphanedmap);
   map_free(&solv->cleandepsmap);
   map_free(&solv->allowuninstallmap);
-  map_free(&solv->favormap);
-  map_free(&solv->isdisfavormap);
 
+  solv_free(solv->favormap);
   solv_free(solv->decisionmap);
   solv_free(solv->rules);
   solv_free(solv->watches);
@@ -2058,14 +2057,12 @@ static void
 prune_disfavored(Solver *solv, Queue *plist)
 {
   int i, j;
-  if (!solv->isdisfavormap.size)
-    return;
-  for (i = j = 0; i < plist->count; i++) 
-    {    
+  for (i = j = 0; i < plist->count; i++)
+    {
       Id p = plist->elements[i];
-      if (!MAPTST(&solv->isdisfavormap, p))
-        plist->elements[j++] = p; 
-    }    
+      if (solv->favormap[p] >= 0)
+        plist->elements[j++] = p;
+    }
   if (i != j)
     queue_truncate(plist, j);
 }
@@ -2141,14 +2138,14 @@ resolve_weak(Solver *solv, int level, int disablerules, Queue *dq, Queue *dqs, i
 	    continue;
 	  if (solv->process_orphans && solv->installed && s->repo == solv->installed && (solv->droporphanedmap_all || (solv->droporphanedmap.size && MAPTST(&solv->droporphanedmap, i - solv->installed->start))))
 	    continue;
-	  if (solv->isdisfavormap.size && MAPTST(&solv->isdisfavormap, i))
+	  if (solv->havedisfavored && solv->favormap[i] < 0)
 	    continue;	/* disfavored supplements, do not install */
 	  queue_push(dqs, i);
 	}
     }
 
   /* filter out disfavored recommended packages */
-  if (dq->count && solv->isdisfavormap.size)
+  if (dq->count && solv->havedisfavored)
     prune_disfavored(solv, dq);
 
   /* filter out all packages obsoleted by installed packages */
@@ -2617,7 +2614,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	  if (rerun)
 	    continue;
 	}
-	  
+
      /* one final pass to make sure we decided all installed packages */
       if (solv->installed)
 	{
@@ -2700,7 +2697,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		      lastsi = -1;
 		      break;
 		    }
-		  if (solv->isdisfavormap.size && MAPTST(&solv->isdisfavormap, p))
+		  if (solv->havedisfavored && solv->favormap[p] < 0)
 		    continue;
 		  if (lastsi < 0 && (MAPTST(&solv->recommendsmap, p) || solver_is_supplementing(solv, pool->solvables + p)))
 		    lastsi = i;
@@ -2714,9 +2711,8 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 		      p = -solv->branches.elements[i];
 		      if (p <= 0 || solv->decisionmap[p] != l + 1)
 			continue;
-		      if (solv->favormap.size && MAPTST(&solv->favormap, p))
-			if (!(solv->isdisfavormap.size && MAPTST(&solv->isdisfavormap, p)))
-			  continue;	/* current selection is favored */
+		      if (solv->favormap && solv->favormap[p] > solv->favormap[solv->branches.elements[lastsi]])
+		        continue;	/* current selection is more favored */
 		      if (!(MAPTST(&solv->recommendsmap, p) || solver_is_supplementing(solv, pool->solvables + p)))
 			{
 			  lasti = lastsi;
@@ -3187,7 +3183,7 @@ add_complex_jobrules(Solver *solv, Id dep, int flags, int jobidx, int weak)
 
 /* sort by package id, last entry wins */
 static int
-setup_favormaps_cmp(const void *ap, const void *bp, void *dp)
+setup_favormap_cmp(const void *ap, const void *bp, void *dp)
 {
   const Id *a = ap, *b = bp;
   if ((*a - *b) != 0)
@@ -3196,28 +3192,25 @@ setup_favormaps_cmp(const void *ap, const void *bp, void *dp)
 }
 
 static void
-setup_favormaps(Solver *solv)
+setup_favormap(Solver *solv)
 {
   Queue *q = solv->favorq;
   Pool *pool = solv->pool;
   int i;
   Id oldp = 0;
   if (q->count > 2)
-    solv_sort(q->elements, q->count / 2, 2 * sizeof(Id), setup_favormaps_cmp, solv);
-  map_grow(&solv->favormap, pool->nsolvables);
+    solv_sort(q->elements, q->count / 2, 2 * sizeof(Id), setup_favormap_cmp, solv);
+  solv->favormap = solv_calloc(pool->nsolvables, sizeof(Id));
+  solv->havedisfavored = 0;
   for (i = 0; i < q->count; i += 2)
     {
       Id p = q->elements[i];
       if (p == oldp)
 	continue;
       oldp = p;
-      MAPSET(&solv->favormap, p);
+      solv->favormap[p] = q->elements[i + 1];
       if (q->elements[i + 1] < 0)
-	{
-	  if (!solv->isdisfavormap.size)
-	    map_grow(&solv->isdisfavormap, pool->nsolvables);
-	  MAPSET(&solv->isdisfavormap, p);
-	}
+	solv->havedisfavored = 1;
     }
 }
 
@@ -3294,8 +3287,7 @@ solver_solve(Solver *solv, Queue *job)
   map_zerosize(&solv->allowuninstallmap);
   map_zerosize(&solv->cleandepsmap);
   map_zerosize(&solv->weakrulemap);
-  map_zerosize(&solv->favormap);
-  map_zerosize(&solv->isdisfavormap);
+  solv->favormap = solv_free(solv->favormap);
   queue_empty(&solv->weakruleq);
   solv->watches = solv_free(solv->watches);
   queue_empty(&solv->ruletojob);
@@ -3839,14 +3831,12 @@ solver_solve(Solver *solv, Queue *job)
 	  POOL_DEBUG(SOLV_DEBUG_JOB, "job: %s %s\n", (how & SOLVER_JOBMASK) == SOLVER_FAVOR ? "favor" : "disfavor", solver_select2str(pool, select, what));
 	  FOR_JOB_SELECT(p, pp, select, what)
 	    {
-	      int j;
 	      if (!solv->favorq)
 		{
 		  solv->favorq = solv_calloc(1, sizeof(Queue));
 		  queue_init(solv->favorq);
 		}
-	      j = solv->favorq->count + 1;
-	      queue_push2(solv->favorq, p, (how & SOLVER_JOBMASK) == SOLVER_FAVOR ? j : -j);
+	      queue_push2(solv->favorq, p, (how & SOLVER_JOBMASK) == SOLVER_FAVOR ? i + 1 : -(i + 1));
 	    }
 	  break;
 	default:
@@ -3869,9 +3859,9 @@ solver_solve(Solver *solv, Queue *job)
   assert(solv->ruletojob.count == solv->nrules - solv->jobrules);
   solv->jobrules_end = solv->nrules;
 
-  /* transform favorq into two maps */
+  /* sort favorq and transform it into two maps */
   if (solv->favorq)
-    setup_favormaps(solv);
+    setup_favormap(solv);
 
   /* now create infarch and dup rules */
   if (!solv->noinfarchcheck)
