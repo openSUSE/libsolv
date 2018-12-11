@@ -571,6 +571,8 @@ testcase_str2dep_complex(Pool *pool, const char **sp, int relop)
   Id flags, id, id2, namespaceid = 0;
   struct oplist *op;
 
+  if (!s)
+    return 0;
   while (*s == ' ' || *s == '\t')
     s++;
   if (!strncmp(s, "namespace:", 10))
