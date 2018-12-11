@@ -85,7 +85,7 @@ dirpool_make_dirtraverse(Dirpool *dp)
     return;
   dp->dirs = solv_extend_resize(dp->dirs, dp->ndirs, sizeof(Id), DIR_BLOCK);
   dirtraverse = solv_calloc_block(dp->ndirs, sizeof(Id), DIR_BLOCK);
-  for (parent = 0, i = 0; i < dp->ndirs; i++)
+  for (i = 0; i < dp->ndirs; i++)
     {
       if (dp->dirs[i] > 0)
 	continue;

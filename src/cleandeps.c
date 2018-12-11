@@ -748,7 +748,6 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
 	    continue;
 	  if (strncmp(pool_id2str(pool, s->name), "pattern:", 8) != 0)
 	    continue;
-	  dp = s->repo->idarraydata + s->requires;
 	  for (dp = s->repo->idarraydata + s->requires; *dp; dp++)
 	    FOR_PROVIDES(p, pp, *dp)
 	      if (pool->solvables[p].repo == installed)

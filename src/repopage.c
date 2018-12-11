@@ -399,7 +399,6 @@ match_done:
 	      litlen -= 32;
 	    }
 	}
-      litofs = 0;
     }
   return oo;
 }

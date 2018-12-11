@@ -1066,7 +1066,6 @@ transaction_order(Transaction *trans, int flags)
 #if 0
 printf("do %s [%d]\n", pool_solvid2str(pool, te->p), temedianr[i]);
 #endif
-      s = pool->solvables + te->p;
       for (j = te->edges; od.invedgedata[j]; j++)
 	{
 	  struct s_TransactionElement *te2 = od.tes + od.invedgedata[j];
