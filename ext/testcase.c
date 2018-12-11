@@ -2772,7 +2772,7 @@ testcase_read(Pool *pool, FILE *fp, const char *testcase, Queue *job, char **res
 	{
 	  int i = strlen(pieces[1]);
 	  s = strchr(pieces[1], '(');
-	  if (!s && pieces[1][i - 1] != ')')
+	  if (!s || pieces[1][i - 1] != ')')
 	    {
 	      pool_error(pool, 0, "testcase_read: bad namespace '%s'", pieces[1]);
 	    }
