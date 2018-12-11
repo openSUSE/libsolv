@@ -2189,7 +2189,7 @@ testcase_write_mangled(Solver *solv, const char *dir, int resultflags, const cha
   Id lowscore;
   FILE *fp;
   Strqueue sq;
-  char *cmd, *out;
+  char *cmd, *out, *result;
   const char *s;
 
   if (!testcasename)
@@ -2324,7 +2324,6 @@ testcase_write_mangled(Solver *solv, const char *dir, int resultflags, const cha
 
   if ((resultflags & ~TESTCASE_RESULT_REUSE_SOLVER) != 0)
     {
-      char *result;
       cmd = 0;
       for (i = 0; resultflags2str[i].str; i++)
 	if ((resultflags & resultflags2str[i].flag) != 0)
@@ -2335,7 +2334,6 @@ testcase_write_mangled(Solver *solv, const char *dir, int resultflags, const cha
       result = testcase_solverresult(solv, resultflags);
       if (!strcmp(resultname, "<inline>"))
 	{
-	  int i;
 	  Strqueue rsq;
 	  strqueue_init(&rsq);
 	  strqueue_split(&rsq, result);
@@ -2375,32 +2373,29 @@ testcase_write_mangled(Solver *solv, const char *dir, int resultflags, const cha
       solv_free(result);
     }
 
-  cmd = strqueue_join(&sq);
+  result = strqueue_join(&sq);
+  strqueue_free(&sq);
   out = pool_tmpjoin(pool, dir, "/", testcasename);
   if (!(fp = fopen(out, "w")))
     {
       pool_error(solv->pool, 0, "testcase_write: could not open '%s' for writing", out);
-      solv_free(cmd);
-      strqueue_free(&sq);
+      solv_free(result);
       return 0;
     }
-  if (*cmd && fwrite(cmd, strlen(cmd), 1, fp) != 1)
+  if (*result && fwrite(result, strlen(result), 1, fp) != 1)
     {
       pool_error(solv->pool, 0, "testcase_write: write error");
-      solv_free(cmd);
-      strqueue_free(&sq);
+      solv_free(result);
       fclose(fp);
       return 0;
     }
   if (fclose(fp))
     {
       pool_error(solv->pool, 0, "testcase_write: write error");
-      solv_free(cmd);
-      strqueue_free(&sq);
+      solv_free(result);
       return 0;
     }
-  solv_free(cmd);
-  strqueue_free(&sq);
+  solv_free(result);
   return 1;
 }
 
