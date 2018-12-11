@@ -1505,6 +1505,7 @@ pool_debug(Pool *pool, int type, const char *format, ...)
         vprintf(format, args);
       else
         vfprintf(stderr, format, args);
+      va_end(args);
       return;
     }
   vsnprintf(buf, sizeof(buf), format, args);
