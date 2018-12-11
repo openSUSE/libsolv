@@ -208,6 +208,7 @@ read_plaindir_repo(Repo *repo, const char *dir)
 	repodata_set_location(data, p, 0, 0, bp[0] == '.' && bp[1] == '/' ? bp + 2 : bp);
       solv_free(rpm);
     }
+  solv_free(buf);
   fclose(fp);
   while (waitpid(pid, &wstatus, 0) == -1)
     {
