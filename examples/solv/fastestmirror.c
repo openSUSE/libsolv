@@ -68,7 +68,11 @@ findfastest(char **urls, int nurls)
 	  socks[i] = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
 	  if (socks[i] >= 0)
 	    {
-	      fcntl(socks[i], F_SETFL, O_NONBLOCK);
+	      if (fcntl(socks[i], F_SETFL, O_NONBLOCK) == -1)
+            {
+		      close(socks[i]);
+		      socks[i] = -1;
+            }
 	      if (connect(socks[i], result->ai_addr, result->ai_addrlen) == -1)
 		{
 		  if (errno != EINPROGRESS)
