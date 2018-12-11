@@ -1939,8 +1939,8 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
   if (fread(lead, 96 + 16, 1, fp) != 1 || getu32(lead) != 0xedabeedb)
     {
       pool_error(pool, -1, "%s: not a rpm", rpm);
-      solv_chksum_free(leadsigchksumh, NULL);
-      solv_chksum_free(chksumh, NULL);
+      solv_chksum_free(leadsigchksumh, 0);
+      solv_chksum_free(chksumh, 0);
       fclose(fp);
       return 0;
     }
@@ -1953,16 +1953,16 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
   if (lead[78] != 0 || lead[79] != 5)
     {
       pool_error(pool, -1, "%s: not a rpm v5 header", rpm);
-      solv_chksum_free(leadsigchksumh, NULL);
-      solv_chksum_free(chksumh, NULL);
+      solv_chksum_free(leadsigchksumh, 0);
+      solv_chksum_free(chksumh, 0);
       fclose(fp);
       return 0;
     }
   if (getu32(lead + 96) != 0x8eade801)
     {
       pool_error(pool, -1, "%s: bad signature header", rpm);
-      solv_chksum_free(leadsigchksumh, NULL);
-      solv_chksum_free(chksumh, NULL);
+      solv_chksum_free(leadsigchksumh, 0);
+      solv_chksum_free(chksumh, 0);
       fclose(fp);
       return 0;
     }
@@ -1971,8 +1971,8 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
   if (sigcnt >= MAX_SIG_CNT || sigdsize >= MAX_SIG_DSIZE)
     {
       pool_error(pool, -1, "%s: bad signature header", rpm);
-      solv_chksum_free(leadsigchksumh, NULL);
-      solv_chksum_free(chksumh, NULL);
+      solv_chksum_free(leadsigchksumh, 0);
+      solv_chksum_free(chksumh, 0);
       fclose(fp);
       return 0;
     }
@@ -1983,8 +1983,8 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
     {
       if (!headfromfp(&state, rpm, fp, lead + 96, sigcnt, sigdsize, sigpad, chksumh, leadsigchksumh))
 	{
-      solv_chksum_free(leadsigchksumh, NULL);
-      solv_chksum_free(chksumh, NULL);
+      solv_chksum_free(leadsigchksumh, 0);
+      solv_chksum_free(chksumh, 0);
 	  fclose(fp);
 	  return 0;
 	}
@@ -2024,8 +2024,8 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
 	  if (fread(lead, l, 1, fp) != 1)
 	    {
 	      pool_error(pool, -1, "%s: unexpected EOF", rpm);
-          solv_chksum_free(leadsigchksumh, NULL);
-          solv_chksum_free(chksumh, NULL);
+	      solv_chksum_free(leadsigchksumh, 0);
+	      solv_chksum_free(chksumh, 0);
 	      fclose(fp);
 	      return 0;
 	    }
@@ -2046,7 +2046,7 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
   if (fread(lead, 16, 1, fp) != 1)
     {
       pool_error(pool, -1, "%s: unexpected EOF", rpm);
-      solv_chksum_free(chksumh, NULL);
+      solv_chksum_free(chksumh, 0);
       fclose(fp);
       return 0;
     }
@@ -2055,7 +2055,7 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
   if (getu32(lead) != 0x8eade801)
     {
       pool_error(pool, -1, "%s: bad header", rpm);
-      solv_chksum_free(chksumh, NULL);
+      solv_chksum_free(chksumh, 0);
       fclose(fp);
       return 0;
     }
@@ -2064,7 +2064,7 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
   if (sigcnt >= MAX_HDR_CNT || sigdsize >= MAX_HDR_DSIZE)
     {
       pool_error(pool, -1, "%s: bad header", rpm);
-      solv_chksum_free(chksumh, NULL);
+      solv_chksum_free(chksumh, 0);
       fclose(fp);
       return 0;
     }
@@ -2072,7 +2072,7 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
 
   if (!headfromfp(&state, rpm, fp, lead, sigcnt, sigdsize, 0, chksumh, 0))
     {
-      solv_chksum_free(chksumh, NULL);
+      solv_chksum_free(chksumh, 0);
       fclose(fp);
       return 0;
     }
