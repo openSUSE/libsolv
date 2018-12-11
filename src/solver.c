@@ -1160,6 +1160,15 @@ reorder_dq_for_future_installed(Solver *solv, int level, Queue *dq)
 /*-------------------------------------------------------------------
  *
  * branch handling
+ *
+ * format is:
+ *   [ -p1 p2 p3 .. pn  opt_pkg opt_data size level ]
+ *
+ * pkgs are negative if we tried them (to prevent inifinite recursion)
+ * opt_pkg:  recommends: package with the recommends
+ *           rule: 0
+ * opt_data: recommends: depid
+ *           rule: ruleid
  */
 
 static void
@@ -2345,7 +2354,7 @@ resolve_weak(Solver *solv, int level, int disablerules, Queue *dq, Queue *dqs, i
 	    policy_filter_unwanted(solv, dq, POLICY_MODE_CHOOSE);
 	  /* if we have multiple candidates we open a branch */
 	  if (dq->count > 1)
-	      createbranch(solv, level, dq, s - pool->solvables, rec);
+	    createbranch(solv, level, dq, s - pool->solvables, rec);
 	  p = dq->elements[0];
 	  POOL_DEBUG(SOLV_DEBUG_POLICY, "installing recommended %s\n", pool_solvid2str(pool, p));
 	  olevel = level;
@@ -2705,7 +2714,7 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	      if (lastsi >= 0)
 		{
 		  /* we have a recommended package that could not be installed */
-		  /* take it if our current selection is not recommended */
+		  /* find current selection and take new one if it is not recommended */
 		  for (i = starti; i < endi - 4; i++)
 		    {
 		      p = -solv->branches.elements[i];
