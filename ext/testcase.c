@@ -2365,6 +2365,7 @@ testcase_write_mangled(Solver *solv, const char *dir, int resultflags, const cha
 	  if (fclose(fp))
 	    {
 	      pool_error(solv->pool, 0, "testcase_write: write error");
+	      solv_free(result);
 	      strqueue_free(&sq);
 	      return 0;
 	    }
@@ -2377,12 +2378,14 @@ testcase_write_mangled(Solver *solv, const char *dir, int resultflags, const cha
   if (!(fp = fopen(out, "w")))
     {
       pool_error(solv->pool, 0, "testcase_write: could not open '%s' for writing", out);
+      solv_free(cmd);
       strqueue_free(&sq);
       return 0;
     }
   if (*cmd && fwrite(cmd, strlen(cmd), 1, fp) != 1)
     {
       pool_error(solv->pool, 0, "testcase_write: write error");
+      solv_free(cmd);
       strqueue_free(&sq);
       fclose(fp);
       return 0;
@@ -2390,6 +2393,7 @@ testcase_write_mangled(Solver *solv, const char *dir, int resultflags, const cha
   if (fclose(fp))
     {
       pool_error(solv->pool, 0, "testcase_write: write error");
+      solv_free(cmd);
       strqueue_free(&sq);
       return 0;
     }
