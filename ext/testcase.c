@@ -576,6 +576,8 @@ testcase_str2dep_complex(Pool *pool, const char **sp, int relop)
   Id flags, id, id2, namespaceid = 0;
   struct oplist *op;
 
+  if (!s)
+    return 0;
   while (*s == ' ' || *s == '\t')
     s++;
   if (!strncmp(s, "namespace:", 10))
@@ -2365,6 +2367,7 @@ testcase_write_mangled(Solver *solv, const char *dir, int resultflags, const cha
 	  if (fclose(fp))
 	    {
 	      pool_error(solv->pool, 0, "testcase_write: write error");
+	      solv_free(result);
 	      strqueue_free(&sq);
 	      return 0;
 	    }
@@ -2377,12 +2380,14 @@ testcase_write_mangled(Solver *solv, const char *dir, int resultflags, const cha
   if (!(fp = fopen(out, "w")))
     {
       pool_error(solv->pool, 0, "testcase_write: could not open '%s' for writing", out);
+      solv_free(cmd);
       strqueue_free(&sq);
       return 0;
     }
   if (*cmd && fwrite(cmd, strlen(cmd), 1, fp) != 1)
     {
       pool_error(solv->pool, 0, "testcase_write: write error");
+      solv_free(cmd);
       strqueue_free(&sq);
       fclose(fp);
       return 0;
@@ -2390,6 +2395,7 @@ testcase_write_mangled(Solver *solv, const char *dir, int resultflags, const cha
   if (fclose(fp))
     {
       pool_error(solv->pool, 0, "testcase_write: write error");
+      solv_free(cmd);
       strqueue_free(&sq);
       return 0;
     }
@@ -2789,7 +2795,7 @@ testcase_read(Pool *pool, FILE *fp, const char *testcase, Queue *job, char **res
 	{
 	  int i = strlen(pieces[1]);
 	  s = strchr(pieces[1], '(');
-	  if (!s && pieces[1][i - 1] != ')')
+	  if (!s || pieces[1][i - 1] != ')')
 	    {
 	      pool_error(pool, 0, "testcase_read: bad namespace '%s'", pieces[1]);
 	    }

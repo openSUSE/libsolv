@@ -107,7 +107,7 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
 {
   struct parsedata *pd = xmlp->userdata;
   Pool *pool = pd->pool;
-  Solvable *s = pd->solvable;
+  Solvable *s;
 
   switch(state)
     {

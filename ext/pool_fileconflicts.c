@@ -590,7 +590,6 @@ findfileconflicts_alias_cb(void *cbdatav, const char *fn, struct filelistinfo *i
 
   if (!info->dirlen)
     return;
-  dp = fn + info->dirlen;
   if (info->diridx != cbdata->lastdiridx)
     {
       cbdata->lastdiridx = info->diridx;

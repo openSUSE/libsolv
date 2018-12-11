@@ -181,7 +181,7 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
             while (value)
 	      {
 		char *p = strchr(value, ',');
-		if (*p)
+		if (p)
 		  *p++ = 0;
 		if (*value)
 		  repodata_add_poolstr_array(pd->data, SOLVID_META, REPOSITORY_UPDATES, value);
