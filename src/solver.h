@@ -80,6 +80,10 @@ struct s_Solver {
   Id choicerules_end;
   Id *choicerules_ref;
 
+  Id recommendsrules;			/* rules from recommends pkg rules with disfavored literals */
+  Id recommendsrules_end;
+  Id *recommendsrules_info;		/* the original pkg rule rule */
+
   Id learntrules;			/* learnt rules, (end == nrules) */
 
   Map noupdate;				/* don't try to update these

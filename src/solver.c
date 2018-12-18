@@ -845,18 +845,19 @@ static void
 disable_recommendsrules(Solver *solv, Queue *weakq)
 {
   Pool *pool = solv->pool;
-  int i;
+  int i, rid;
   for (i = 0; i < weakq->count; i++)
     {
-      Rule *r;
-      if (!queue_contains(solv->recommendsruleq, weakq->elements[i]))
-	continue;
-      r = solv->rules + weakq->elements[i];
-      if (r->d >= 0)
+      rid = weakq->elements[i];
+      if ((rid >= solv->recommendsrules && rid < solv->recommendsrules_end) || queue_contains(solv->recommendsruleq, rid))
 	{
-	  POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, "disabling ");
-	  solver_printruleclass(solv, SOLV_DEBUG_UNSOLVABLE, r);
-	  solver_disablerule(solv, r);
+	  Rule *r = solv->rules + rid;
+	  if (r->d >= 0)
+	    {
+	      POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, "disabling ");
+	      solver_printruleclass(solv, SOLV_DEBUG_UNSOLVABLE, r);
+	      solver_disablerule(solv, r);
+	    }
 	}
     }
 }
@@ -904,6 +905,18 @@ disable_weakrules(Solver *solv, Queue *weakq)
   for (i = 0; i < weakq->count; i++)
     if (weakq->elements[i] > lastweak)
       lastweak = weakq->elements[i];
+  if (lastweak >= solv->recommendsrules && lastweak < solv->recommendsrules_end)
+    {
+      lastweak = 0;
+      for (i = 0; i < weakq->count; i++)
+	if (weakq->elements[i] < solv->recommendsrules && weakq->elements[i] > lastweak)
+	  lastweak = weakq->elements[i];
+      if (lastweak < solv->pkgrules_end)
+	{
+	  disable_recommendsrules(solv, weakq);
+	  return;
+	}
+    }
   if (lastweak < solv->pkgrules_end && solv->strongrecommends && solv->recommendsruleq && queue_contains(solv->recommendsruleq, lastweak))
     {
       disable_recommendsrules(solv, weakq);
@@ -1397,6 +1410,7 @@ solver_free(Solver *solv)
   solv_free(solv->choicerules_ref);
   solv_free(solv->bestrules_pkg);
   solv_free(solv->yumobsrules_info);
+  solv_free(solv->recommendsrules_info);
   solv_free(solv->instbuddy);
   solv_free(solv);
 }
@@ -3129,10 +3143,6 @@ addedmap2deduceq(Solver *solv, Map *addedmap)
   for (; i < pool->nsolvables; i++)
     if (MAPTST(addedmap, i))
       queue_push(&solv->addedmap_deduceq, i);
-  j = 0;
-  for (i = 2; i < pool->nsolvables; i++)
-    if (MAPTST(addedmap, i))
-      j++;
 }
 
 static void
@@ -3284,6 +3294,7 @@ solver_solve(Solver *solv, Queue *job)
   queue_empty(&solv->ruleassertions);
   solv->bestrules_pkg = solv_free(solv->bestrules_pkg);
   solv->yumobsrules_info = solv_free(solv->yumobsrules_info);
+  solv->recommendsrules_info = solv_free(solv->recommendsrules_info);
   solv->choicerules_ref = solv_free(solv->choicerules_ref);
   if (solv->noupdate.size)
     map_empty(&solv->noupdate);
@@ -3354,9 +3365,9 @@ solver_solve(Solver *solv, Queue *job)
    */
   initialnrules = solv->pkgrules_end ? solv->pkgrules_end : 1;
   if (initialnrules > 1)
-    deduceq2addedmap(solv, &addedmap);
+    deduceq2addedmap(solv, &addedmap);		/* also enables all pkg rules */
   if (solv->nrules != initialnrules)
-    solver_shrinkrules(solv, initialnrules);
+    solver_shrinkrules(solv, initialnrules);	/* shrink to just pkg rules */
   solv->lastpkgrule = 0;
   solv->pkgrules_end = 0;
 
@@ -3907,6 +3918,11 @@ solver_solve(Solver *solv, Queue *job)
     solver_addyumobsrules(solv);
   else
     solv->yumobsrules = solv->yumobsrules_end = solv->nrules;
+
+  if (solv->havedisfavored && solv->strongrecommends)
+    solver_addrecommendsrules(solv);
+  else
+    solv->recommendsrules = solv->recommendsrules_end = solv->nrules;
 
   if (1)
     solver_addchoicerules(solv);
@@ -4776,6 +4792,8 @@ solver_alternative2str(Solver *solv, int type, Id id, Id from)
       Id depfrom, depto, dep;
       char buf[64];
       if (solver_ruleclass(solv, id) == SOLVER_RULE_CHOICE)
+	id = solver_rule2pkgrule(solv, id);
+      if (solver_ruleclass(solv, id) == SOLVER_RULE_RECOMMENDS)
 	id = solver_rule2pkgrule(solv, id);
       rtype = solver_ruleinfo(solv, id, &depfrom, &depto, &dep);
       if ((rtype & SOLVER_RULE_TYPEMASK) == SOLVER_RULE_JOB)

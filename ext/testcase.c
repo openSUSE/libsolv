@@ -2025,6 +2025,8 @@ testcase_solverresult(Solver *solv, int resultflags)
 	      /* map choice rules back to pkg rules */
 	      if (solver_ruleclass(solv, id) == SOLVER_RULE_CHOICE)
 		id = solver_rule2pkgrule(solv, id);
+	      if (solver_ruleclass(solv, id) == SOLVER_RULE_RECOMMENDS)
+		id = solver_rule2pkgrule(solv, id);
 	      solver_allruleinfos(solv, id, &rq);
 	      for (i = 0; i < rq.count; i += 4)
 		{

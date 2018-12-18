@@ -2740,13 +2740,11 @@ solver_ruleinfo(Solver *solv, Id rid, Id *fromp, Id *top, Id *depp)
       return SOLVER_RULE_YUMOBS;
     }
   if (rid >= solv->choicerules && rid < solv->choicerules_end)
-    {
-      return SOLVER_RULE_CHOICE;
-    }
+    return SOLVER_RULE_CHOICE;
+  if (rid >= solv->recommendsrules && rid < solv->recommendsrules_end)
+    return SOLVER_RULE_RECOMMENDS;
   if (rid >= solv->learntrules)
-    {
-      return SOLVER_RULE_LEARNT;
-    }
+    return SOLVER_RULE_LEARNT;
   return SOLVER_RULE_UNKNOWN;
 }
 
@@ -2773,6 +2771,8 @@ solver_ruleclass(Solver *solv, Id rid)
     return SOLVER_RULE_YUMOBS;
   if (rid >= solv->choicerules && rid < solv->choicerules_end)
     return SOLVER_RULE_CHOICE;
+  if (rid >= solv->recommendsrules && rid < solv->recommendsrules_end)
+    return SOLVER_RULE_RECOMMENDS;
   if (rid >= solv->learntrules && rid < solv->nrules)
     return SOLVER_RULE_LEARNT;
   return SOLVER_RULE_UNKNOWN;
@@ -2835,6 +2835,8 @@ solver_rule2pkgrule(Solver *solv, Id rid)
 {
   if (rid >= solv->choicerules && rid < solv->choicerules_end)
     return solv->choicerules_ref[rid - solv->choicerules];
+  if (rid >= solv->recommendsrules && rid < solv->recommendsrules_end)
+    return solv->recommendsrules_info[rid - solv->recommendsrules];
   return 0;
 }
 
@@ -3632,6 +3634,54 @@ for (j = 0; j < qq.count; j++)
   queue_free(&qo);
   solv->yumobsrules_end = solv->nrules;
   POOL_DEBUG(SOLV_DEBUG_STATS, "yumobs rule creation took %d ms\n", solv_timems(now));
+}
+
+/* recommendsrules are a copy of some recommends package rule but
+ * with some disfavored literals removed */
+void
+solver_addrecommendsrules(Solver *solv)
+{
+  Pool *pool = solv->pool;
+  int i, havedis, havepos;
+  Id p, pp;
+  Queue q, infoq;
+
+  solv->recommendsrules = solv->nrules;
+  queue_init(&q);
+  queue_init(&infoq);
+  for (i = 0; i < solv->recommendsruleq->count; i++)
+    {
+      int rid = solv->recommendsruleq->elements[i];
+      Rule *r = solv->rules + rid;
+      queue_empty(&q);
+      havedis = havepos = 0;
+      FOR_RULELITERALS(p, pp, r)
+	{
+	  if (p > 0 && solv->favormap[p] < 0)
+	    havedis = 1;
+	  else
+	    {
+	      if (p > 0)
+		havepos = 1;
+	      queue_push(&q, p);
+	    }
+	}
+      if (!havedis)
+	continue;
+      solver_disablerule(solv, r);
+      if (!havepos || q.count < 2)
+	continue;
+      if (q.count == 2)
+	solver_addrule(solv, q.elements[0], q.elements[1], 0);
+      else
+	solver_addrule(solv, q.elements[0], 0, pool_ids2whatprovides(pool, q.elements + 1, q.count - 1));
+      queue_push(&infoq, rid);
+    }
+  if (infoq.count)
+    solv->recommendsrules_info = solv_memdup2(infoq.elements, infoq.count, sizeof(Id));
+  queue_free(&infoq);
+  queue_free(&q);
+  solv->recommendsrules_end = solv->nrules;
 }
 
 void
