@@ -894,6 +894,29 @@ analyze_unsolvable_rule(Solver *solv, Rule *r, Queue *weakq, Map *rseen)
     solver_recordproblem(solv, why);
 }
 
+/* fix a problem by disabling one or more weak rules */
+static void
+disable_weakrules(Solver *solv, Queue *weakq)
+{
+  Pool *pool = solv->pool;
+  int i;
+  Id lastweak = 0;
+  for (i = 0; i < weakq->count; i++)
+    if (weakq->elements[i] > lastweak)
+      lastweak = weakq->elements[i];
+  if (lastweak < solv->pkgrules_end && solv->strongrecommends && solv->recommendsruleq && queue_contains(solv->recommendsruleq, lastweak))
+    {
+      disable_recommendsrules(solv, weakq);
+      return;
+    }
+  POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, "disabling ");
+  solver_printruleclass(solv, SOLV_DEBUG_UNSOLVABLE, solv->rules + lastweak);
+  /* choice rules need special handling */
+  if (lastweak >= solv->choicerules && lastweak < solv->choicerules_end)
+    solver_disablechoicerules(solv, solv->rules + lastweak);
+  else
+    solver_fixproblem(solv, lastweak);
+}
 
 /*-------------------------------------------------------------------
  *
@@ -924,7 +947,7 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
   Map rseen;
   Queue weakq;
   Id pp, v, vv, why;
-  int i, idx;
+  int idx;
   Id *decisionmap = solv->decisionmap;
   int oldproblemcount;
   int oldlearntpoolcount;
@@ -981,28 +1004,12 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
 
   if (weakq.count)
     {
-      Id lastweak;
       /* revert problems */
       solv->problems.count = oldproblemcount;
       solv->learnt_pool.count = oldlearntpoolcount;
-      /* find last weak */
-      lastweak = 0;
-      for (i = 0; i < weakq.count; i++)
-	if (weakq.elements[i] > lastweak)
-	  lastweak = weakq.elements[i];
-      if (lastweak < solv->pkgrules_end && solv->strongrecommends && solv->recommendsruleq && queue_contains(solv->recommendsruleq, lastweak))
-	{
-	  disable_recommendsrules(solv, &weakq);
-	  queue_free(&weakq);
-	  solver_reset(solv);
-	  return 0;
-	}
+      /* disable some weak rules */
+      disable_weakrules(solv, &weakq);
       queue_free(&weakq);
-      POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, "disabling ");
-      solver_printruleclass(solv, SOLV_DEBUG_UNSOLVABLE, solv->rules + lastweak);
-      if (lastweak >= solv->choicerules && lastweak < solv->choicerules_end)
-	solver_disablechoicerules(solv, solv->rules + lastweak);
-      solver_fixproblem(solv, lastweak);
       solver_reset(solv);
       return 0;
     }

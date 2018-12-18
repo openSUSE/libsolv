@@ -3177,9 +3177,9 @@ solver_addchoicerules(Solver *solv)
   POOL_DEBUG(SOLV_DEBUG_STATS, "choice rule creation took %d ms\n", solv_timems(now));
 }
 
-/* called when a choice rule is disabled by analyze_unsolvable. We also
- * have to disable all other choice rules so that the best packages get
- * picked */
+/* called when a choice rule needs to be disabled by analyze_unsolvable.
+ * We also have to disable all other choice rules so that the best packages
+ * get picked */
 void
 solver_disablechoicerules(Solver *solv, Rule *r)
 {
@@ -3188,6 +3188,7 @@ solver_disablechoicerules(Solver *solv, Rule *r)
   Map m;
   Rule *or;
 
+  solver_disablerule(solv, r);
   or = solv->rules + solv->choicerules_ref[(r - solv->rules) - solv->choicerules];
   map_init(&m, pool->nsolvables);
   FOR_RULELITERALS(p, pp, or)
@@ -3201,7 +3202,7 @@ solver_disablechoicerules(Solver *solv, Rule *r)
       r = solv->rules + rid;
       if (r->d < 0)
 	continue;
-      or = solv->rules + solv->choicerules_ref[(r - solv->rules) - solv->choicerules];
+      or = solv->rules + solv->choicerules_ref[rid - solv->choicerules];
       FOR_RULELITERALS(p, pp, or)
         if (p > 0 && MAPTST(&m, p))
 	  break;
@@ -3442,7 +3443,7 @@ find_obsolete_group(Solver *solv, Id obs, Queue *q)
 	    continue;
 	  if ((pool->obsoleteusescolors || pool->implicitobsoleteusescolors) && !pool_colormatch(pool, s2, os))
 	    continue;
-	  obsp2 = os->repo->idarraydata + os->obsoletes; 
+	  obsp2 = os->repo->idarraydata + os->obsoletes;
 	  while ((obs2 = *obsp2++) != 0)
 	    if (obs2 == obs)
 	      break;
@@ -3460,7 +3461,7 @@ find_obsolete_group(Solver *solv, Id obs, Queue *q)
 	    continue;
 	  if ((pool->obsoleteusescolors || pool->implicitobsoleteusescolors) && !pool_colormatch(pool, s2, os))
 	    continue;
-	  obsp2 = os->repo->idarraydata + os->obsoletes; 
+	  obsp2 = os->repo->idarraydata + os->obsoletes;
 	  while ((obs2 = *obsp2++) != 0)
 	    if (obs2 == obs)
 	      break;
@@ -3588,7 +3589,7 @@ for (j = 0; j < qq.count; j++)
   else
     printf("%s\n", pool_solvid2str(pool, qq.elements[j]));
 #endif
-  
+
       if (!qq.count)
 	continue;
       /* at least two goups, build rules */
@@ -3696,7 +3697,7 @@ solver_check_brokenorphanrules(Solver *solv, Queue *dq)
   Pool *pool = solv->pool;
   int i;
   Id l, pp;
-  
+
   queue_empty(dq);
   if (!solv->brokenorphanrules)
     return;
