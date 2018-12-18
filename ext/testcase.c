@@ -1818,6 +1818,7 @@ static struct rclass2str {
   { SOLVER_RULE_LEARNT, "learnt" },
   { SOLVER_RULE_BEST, "best" },
   { SOLVER_RULE_YUMOBS, "yumobs" },
+  { SOLVER_RULE_RECOMMENDS, "recommends" },
   { 0, 0 }
 };
 
