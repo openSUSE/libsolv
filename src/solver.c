@@ -1407,8 +1407,8 @@ solver_free(Solver *solv)
   solv_free(solv->obsoletes);
   solv_free(solv->obsoletes_data);
   solv_free(solv->specialupdaters);
-  solv_free(solv->choicerules_ref);
-  solv_free(solv->bestrules_pkg);
+  solv_free(solv->choicerules_info);
+  solv_free(solv->bestrules_info);
   solv_free(solv->yumobsrules_info);
   solv_free(solv->recommendsrules_info);
   solv_free(solv->instbuddy);
@@ -3292,10 +3292,10 @@ solver_solve(Solver *solv, Queue *job)
   queuep_free(&solv->update_targets);
   queuep_free(&solv->cleandeps_updatepkgs);
   queue_empty(&solv->ruleassertions);
-  solv->bestrules_pkg = solv_free(solv->bestrules_pkg);
+  solv->bestrules_info = solv_free(solv->bestrules_info);
   solv->yumobsrules_info = solv_free(solv->yumobsrules_info);
   solv->recommendsrules_info = solv_free(solv->recommendsrules_info);
-  solv->choicerules_ref = solv_free(solv->choicerules_ref);
+  solv->choicerules_info = solv_free(solv->choicerules_info);
   if (solv->noupdate.size)
     map_empty(&solv->noupdate);
   map_zerosize(&solv->multiversion);

@@ -64,12 +64,12 @@ solver_disableproblem(Solver *solv, Id v)
     }
   v = -(v + 1);
   jp = solv->ruletojob.elements;
-  if (solv->bestrules_pkg)
+  if (solv->bestrules_info)
     {
       int ni = solv->bestrules_up - solv->bestrules;
       for (i = 0; i < ni; i++)
 	{
-	  int j = solv->bestrules_pkg[i];
+	  int j = solv->bestrules_info[i];
 	  if (j < 0 && jp[-j - solv->jobrules] == v)
 	    solver_disablerule(solv, solv->rules + solv->bestrules + i);
 	}
@@ -131,12 +131,12 @@ solver_enableproblem(Solver *solv, Id v)
     }
   v = -(v + 1);
   jp = solv->ruletojob.elements;
-  if (solv->bestrules_pkg)
+  if (solv->bestrules_info)
     {
       int ni = solv->bestrules_up - solv->bestrules;
       for (i = 0; i < ni; i++)
 	{
-	  int j = solv->bestrules_pkg[i];
+	  int j = solv->bestrules_info[i];
 	  if (j < 0 && jp[-j - solv->jobrules] == v)
 	    solver_enablerule(solv, solv->rules + solv->bestrules + i);
 	}
@@ -155,8 +155,8 @@ solver_ruletoproblem(Solver *solv, Id rid)
 {
   if (rid >= solv->jobrules && rid < solv->jobrules_end)
     rid = -(solv->ruletojob.elements[rid - solv->jobrules] + 1);
-  else if (rid >= solv->bestrules && rid < solv->bestrules_up && solv->bestrules_pkg[rid - solv->bestrules] < 0)
-    rid = -(solv->ruletojob.elements[-solv->bestrules_pkg[rid - solv->bestrules] - solv->jobrules] + 1);
+  else if (rid >= solv->bestrules && rid < solv->bestrules_up && solv->bestrules_info[rid - solv->bestrules] < 0)
+    rid = -(solv->ruletojob.elements[-solv->bestrules_info[rid - solv->bestrules] - solv->jobrules] + 1);
   else if (rid > solv->infarchrules && rid < solv->infarchrules_end)
     {
       Pool *pool = solv->pool;
@@ -252,13 +252,13 @@ solver_autouninstall(Solver *solv, int start)
 	    continue;
 	  if (pool->considered && !MAPTST(pool->considered, p))
 	    continue;	/* do not uninstalled disabled packages */
-	  if (solv->bestrules_pkg && solv->bestrules_end > solv->bestrules)
+	  if (solv->bestrules_info && solv->bestrules_end > solv->bestrules)
 	    {
 	      int j;
 	      for (j = start + 1; j < solv->problems.count - 1; j++)
 		{
 		  Id vv = solv->problems.elements[j];
-		  if (vv >= solv->bestrules && vv < solv->bestrules_end && solv->bestrules_pkg[vv - solv->bestrules] == p)
+		  if (vv >= solv->bestrules && vv < solv->bestrules_end && solv->bestrules_info[vv - solv->bestrules] == p)
 		    break;
 		}
 	      if (j < solv->problems.count - 1)
@@ -678,7 +678,7 @@ convertsolution(Solver *solv, Id why, Queue *solutionq)
 	if (p > 0 && solv->decisionmap[p] > 0)
 	  return;	/* false alarm */
       /* check update/feature rule */
-      p = solv->bestrules_pkg[why - solv->bestrules];
+      p = solv->bestrules_info[why - solv->bestrules];
       if (p < 0)
 	{
 	  /* install job */

@@ -70,7 +70,7 @@ struct s_Solver {
   Id bestrules;				/* rules from SOLVER_FORCEBEST */
   Id bestrules_up;			/* update rule part starts here*/
   Id bestrules_end;
-  Id *bestrules_pkg;
+  Id *bestrules_info;			/* < 0 : install rule, > 0 : pkg that needs to be updated */
 
   Id yumobsrules;			/* rules from yum obsoletes handling */
   Id yumobsrules_end;
@@ -78,7 +78,7 @@ struct s_Solver {
 
   Id choicerules;			/* choice rules (always weak) */
   Id choicerules_end;
-  Id *choicerules_ref;
+  Id *choicerules_info;			/* the rule we used to generate the choice rule */
 
   Id recommendsrules;			/* rules from recommends pkg rules with disfavored literals */
   Id recommendsrules_end;

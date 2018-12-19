@@ -1367,11 +1367,11 @@ solver_check_cleandeps_mistakes(Solver *solv)
 	  if (!r->p || r == fr || cleandeps_rule_is_true(solv, r))
 	    {
 	      /* update rule is true, check best rules */
-	      if (!solv->bestrules_pkg)
+	      if (!solv->bestrules_info)
 		continue;
 	      nj = solv->bestrules_end - solv->bestrules;
-	      for (j = 0; j < nj; j++)
-		if (solv->bestrules_pkg[j] == i)
+	      for (j = solv->bestrules_up - solv->bestrules; j < nj; j++)
+		if (solv->bestrules_info[j] == i)
 		  {
 		    r = solv->rules + solv->bestrules + j;
 		    if (!cleandeps_rule_is_true(solv, r))

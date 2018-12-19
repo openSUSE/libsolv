@@ -1463,12 +1463,12 @@ disableupdaterule(Solver *solv, Id p)
   r = solv->rules + solv->featurerules + (p - solv->installed->start);
   if (r->p && r->d >= 0)
     solver_disablerule(solv, r);
-  if (solv->bestrules_pkg)
+  if (solv->bestrules_info)
     {
       int i, ni;
       ni = solv->bestrules_end - solv->bestrules;
       for (i = solv->bestrules_up - solv->bestrules; i < ni; i++)
-	if (solv->bestrules_pkg[i] == p)
+	if (solv->bestrules_info[i] == p)
 	  solver_disablerule(solv, solv->rules + solv->bestrules + i);
     }
 }
@@ -1506,12 +1506,12 @@ reenableupdaterule(Solver *solv, Id p)
 	    }
 	}
     }
-  if (solv->bestrules_pkg)
+  if (solv->bestrules_info)
     {
       int i, ni;
       ni = solv->bestrules_end - solv->bestrules;
       for (i = solv->bestrules_up - solv->bestrules; i < ni; i++)
-	if (solv->bestrules_pkg[i] == p)
+	if (solv->bestrules_info[i] == p)
 	  solver_enablerule(solv, solv->rules + solv->bestrules + i);
     }
 }
@@ -2719,8 +2719,8 @@ solver_ruleinfo(Solver *solv, Id rid, Id *fromp, Id *top, Id *depp)
     }
   if (rid >= solv->bestrules && rid < solv->bestrules_end)
     {
-      if (fromp && solv->bestrules_pkg[rid - solv->bestrules] > 0)
-	*fromp = solv->bestrules_pkg[rid - solv->bestrules];
+      if (fromp && solv->bestrules_info[rid - solv->bestrules] > 0)
+	*fromp = solv->bestrules_info[rid - solv->bestrules];
       return SOLVER_RULE_BEST;
     }
   if (rid >= solv->yumobsrules && rid < solv->yumobsrules_end)
@@ -2834,7 +2834,7 @@ Id
 solver_rule2pkgrule(Solver *solv, Id rid)
 {
   if (rid >= solv->choicerules && rid < solv->choicerules_end)
-    return solv->choicerules_ref[rid - solv->choicerules];
+    return solv->choicerules_info[rid - solv->choicerules];
   if (rid >= solv->recommendsrules && rid < solv->recommendsrules_end)
     return solv->recommendsrules_info[rid - solv->recommendsrules];
   return 0;
@@ -2952,7 +2952,7 @@ solver_addchoicerules(Solver *solv)
   Pool *pool = solv->pool;
   Map m, mneg;
   Rule *r;
-  Queue q, qi, qcheck;
+  Queue q, qi, qcheck, infoq;
   int i, j, rid, havechoice;
   Id p, d, pp;
   Id p2, pp2;
@@ -2968,10 +2968,11 @@ solver_addchoicerules(Solver *solv)
       return;
     }
   now = solv_timems(0);
-  solv->choicerules_ref = solv_calloc(solv->pkgrules_end, sizeof(Id));
+  solv->choicerules_info = solv_calloc(solv->pkgrules_end, sizeof(Id));
   queue_init(&q);
   queue_init(&qi);
   queue_init(&qcheck);
+  queue_init(&infoq);
   map_init(&m, pool->nsolvables);
   map_init(&mneg, pool->nsolvables);
   /* set up negative assertion map from infarch and dup rules */
@@ -3160,7 +3161,7 @@ solver_addchoicerules(Solver *solv)
 
       solver_addrule(solv, r->p, 0, d);
       queue_push(&solv->weakruleq, solv->nrules - 1);
-      solv->choicerules_ref[solv->nrules - 1 - solv->choicerules] = rid;
+      queue_push(&infoq, rid);
 #if 0
       printf("OLD ");
       solver_printrule(solv, SOLV_DEBUG_RESULT, solv->rules + rid);
@@ -3168,14 +3169,15 @@ solver_addchoicerules(Solver *solv)
       solver_printrule(solv, SOLV_DEBUG_RESULT, solv->rules + solv->nrules - 1);
 #endif
     }
+  if (infoq.count)
+    solv->choicerules_info = solv_memdup2(infoq.elements, infoq.count, sizeof(Id));
   queue_free(&q);
   queue_free(&qi);
   queue_free(&qcheck);
+  queue_free(&infoq);
   map_free(&m);
   map_free(&mneg);
   solv->choicerules_end = solv->nrules;
-  /* shrink choicerules_ref */
-  solv->choicerules_ref = solv_realloc2(solv->choicerules_ref, solv->choicerules_end - solv->choicerules, sizeof(Id));
   POOL_DEBUG(SOLV_DEBUG_STATS, "choice rule creation took %d ms\n", solv_timems(now));
 }
 
@@ -3191,7 +3193,7 @@ solver_disablechoicerules(Solver *solv, Rule *r)
   Rule *or;
 
   solver_disablerule(solv, r);
-  or = solv->rules + solv->choicerules_ref[(r - solv->rules) - solv->choicerules];
+  or = solv->rules + solv->choicerules_info[(r - solv->rules) - solv->choicerules];
   map_init(&m, pool->nsolvables);
   FOR_RULELITERALS(p, pp, or)
     if (p > 0)
@@ -3204,7 +3206,7 @@ solver_disablechoicerules(Solver *solv, Rule *r)
       r = solv->rules + rid;
       if (r->d < 0)
 	continue;
-      or = solv->rules + solv->choicerules_ref[rid - solv->choicerules];
+      or = solv->rules + solv->choicerules_info[rid - solv->choicerules];
       FOR_RULELITERALS(p, pp, or)
         if (p > 0 && MAPTST(&m, p))
 	  break;
@@ -3253,13 +3255,13 @@ solver_addbestrules(Solver *solv, int havebestinstalljobs)
   Repo *installed = solv->installed;
   Queue q, q2;
   Rule *r;
-  Queue r2pkg;
+  Queue infoq;
   int i, oldcnt;
 
   solv->bestrules = solv->nrules;
   queue_init(&q);
   queue_init(&q2);
-  queue_init(&r2pkg);
+  queue_init(&infoq);
 
   if (havebestinstalljobs)
     {
@@ -3300,7 +3302,7 @@ solver_addbestrules(Solver *solv, int havebestinstalljobs)
 		    solver_addrule(solv, p2, 0, pool_queuetowhatprovides(pool, &q));
 		  if ((how & SOLVER_WEAK) != 0)
 		    queue_push(&solv->weakruleq, solv->nrules - 1);
-		  queue_push(&r2pkg, -(solv->jobrules + j));
+		  queue_push(&infoq, -(solv->jobrules + j));
 		}
 	    }
 	}
@@ -3390,7 +3392,7 @@ solver_addbestrules(Solver *solv, int havebestinstalljobs)
 		    solver_addrule(solv, -p2, d, 0);
 		  else
 		    solver_addrule(solv, -p2, 0, -d);
-		  queue_push(&r2pkg, p);
+		  queue_push(&infoq, p);
 		}
 	      for (i = 0; i < q.count; i++)
 		MAPCLR(&m, q.elements[i]);
@@ -3401,16 +3403,16 @@ solver_addbestrules(Solver *solv, int havebestinstalljobs)
 	    solver_addrule(solv, p2, q.count ? q.elements[0] : 0, 0);
 	  else
 	    solver_addrule(solv, p2, 0, pool_queuetowhatprovides(pool, &q));
-	  queue_push(&r2pkg, p);
+	  queue_push(&infoq, p);
 	}
       map_free(&m);
     }
-  if (r2pkg.count)
-    solv->bestrules_pkg = solv_memdup2(r2pkg.elements, r2pkg.count, sizeof(Id));
+  if (infoq.count)
+    solv->bestrules_info = solv_memdup2(infoq.elements, infoq.count, sizeof(Id));
   solv->bestrules_end = solv->nrules;
   queue_free(&q);
   queue_free(&q2);
-  queue_free(&r2pkg);
+  queue_free(&infoq);
 }
 
 
@@ -3527,7 +3529,7 @@ solver_addyumobsrules(Solver *solv)
   Repo *installed = solv->installed;
   Id p, op, *opp;
   Solvable *s;
-  Queue qo, qq, yumobsinfoq;
+  Queue qo, qq, infoq;
   int i, j, k;
   unsigned int now;
 
@@ -3573,7 +3575,7 @@ printf("checking yumobs for %s\n", pool_solvable2str(pool, s));
       queue_free(&qo);
       return;
     }
-  queue_init(&yumobsinfoq);
+  queue_init(&infoq);
   queue_init(&qq);
   for (i = 0; i < qo.count; i++)
     {
@@ -3620,16 +3622,16 @@ for (j = 0; j < qq.count; j++)
 		    solver_addrule(solv, -p, qq.elements[groupstart], 0);
 		  else
 		    solver_addrule(solv, -p, 0, pool_ids2whatprovides(pool, qq.elements + groupstart, k - groupstart));
-		  queue_push(&yumobsinfoq, qo.elements[i]);
+		  queue_push(&infoq, qo.elements[i]);
 		}
 	      groupstart = k + 1;
 	      groupk++;
 	    }
 	}
     }
-  if (yumobsinfoq.count)
-    solv->yumobsrules_info = solv_memdup2(yumobsinfoq.elements, yumobsinfoq.count, sizeof(Id));
-  queue_free(&yumobsinfoq);
+  if (infoq.count)
+    solv->yumobsrules_info = solv_memdup2(infoq.elements, infoq.count, sizeof(Id));
+  queue_free(&infoq);
   queue_free(&qq);
   queue_free(&qo);
   solv->yumobsrules_end = solv->nrules;
