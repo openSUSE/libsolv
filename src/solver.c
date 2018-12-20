@@ -2482,6 +2482,7 @@ resolve_orphaned(Solver *solv, int level, int disablerules, Queue *dq, int *reru
 		break;
 	    }
 	  *rerunp = 1;
+	  return level;
 	}
     }
   return level;
@@ -3929,11 +3930,6 @@ solver_solve(Solver *solv, Queue *job)
   else
     solv->choicerules = solv->choicerules_end = solv->nrules;
 
-  if (0)
-    {
-      for (i = solv->featurerules; i < solv->nrules; i++)
-        solver_printruleclass(solv, SOLV_DEBUG_RESULT, solv->rules + i);
-    }
   /* all rules created
    * --------------------------------------------------------------
    * prepare for solving
