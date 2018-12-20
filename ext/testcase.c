@@ -966,11 +966,101 @@ str2jobflags(Pool *pool, char *s)	/* modifies the string */
   return jobflags;
 }
 
+static Id
+testcase_str2jobsel(Pool *pool, const char *caller, char **pieces, int npieces, Id *whatp)
+{
+  Id job, what;
+  if (!strcmp(pieces[0], "pkg") && npieces == 2)
+    {
+      job = SOLVER_SOLVABLE;
+      what = testcase_str2solvid(pool, pieces[1]);
+      if (!what)
+	return pool_error(pool, -1, "%s: unknown package '%s'", caller, pieces[1]);
+    }
+  else if (!strcmp(pieces[0], "name") || !strcmp(pieces[0], "provides"))
+    {
+      /* join em again for dep2str... */
+      char *sp;
+      for (sp = pieces[1]; sp < pieces[npieces - 1]; sp++)
+	if (*sp == 0)
+	  *sp = ' ';
+      what = 0;
+      if (pieces[0][0] == 'p' && strncmp(pieces[1], "namespace:", 10) == 0)
+	{
+	  char *spe = strchr(pieces[1], '(');
+	  int l = strlen(pieces[1]);
+	  if (spe && pieces[1][l - 1] == ')')
+	    {
+	      /* special namespace provides */
+	      if (strcmp(spe, "(<NULL>)") != 0)
+		{
+		  pieces[1][l - 1] = 0;
+		  what = testcase_str2dep(pool, spe + 1);
+		  pieces[1][l - 1] = ')';
+		}
+	      what = pool_rel2id(pool, pool_strn2id(pool, pieces[1], spe - pieces[1], 1), what, REL_NAMESPACE, 1);
+	    }
+	}
+      if (!what)
+        what = testcase_str2dep(pool, pieces[1]);
+      if (pieces[0][0] == 'n')
+	job = SOLVER_SOLVABLE_NAME;
+      else
+	job = SOLVER_SOLVABLE_PROVIDES;
+    }
+  else if (!strcmp(pieces[0], "oneof"))
+    {
+      Queue q;
+      job = SOLVER_SOLVABLE_ONE_OF;
+      queue_init(&q);
+      if (npieces > 1 && strcmp(pieces[1], "nothing") != 0)
+	{
+	  int i;
+	  for (i = 1; i < npieces; i++)
+	    {
+	      Id p = testcase_str2solvid(pool, pieces[i]);
+	      if (!p)
+		{
+		  queue_free(&q);
+		  return pool_error(pool, -1, "%s: unknown package '%s'", caller, pieces[i]);
+		}
+	      queue_push(&q, p);
+	    }
+	}
+      what = pool_queuetowhatprovides(pool, &q);
+      queue_free(&q);
+    }
+  else if (!strcmp(pieces[0], "repo") && npieces == 2)
+    {
+      Repo *repo = testcase_str2repo(pool, pieces[1]);
+      if (!repo)
+	return pool_error(pool, -1, "%s: unknown repo '%s'", caller, pieces[1]);
+      job = SOLVER_SOLVABLE_REPO;
+      what = repo->repoid;
+    }
+  else if (!strcmp(pieces[0], "all") && npieces == 2 && !strcmp(pieces[1], "packages"))
+    {
+      job = SOLVER_SOLVABLE_ALL;
+      what = 0;
+    }
+  else
+    {
+      /* join em again for the error message... */
+      char *sp;
+      for (sp = pieces[0]; sp < pieces[npieces - 1]; sp++)
+	if (*sp == 0)
+	  *sp = ' ';
+      return pool_error(pool, -1, "%s: bad line '%s'", caller, pieces[0]);
+    }
+  *whatp = what;
+  return job;
+}
+
 Id
 testcase_str2job(Pool *pool, const char *str, Id *whatp)
 {
   int i;
-  Id job;
+  Id job, jobsel;
   Id what;
   char *s;
   char **pieces = 0;
@@ -1022,116 +1112,12 @@ testcase_str2job(Pool *pool, const char *str, Id *whatp)
 	  job |= str2jobflags(pool, flags);
 	}
     }
-  if (!strcmp(pieces[1], "pkg"))
-    {
-      if (npieces != 3)
-	{
-	  pool_error(pool, -1, "str2job: bad pkg selector in '%s'", str);
-	  solv_free(pieces);
-	  return -1;
-	}
-      job |= SOLVER_SOLVABLE;
-      what = testcase_str2solvid(pool, pieces[2]);
-      if (!what)
-	{
-	  pool_error(pool, -1, "str2job: unknown package '%s'", pieces[2]);
-	  solv_free(pieces);
-	  return -1;
-	}
-    }
-  else if (!strcmp(pieces[1], "name") || !strcmp(pieces[1], "provides"))
-    {
-      /* join em again for dep2str... */
-      char *sp;
-      for (sp = pieces[2]; sp < pieces[npieces - 1]; sp++)
-	if (*sp == 0)
-	  *sp = ' ';
-      what = 0;
-      if (pieces[1][0] == 'p' && strncmp(pieces[2], "namespace:", 10) == 0)
-	{
-	  char *spe = strchr(pieces[2], '(');
-	  int l = strlen(pieces[2]);
-	  if (spe && pieces[2][l - 1] == ')')
-	    {
-	      /* special namespace provides */
-	      if (strcmp(spe, "(<NULL>)") != 0)
-		{
-		  pieces[2][l - 1] = 0;
-		  what = testcase_str2dep(pool, spe + 1);
-		  pieces[2][l - 1] = ')';
-		}
-	      what = pool_rel2id(pool, pool_strn2id(pool, pieces[2], spe - pieces[2], 1), what, REL_NAMESPACE, 1);
-	    }
-	}
-      if (!what)
-        what = testcase_str2dep(pool, pieces[2]);
-      if (pieces[1][0] == 'n')
-	job |= SOLVER_SOLVABLE_NAME;
-      else
-	job |= SOLVER_SOLVABLE_PROVIDES;
-    }
-  else if (!strcmp(pieces[1], "oneof"))
-    {
-      Queue q;
-      job |= SOLVER_SOLVABLE_ONE_OF;
-      queue_init(&q);
-      if (npieces > 2 && strcmp(pieces[2], "nothing") != 0)
-	{
-	  for (i = 2; i < npieces; i++)
-	    {
-	      Id p = testcase_str2solvid(pool, pieces[i]);
-	      if (!p)
-		{
-		  pool_error(pool, -1, "str2job: unknown package '%s'", pieces[i]);
-		  queue_free(&q);
-		  solv_free(pieces);
-		  return -1;
-		}
-	      queue_push(&q, p);
-	    }
-	}
-      what = pool_queuetowhatprovides(pool, &q);
-      queue_free(&q);
-    }
-  else if (!strcmp(pieces[1], "repo"))
-    {
-      Repo *repo;
-      if (npieces != 3)
-	{
-	  pool_error(pool, -1, "str2job: bad line '%s'", str);
-	  solv_free(pieces);
-	  return -1;
-	}
-      repo = testcase_str2repo(pool, pieces[2]);
-      if (!repo)
-	{
-	  pool_error(pool, -1, "str2job: unknown repo '%s'", pieces[2]);
-	  solv_free(pieces);
-	  return -1;
-	}
-      job |= SOLVER_SOLVABLE_REPO;
-      what = repo->repoid;
-    }
-  else if (!strcmp(pieces[1], "all"))
-    {
-      if (npieces != 3 && strcmp(pieces[2], "packages") != 0)
-	{
-	  pool_error(pool, -1, "str2job: bad line '%s'", str);
-	  solv_free(pieces);
-	  return -1;
-	}
-      job |= SOLVER_SOLVABLE_ALL;
-      what = 0;
-    }
-  else
-    {
-      pool_error(pool, -1, "str2job: unknown selection in '%s'", str);
-      solv_free(pieces);
-      return -1;
-    }
-  *whatp = what;
+  jobsel = testcase_str2jobsel(pool, "str2job", pieces + 1, npieces - 1, &what);
   solv_free(pieces);
-  return job;
+  if (jobsel == -1)
+    return -1;
+  *whatp = what;
+  return job | jobsel;
 }
 
 #define SELECTIONJOB_MATCHDEPS		1
@@ -2881,12 +2867,7 @@ testcase_read(Pool *pool, FILE *fp, const char *testcase, Queue *job, char **res
 	}
       else if (!strcmp(pieces[0], "disable") && npieces == 3)
 	{
-	  Id p;
-	  if (strcmp(pieces[1], "pkg"))
-	    {
-	      pool_error(pool, 0, "testcase_read: bad disable type '%s'", pieces[1]);
-	      continue;
-	    }
+	  Id p, pp, jobsel, what = 0;
 	  if (!prepared)
 	    pool_createwhatprovides(pool);
 	  prepared = -1;
@@ -2896,11 +2877,20 @@ testcase_read(Pool *pool, FILE *fp, const char *testcase, Queue *job, char **res
 	      map_init(pool->considered, pool->nsolvables);
 	      map_setall(pool->considered);
 	    }
-	  p = testcase_str2solvid(pool, pieces[2]);
-	  if (p)
+	  jobsel = testcase_str2jobsel(pool, "disable", pieces + 1, npieces - 1, &what);
+	  if (jobsel < 0)
+	    continue;
+	  if (jobsel == SOLVER_SOLVABLE_ALL)
+	    map_empty(pool->considered);
+	  else if (jobsel == SOLVER_SOLVABLE_REPO)
+	    {
+	      Repo *repo = pool_id2repo(pool, what);
+	      Solvable *s;
+	      FOR_REPO_SOLVABLES(repo, p, s)
+		MAPCLR(pool->considered, p);
+	    }
+	  FOR_JOB_SELECT(p, pp, jobsel, what)
 	    MAPCLR(pool->considered, p);
-	  else
-	    pool_error(pool, 0, "disable: unknown package '%s'", pieces[2]);
 	}
       else if (!strcmp(pieces[0], "feature"))
 	{
