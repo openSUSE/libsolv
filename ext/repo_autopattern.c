@@ -131,8 +131,8 @@ repo_add_autopattern(Repo *repo, int flags)
   if (repo == pool->installed)
     flags |= ADD_NO_AUTOPRODUCTS;	/* no auto products for installed repos */
 
-  pattern_id = pool_str2id(pool, "pattern()", 9);
-  product_id = pool_str2id(pool, "product()", 9);
+  pattern_id = pool_str2id(pool, "pattern()", 1);
+  product_id = pool_str2id(pool, "product()", 1);
 
   queue_init(&categorykeys);
   FOR_REPO_SOLVABLES(repo, p, s)
