@@ -2126,7 +2126,13 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
       if ((set & SOLVER_SETARCH) != 0 && solv->infarchrules != solv->infarchrules_end)
 	{
 	  if (select == SOLVER_SOLVABLE)
-	    queue_push2(q, DISABLE_INFARCH, pool->solvables[what].name);
+	    {
+	      for (i = solv->infarchrules; i < solv->infarchrules_end; i++)
+		if (solv->rules[i].p == -what)
+		  break;
+	      if (i < solv->infarchrules_end)
+	        queue_push2(q, DISABLE_INFARCH, pool->solvables[what].name);
+	    }
 	  else
 	    {
 	      int qcnt = q->count;
@@ -2140,8 +2146,12 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
 		    if (q->elements[i + 1] == s->name)
 		      break;
 		  if (i < q->count)
-		    continue;
-		  queue_push2(q, DISABLE_INFARCH, s->name);
+		    continue;		/* already have that DISABLE_INFARCH element */
+		  for (i = solv->infarchrules; i < solv->infarchrules_end; i++)
+		    if (solv->rules[i].p == -p)
+		      break;
+		  if (i < solv->infarchrules_end)
+		    queue_push2(q, DISABLE_INFARCH, s->name);
 		}
 	    }
 	}
