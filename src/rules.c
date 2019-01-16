@@ -1674,11 +1674,15 @@ solver_addinfarchrules(Solver *solv, Map *addedmap)
 		}
 	      if (installed && pool->solvables[p].repo == installed && !haveinstalled)
 		continue;	/* installed package not in lock-step */
+	      if (lsq.count < 2)
+		solver_addrule(solv, -p, lsq.count ? lsq.elements[0] : 0, 0);
+	      else
+		solver_addrule(solv, -p, 0, pool_queuetowhatprovides(pool, &lsq));
 	    }
-	  if (lsq.count < 2)
-	    solver_addrule(solv, -p, lsq.count ? lsq.elements[0] : 0, 0);
 	  else
-	    solver_addrule(solv, -p, 0, pool_queuetowhatprovides(pool, &lsq));
+	    {
+	      solver_addrule(solv, -p, 0, 0);
+	    }
 	}
     }
   queue_free(&lsq);
