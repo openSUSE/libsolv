@@ -37,6 +37,7 @@
  *     <pkglist>
  *       <collection short="F8">
  *         <name>Fedora 8</name>
+ *         <module name="pki-deps" stream="10.6" version="20181019123559" context="9edba152" arch="x86_64"/>
  *         <package arch="ppc64" name="imlib-debuginfo" release="6.fc8" src="http://download.fedoraproject.org/pub/fedora/linux/updates/8/ppc64/imlib-debuginfo-1.9.15-6.fc8.ppc64.rpm" version="1.9.15">
  *           <filename>imlib-debuginfo-1.9.15-6.fc8.ppc64.rpm</filename>
  *           <reboot_suggested>True</reboot_suggested>
@@ -70,6 +71,7 @@ enum state {
   STATE_RELOGIN,
   STATE_RIGHTS,
   STATE_SEVERITY,
+  STATE_MODULE,
   NUMSTATES
 };
 
@@ -92,6 +94,7 @@ static struct solv_xmlparser_element stateswitches[] = {
   { STATE_PKGLIST,     "collection",      STATE_COLLECTION,  0 },
   { STATE_COLLECTION,  "name",            STATE_NAME,        1 },
   { STATE_COLLECTION,  "package",         STATE_PACKAGE,     0 },
+  { STATE_COLLECTION,  "module",          STATE_MODULE,      0 },
   { STATE_PACKAGE,     "filename",        STATE_FILENAME,    1 },
   { STATE_PACKAGE,     "reboot_suggested",STATE_REBOOT,      1 },
   { STATE_PACKAGE,     "restart_suggested",STATE_RESTART,    1 },
@@ -319,6 +322,40 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
 	repodata_set_id(pd->data, pd->collhandle, UPDATE_COLLECTION_EVR, evr);
 	if (a)
 	  repodata_set_id(pd->data, pd->collhandle, UPDATE_COLLECTION_ARCH, a);
+        break;
+      }
+    case STATE_MODULE:
+      {
+        const char *name = 0, *stream = 0, *version = 0, *context = 0, *arch = 0;
+        Id name_id, stream_id, version_id, context_id, arch_id = 0;
+        for (; *atts; atts += 2)
+          {
+            if (!strcmp(*atts, "arch"))
+              arch = atts[1];
+            else if (!strcmp(*atts, "name"))
+              name = atts[1];
+            else if (!strcmp(*atts, "stream"))
+              stream = atts[1];
+            else if (!strcmp(*atts, "version"))
+              version = atts[1];
+            else if (!strcmp(*atts, "context"))
+              context = atts[1];
+          }
+        name_id = pool_str2id(pool, name, 1);
+        if (arch)
+          arch_id = pool_str2id(pool, arch, 1);
+        stream_id = pool_str2id(pool, stream, 1);
+        version_id = pool_str2id(pool, version, 1);
+        context_id = pool_str2id(pool, context, 1);
+
+        Id module_handle = repodata_new_handle(pd->data);
+        repodata_set_id(pd->data, module_handle, UPDATE_MODULE_NAME, name_id);
+        repodata_set_id(pd->data, module_handle, UPDATE_MODULE_STREAM, stream_id);
+        repodata_set_id(pd->data, module_handle, UPDATE_MODULE_VERSION, version_id);
+        repodata_set_id(pd->data, module_handle, UPDATE_MODULE_CONTEXT, context_id);
+        if (arch_id)
+          repodata_set_id(pd->data, module_handle, UPDATE_MODULE_ARCH, arch_id);
+        repodata_add_flexarray(pd->data, pd->handle, UPDATE_MODULE, module_handle);
         break;
       }
 
