@@ -169,9 +169,9 @@ read_plaindir_repo(Repo *repo, const char *dir)
 	  close(fds[1]);
 	}
       if (recursive)
-	execl("/usr/bin/find", ".", "-name", ".", "-o", "-name", ".*", "-prune", "-o", "-name", "*.delta.rpm", "-o", "-name", "*.patch.rpm", "-o", "-name", "*.rpm", "-a", "-type", "f", "-print0", (char *)0);
+	execl("/usr/bin/find", "/usr/bin/find", ".", "-name", ".", "-o", "-name", ".*", "-prune", "-o", "-name", "*.delta.rpm", "-o", "-name", "*.patch.rpm", "-o", "-name", "*.rpm", "-a", "-type", "f", "-print0", (char *)0);
       else
-	execl("/usr/bin/find", ".", "-maxdepth", "1", "-name", ".", "-o", "-name", ".*", "-prune", "-o", "-name", "*.delta.rpm", "-o", "-name", "*.patch.rpm", "-o", "-name", "*.rpm", "-a", "-type", "f", "-print0", (char *)0);
+	execl("/usr/bin/find", "/usr/bin/find", ".", "-maxdepth", "1", "-name", ".", "-o", "-name", ".*", "-prune", "-o", "-name", "*.delta.rpm", "-o", "-name", "*.patch.rpm", "-o", "-name", "*.rpm", "-a", "-type", "f", "-print0", (char *)0);
       perror("/usr/bin/find");
       _exit(1);
     }
