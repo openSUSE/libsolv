@@ -300,10 +300,28 @@ solv_zchunk_open(FILE *fp, unsigned int streamid)
 #endif
   if ((p = getuint(p, zck->hdr_end, &zck->flags)) == 0)
     return open_error(zck);
-  if ((zck->flags & ~(1)) != 0)
+  if ((zck->flags & ~(3)) != 0)
     return open_error(zck);
   if ((p = getuint(p, zck->hdr_end, &zck->comp)) == 0 || (zck->comp != 0 && zck->comp != 2))
     return open_error(zck);	/* only uncompressed + zstd supported */
+  /* skip all optional elements if present */
+  if ((zck->flags & 2) != 0)
+    {
+      unsigned int nopt, lopt;
+      if ((p = getuint(p, zck->hdr_end, &nopt)) == 0)
+        return open_error(zck);
+      for (; nopt != 0; nopt--)
+	{
+	  if ((p = getuint(p, zck->hdr_end, &lopt)) == 0)
+            return open_error(zck);
+	  if ((p = getuint(p, zck->hdr_end, &lopt)) == 0)
+            return open_error(zck);
+	  if (p + lopt > zck->hdr_end)
+	    return open_error(zck);
+	  p += lopt;
+	}
+    }
+
   preface_size = p - (zck->hdr + lead_size);
 
   /* parse index: index size, index chksum type, num chunks, chunk data  */
