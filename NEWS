@@ -2,6 +2,18 @@
 This file contains the major changes between
 libsolv versions:
 
+Version 0.7.3
+- selected bug fixes:
+  * fixed a couple of null pointer derefs and potential memory
+    leaks
+  * made disfavoring recommended packages work if strong recommends
+    is enabled
+  * no longer disable infarch rules when they don't conflict with
+    the job
+- new features:
+  * do favor evaluation before pruning allowing to (dis)favor
+    specific package versions
+
 Version 0.7.2
 - bug fixes:
   * do not autouninstall packages because of forcebest updates
