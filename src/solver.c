@@ -3920,7 +3920,7 @@ solver_solve(Solver *solv, Queue *job)
   else
     solv->yumobsrules = solv->yumobsrules_end = solv->nrules;
 
-  if (solv->havedisfavored && solv->strongrecommends)
+  if (solv->havedisfavored && solv->strongrecommends && solv->recommendsruleq)
     solver_addrecommendsrules(solv);
   else
     solv->recommendsrules = solv->recommendsrules_end = solv->nrules;
