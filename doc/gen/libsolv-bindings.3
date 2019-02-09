@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 12/06/2018
+.\"      Date: 02/13/2019
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "12/06/2018" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "02/13/2019" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -846,6 +846,21 @@ my \fI@solvables\fR \fB=\fR \fI$pool\fR\fB\->whatprovides(\fR\fI$dep\fR\fB)\fR;
 .\}
 .sp
 Return all solvables that provide the specified dependency\&. You can use either a Dep object or a simple Id as argument\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSolvable *best_solvables(Solvable *\fR\fIsolvables\fR\fB, int\fR \fIflags\fR \fB= 0)\fR
+my \fI@solvables\fR \fB=\fR \fI$pool\fR\fB\->best_solvables(\fR\fI$solvables\fR\fB)\fR;
+\fIsolvables\fR \fB=\fR \fIpool\fR\fB\&.best_solvables(\fR\fIsolvables\fR\fB)\fR
+\fIsolvables\fR \fB=\fR \fIpool\fR\fB\&.best_solvables(\fR\fIsolvables\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Filter list of solvables by repo priority, architecture and version\&.
 .sp
 .if n \{\
 .RS 4

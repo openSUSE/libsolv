@@ -488,6 +488,13 @@ the call to addfileprovides().
 Return all solvables that provide the specified dependency. You can use either
 a Dep object or a simple Id as argument.
 
+	Solvable *best_solvables(Solvable *solvables, int flags = 0)
+	my @solvables = $pool->best_solvables($solvables);
+	solvables = pool.best_solvables(solvables)
+	solvables = pool.best_solvables(solvables)
+
+Filter list of solvables by repo priority, architecture and version.
+
 	Id *matchprovidingids(const char *match, int flags)
 	my @ids = $pool->matchprovidingids($match, $flags);
 	ids = pool.matchprovidingids(match, flags)

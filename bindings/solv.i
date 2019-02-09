@@ -381,6 +381,7 @@ typedef struct {
 
 %typemap(in) Queue Array2Queue(SWIG_AsVal_int, "integers")
 %typemap(in) Queue solvejobs ObjArray2Queue(Job *, queue_push2(&$1, obj->how, obj->what))
+%typemap(in) Queue solvables ObjArray2Queue(XSolvable *, queue_push(&$1, obj->id))
 
 
 
@@ -1943,6 +1944,14 @@ typedef struct {
     queue_init(&q);
     FOR_PROVIDES(p, pp, dep)
       queue_push(&q, p);
+    return q;
+  }
+  %typemap(out) Queue best_solvables Queue2Array(XSolvable *, 1, new_XSolvable(arg1, id));
+  %newobject best_solvables;
+  Queue best_solvables(Queue solvables, int flags=0) {
+    Queue q;
+    queue_init_clone(&q, &solvables);
+    pool_best_solvables($self, &q, flags);
     return q;
   }
 
