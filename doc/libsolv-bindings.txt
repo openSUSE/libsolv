@@ -495,6 +495,14 @@ a Dep object or a simple Id as argument.
 
 Filter list of solvables by repo priority, architecture and version.
 
+	Solvable *whatmatchessolvable(Id keyname, Solvable solvable, Id marker = -1)
+	my @solvables = $pool->whatmatchessolvable($keyname, $solvable)
+	solvables = pool.whatmatchessolvable(keyname, solvable)
+	solvables = pool.whatmatchessolvable(keyname, solvable)
+
+Return all solvables that match package dependencies in against solvable's
+provides.
+
 	Id *matchprovidingids(const char *match, int flags)
 	my @ids = $pool->matchprovidingids($match, $flags);
 	ids = pool.matchprovidingids(match, flags)
