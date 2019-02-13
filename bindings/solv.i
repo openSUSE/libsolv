@@ -663,12 +663,6 @@ SWIG_AsValDepId(void *obj, int *val) {
 %typemaps_asval(%checkcode(POINTER), SWIG_AsValSolvFpPtr, "SWIG_AsValSolvFpPtr", FILE*);
 %typemaps_asval(%checkcode(INT32), SWIG_AsValDepId, "SWIG_AsValDepId", DepId);
 
-%define SamePool(pool1,pool2) %{ {
-  if (pool1 != pool2)
-    SWIG_exception_fail(SWIG_ArgError(EINVAL), "pool of argument $argnum must be same as pool in method's object");
-}
-%}
-%enddef
 
 /**
  ** the C declarations
@@ -1073,12 +1067,10 @@ typedef struct {
   Id what;
 } Job;
 
-%typemap(check) XSolvable *pool_solvable SamePool($1->pool, arg1)
 %nodefaultctor Pool;
 %nodefaultdtor Pool;
 typedef struct {
 } Pool;
-%typemap(check) XSolvable *pool_solvable;
 
 %nodefaultctor Repo;
 %nodefaultdtor Repo;
