@@ -250,6 +250,14 @@ KNOWNID(SIGNATURE_TIME,	        	"signature:time"),
 KNOWNID(SIGNATURE_EXPIRES,	        "signature:expires"),
 KNOWNID(SIGNATURE_DATA,		        "signature:data"),
 
+/* 'content' of patch, usually list of modules */
+KNOWNID(UPDATE_MODULE,                  "update:module"),              /*  "name stream version context arch" */
+KNOWNID(UPDATE_MODULE_NAME,             "update:module:name"),         /*   name */
+KNOWNID(UPDATE_MODULE_STREAM,           "update:module:stream"),       /*   stream */
+KNOWNID(UPDATE_MODULE_VERSION,          "update:module:version"),      /*   version */
+KNOWNID(UPDATE_MODULE_CONTEXT,          "update:module:context"),      /*   context */
+KNOWNID(UPDATE_MODULE_ARCH,             "update:module:arch"),         /*   architecture */
+
 KNOWNID(ID_NUM_INTERNAL,		0)
 
 #ifdef KNOWNID_INITIALIZE
