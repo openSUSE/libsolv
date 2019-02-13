@@ -59,7 +59,7 @@ natural constant subs), so don't forget the leading ``$'' when accessing a
 constant. Also do not forget to prepend the namespace of the constant:
 
 	$pool->set_flag($solv::Pool::POOL_FLAG_OBSOLETEUSESCOLORS, 1);
-	
+
 
 Python Specifics
 ----------------
@@ -185,7 +185,7 @@ to a libsolv class are prefixed with the class name:
 
 	TCL $pool set_flag $solv::Pool_POOL_FLAG_OBSOLETEUSESCOLORS 1
 	TCL puts [$solvable lookup_str $solv::SOLVABLE_SUMMARY]
-	
+
 
 The Solv Class
 --------------
@@ -248,7 +248,7 @@ Repositories, Dependencies, each indexed by Ids.
 	pool = Solv::Pool.new()
 
 Create a new pool instance. In most cases you just need one pool.
-Note that the returned object "owns" the pool, i.e. if the object is 
+Note that the returned object "owns" the pool, i.e. if the object is
 freed, the pool is also freed. You can use the disown method to
 break this ownership relation.
 
@@ -488,6 +488,21 @@ the call to addfileprovides().
 Return all solvables that provide the specified dependency. You can use either
 a Dep object or a simple Id as argument.
 
+	Solvable *best_solvables(Solvable *solvables, int flags = 0)
+	my @solvables = $pool->best_solvables($solvables);
+	solvables = pool.best_solvables(solvables)
+	solvables = pool.best_solvables(solvables)
+
+Filter list of solvables by repo priority, architecture and version.
+
+	Solvable *whatmatchessolvable(Id keyname, Solvable solvable, Id marker = -1)
+	my @solvables = $pool->whatmatchessolvable($keyname, $solvable)
+	solvables = pool.whatmatchessolvable(keyname, solvable)
+	solvables = pool.whatmatchessolvable(keyname, solvable)
+
+Return all solvables that match package dependencies in against solvable's
+provides.
+
 	Id *matchprovidingids(const char *match, int flags)
 	my @ids = $pool->matchprovidingids($match, $flags);
 	ids = pool.matchprovidingids(match, flags)
@@ -554,7 +569,7 @@ selections.
 	my $sel = $pool->Selection_all();
 	sel = pool.Selection_all()
 	sel = pool.Selection_all()
-	
+
 Create a selection containing all packages. Useful as starting point for
 intersecting other selections or for update/distupgrade jobs.
 
@@ -860,7 +875,7 @@ The id of the repository.
 	$repo->{name}
 	repo.name
 	repo.name
-	
+
 The repositories name. To libsolv, the name is just a string with no specific
 meaning.
 
@@ -1371,7 +1386,7 @@ a specific id and want to avoid the string compare overhead.
 	my @deps = $solvable->lookup_deparray($keyname);
 	deps = solvable.lookup_deparray(keyname)
 	deps = solvable.lookup_deparray(keyname)
-	
+
 Generic lookup methods. Retrieve data stored for the specific keyname.
 The lookup_idarray() method will return an array of Ids, use
 lookup_deparray if you want an array of Dependency objects instead.
@@ -1719,7 +1734,7 @@ the version, and the architecture of a package.
 *SELECTION_DOTARCH*::
 Allow an ".<architecture>" suffix when matching names or
 provides.
- 
+
 *SELECTION_REL*::
 Allow the specification of a relation when matching names
 or dependencies, e.g. "name >= 1.2".
@@ -1945,7 +1960,7 @@ Update the matching installed packages to their best version. If none
 of the specified packages are installed, try to update the installed
 packages to the specified versions. See the section about targeted
 updates about more information.
- 
+
 *SOLVER_WEAKENDEPS*::
 Allow to break the dependencies of the matching packages. Handle with care.
 
@@ -3164,7 +3179,7 @@ in passive mode, but
   update A-2-1 (other: A-1-1)
   erase  B
 
-in active mode. If the mode contains SOLVER_TRANSACTION_SHOW_ALL, the 
+in active mode. If the mode contains SOLVER_TRANSACTION_SHOW_ALL, the
 passive mode list will be unchanged but the active mode list will just
 contain A-2-1.
 
@@ -3290,7 +3305,7 @@ Add a (binary) string to the checksum.
 	chksum.add_fp(file)
 
 Add the contents of a file to the checksum.
-	
+
 	void add_stat(const char *filename)
 	$chksum->add_stat($filename);
 	chksum.add_stat(filename)
@@ -3422,7 +3437,7 @@ The Repodata Class
 The Repodata stores attributes for packages and the repository itself, each
 repository can have multiple repodata areas. You normally only need to
 directly access them if you implement lazy downloading of repository data.
-Repodata areas are created by calling the repository's add_repodata() method 
+Repodata areas are created by calling the repository's add_repodata() method
 or by using repo_add methods without the REPO_REUSE_REPODATA or REPO_USE_LOADING
 flag.
 

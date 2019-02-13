@@ -381,6 +381,7 @@ typedef struct {
 
 %typemap(in) Queue Array2Queue(SWIG_AsVal_int, "integers")
 %typemap(in) Queue solvejobs ObjArray2Queue(Job *, queue_push2(&$1, obj->how, obj->what))
+%typemap(in) Queue solvables ObjArray2Queue(XSolvable *, queue_push(&$1, obj->id))
 
 
 
@@ -662,6 +663,12 @@ SWIG_AsValDepId(void *obj, int *val) {
 %typemaps_asval(%checkcode(POINTER), SWIG_AsValSolvFpPtr, "SWIG_AsValSolvFpPtr", FILE*);
 %typemaps_asval(%checkcode(INT32), SWIG_AsValDepId, "SWIG_AsValDepId", DepId);
 
+%define SamePool(pool1,pool2) %{ {
+  if (pool1 != pool2)
+    SWIG_exception_fail(SWIG_ArgError(EINVAL), "pool of argument $argnum must be same as pool in method's object");
+}
+%}
+%enddef
 
 /**
  ** the C declarations
@@ -1066,10 +1073,12 @@ typedef struct {
   Id what;
 } Job;
 
+%typemap(check) XSolvable *pool_solvable SamePool($1->pool, arg1)
 %nodefaultctor Pool;
 %nodefaultdtor Pool;
 typedef struct {
 } Pool;
+%typemap(check) XSolvable *pool_solvable;
 
 %nodefaultctor Repo;
 %nodefaultdtor Repo;
@@ -1945,6 +1954,14 @@ typedef struct {
       queue_push(&q, p);
     return q;
   }
+  %typemap(out) Queue best_solvables Queue2Array(XSolvable *, 1, new_XSolvable(arg1, id));
+  %newobject best_solvables;
+  Queue best_solvables(Queue solvables, int flags=0) {
+    Queue q;
+    queue_init_clone(&q, &solvables);
+    pool_best_solvables($self, &q, flags);
+    return q;
+  }
 
   Id towhatprovides(Queue q) {
     return pool_queuetowhatprovides($self, &q);
@@ -1966,6 +1983,15 @@ typedef struct {
     Queue q;
     queue_init(&q);
     pool_whatmatchesdep($self, keyname, dep, &q, marker);
+    return q;
+  }
+
+  %typemap(out) Queue whatmatchessolvable Queue2Array(XSolvable *, 1, new_XSolvable(arg1, id));
+  %newobject whatmatchessolvable;
+  Queue whatmatchessolvable(Id keyname, XSolvable *pool_solvable, Id marker = -1) {
+    Queue q;
+    queue_init(&q);
+    pool_whatmatchessolvable($self, keyname, pool_solvable->id, &q, marker);
     return q;
   }
 
