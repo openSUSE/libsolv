@@ -327,7 +327,8 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
     case STATE_MODULE:
       {
         const char *name = 0, *stream = 0, *version = 0, *context = 0, *arch = 0;
-        Id name_id, stream_id, version_id, context_id, arch_id = 0;
+        Id module_handle;
+
         for (; *atts; atts += 2)
           {
             if (!strcmp(*atts, "arch"))
@@ -341,20 +342,17 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
             else if (!strcmp(*atts, "context"))
               context = atts[1];
           }
-        name_id = pool_str2id(pool, name, 1);
+        module_handle = repodata_new_handle(pd->data);
+	if (name)
+          repodata_set_poolstr(pd->data, module_handle, UPDATE_MODULE_NAME, name);
+	if (stream)
+          repodata_set_poolstr(pd->data, module_handle, UPDATE_MODULE_STREAM, stream);
+	if (version)
+          repodata_set_poolstr(pd->data, module_handle, UPDATE_MODULE_VERSION, version);
+	if (context)
+          repodata_set_poolstr(pd->data, module_handle, UPDATE_MODULE_CONTEXT, context);
         if (arch)
-          arch_id = pool_str2id(pool, arch, 1);
-        stream_id = pool_str2id(pool, stream, 1);
-        version_id = pool_str2id(pool, version, 1);
-        context_id = pool_str2id(pool, context, 1);
-
-        Id module_handle = repodata_new_handle(pd->data);
-        repodata_set_id(pd->data, module_handle, UPDATE_MODULE_NAME, name_id);
-        repodata_set_id(pd->data, module_handle, UPDATE_MODULE_STREAM, stream_id);
-        repodata_set_id(pd->data, module_handle, UPDATE_MODULE_VERSION, version_id);
-        repodata_set_id(pd->data, module_handle, UPDATE_MODULE_CONTEXT, context_id);
-        if (arch_id)
-          repodata_set_id(pd->data, module_handle, UPDATE_MODULE_ARCH, arch_id);
+          repodata_set_poolstr(pd->data, module_handle, UPDATE_MODULE_ARCH, arch);
         repodata_add_flexarray(pd->data, pd->handle, UPDATE_MODULE, module_handle);
         break;
       }
