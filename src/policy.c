@@ -831,6 +831,33 @@ move_installed_to_front(Pool *pool, Queue *plist)
     }
 }
 
+
+/*
+ * prune_to_considered
+ *
+ * Keep only considered (pool->considered) solvables in plist. If pool->considered is NULL, it keeps
+ * all solvable in plist. If non of solvables in plist is in considered map, it returns empty plist.
+ */
+static void
+prune_to_considered(Pool *pool, Queue *plist)
+{
+  if (plist->count == 0)		/* no need to prune if plist is empty */
+    return;
+  if (!pool->considered)        /* no need to prune if no considered map */
+    return;
+  int i, j;
+  Id id;
+  for (i = j = 0; i < plist->count; i++)
+    {
+      id = plist->elements[i];
+      if (MAPTST(pool->considered, id))
+        {
+          plist->elements[j++] = id;
+        }
+    }
+  plist->count = j;
+}
+
 /*
  * prune_to_best_version
  *
@@ -1299,6 +1326,7 @@ policy_filter_unwanted(Solver *solv, Queue *plist, int mode)
 	  return;
 	}
     }
+  prune_to_considered(pool, plist);
   if (plist->count > 1)
     {
       if (mode != POLICY_MODE_SUGGEST)
