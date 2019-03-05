@@ -1598,7 +1598,7 @@ pool_setdebuglevel(Pool *pool, int level)
   if (level > 2)
     mask |= SOLV_DEBUG_PROPAGATE;
   if (level > 3)
-    mask |= SOLV_DEBUG_RULE_CREATION;
+    mask |= SOLV_DEBUG_RULE_CREATION | SOLV_DEBUG_WATCHES;
   mask |= pool->debugmask & SOLV_DEBUG_TO_STDERR;	/* keep bit */
   pool->debugmask = mask;
 }

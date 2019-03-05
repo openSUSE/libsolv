@@ -188,6 +188,7 @@ struct s_Pool {
 #define SOLV_DEBUG_JOB			(1<<11)
 #define SOLV_DEBUG_SOLVER		(1<<12)
 #define SOLV_DEBUG_TRANSACTION		(1<<13)
+#define SOLV_DEBUG_WATCHES		(1<<14)
 
 #define SOLV_DEBUG_TO_STDERR		(1<<30)
 

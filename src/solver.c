@@ -431,7 +431,7 @@ propagate(Solver *solv, int level)
   Id *decisionmap = solv->decisionmap;
   Id *watches = solv->watches + pool->nsolvables;   /* place ptr in middle */
 
-  POOL_DEBUG(SOLV_DEBUG_PROPAGATE, "----- propagate -----\n");
+  POOL_DEBUG(SOLV_DEBUG_PROPAGATE, "----- propagate level %d -----\n", level);
 
   /* foreach non-propagated decision */
   while (solv->propagate_index < solv->decisionq.count)
@@ -444,7 +444,7 @@ propagate(Solver *solv, int level)
 	
       IF_POOLDEBUG (SOLV_DEBUG_PROPAGATE)
         {
-	  POOL_DEBUG(SOLV_DEBUG_PROPAGATE, "propagate for decision %d level %d\n", -pkg, level);
+	  POOL_DEBUG(SOLV_DEBUG_PROPAGATE, "propagate decision %d:", -pkg);
 	  solver_printruleelement(solv, SOLV_DEBUG_PROPAGATE, 0, -pkg);
         }
 
@@ -462,10 +462,10 @@ propagate(Solver *solv, int level)
 	      continue;
 	    }
 
-	  IF_POOLDEBUG (SOLV_DEBUG_PROPAGATE)
+	  IF_POOLDEBUG (SOLV_DEBUG_WATCHES)
 	    {
-	      POOL_DEBUG(SOLV_DEBUG_PROPAGATE,"  watch triggered ");
-	      solver_printrule(solv, SOLV_DEBUG_PROPAGATE, r);
+	      POOL_DEBUG(SOLV_DEBUG_WATCHES, "  watch triggered ");
+	      solver_printrule(solv, SOLV_DEBUG_WATCHES, r);
 	    }
 
 	  /*
@@ -532,12 +532,12 @@ propagate(Solver *solv, int level)
 		   * if we found some p that is UNDEF or TRUE, move
 		   * watch to it
 		   */
-		  IF_POOLDEBUG (SOLV_DEBUG_PROPAGATE)
+		  IF_POOLDEBUG (SOLV_DEBUG_WATCHES)
 		    {
 		      if (p > 0)
-			POOL_DEBUG(SOLV_DEBUG_PROPAGATE, "    -> move w%d to %s\n", (pkg == r->w1 ? 1 : 2), pool_solvid2str(pool, p));
+			POOL_DEBUG(SOLV_DEBUG_WATCHES, "    -> move w%d to %s\n", (pkg == r->w1 ? 1 : 2), pool_solvid2str(pool, p));
 		      else
-			POOL_DEBUG(SOLV_DEBUG_PROPAGATE, "    -> move w%d to !%s\n", (pkg == r->w1 ? 1 : 2), pool_solvid2str(pool, -p));
+			POOL_DEBUG(SOLV_DEBUG_WATCHES, "    -> move w%d to !%s\n", (pkg == r->w1 ? 1 : 2), pool_solvid2str(pool, -p));
 		    }
 
 		  *rp = *next_rp;
@@ -593,7 +593,7 @@ propagate(Solver *solv, int level)
 	
     } /* while we have non-decided decisions */
 
-  POOL_DEBUG(SOLV_DEBUG_PROPAGATE, "----- propagate end-----\n");
+  POOL_DEBUG(SOLV_DEBUG_PROPAGATE, "----- propagate end -----\n");
 
   return 0;	/* all is well */
 }
