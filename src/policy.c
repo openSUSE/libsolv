@@ -924,9 +924,9 @@ prune_to_best_version(Pool *pool, Queue *plist)
     {
       s = pool->solvables + plist->elements[i];
 
-      POOL_DEBUG(SOLV_DEBUG_POLICY, "- %s[%s]\n",
-		 pool_solvable2str(pool, s),
-		 (pool->installed && s->repo == pool->installed) ? "installed" : "not installed");
+      POOL_DEBUG(SOLV_DEBUG_POLICY, "- %s [%d]%s\n",
+		 pool_solvable2str(pool, s), plist->elements[i], 
+		 (pool->installed && s->repo == pool->installed) ? "I" : "");
 
       if (!best)		/* if no best yet, the current is best */
         {
