@@ -500,7 +500,7 @@ Filter list of solvables by repo priority, architecture and version.
 	solvables = pool.whatmatchessolvable(keyname, solvable)
 	solvables = pool.whatmatchessolvable(keyname, solvable)
 
-Return all solvables that match package dependencies in against solvable's
+Return all solvables that match package dependencies against solvable's
 provides.
 
 	Id *matchprovidingids(const char *match, int flags)
@@ -591,7 +591,7 @@ Create a selection by matching package dependencies against the specified string
 This can be used if you want to match other dependency types than ``provides''.
 
 	Selection matchdepid(DepId dep, int flags, Id keyname, Id marker = -1)
-	my $sel = $pool->matchdepid(dep, $flags, $keyname);
+	my $sel = $pool->matchdepid($dep, $flags, $keyname);
 	sel = pool.matchdepid(dep, flags, keyname)
 	sel = pool.matchdepid(dep, flags, keyname)
 
@@ -599,6 +599,14 @@ Create a selection by matching package dependencies against the specified
 dependency. This may be faster than matchdeps and also works with complex
 dependencies. The downside is that you cannot use globs or case insensitive
 matching.
+
+	Selection matchsolvable(Solvable solvable, int flags, Id keyname, Id marker = -1)
+	my $sel = $pool->matchsolvable($solvable, $flags, $keyname);
+	sel = pool.matchsolvable(solvable, flags, keyname)
+	sel = pool.matchsolvable(solvable, flags, keyname)
+
+Create a selection by matching package dependencies against the specified
+solvable's provides.
 
 	void setpooljobs(Jobs *jobs)
 	$pool->setpooljobs(\@jobs);
@@ -1900,6 +1908,13 @@ Do a matchdeps operation and combine the result with the current selection.
 	sel.matchdepid(dep, flags, keyname)
 
 Do a matchdepid operation and combine the result with the current selection.
+
+	void matchsolvable(Solvable solvable, int flags, Id keyname, Id marker = -1)
+	$sel->matchsolvable($solvable, $flags, $keyname);
+	sel.matchsolvable(solvable, flags, keyname)
+	sel.matchsolvable(solvable, flags, keyname)
+
+Do a matchsolvable operation and combine the result with the current selection.
 
 	<stringification>
 	my $str = $sel->str;

@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 02/13/2019
+.\"      Date: 03/16/2019
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "02/13/2019" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "03/16/2019" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -875,7 +875,7 @@ my \fI@solvables\fR \fB=\fR \fI$pool\fR\fB\->whatmatchessolvable(\fR\fI$keyname\
 .RE
 .\}
 .sp
-Return all solvables that match package dependencies in against solvable\(cqs provides\&.
+Return all solvables that match package dependencies against solvable\(cqs provides\&.
 .sp
 .if n \{\
 .RS 4
@@ -1047,7 +1047,7 @@ Create a selection by matching package dependencies against the specified string
 .\}
 .nf
 \fBSelection matchdepid(DepId\fR \fIdep\fR\fB, int\fR \fIflags\fR\fB, Id\fR \fIkeyname\fR\fB, Id\fR \fImarker\fR \fB= \-1)\fR
-my \fI$sel\fR \fB=\fR \fI$pool\fR\fB\->matchdepid(\fR\fIdep\fR\fB,\fR \fI$flags\fR\fB,\fR \fI$keyname\fR\fB)\fR;
+my \fI$sel\fR \fB=\fR \fI$pool\fR\fB\->matchdepid(\fR\fI$dep\fR\fB,\fR \fI$flags\fR\fB,\fR \fI$keyname\fR\fB)\fR;
 \fIsel\fR \fB=\fR \fIpool\fR\fB\&.matchdepid(\fR\fIdep\fR\fB,\fR \fIflags\fR\fB,\fR \fIkeyname\fR\fB)\fR
 \fIsel\fR \fB=\fR \fIpool\fR\fB\&.matchdepid(\fR\fIdep\fR\fB,\fR \fIflags\fR\fB,\fR \fIkeyname\fR\fB)\fR
 .fi
@@ -1056,6 +1056,21 @@ my \fI$sel\fR \fB=\fR \fI$pool\fR\fB\->matchdepid(\fR\fIdep\fR\fB,\fR \fI$flags\
 .\}
 .sp
 Create a selection by matching package dependencies against the specified dependency\&. This may be faster than matchdeps and also works with complex dependencies\&. The downside is that you cannot use globs or case insensitive matching\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSelection matchsolvable(Solvable\fR \fIsolvable\fR\fB, int\fR \fIflags\fR\fB, Id\fR \fIkeyname\fR\fB, Id\fR \fImarker\fR \fB= \-1)\fR
+my \fI$sel\fR \fB=\fR \fI$pool\fR\fB\->matchsolvable(\fR\fI$solvable\fR\fB,\fR \fI$flags\fR\fB,\fR \fI$keyname\fR\fB)\fR;
+\fIsel\fR \fB=\fR \fIpool\fR\fB\&.matchsolvable(\fR\fIsolvable\fR\fB,\fR \fIflags\fR\fB,\fR \fIkeyname\fR\fB)\fR
+\fIsel\fR \fB=\fR \fIpool\fR\fB\&.matchsolvable(\fR\fIsolvable\fR\fB,\fR \fIflags\fR\fB,\fR \fIkeyname\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Create a selection by matching package dependencies against the specified solvable\(cqs provides\&.
 .sp
 .if n \{\
 .RS 4
@@ -3372,6 +3387,21 @@ Do a matchdeps operation and combine the result with the current selection\&.
 .\}
 .sp
 Do a matchdepid operation and combine the result with the current selection\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid matchsolvable(Solvable\fR \fIsolvable\fR\fB, int\fR \fIflags\fR\fB, Id\fR \fIkeyname\fR\fB, Id\fR \fImarker\fR \fB= \-1)\fR
+\fI$sel\fR\fB\->matchsolvable(\fR\fI$solvable\fR\fB,\fR \fI$flags\fR\fB,\fR \fI$keyname\fR\fB)\fR;
+\fIsel\fR\fB\&.matchsolvable(\fR\fIsolvable\fR\fB,\fR \fIflags\fR\fB,\fR \fIkeyname\fR\fB)\fR
+\fIsel\fR\fB\&.matchsolvable(\fR\fIsolvable\fR\fB,\fR \fIflags\fR\fB,\fR \fIkeyname\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Do a matchsolvable operation and combine the result with the current selection\&.
 .sp
 .if n \{\
 .RS 4
