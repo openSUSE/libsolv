@@ -22,6 +22,14 @@
 #include "chksum.h"
 #include "repo_deb.h"
 
+#ifdef _WIN32
+  #include "strfncs.h"
+#endif
+
+#if !defined(S_ISREG) && defined(S_IFMT) && defined(S_IFREG)
+#define S_ISREG(m) (((m) & S_IFMT) == S_IFREG)
+#endif
+
 static unsigned char *
 decompress_gz(unsigned char *in, int inl, int *outlp, int maxoutl)
 {

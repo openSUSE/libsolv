@@ -28,12 +28,20 @@
 #include "ext/repo_helix.h"
 #endif
 
+#ifdef _WIN32
+  #include <direct.h>
+  #define PATH_SEP '\\'
+#else
+  #define PATH_SEP '/'
+#endif
+
 /* see repo_testcase.c */
 struct oplist {
   Id flags;
   const char *opname;
 };
 extern struct oplist oplist[];
+
 
 static struct job2str {
   Id job;
@@ -1566,7 +1574,11 @@ testcase_write_mangled(Solver *solv, const char *dir, int resultflags, const cha
   if (!resultname)
     resultname = "solver.result";
 
+#ifdef _WIN32
+  if (mkdir(dir) && errno != EEXIST)
+#else
   if (mkdir(dir, 0777) && errno != EEXIST)
+#endif
     return pool_error(solv->pool, 0, "testcase_write: could not create directory '%s'", dir);
   strqueue_init(&sq);
   FOR_REPOS(repoid, repo)
@@ -1951,7 +1963,7 @@ testcase_read(Pool *pool, FILE *fp, const char *testcase, Queue *job, char **res
       return 0;
     }
   testcasedir = solv_strdup(testcase);
-  if ((s = strrchr(testcasedir, '/')) != 0)
+  if ((s = strrchr(testcasedir, PATH_SEP)) != 0)
     s[1] = 0;
   else
     *testcasedir = 0;

@@ -12,7 +12,12 @@
 #include <unistd.h>
 #include <string.h>
 #include <fcntl.h>
-#include <sys/time.h>
+#ifdef _WIN32
+  #include <windows.h>
+  #include <io.h>
+#else
+  #include <sys/time.h>
+#endif
 
 #include "util.h"
 
@@ -124,6 +129,9 @@ solv_strdup(const char *s)
 unsigned int
 solv_timems(unsigned int subtract)
 {
+#ifdef _WIN32
+  return GetTickCount() - subtract;
+#else
   struct timeval tv;
   unsigned int r;
 
@@ -133,12 +141,17 @@ solv_timems(unsigned int subtract)
   r += ((unsigned int)tv.tv_sec & 0xffff) * 1000;
   r += (unsigned int)tv.tv_usec / 1000;
   return r - subtract;
+#endif
 }
 
 int
 solv_setcloexec(int fd, int state)
 {
-  return fcntl(fd, F_SETFD, state ? FD_CLOEXEC : 0) == 0;
+  #ifdef _WIN32
+    return SetHandleInformation((HANDLE) _get_osfhandle(fd), HANDLE_FLAG_INHERIT, state ? 0 : HANDLE_FLAG_INHERIT);
+  #else
+    return fcntl(fd, F_SETFD, state ? FD_CLOEXEC : 0) == 0;
+  #endif
 }
 
 /* bsd's qsort_r has different arguments, so we define our

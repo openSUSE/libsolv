@@ -34,6 +34,9 @@
 #include "solver.h"
 #include "solv_xfopen.h"
 
+#ifdef _WIN32
+#include "strfncs.h"
+#endif
 
 void
 usage(char** argv)

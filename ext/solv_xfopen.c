@@ -12,6 +12,10 @@
 #include <string.h>
 #include <fcntl.h>
 
+#ifdef _WIN32
+  #include "fmemopen.c"
+#endif
+
 #include "solv_xfopen.h"
 #include "util.h"
 
@@ -675,7 +679,15 @@ solv_xfopen_fd(const char *fn, int fd, const char *mode)
   suf = fn ? strrchr(fn, '.') : 0;
   if (!mode)
     {
+      #ifndef _WIN32
       int fl = fcntl(fd, F_GETFL, 0);
+      #else
+      HANDLE handle = (HANDLE) _get_osfhandle(fd);
+      BY_HANDLE_FILE_INFORMATION file_info;
+      if (!GetFileInformationByHandle(handle, &file_info))
+        return 0;
+      int fl = file_info.dwFileAttributes;
+      #endif
       if (fl == -1)
 	return 0;
       fl &= O_RDONLY|O_WRONLY|O_RDWR;

@@ -30,6 +30,12 @@
 #include <fcntl.h>
 #include <time.h>
 
+#ifdef _WIN32
+  #include <windows.h>
+  #include <fileapi.h>
+  #include <io.h>
+#endif
+
 #include "repo.h"
 #include "repopage.h"
 
@@ -704,11 +710,22 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
 #ifdef DEBUG_PAGING
 	  fprintf(stderr, "PAGEIN: %d to %d", pnum, i);
 #endif
+#ifndef _WIN32
           if (pread(store->pagefd, compressed ? buf : dest, in_len, store->file_offset + p->page_offset) != in_len)
 	    {
 	      perror("mapping pread");
 	      return 0;
 	    }
+#else
+	  DWORD read_len;
+	  OVERLAPPED ovlp = {0};
+	  ovlp.Offset = store->file_offset + p->page_offset;
+	  if (!ReadFile((HANDLE) _get_osfhandle(store->pagefd), compressed ? buf : dest, in_len, &read_len, &ovlp) || read_len != in_len)
+	  {
+	  	perror("mapping ReadFile");
+	  	return 0;
+	  }
+#endif
 	  if (compressed)
 	    {
 	      unsigned int out_len;

@@ -19,6 +19,10 @@
 #include "sha1.h"
 #include "sha2.h"
 
+#ifdef _WIN32
+  #include "strfncs.h"
+#endif
+
 struct s_Chksum {
   Id type;
   int done;
