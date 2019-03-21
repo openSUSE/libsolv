@@ -36,7 +36,7 @@
 #include <string.h>     /* memcpy()/memset() or bcopy()/bzero() */
 /* #include <assert.h> */   /* assert() */
 #include <stdio.h>
-#include <sys/uio.h>
+/* #include <sys/uio.h> */
 #include <unistd.h>
 #include <inttypes.h>
 
