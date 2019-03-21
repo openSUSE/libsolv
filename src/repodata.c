@@ -2941,7 +2941,8 @@ repodata_set_kv(Repodata *data, Id solvid, Id keyname, Id keytype, KeyValue *kv)
         repodata_add_dirnumnum(data, solvid, keyname, kv->id, kv->num, kv->num2);
       break;
     case REPOKEY_TYPE_DIRSTRARRAY:
-      repodata_add_dirstr(data, solvid, keyname, kv->id, kv->str);
+      if (kv->id)
+        repodata_add_dirstr(data, solvid, keyname, kv->id, kv->str);
       break;
     case_CHKSUM_TYPES:
       repodata_set_bin_checksum(data, solvid, keyname, keytype, (const unsigned char *)kv->str);
