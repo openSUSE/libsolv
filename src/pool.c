@@ -158,6 +158,9 @@ pool_setdisttype(Pool *pool, int disttype)
     case DISTTYPE_HAIKU:
       pool->noarchid = ARCH_ANY;
       break;
+    case DISTTYPE_CONDA:
+      pool->noarchid = ARCH_ANY;
+      break;
     default:
       return -1;
     }

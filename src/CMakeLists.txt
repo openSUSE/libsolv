@@ -29,6 +29,11 @@ SET (libsolv_HEADERS
     strpool.h dirpool.h knownid.h transaction.h rules.h problems.h
     chksum.h dataiterator.h ${CMAKE_BINARY_DIR}/src/solvversion.h)
 
+IF (ENABLE_CONDA)
+    SET (libsolv_SRCS ${libsolv_SRCS} conda.c)
+ENDIF (ENABLE_CONDA)
+
+
 SET (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
 IF (HAVE_LINKER_VERSION_SCRIPT)
 SET (CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${LINK_FLAGS} -Wl,--version-script=${CMAKE_SOURCE_DIR}/src/libsolv.ver")

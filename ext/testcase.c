@@ -153,6 +153,7 @@ static struct disttype2str {
   { DISTTYPE_DEB,  "deb" },
   { DISTTYPE_ARCH, "arch" },
   { DISTTYPE_HAIKU, "haiku" },
+  { DISTTYPE_CONDA, "conda" },
   { 0, 0 }
 };
 
