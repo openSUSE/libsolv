@@ -1790,6 +1790,67 @@ resolve_installed(Solver *solv, int level, int disablerules, Queue *dq)
   return level;
 }
 
+/* one or more installed cleandeps packages in dq that are to be updated */
+/* we need to emulate the code in resolve_installed */
+static void
+do_cleandeps_update_filter(Solver *solv, Queue *dq)
+{
+  Pool *pool = solv->pool;
+  Repo *installed = solv->installed;
+  Id *specialupdaters = solv->specialupdaters;
+  Id p, p2, pp, d;
+  Queue q;
+  int i, j, k;
+
+  queue_init(&q);
+  for (i = 0; i < dq->count; i++)
+    {
+      Id p = dq->elements[i];
+      if (p < 0)
+	p = -p;
+      if (pool->solvables[p].repo != installed || !MAPTST(&solv->cleandepsmap, p - installed->start))
+	continue;
+      queue_empty(&q);
+      /* find updaters */
+      if (specialupdaters && (d = specialupdaters[p - installed->start]) != 0)
+	{
+	  while ((p2 = pool->whatprovidesdata[d++]) != 0)
+	    queue_push(&q, p2);
+	}
+      else
+	{
+	  Rule *r = solv->rules + solv->updaterules + (p - installed->start);
+	  if (r->p)
+	    {
+	      FOR_RULELITERALS(p2, pp, r)
+		queue_push(&q, p2);
+	    }
+	}
+      if (q.count && solv->update_targets && solv->update_targets->elements[p - installed->start])
+        prune_to_update_targets(solv, solv->update_targets->elements + solv->update_targets->elements[p - installed->start], &q);
+      /* mark all elements in dq that are in the updaters list */
+      dq->elements[i] = -p;
+      for (j = 0; j < dq->count; j++)
+	{
+          p = dq->elements[j];
+	  if (p < 0)
+	    continue;
+	  for (k = 0; k < q.count; k++)
+	    if (q.elements[k] == p)
+	      {
+		dq->elements[j] = -p;
+		break;
+	      }
+	}
+    }
+  /* now prune to marked elements */
+  for (i = j = 0; i < dq->count; i++)
+    if ((p = dq->elements[i]) < 0)
+      dq->elements[j++] = -p;
+  dq->count = j;
+  queue_free(&q);
+}
+
 static int
 resolve_dependencies(Solver *solv, int level, int disablerules, Queue *dq)
 {
@@ -1885,15 +1946,25 @@ resolve_dependencies(Solver *solv, int level, int disablerules, Queue *dq)
       /* prune to cleandeps packages */
       if (solv->cleandepsmap.size && solv->installed)
 	{
+	  int cleandeps_update = 0;
 	  Repo *installed = solv->installed;
 	  for (j = 0; j < dq->count; j++)
 	    if (pool->solvables[dq->elements[j]].repo == installed && MAPTST(&solv->cleandepsmap, dq->elements[j] - installed->start))
-	      break;
+	      {
+		if (solv->updatemap_all || (solv->updatemap.size && MAPTST(&solv->updatemap, dq->elements[j] - installed->start)))
+		  {
+		    cleandeps_update = 1;		/* cleandeps package is marked for update */
+		    continue;
+		  }
+	        break;
+	      }
 	  if (j < dq->count)
 	    {
 	      dq->elements[0] = dq->elements[j];
 	      queue_truncate(dq, 1);
 	    }
+	  else if (cleandeps_update)
+	    do_cleandeps_update_filter(solv, dq);	/* special update filter */
 	}
 
       if (dq->count > 1 && postponed >= 0)
