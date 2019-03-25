@@ -55,6 +55,7 @@ static const char *archpolicies[] = {
   "sparcv8",	"sparcv8:sparc",
 #if defined(FEDORA) || defined(MAGEIA)
   "ia32e",	"ia32e:x86_64:athlon:i686:i586:i486:i386",
+  "aarch64",	"aarch64:m3ulcb",
   "athlon",	"athlon:i686:i586:i486:i386",
   "amd64",	"amd64:x86_64:athlon:i686:i586:i486:i386",
   "geode",	"geode:i586:i486:i386",
