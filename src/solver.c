@@ -1815,7 +1815,8 @@ do_cleandeps_update_filter(Solver *solv, Queue *dq)
       if (specialupdaters && (d = specialupdaters[p - installed->start]) != 0)
 	{
 	  while ((p2 = pool->whatprovidesdata[d++]) != 0)
-	    queue_push(&q, p2);
+	    if (solv->decisionmap[p2] >= 0)
+	      queue_push(&q, p2);
 	}
       else
 	{
@@ -1823,7 +1824,8 @@ do_cleandeps_update_filter(Solver *solv, Queue *dq)
 	  if (r->p)
 	    {
 	      FOR_RULELITERALS(p2, pp, r)
-		queue_push(&q, p2);
+	        if (solv->decisionmap[p2] >= 0)
+		  queue_push(&q, p2);
 	    }
 	}
       if (q.count && solv->update_targets && solv->update_targets->elements[p - installed->start])
