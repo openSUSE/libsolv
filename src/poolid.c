@@ -172,7 +172,7 @@ pool_id2rel(const Pool *pool, Id id)
 #ifdef ENABLE_CONDA
   if (pool->disttype == DISTTYPE_CONDA)
     {
-      static const char *condarels[] = { "!", ">", "=", ">=", "<", "!=", "<=", "<=>" };
+      static const char *condarels[] = { "!", ">", "==", ">=", "<", "!=", "<=", "<=>" };
       if (rd->flags < 8)
         return condarels[rd->flags];
       if (rd->flags == REL_WITH)
