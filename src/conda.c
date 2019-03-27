@@ -204,3 +204,11 @@ pool_evrcmp_conda(const Pool *pool, const char *evr1, const char *evr2, int mode
   return solv_vercmp_conda(r1 + 1, s1, r2 + 1, s2);
 }
 
+#if 0
+/* return true if solvable s matches the spec */
+/* see conda/models/match_spec.py */
+int
+solvable_conda_matchspec(Solvable *s, const char *spec)
+{
+}
+#endif

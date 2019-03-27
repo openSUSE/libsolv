@@ -2959,6 +2959,11 @@ repodata_unset_uninternalized(Repodata *data, Id solvid, Id keyname)
   ap = *app;
   if (!ap)
     return;
+  if (!keyname)
+    {
+      *app = 0;		/* delete all attributes */
+      return;
+    }
   for (; *ap; ap += 2)
     if (data->keys[*ap].name == keyname)
       break;
