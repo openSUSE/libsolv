@@ -1390,6 +1390,7 @@ struct solvable_copy_cbdata {
   Id handle;
   Id subhandle;
   Id *dircache;
+  int bad;
 };
 
 static int
@@ -1410,6 +1411,11 @@ solvable_copy_cb(void *vcbdata, Solvable *r, Repodata *fromdata, Repokey *key, K
     case REPOKEY_TYPE_DIRNUMNUMARRAY:
     case REPOKEY_TYPE_DIRSTRARRAY:
       kv->id = repodata_translate_dir(data, fromdata, kv->id, 1, fromdata->repodataid == 1 ? cbdata->dircache : 0);
+      if (!kv->id)
+	{
+	  cbdata->bad = 1;	/* oops, cannot copy this */
+	  return 0;
+	}
       break;
     case REPOKEY_TYPE_FIXARRAY:
       cbdata->handle = repodata_new_handle(data);
@@ -1430,7 +1436,7 @@ solvable_copy_cb(void *vcbdata, Solvable *r, Repodata *fromdata, Repokey *key, K
   return 0;
 }
 
-static void
+static int
 solvable_copy(Solvable *s, Solvable *r, Repodata *data, Id *dircache, Id **oldkeyskip)
 {
   int p, i;
@@ -1456,25 +1462,36 @@ solvable_copy(Solvable *s, Solvable *r, Repodata *data, Id *dircache, Id **oldke
 
   /* copy all attributes */
   if (!data || fromrepo->nrepodata < 2)
-    return;
+    return 1;
   cbdata.data = data;
   cbdata.handle = s - pool->solvables;
   cbdata.subhandle = 0;
   cbdata.dircache = dircache;
+  cbdata.bad = 0;
   p = r - fromrepo->pool->solvables;
   if (fromrepo->nrepodata == 2)
     {
       Repodata *fromdata = repo_id2repodata(fromrepo, 1);
       if (p >= fromdata->start && p < fromdata->end)
         repodata_search(fromdata, p, 0, 0, solvable_copy_cb, &cbdata);
-      return;
     }
-  keyskip = repo_create_keyskip(repo, p, oldkeyskip);
-  FOR_REPODATAS(fromrepo, i, data)
+  else
     {
-      if (p >= data->start && p < data->end)
-        repodata_search_keyskip(data, p, 0, 0, keyskip, solvable_copy_cb, &cbdata);
+      keyskip = repo_create_keyskip(repo, p, oldkeyskip);
+      FOR_REPODATAS(fromrepo, i, data)
+	{
+	  if (p >= data->start && p < data->end)
+	    repodata_search_keyskip(data, p, 0, 0, keyskip, solvable_copy_cb, &cbdata);
+	}
     }
+  if (cbdata.bad)
+    {
+      repodata_unset_uninternalized(data, cbdata.handle, 0);
+      memset(s, 0, sizeof(*s));
+      s->repo = repo;
+      return 0;
+    }
+  return 1;
 }
 
 /* used to sort entries by package name that got returned in some database order */
@@ -1765,11 +1782,8 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
 	      if (id)
 		{
 		  Solvable *r = ref->pool->solvables + ref->start + (id - 1);
-		  if (r->repo == ref)
-		    {
-		      solvable_copy(s, r, data, dircache, &oldkeyskip);
-		      continue;
-		    }
+		  if (r->repo == ref && solvable_copy(s, r, data, dircache, &oldkeyskip))
+		    continue;
 		}
 	    }
 	  res = getrpm_dbid(&state, dbid);
