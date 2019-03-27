@@ -168,6 +168,20 @@ pool_id2rel(const Pool *pool, Id id)
   if (!ISRELDEP(id))
     return "";
   rd = GETRELDEP(pool, id);
+
+#ifdef ENABLE_CONDA
+  if (pool->disttype == DISTTYPE_CONDA)
+    {
+      static const char *condarels[] = { "!", ">", "=", ">=", "<", "!=", "<=", "<=>" };
+      if (rd->flags < 8)
+        return condarels[rd->flags];
+      if (rd->flags == REL_WITH)
+        return ",";
+      if (rd->flags == REL_OR)
+        return "|";
+    }
+#endif
+
   switch (rd->flags)
     {
     /* debian special cases < and > */
