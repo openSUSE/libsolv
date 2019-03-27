@@ -41,12 +41,14 @@ static void
 usage(int status)
 {
   fprintf(stderr, "\nUsage:\n"
-	  "rpmdb2solv [-n] [-b <basefile>] [-p <productsdir>] [-r <root>]\n"
+	  "rpmdb2solv [-P] [-C] [-n] [-b <basefile>] [-p <productsdir>] [-r <root>]\n"
 	  " -n : No packages, do not read rpmdb, useful to only parse products\n"
 	  " -b <basefile> : Write .solv to <basefile>.solv instead of stdout\n"
 	  " -p <productsdir> : Scan <productsdir> for .prod files, representing installed products\n"
 	  " -r <root> : Prefix rpmdb path and <productsdir> with <root>\n"
 	  " -o <solv> : Write .solv to file instead of stdout\n"
+          " -P : print percentage done\n"
+          " -C : include the changelog\n"
 	 );
   exit(status);
 }

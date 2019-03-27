@@ -47,6 +47,9 @@ standard directory is */etc/products.d*.
 Do not read any packages from the rpm database. This is useful
 together with *-p* to only convert SUSE products.
 
+*-C*::
+Include the package changelog in the generated solv file.
+
 *-X*::
 Autoexpand SUSE pattern and product provides into packages.
 
