@@ -218,6 +218,8 @@ pool_id2rel(const Pool *pool, Id id)
       return " KIND ";
     case REL_ELSE:
       return pool->disttype == DISTTYPE_RPM ? " else " : " ELSE ";
+    case REL_CONDA:
+      return " ";
     case REL_ERROR:
       return " ERROR ";
     default:

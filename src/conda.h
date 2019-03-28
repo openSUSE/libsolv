@@ -14,6 +14,7 @@
 #define LIBSOLV_CONDA_H
 
 int pool_evrcmp_conda(const Pool *pool, const char *evr1, const char *evr2, int mode);
+int solvable_conda_matchversion(Solvable *s, const char *version);
 
 #endif /* LIBSOLV_CONDA_H */
 

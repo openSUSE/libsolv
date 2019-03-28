@@ -1008,6 +1008,7 @@ typedef int Id;
 %constant int REL_ERROR;
 %constant int REL_WITHOUT;
 %constant int REL_UNLESS;
+%constant int REL_CONDA;
 
 typedef struct {
   Pool* const pool;

@@ -406,6 +406,7 @@ struct oplist {
   { REL_ELSE, "<ELSE>" },
   { REL_ERROR, "<ERROR>" },
   { REL_UNLESS, "<UNLESS>" },
+  { REL_CONDA, "<CONDA>" },
   { REL_LT, "<" },
   { 0, 0 }
 };

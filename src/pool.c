@@ -27,6 +27,9 @@
 #include "util.h"
 #include "bitmap.h"
 #include "evr.h"
+#ifdef ENABLE_CONDA
+#include "conda.h"
+#endif
 
 #define SOLVABLE_BLOCK	255
 
@@ -1284,6 +1287,23 @@ pool_addrelproviders(Pool *pool, Id d)
 		queue_push(&plist, p);
 	    }
 	  break;
+#ifdef ENABLE_CONDA
+	case REL_CONDA:
+	  wp = pool_whatprovides(pool, name);
+	  if (evr)
+	    {
+	      const char *evrstr = pool_id2str(pool, evr);
+	      pp = pool->whatprovidesdata + wp;
+	      while ((p = *pp++) != 0)
+		{
+		  if (solvable_conda_matchversion(pool->solvables + p, evrstr))
+		    queue_push(&plist, p);
+		  else
+		    wp = 0;
+		}
+	    }
+	  break;
+#endif
 	default:
 	  break;
 	}

@@ -233,6 +233,7 @@ struct s_Pool {
 #define REL_ERROR	27	/* parse errors and the like */
 #define REL_WITHOUT	28
 #define REL_UNLESS	29	/* AND_NOT */
+#define REL_CONDA	30
 
 #if !defined(__GNUC__) && !defined(__attribute__)
 # define __attribute__(x)
