@@ -15,9 +15,41 @@
 #include "util.h"
 #include "chksum.h"
 
+#ifdef WITH_OPENSSL
+
+#include <openssl/md5.h>
+#include <openssl/sha.h>
+
+typedef SHA_CTX SHA1_CTX;
+typedef SHA256_CTX SHA224_CTX;
+typedef SHA512_CTX SHA384_CTX;
+
+#define solv_MD5_Init(ctx) MD5_Init(ctx)
+#define solv_MD5_Update(ctx, data, len) MD5_Update(ctx, data, len)
+#define solv_MD5_Final(md, ctx) MD5_Final(md, ctx)
+#define solv_SHA1_Init(ctx) SHA1_Init(ctx)
+#define solv_SHA1_Update(ctx, data, len) SHA1_Update(ctx, data, len)
+#define solv_SHA1_Final(ctx, md) SHA1_Final(md, ctx)
+#define solv_SHA224_Init(ctx) SHA224_Init(ctx)
+#define solv_SHA224_Update(ctx, data, len) SHA224_Update(ctx, data, len)
+#define solv_SHA224_Final(md, ctx) SHA224_Final(md, ctx)
+#define solv_SHA256_Init(ctx) SHA256_Init(ctx)
+#define solv_SHA256_Update(ctx, data, len) SHA256_Update(ctx, data, len)
+#define solv_SHA256_Final(md, ctx) SHA256_Final(md, ctx)
+#define solv_SHA384_Init(ctx) SHA384_Init(ctx)
+#define solv_SHA384_Update(ctx, data, len) SHA384_Update(ctx, data, len)
+#define solv_SHA384_Final(md, ctx) SHA384_Final(md, ctx)
+#define solv_SHA512_Init(ctx) SHA512_Init(ctx)
+#define solv_SHA512_Update(ctx, data, len) SHA512_Update(ctx, data, len)
+#define solv_SHA512_Final(md, ctx) SHA512_Final(md, ctx)
+
+#else
+
 #include "md5.h"
 #include "sha1.h"
 #include "sha2.h"
+
+#endif
 
 struct s_Chksum {
   Id type;

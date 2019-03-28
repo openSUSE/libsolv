@@ -18,9 +18,8 @@ SET (libsolv_SRCS
     solver.c solverdebug.c repo_solv.c repo_write.c evr.c pool.c
     queue.c repo.c repodata.c repopage.c util.c policy.c solvable.c
     transaction.c order.c rules.c problems.c linkedpkg.c cplxdeps.c
-    chksum.c md5.c sha1.c sha2.c solvversion.c selection.c
-    fileprovides.c diskusage.c suse.c solver_util.c cleandeps.c
-    userinstalled.c filelistfilter.c)
+    chksum.c solvversion.c selection.c fileprovides.c diskusage.c
+    suse.c solver_util.c cleandeps.c userinstalled.c filelistfilter.c)
 
 SET (libsolv_HEADERS
     bitmap.h evr.h hash.h policy.h poolarch.h poolvendor.h pool.h
@@ -33,6 +32,9 @@ IF (ENABLE_CONDA)
     SET (libsolv_SRCS ${libsolv_SRCS} conda.c)
 ENDIF (ENABLE_CONDA)
 
+IF (NOT WITH_OPENSSL)
+  SET (libsolv_SRCS ${libsolv_SRCS} md5.c sha1.c sha2.c)
+ENDIF (NOT WITH_OPENSSL)
 
 SET (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
 IF (HAVE_LINKER_VERSION_SCRIPT)
@@ -40,9 +42,12 @@ SET (CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${LINK_FLAGS} -Wl,-
 ENDIF (HAVE_LINKER_VERSION_SCRIPT)
 
 IF (DISABLE_SHARED)
-ADD_LIBRARY (libsolv STATIC ${libsolv_SRCS})
+  ADD_LIBRARY (libsolv STATIC ${libsolv_SRCS})
 ELSE (DISABLE_SHARED)
-ADD_LIBRARY (libsolv SHARED ${libsolv_SRCS})
+  ADD_LIBRARY (libsolv SHARED ${libsolv_SRCS})
+  IF (WITH_OPENSSL)
+    TARGET_LINK_LIBRARIES (libsolv ${OPENSSL_CRYPTO_LIBRARY})
+  ENDIF (WITH_OPENSSL)
 ENDIF (DISABLE_SHARED)
 
 SET_TARGET_PROPERTIES(libsolv PROPERTIES OUTPUT_NAME "solv")

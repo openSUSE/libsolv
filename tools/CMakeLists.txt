@@ -99,7 +99,7 @@ SET (tools_list ${tools_list} appdata2solv)
 ENDIF (ENABLE_APPDATA)
 
 ADD_EXECUTABLE (dumpsolv dumpsolv.c )
-TARGET_LINK_LIBRARIES (dumpsolv libsolv)
+TARGET_LINK_LIBRARIES (dumpsolv libsolv ${SYSTEM_LIBRARIES})
 
 ADD_EXECUTABLE (mergesolv mergesolv.c )
 TARGET_LINK_LIBRARIES (mergesolv toolstuff libsolvext libsolv ${SYSTEM_LIBRARIES})
