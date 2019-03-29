@@ -382,22 +382,73 @@ solvable_conda_matchversion_single(Solvable *s, const char *version, size_t vers
   return r == 0 ? 1 : 0;
 }
 
+static int
+solvable_conda_matchversion_rec(Solvable *s, const char **versionp, const char *versionend)
+{
+  const char *version = *versionp;
+  int v, vor = 0, vand = -1;	/* -1: doing OR, 0,1: doing AND */
+
+  if (version == versionend)
+    return -1;
+  for (;;)
+    {
+      if (*version == '(')
+	{
+	  version++;
+	  v = solvable_conda_matchversion_rec(s, &version, versionend);
+	  if (v == -1 || version == versionend || *version != ')')
+	    return -1;
+	  version++;
+	}
+      else if (*version == ')' || *version == '|' || *version == ',')
+	return -1;
+      else
+	{
+	  const char *vstart = version;
+	  while (version < versionend && *version != '(' && *version != ')' && *version != '|' && *version != ',')
+	    version++;
+	  if (vand >= 0 ? !vand : vor)
+	    v = 0;		/* no need to call expensive matchversion if the result does not matter */
+	  else
+	    v = solvable_conda_matchversion_single(s, vstart, version - vstart) ? 1 : 0;
+	}
+      if (version == versionend || *version == ')')
+	{
+ 	  *versionp = version;
+	  return vor | (vand >= 0 ? (vand & v) : v);
+	}
+      if (*version == ',')
+	vand = vand >= 0 ? (vand & v) : v;
+      else if (*version == '|')
+	{
+	  vor |= vand >= 0 ? (vand & v) : v;
+	  vand = -1;
+	}
+      else
+	return -1;
+      version++;
+    }
+}
 
 /* return true if solvable s matches the version */
 /* see conda/models/match_spec.py */
 int
 solvable_conda_matchversion(Solvable *s, const char *version)
 {
-  const char *build;
-  size_t vl;
+  const char *build, *versionend;
+  int r;
   /* split off build */
   if ((build = strchr(version, ' ')) != 0)
     {
-      vl = build - version;
+      versionend = build++;
       while (*build == ' ')
 	build++;
     }
   else
-    vl = strlen(version);
-  return solvable_conda_matchversion_single(s, version, vl);
+    versionend = version + strlen(version);
+  r = solvable_conda_matchversion_rec(s, &version, versionend);
+  if (r != 1 || version != versionend)
+    return 0;
+  return r;
 }
+
