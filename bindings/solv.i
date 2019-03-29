@@ -1380,7 +1380,7 @@ typedef struct {
     if ($self->pool == lsel->pool)
       selection_subtract($self->pool, &$self->q, &lsel->q);
   }
-  
+
   void select(const char *name, int flags) {
     if ((flags & SELECTION_MODEBITS) == 0)
       flags |= SELECTION_FILTER | SELECTION_WITH_ALL;
@@ -1395,6 +1395,11 @@ typedef struct {
     if ((flags & SELECTION_MODEBITS) == 0)
       flags |= SELECTION_FILTER | SELECTION_WITH_ALL;
     $self->flags = selection_make_matchdepid($self->pool, &$self->q, dep, flags, keyname, marker);
+  }
+  void matchsolvable(XSolvable *solvable, int flags, Id keyname, Id marker = -1) {
+    if ((flags & SELECTION_MODEBITS) == 0)
+      flags |= SELECTION_FILTER | SELECTION_WITH_ALL;
+    $self->flags = selection_make_matchsolvable($self->pool, &$self->q, solvable->id, flags, keyname, marker);
   }
 
   %typemap(out) Queue jobs Queue2Array(Job *, 2, new_Job(arg1->pool, id, idp[1]));
@@ -1709,7 +1714,7 @@ typedef struct {
     int result, ecode = 0, vresult = 0;
     Tcl_Obj *objvx[2];
     objvx[0] = callback_var->obj;
-    objvx[1] = SWIG_NewInstanceObj(SWIG_as_voidptr(xd), SWIGTYPE_p_XRepodata, 0); 
+    objvx[1] = SWIG_NewInstanceObj(SWIG_as_voidptr(xd), SWIGTYPE_p_XRepodata, 0);
     Tcl_IncrRefCount(objvx[1]);
     result = Tcl_EvalObjv(interp, sizeof(objvx)/sizeof(*objvx), objvx, TCL_EVAL_GLOBAL);
     Tcl_DecrRefCount(objvx[1]);
@@ -2035,6 +2040,13 @@ typedef struct {
   Selection *matchdepid(DepId dep, int flags, Id keyname, Id marker = -1) {
     Selection *sel = new_Selection($self);
     sel->flags = selection_make_matchdepid($self, &sel->q, dep, flags, keyname, marker);
+    return sel;
+  }
+
+  %newobject matchsolvable;
+  Selection *matchsolvable(XSolvable *solvable, int flags, Id keyname, Id marker = -1) {
+    Selection *sel = new_Selection($self);
+    sel->flags = selection_make_matchsolvable($self, &sel->q, solvable->id, flags, keyname, marker);
     return sel;
   }
 
