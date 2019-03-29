@@ -2,6 +2,15 @@
 This file contains the major changes between
 libsolv versions:
 
+Version 0.7.4
+- selected bug fixes:
+  * repo_add_rpmdb: do not copy bad solvables from the old solv file
+  * fix cleandeps updates not updating all packages
+- new features:
+  * bindings: support pool.matchsolvable(), pool.whatmatchessolvable()
+    pool.best_solvables() and selection.matchsolvable()
+  * experimental DISTTYPE_CONDA and REL_CONDA support
+
 Version 0.7.3
 - selected bug fixes:
   * fixed a couple of null pointer derefs and potential memory

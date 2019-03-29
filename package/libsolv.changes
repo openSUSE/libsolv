@@ -1,4 +1,12 @@
 -------------------------------------------------------------------
+Fri Mar 29 15:58:54 CET 2019 - mls@suse.de
+
+- repo_add_rpmdb: do not copy bad solvables from the old solv file
+- fix cleandeps updates not updating all packages
+- experimental DISTTYPE_CONDA and REL_CONDA support
+- bump version to 0.7.4
+
+-------------------------------------------------------------------
 Wed Jan 30 15:51:36 CET 2019 - mls@suse.de
 
 - fixed a couple of null pointer derefs
