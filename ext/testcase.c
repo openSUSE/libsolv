@@ -2199,7 +2199,11 @@ testcase_write_mangled(Solver *solv, const char *dir, int resultflags, const cha
 	sprintf(priobuf, "%d.%d", repo->priority, repo->subpriority);
       else
 	sprintf(priobuf, "%d", repo->priority);
+#if !defined(WITHOUT_COOKIEOPEN) && defined(ENABLE_ZLIB_COMPRESSION)
       out = pool_tmpjoin(pool, name, ".repo", ".gz");
+#else
+      out = pool_tmpjoin(pool, name, ".repo", 0);
+#endif
       for (i = 0; out[i]; i++)
 	if (out[i] == '/')
 	  out[i] = '_';

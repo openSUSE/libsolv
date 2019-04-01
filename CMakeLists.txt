@@ -38,6 +38,7 @@ OPTION (ENABLE_ZSTD_COMPRESSION "Build with zstd compression support?" OFF)
 OPTION (ENABLE_ZCHUNK_COMPRESSION "Build with zchunk compression support?" OFF)
 OPTION (WITH_SYSTEM_ZCHUNK "Use system zchunk library?" OFF)
 OPTION (WITH_LIBXML2  "Build with libxml2 instead of libexpat?" OFF)
+OPTION (WITHOUT_COOKIEOPEN "Disable the use of stdio cookie opens?" OFF)
 
 include (GNUInstallDirs)
 message (STATUS "Libraries will be installed in ${CMAKE_INSTALL_FULL_LIBDIR}")
@@ -267,7 +268,7 @@ ENDIF (${CMAKE_MAJOR_VERSION} GREATER 2)
 
 # should create config.h with #cmakedefine instead...
 FOREACH (VAR HAVE_STRCHRNUL HAVE_FOPENCOOKIE HAVE_FUNOPEN WORDS_BIGENDIAN
-  HAVE_RPM_DB_H HAVE_PGPDIGGETPARAMS WITH_LIBXML2 )
+  HAVE_RPM_DB_H HAVE_PGPDIGGETPARAMS WITH_LIBXML2 WITHOUT_COOKIEOPEN)
   IF(${VAR})
     ADD_DEFINITIONS (-D${VAR}=1)
     SET (SWIG_FLAGS ${SWIG_FLAGS} -D${VAR})

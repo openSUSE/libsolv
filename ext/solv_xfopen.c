@@ -15,6 +15,7 @@
 #include "solv_xfopen.h"
 #include "util.h"
 
+#ifndef WITHOUT_COOKIEOPEN
 
 static FILE *cookieopen(void *cookie, const char *mode,
 	ssize_t (*cread)(void *, char *, size_t),
@@ -602,6 +603,16 @@ static inline FILE *myzchunkfdopen(int fd, const char *mode)
 
 #endif /* ENABLE_ZCHUNK_COMPRESSION */
 
+#else
+/* no cookies no compression */
+#undef ENABLE_ZLIB_COMPRESSION
+#undef ENABLE_LZMA_COMPRESSION
+#undef ENABLE_BZIP2_COMPRESSION
+#undef ENABLE_ZSTD_COMPRESSION
+#undef ENABLE_ZCHUNK_COMPRESSION
+#endif
+
+
 
 FILE *
 solv_xfopen(const char *fn, const char *mode)
@@ -759,6 +770,9 @@ solv_xfopen_iscompressed(const char *fn)
   return 0;
 }
 
+
+#ifndef WITHOUT_COOKIEOPEN
+
 struct bufcookie {
   char **bufp;
   size_t *buflp;
@@ -835,3 +849,32 @@ solv_xfopen_buf(const char *fn, char **bufp, size_t *buflp, const char *mode)
     }
   return fp;
 }
+
+#else
+
+FILE *
+solv_xfopen_buf(const char *fn, char **bufp, size_t *buflp, const char *mode)
+{
+  FILE *fp;
+  size_t l;
+  if (*mode != 'r')
+    return 0;
+  l = buflp ? *buflp : strlen(*bufp);
+  if (!strcmp(mode, "rf"))
+    {
+      if (!(fp = fmemopen(0, l + 1, "r+")))
+	return 0;
+      if (l && fwrite(*bufp, l, 1, fp) != 1)
+	{
+	  fclose(fp);
+	  return 0;
+	}
+      rewind(fp);
+    }
+  else
+    fp = fmemopen(*bufp, l, "r");
+  return fp;
+}
+
+#endif
+
