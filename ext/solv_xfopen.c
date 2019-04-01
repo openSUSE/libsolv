@@ -862,13 +862,14 @@ solv_xfopen_buf(const char *fn, char **bufp, size_t *buflp, const char *mode)
   l = buflp ? *buflp : strlen(*bufp);
   if (!strcmp(mode, "rf"))
     {
-      if (!(fp = fmemopen(0, l + 1, "r+")))
+      if (!(fp = fmemopen(0, l, "r+")))
 	return 0;
       if (l && fwrite(*bufp, l, 1, fp) != 1)
 	{
 	  fclose(fp);
 	  return 0;
 	}
+      solv_free(*bufp);
       rewind(fp);
     }
   else
