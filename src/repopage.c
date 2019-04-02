@@ -785,7 +785,7 @@ repopagestore_read_or_setup_pages(Repopagestore *store, FILE *fp, unsigned int p
   if (store->pagefd == -1)
     can_seek = 0;
   else
-    fcntl(store->pagefd, F_SETFD, FD_CLOEXEC);
+    solv_setcloexec(store->pagefd, 1);
 
 #ifdef DEBUG_PAGING
   fprintf(stderr, "can %sseek\n", can_seek ? "" : "NOT ");

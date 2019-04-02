@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <fcntl.h>
 #include <sys/time.h>
 
 #include "util.h"
@@ -132,6 +133,12 @@ solv_timems(unsigned int subtract)
   r += ((unsigned int)tv.tv_sec & 0xffff) * 1000;
   r += (unsigned int)tv.tv_usec / 1000;
   return r - subtract;
+}
+
+int
+solv_setcloexec(int fd, int state)
+{
+  return fcntl(fd, F_SETFD, state ? FD_CLOEXEC : 0) == 0;
 }
 
 /* bsd's qsort_r has different arguments, so we define our

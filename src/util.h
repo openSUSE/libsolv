@@ -34,6 +34,7 @@ extern void *solv_free(void *);
 extern char *solv_strdup(const char *);
 extern void solv_oom(size_t, size_t);
 extern unsigned int solv_timems(unsigned int subtract);
+extern int solv_setcloexec(int fd, int state);
 extern void solv_sort(void *base, size_t nmemb, size_t size, int (*compar)(const void *, const void *, void *), void *compard);
 extern char *solv_dupjoin(const char *str1, const char *str2, const char *str3);
 extern char *solv_dupappend(const char *str1, const char *str2, const char *str3);

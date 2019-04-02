@@ -1121,7 +1121,7 @@ SolvFp *solvfp_xfopen_fd(const char *fn, int fd, const char *mode = 0);
     fd = dup(fd);
     if (fd == -1)
       return 0;
-    fcntl(fd, F_SETFD, FD_CLOEXEC);
+    solv_setcloexec(fd, 1);
     fp = solv_xfopen_fd(fn, fd, mode);
     if (!fp) {
       close(fd);
@@ -1138,7 +1138,7 @@ SolvFp *solvfp_xfopen_fd(const char *fn, int fd, const char *mode = 0);
     if (!fp)
       return 0;
     if (fileno(fp) != -1)
-      fcntl(fileno(fp), F_SETFD, FD_CLOEXEC);
+      solv_setcloexec(fileno(fp), 1);
     sfp = solv_calloc(1, sizeof(SolvFp));
     sfp->fp = fp;
     return sfp;
@@ -1220,7 +1220,7 @@ typedef struct {
   void cloexec(bool state) {
     if (!$self->fp || fileno($self->fp) == -1)
       return;
-    fcntl(fileno($self->fp), F_SETFD, state ? FD_CLOEXEC : 0);
+    solv_setcloexec(fileno($self->fp), state);
   }
 }
 
