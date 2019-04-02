@@ -3389,6 +3389,7 @@ solver_solve(Solver *solv, Queue *job)
   map_zerosize(&solv->cleandepsmap);
   map_zerosize(&solv->weakrulemap);
   solv->favormap = solv_free(solv->favormap);
+  queuep_free(&solv->favorq);
   queue_empty(&solv->weakruleq);
   solv->watches = solv_free(solv->watches);
   queue_empty(&solv->ruletojob);
