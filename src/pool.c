@@ -1289,19 +1289,7 @@ pool_addrelproviders(Pool *pool, Id d)
 	  break;
 #ifdef ENABLE_CONDA
 	case REL_CONDA:
-	  wp = pool_whatprovides(pool, name);
-	  if (evr)
-	    {
-	      const char *evrstr = pool_id2str(pool, evr);
-	      pp = pool->whatprovidesdata + wp;
-	      while ((p = *pp++) != 0)
-		{
-		  if (solvable_conda_matchversion(pool->solvables + p, evrstr))
-		    queue_push(&plist, p);
-		  else
-		    wp = 0;
-		}
-	    }
+          wp = pool_addrelproviders_conda(pool, name, evr, &plist);
 	  break;
 #endif
 	default:

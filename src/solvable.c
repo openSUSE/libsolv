@@ -126,7 +126,7 @@ solvable_lookup_str(Solvable *s, Id keyname)
   if (!s->repo)
     return 0;
   str = repo_lookup_str(s->repo, s - s->repo->pool->solvables, keyname);
-  if (!str && (keyname == SOLVABLE_LICENSE || keyname == SOLVABLE_GROUP))
+  if (!str && (keyname == SOLVABLE_LICENSE || keyname == SOLVABLE_GROUP || keyname == SOLVABLE_BUILDFLAVOR))
     str = solvable_lookup_str_joinarray(s, keyname, ", ");
   return str;
 }

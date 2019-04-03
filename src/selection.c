@@ -21,6 +21,9 @@
 #include "selection.h"
 #include "solver.h"
 #include "evr.h"
+#ifdef ENABLE_CONDA
+#include "conda.h"
+#endif
 
 
 static int
@@ -1149,6 +1152,19 @@ selection_canon(Pool *pool, Queue *selection, const char *name, int flags)
   flags |= SELECTION_NAME;
   flags &= ~SELECTION_PROVIDES;
 
+#ifdef ENABLE_CONDA
+  if (pool->disttype == DISTTYPE_CONDA)
+    {
+      Id *wp, id = pool_conda_matchspec(pool, name);
+      if (!id)
+	return 0;
+      wp = pool_whatprovides_ptr(pool, id);         /* check if there is a match */
+      if (!wp || !*wp)
+	return 0;
+      queue_push2(selection, SOLVER_SOLVABLE_PROVIDES, id);
+      return SELECTION_CANON;
+    }
+#endif
   if (pool->disttype == DISTTYPE_DEB)
     {
       if ((r = strchr(name, '_')) == 0)

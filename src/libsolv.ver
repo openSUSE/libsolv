@@ -291,7 +291,6 @@ SOLV_1.0 {
 		solv_realloc;
 		solv_realloc2;
 		solv_replacebadutf8;
-		solv_setcloexec;
 		solv_sort;
 		solv_strdup;
 		solv_timems;
@@ -449,4 +448,5 @@ SOLV_1.2 {
 
 SOLV_1.3 {
 		repodata_set_kv;
+		solv_setcloexec;
 } SOLV_1.2;

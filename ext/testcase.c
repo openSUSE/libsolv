@@ -1258,7 +1258,7 @@ testcase_write_testtags(Repo *repo, FILE *fp)
     {
       name = pool_id2str(pool, s->name);
       evr = pool_id2str(pool, s->evr);
-      arch = pool_id2str(pool, s->arch);
+      arch = s->arch ? pool_id2str(pool, s->arch) : "-";
       release = strrchr(evr, '-');
       if (!release)
 	release = evr + strlen(evr);
@@ -1284,6 +1284,12 @@ testcase_write_testtags(Repo *repo, FILE *fp)
 	}
       if (s->vendor)
 	fprintf(fp, "=Vnd: %s\n", pool_id2str(pool, s->vendor));
+      if (solvable_lookup_idarray(s, SOLVABLE_BUILDFLAVOR, &q))
+	{
+	  int i;
+	  for (i = 0; i < q.count; i++)
+	    fprintf(fp, "=Flv: %s\n", pool_id2str(pool, q.elements[i]));
+	}
       ti = solvable_lookup_num(s, SOLVABLE_BUILDTIME, 0);
       if (ti)
 	fprintf(fp, "=Tim: %u\n", ti);
@@ -1412,7 +1418,7 @@ testcase_add_testtags(Repo *repo, FILE *fp, int flags)
 	  if (sp[2] && !(sp[2][0] == '-' && !sp[2][1]))
 	    sp[2][-1] = '-';
 	  s->evr = makeevr(pool, sp[1]);
-	  s->arch = pool_str2id(pool, sp[3], 1);
+	  s->arch = strcmp(sp[3], "-") ? pool_str2id(pool, sp[3], 1) : 0;
 	  continue;
 	default:
 	  break;
@@ -1502,6 +1508,9 @@ testcase_add_testtags(Repo *repo, FILE *fp, int flags)
 	    repodata_add_idarray(data, s - pool->solvables, SOLVABLE_PREREQ_IGNOREINST, id);
 	    break;
 	  }
+	case 'F' << 16 | 'l' << 8 | 'v':
+	  repodata_add_poolstr_array(data, s - pool->solvables, SOLVABLE_BUILDFLAVOR, line + 6);
+	  break;
         default:
 	  break;
         }
@@ -2239,7 +2248,7 @@ testcase_write_mangled(Solver *solv, const char *dir, int resultflags, const cha
 	  lowscore = pool->id2arch[i];
 	}
     }
-  cmd = pool_tmpjoin(pool, "system ", pool->lastarch ? pool_id2str(pool, arch) : "unset", 0);
+  cmd = pool_tmpjoin(pool, "system ", pool->lastarch ? pool_id2str(pool, arch) : "-", 0);
   for (i = 0; disttype2str[i].str != 0; i++)
     if (pool->disttype == disttype2str[i].type)
       break;
@@ -2721,7 +2730,7 @@ testcase_read(Pool *pool, FILE *fp, const char *testcase, Queue *job, char **res
 		  missing_features = 1;
 		}
 	    }
-	  if (strcmp(pieces[1], "unset") == 0)
+	  if (strcmp(pieces[1], "unset") == 0 || strcmp(pieces[1], "-") == 0)
 	    pool_setarch(pool, 0);
 	  else if (pieces[1][0] == ':')
 	    pool_setarchpolicy(pool, pieces[1] + 1);
