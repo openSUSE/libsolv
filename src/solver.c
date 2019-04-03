@@ -1382,7 +1382,6 @@ solver_free(Solver *solv)
   queuep_free(&solv->recommendscplxq);
   queuep_free(&solv->suggestscplxq);
   queuep_free(&solv->brokenorphanrules);
-  queuep_free(&solv->favorq);
   queuep_free(&solv->recommendsruleq);
 
   map_free(&solv->recommendsmap);
@@ -3281,36 +3280,44 @@ add_complex_jobrules(Solver *solv, Id dep, int flags, int jobidx, int weak)
 }
 #endif
 
-/* sort by package id, last entry wins */
-static int
-setup_favormap_cmp(const void *ap, const void *bp, void *dp)
-{
-  const Id *a = ap, *b = bp;
-  if ((*a - *b) != 0)
-    return *a - *b;
-  return (b[1] < 0 ? -b[1] : b[1]) - (a[1] < 0 ? -a[1] : a[1]);
-}
-
 static void
 setup_favormap(Solver *solv)
 {
-  Queue *q = solv->favorq;
+  Queue *job = &solv->job;
   Pool *pool = solv->pool;
-  int i;
-  Id oldp = 0;
-  if (q->count > 2)
-    solv_sort(q->elements, q->count / 2, 2 * sizeof(Id), setup_favormap_cmp, solv);
+  int i, idx;
+  Id p, pp, how, what, select;
+
+  solv_free(solv->favormap);
   solv->favormap = solv_calloc(pool->nsolvables, sizeof(Id));
-  solv->havedisfavored = 0;
-  for (i = 0; i < q->count; i += 2)
+  for (i = 0; i < job->count; i += 2)
     {
-      Id p = q->elements[i];
-      if (p == oldp)
+      how = job->elements[i];
+      if ((how & SOLVER_JOBMASK) != SOLVER_FAVOR && (how & SOLVER_JOBMASK) != SOLVER_DISFAVOR)
 	continue;
-      oldp = p;
-      solv->favormap[p] = q->elements[i + 1];
-      if (q->elements[i + 1] < 0)
-	solv->havedisfavored = 1;
+      what = job->elements[i + 1];
+      select = how & SOLVER_SELECTMASK;
+      idx = (how & SOLVER_JOBMASK) == SOLVER_FAVOR ? i + 1 : -(i + 1);
+      if (select == SOLVER_SOLVABLE_REPO)
+	{
+	  Repo *repo = pool_id2repo(pool, what);
+	  if (repo)
+	    {
+	      Solvable *s;
+	      FOR_REPO_SOLVABLES(repo, p, s)
+		{
+		  solv->favormap[p] = idx;
+		  if (idx < 0)
+		    solv->havedisfavored = 1;
+		}
+	    }
+	}
+      FOR_JOB_SELECT(p, pp, select, what)
+	{
+	  solv->favormap[p] = idx;
+	  if (idx < 0)
+	    solv->havedisfavored = 1;
+	}
     }
 }
 
@@ -3336,6 +3343,7 @@ solver_solve(Solver *solv, Queue *job)
   int now, solve_start;
   int needduprules = 0;
   int hasbestinstalljob = 0;
+  int hasfavorjob = 0;
 
   solve_start = solv_timems(0);
 
@@ -3389,7 +3397,6 @@ solver_solve(Solver *solv, Queue *job)
   map_zerosize(&solv->cleandepsmap);
   map_zerosize(&solv->weakrulemap);
   solv->favormap = solv_free(solv->favormap);
-  queuep_free(&solv->favorq);
   queue_empty(&solv->weakruleq);
   solv->watches = solv_free(solv->watches);
   queue_empty(&solv->ruletojob);
@@ -3931,15 +3938,7 @@ solver_solve(Solver *solv, Queue *job)
 	case SOLVER_FAVOR:
 	case SOLVER_DISFAVOR:
 	  POOL_DEBUG(SOLV_DEBUG_JOB, "job: %s %s\n", (how & SOLVER_JOBMASK) == SOLVER_FAVOR ? "favor" : "disfavor", solver_select2str(pool, select, what));
-	  FOR_JOB_SELECT(p, pp, select, what)
-	    {
-	      if (!solv->favorq)
-		{
-		  solv->favorq = solv_calloc(1, sizeof(Queue));
-		  queue_init(solv->favorq);
-		}
-	      queue_push2(solv->favorq, p, (how & SOLVER_JOBMASK) == SOLVER_FAVOR ? i + 1 : -(i + 1));
-	    }
+	  hasfavorjob = 1;
 	  break;
 	default:
 	  POOL_DEBUG(SOLV_DEBUG_JOB, "job: unknown job\n");
@@ -3961,8 +3960,8 @@ solver_solve(Solver *solv, Queue *job)
   assert(solv->ruletojob.count == solv->nrules - solv->jobrules);
   solv->jobrules_end = solv->nrules;
 
-  /* sort favorq and transform it into two maps */
-  if (solv->favorq)
+  /* create favormap if we have favor jobs */
+  if (hasfavorjob)
     setup_favormap(solv);
 
   /* now create infarch and dup rules */
