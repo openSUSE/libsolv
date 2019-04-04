@@ -449,4 +449,5 @@ SOLV_1.2 {
 SOLV_1.3 {
 		repodata_set_kv;
 		solv_setcloexec;
+		pool_conda_matchspec;
 } SOLV_1.2;

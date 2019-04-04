@@ -116,6 +116,13 @@ IF (ENABLE_APPDATA)
 	repo_appdata.h)
 ENDIF (ENABLE_APPDATA)
 
+IF (ENABLE_CONDA)
+    SET (libsolvext_SRCS ${libsolvext_SRCS}
+	repo_conda.c)
+    SET (libsolvext_HEADERS ${libsolvext_HEADERS}
+	repo_conda.h)
+ENDIF (ENABLE_CONDA)
+
 IF (ENABLE_RPMMD OR ENABLE_SUSEREPO)
     SET (libsolvext_SRCS ${libsolvext_SRCS}
 	repodata_diskusage.c)
@@ -125,6 +132,11 @@ IF (ENABLE_RPMMD OR ENABLE_SUSEREPO OR ENABLE_APPDATA OR ENABLE_COMPS OR ENABLE_
     SET (libsolvext_SRCS ${libsolvext_SRCS}
 	solv_xmlparser.c)
 ENDIF (ENABLE_RPMMD OR ENABLE_SUSEREPO OR ENABLE_APPDATA OR ENABLE_COMPS OR ENABLE_HELIXREPO OR ENABLE_MDKREPO)
+
+IF (ENABLE_CONDA)
+    SET (libsolvext_SRCS ${libsolvext_SRCS}
+	solv_jsonparser.c)
+ENDIF (ENABLE_CONDA)
 
 IF (ENABLE_ZCHUNK_COMPRESSION)
     SET (libsolvext_SRCS ${libsolvext_SRCS}

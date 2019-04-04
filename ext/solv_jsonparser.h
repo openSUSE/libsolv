@@ -41,7 +41,7 @@ struct solv_jsonparser {
 #define JP_ARRAY	8
 #define JP_ARRAY_END	9
 
-struct solv_jsonparser *jsonparser_init(struct solv_jsonparser *jp, FILE *fp);
+void jsonparser_init(struct solv_jsonparser *jp, FILE *fp);
 struct solv_jsonparser *jsonparser_free(struct solv_jsonparser *jp);
 int jsonparser_parse(struct solv_jsonparser *jp);
 int jsonparser_skip(struct solv_jsonparser *jp, int type);

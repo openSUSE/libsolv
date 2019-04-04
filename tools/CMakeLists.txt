@@ -98,6 +98,13 @@ TARGET_LINK_LIBRARIES (appdata2solv toolstuff libsolvext libsolv ${SYSTEM_LIBRAR
 SET (tools_list ${tools_list} appdata2solv)
 ENDIF (ENABLE_APPDATA)
 
+IF (ENABLE_CONDA)
+ADD_EXECUTABLE (conda2solv conda2solv.c)
+TARGET_LINK_LIBRARIES (conda2solv toolstuff libsolvext libsolv ${SYSTEM_LIBRARIES})
+
+SET (tools_list ${tools_list} conda2solv)
+ENDIF (ENABLE_CONDA)
+
 ADD_EXECUTABLE (dumpsolv dumpsolv.c )
 TARGET_LINK_LIBRARIES (dumpsolv libsolv)
 

@@ -15,7 +15,7 @@
 #include "util.h"
 #include "solv_jsonparser.h"
 
-struct solv_jsonparser *
+void
 jsonparser_init(struct solv_jsonparser *jp, FILE *fp)
 {
   memset(jp, 0, sizeof(*jp));
@@ -24,7 +24,6 @@ jsonparser_init(struct solv_jsonparser *jp, FILE *fp)
   jp->line = jp->nextline = 1;
   jp->nextc = ' ';
   queue_init(&jp->stateq);
-  return jp;
 }
 
 struct solv_jsonparser *
