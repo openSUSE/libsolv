@@ -1,5 +1,5 @@
 SET (libsolvext_SRCS
-    solv_xfopen.c testcase.c)
+    solv_xfopen.c testcase.c repo_testcase.c)
 
 SET (libsolvext_HEADERS
     tools_util.h solv_xfopen.h testcase.h)
