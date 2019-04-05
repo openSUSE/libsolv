@@ -32,9 +32,9 @@ pool_solvable2str(Pool *pool, Solvable *s)
   int nl, el, al;
   char *p;
   n = pool_id2str(pool, s->name);
-  e = pool_id2str(pool, s->evr);
+  e = s->evr ? pool_id2str(pool, s->evr) : 0;
   /* XXX: may want to skip the epoch here */
-  a = pool_id2str(pool, s->arch);
+  a = s->arch ? pool_id2str(pool, s->arch) : "";
   nl = strlen(n);
   el = strlen(e);
   al = strlen(a);
@@ -110,10 +110,15 @@ solvable_lookup_str_joinarray(Solvable *s, Id keyname, const char *joinstr)
   if (solvable_lookup_idarray(s, keyname, &q) && q.count)
     {
       Pool *pool = s->repo->pool;
-      int i;
-      str = pool_tmpjoin(pool, pool_id2str(pool, q.elements[0]), 0, 0);
-      for (i = 1; i < q.count; i++)
-	str = pool_tmpappend(pool, str, joinstr, pool_id2str(pool, q.elements[i]));
+      if (q.count == 1)
+	str = (char *)pool_id2str(pool, q.elements[0]);
+      else
+	{
+	  int i;
+	  str = pool_tmpjoin(pool, pool_id2str(pool, q.elements[0]), 0, 0);
+	  for (i = 1; i < q.count; i++)
+	    str = pool_tmpappend(pool, str, joinstr, pool_id2str(pool, q.elements[i]));
+	}
     }
   queue_free(&q);
   return str;
@@ -456,7 +461,7 @@ pool_create_state_maps(Pool *pool, Queue *installed, Map *installedmap, Map *con
 int
 solvable_identical(Solvable *s1, Solvable *s2)
 {
-  unsigned int bt1, bt2;
+  unsigned long long bt1, bt2;
   Id rq1, rq2;
   Id *reqp;
   if (s1->name != s2->name)
@@ -503,6 +508,19 @@ solvable_identical(Solvable *s1, Solvable *s2)
 	  rq2 ^= *reqp;
       if (rq1 != rq2)
 	 return 0;
+    }
+  if (s1->repo && s1->repo->pool->disttype == DISTTYPE_CONDA)
+    {
+      /* check buildflavor and buildversion */
+      const char *str1, *str2;
+      str1 = solvable_lookup_str(s1, SOLVABLE_BUILDFLAVOR);
+      str2 = solvable_lookup_str(s2, SOLVABLE_BUILDFLAVOR);
+      if (str1 != str2 && (!str1 || !str2 || strcmp(str1, str2) != 0))
+	return 0;
+      str1 = solvable_lookup_str(s1, SOLVABLE_BUILDVERSION);
+      str2 = solvable_lookup_str(s2, SOLVABLE_BUILDVERSION);
+      if (str1 != str2 && (!str1 || !str2 || strcmp(str1, str2) != 0))
+	return 0;
     }
   return 1;
 }
