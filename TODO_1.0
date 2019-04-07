@@ -7,10 +7,6 @@
 
 - deal with DIRSTR entries having dirid 0 (for source rpms)
 
-- drop patchcheck
-
-- make FAVOR handling deal with versions
-
 - write more manpages
 
 IDEAS:
