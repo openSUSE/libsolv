@@ -12,7 +12,7 @@ repo test 0 testtags <inline>
 #>=Req: XX
 #>=Pkg: B2 1 1 i686
 #>=Sup: A2
-system x86_64 * system
+system x86_64 rpm system
 poolflags implicitobsoleteusescolors
 job install name A
 result transaction,problems <inline>
