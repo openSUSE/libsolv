@@ -9,3 +9,6 @@ repo test 0 testtags <inline>
 system x86_64 rpm system
 poolflags implicitobsoleteusescolors
 job update all packages
+result transaction,problems <inline>
+#>upgrade A-1-1.i586@system A-2-1.i586@test
+#>upgrade A-1-1.x86_64@system A-2-1.x86_64@test

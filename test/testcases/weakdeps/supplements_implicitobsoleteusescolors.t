@@ -15,6 +15,13 @@ repo test 0 testtags <inline>
 system x86_64 * system
 poolflags implicitobsoleteusescolors
 job install name A
+result transaction,problems <inline>
+#>install A-1-1.noarch@test
+#>install B-1-1.x86_64@test
 
 nextjob
 job install name A2
+result transaction,problems <inline>
+#>install A2-1-1.noarch@test
+
+

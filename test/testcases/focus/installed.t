@@ -21,3 +21,7 @@ solverflags focusinstalled
 
 job install name B
 job install name C
+result transaction,problems <inline>
+#>install B-1-1.noarch@available
+#>install B2-1-1.noarch@available
+#>install C-1-1.noarch@available

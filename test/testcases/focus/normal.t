@@ -20,3 +20,8 @@ system i686 rpm system
 
 job install name B
 job install name C
+result transaction,problems <inline>
+#>install B-2-1.noarch@available
+#>install B2-1-1.noarch@available
+#>install C-1-1.noarch@available
+#>upgrade A-1-1.noarch@system A-2-1.noarch@available
