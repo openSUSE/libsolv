@@ -1138,7 +1138,7 @@ repodata_search_array(Repodata *data, Id solvid, Id keyname, int flags, Repokey 
 
   if (!dp || kv->entry != -1)
     return 0;
-  while (++kv->entry < kv->num)
+  while (++kv->entry < (int)kv->num)
     {
       if (kv->entry)
 	dp = data_skip_schema(data, dp, schema);
@@ -3156,7 +3156,7 @@ compact_attrdata(Repodata *data, int entry, int nentry)
 	      break;
 	    case REPOKEY_TYPE_DIRSTRARRAY:
 	      for (v = attrs[1]; data->attriddata[v] ; v += 2)
-		if (data->attriddata[v + 1] < attrdatastart)
+		if ((unsigned int)data->attriddata[v + 1] < attrdatastart)
 		  attrdatastart = data->attriddata[v + 1];
 	      /* FALLTHROUGH */
 	    case REPOKEY_TYPE_IDARRAY:

@@ -1312,7 +1312,7 @@ pool_addrelproviders(Pool *pool, Id d)
       POOL_DEBUG(SOLV_DEBUG_STATS, "addrelproviders: what provides %s?\n", pool_dep2str(pool, name));
 #endif
       pp = pool_whatprovides_ptr(pool, name);
-      if (!ISRELDEP(name) && name < pool->whatprovidesauxoff)
+      if (!ISRELDEP(name) && (Offset)name < pool->whatprovidesauxoff)
 	ppaux = pool->whatprovidesaux[name] ? pool->whatprovidesauxdata + pool->whatprovidesaux[name] : 0;
       while (ISRELDEP(name))
 	{
@@ -1926,7 +1926,7 @@ pool_set_whatprovides(Pool *pool, Id id, Id providers)
   else
     {
       pool->whatprovides[id] = providers;
-      if (id < pool->whatprovidesauxoff)
+      if ((Offset)id < pool->whatprovidesauxoff)
 	pool->whatprovidesaux[id] = 0;	/* sorry */
       d = 1;
     }
