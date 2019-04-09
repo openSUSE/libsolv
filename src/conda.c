@@ -559,6 +559,7 @@ pool_conda_matchspec(Pool *pool, const char *name)
   char *p, *pp;
   char *build, *buildend, *version, *versionend;
   Id nameid, evrid = 1;
+  int haveglob = 0;
 
   /* ignore channel and namespace for now */
   if ((p2 = strrchr(name, ':')))
@@ -566,19 +567,27 @@ pool_conda_matchspec(Pool *pool, const char *name)
   name2 = solv_strdup(name);
   /* find end of name */
   for (p = name2; *p && *p != ' ' && *p != '=' && *p != '<' && *p != '>' && *p != '!' && *p != '~'; p++)
-    if (*p >= 'A' && *p <= 'Z')
-      *(char *)p += 'a' - 'A';		/* lower case the name */
+    {
+      if (*p >= 'A' && *p <= 'Z')
+        *(char *)p += 'a' - 'A';		/* lower case the name */
+      else if (*p == '*')
+	haveglob = 1;
+    }
   if (p == name2)
     {
       solv_free(name2);
-      return 0;	/* error: no package name */
+      return 0;	/* error: empty package name */
     }
   nameid = pool_strn2id(pool, name2, p - name2, 1);
   while (*p == ' ')
     p++;
   if (!*p)
     {
-      solv_free(name2);
+      if (*name2 != '^' && !haveglob)
+	{
+	  solv_free(name2);
+	  return nameid;		/* return a simple dependency if no glob/regex */
+	}
       return pool_rel2id(pool, nameid, evrid, REL_CONDA, 1);
     }
   /* have version */
