@@ -1913,6 +1913,8 @@ resolve_dependencies(Solver *solv, int level, int disablerules, Queue *dq)
 	}
       if (i == solv->nrules)
 	i = 1;
+      if (solv->focus_best && solv->do_extra_reordering && i >= solv->featurerules)
+	continue;
       r = solv->rules + i;
       if (r->d < 0)		/* ignore disabled rules */
 	continue;
