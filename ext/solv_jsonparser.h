@@ -20,7 +20,7 @@ struct solv_jsonparser {
   char *value;
   size_t valuelen;
 
-  int state;
+  int state;		/* START, END, OBJECT, ARRAY */
   Queue stateq;
   int nextc;
   int nextline;

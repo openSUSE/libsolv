@@ -362,7 +362,21 @@ testcase_solvid2str(Pool *pool, Id p)
   e = pool_id2str(pool, s->evr);
   a = pool_id2str(pool, s->arch);
   str = pool_alloctmpspace(pool, strlen(n) + strlen(e) + strlen(a) + 3);
-  sprintf(str, "%s-%s.%s", n, e, a);
+  if (s->arch)
+    sprintf(str, "%s-%s.%s", n, e, a);
+  else
+    sprintf(str, "%s-%s", n, e);
+  if (solvable_lookup_type(s, SOLVABLE_BUILDFLAVOR))
+    {
+      Queue flavorq;
+      int i;
+
+      queue_init(&flavorq);
+      solvable_lookup_idarray(s, SOLVABLE_BUILDFLAVOR, &flavorq);
+      for (i = 0; i < flavorq.count; i++)
+	str = pool_tmpappend(pool, str, "-", pool_id2str(pool, flavorq.elements[i]));
+      queue_free(&flavorq);
+    }
   if (!s->repo)
     return pool_tmpappend(pool, str, "@", 0);
   if (s->repo->name)
@@ -417,6 +431,47 @@ testcase_str2repo(Pool *pool, const char *str)
   return repo;
 }
 
+/* check evr and buildflavors */
+static int
+str2solvid_check(Pool *pool, Solvable *s, const char *start, const char *end, Id evrid)
+{
+  if (!solvable_lookup_type(s, SOLVABLE_BUILDFLAVOR))
+    {
+      /* just check the evr */
+      return evrid && s->evr == evrid;
+    }
+  else
+    {
+      Queue flavorq;
+      int i;
+
+      queue_init(&flavorq);
+      solvable_lookup_idarray(s, SOLVABLE_BUILDFLAVOR, &flavorq);
+      queue_unshift(&flavorq, s->evr);
+      for (i = 0; i < flavorq.count; i++)
+	{
+	  const char *part = pool_id2str(pool, flavorq.elements[i]);
+	  size_t partl = strlen(part);
+	  if (start + partl > end || strncmp(start, part, partl) != 0)
+	    break;
+	  start += partl;
+	  if (i + 1 < flavorq.count)
+	    {
+	      if (start >= end || *start != '-')
+		break;
+	      start++;
+	    }
+	}
+      if (i < flavorq.count)
+	{
+	  queue_free(&flavorq);
+	  return 0;
+	}
+      queue_free(&flavorq);
+      return start == end;
+    }
+}
+
 Id
 testcase_str2solvid(Pool *pool, const char *str)
 {
@@ -456,19 +511,18 @@ testcase_str2solvid(Pool *pool, const char *str)
 	  if (!nid)
 	    continue;
 	  evrid = pool_strn2id(pool, str + i + 1, repostart - (i + 1), 0);
-	  if (!evrid)
-	    continue;
 	  /* first check whatprovides */
 	  FOR_PROVIDES(p, pp, nid)
 	    {
 	      Solvable *s = pool->solvables + p;
-	      if (s->name != nid || s->evr != evrid)
+	      if (s->name != nid)
 		continue;
 	      if (repo && s->repo != repo)
 		continue;
 	      if (arch && s->arch != arch)
 		continue;
-	      return p;
+	      if (str2solvid_check(pool, s, str + i + 1, str + repostart, evrid))
+	        return p;
 	    }
 	  /* maybe it's not installable and thus not in whatprovides. do a slow search */
 	  if (repo)
@@ -476,11 +530,12 @@ testcase_str2solvid(Pool *pool, const char *str)
 	      Solvable *s;
 	      FOR_REPO_SOLVABLES(repo, p, s)
 		{
-		  if (s->name != nid || s->evr != evrid)
+		  if (s->name != nid)
 		    continue;
 		  if (arch && s->arch != arch)
 		    continue;
-		  return p;
+		  if (str2solvid_check(pool, s, str + i + 1, str + repostart, evrid))
+		    return p;
 		}
 	    }
 	  else
@@ -488,11 +543,12 @@ testcase_str2solvid(Pool *pool, const char *str)
 	      FOR_POOL_SOLVABLES(p)
 		{
 		  Solvable *s = pool->solvables + p;
-		  if (s->name != nid || s->evr != evrid)
+		  if (s->name != nid)
 		    continue;
 		  if (arch && s->arch != arch)
 		    continue;
-		  return p;
+		  if (str2solvid_check(pool, s, str + i + 1, str + repostart, evrid))
+		    return p;
 		}
 	    }
 	}

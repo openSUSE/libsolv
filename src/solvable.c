@@ -32,7 +32,7 @@ pool_solvable2str(Pool *pool, Solvable *s)
   int nl, el, al;
   char *p;
   n = pool_id2str(pool, s->name);
-  e = s->evr ? pool_id2str(pool, s->evr) : 0;
+  e = s->evr ? pool_id2str(pool, s->evr) : "";
   /* XXX: may want to skip the epoch here */
   a = s->arch ? pool_id2str(pool, s->arch) : "";
   nl = strlen(n);
@@ -57,6 +57,16 @@ pool_solvable2str(Pool *pool, Solvable *s)
     {
       p[nl + el] = pool->disttype == DISTTYPE_HAIKU ? '-' : '.';
       strcpy(p + nl + el + 1, a);
+    }
+  if (pool->disttype == DISTTYPE_CONDA && solvable_lookup_type(s, SOLVABLE_BUILDFLAVOR))
+    {
+      Queue flavorq;
+      int i;
+      queue_init(&flavorq);
+      solvable_lookup_idarray(s, SOLVABLE_BUILDFLAVOR, &flavorq);
+      for (i = 0; i < flavorq.count; i++)
+	p = pool_tmpappend(pool, p, "-", pool_id2str(pool, flavorq.elements[i]));
+      queue_free(&flavorq);
     }
   return p;
 }
