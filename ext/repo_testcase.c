@@ -469,6 +469,9 @@ testcase_write_testtags(Repo *repo, FILE *fp)
 	  for (i = 0; i < q.count; i++)
 	    fprintf(fp, "=Flv: %s\n", pool_id2str(pool, q.elements[i]));
 	}
+      tmp = solvable_lookup_str(s, SOLVABLE_BUILDVERSION);
+      if (tmp)
+        fprintf(fp, "=Bvr: %s\n", tmp);
       ti = solvable_lookup_num(s, SOLVABLE_BUILDTIME, 0);
       if (ti)
 	fprintf(fp, "=Tim: %u\n", ti);
@@ -689,6 +692,9 @@ testcase_add_testtags(Repo *repo, FILE *fp, int flags)
 	  }
 	case 'F' << 16 | 'l' << 8 | 'v':
 	  repodata_add_poolstr_array(data, s - pool->solvables, SOLVABLE_BUILDFLAVOR, line + 6);
+	  break;
+	case 'B' << 16 | 'v' << 8 | 'r':
+	  repodata_set_str(data, s - pool->solvables, SOLVABLE_BUILDVERSION, line + 6);
 	  break;
         default:
 	  break;

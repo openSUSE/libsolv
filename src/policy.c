@@ -831,6 +831,19 @@ move_installed_to_front(Pool *pool, Queue *plist)
     }
 }
 
+static int
+pool_buildversioncmp(Pool *pool, Solvable *s1, Solvable *s2)
+{
+  const char *bv2, *bv1 = solvable_lookup_str(s1, SOLVABLE_BUILDVERSION);
+  if (bv1)
+    {
+      bv2 = solvable_lookup_str(s2, SOLVABLE_BUILDVERSION);
+      if (bv1 != bv2)
+	return pool_evrcmp_str(pool, bv1, bv2, EVRCMP_COMPARE);
+    }
+  return 0;
+}
+
 /*
  * prune_to_best_version
  *
@@ -878,6 +891,8 @@ prune_to_best_version(Pool *pool, Queue *plist)
       if (r == 0 && has_package_link(pool, s))
         r = pool_link_evrcmp(pool, best, s);
 #endif
+      if (r == 0 && pool->disttype == DISTTYPE_CONDA)
+	r = pool_buildversioncmp(pool, best, s);
       if (r < 0)
 	best = s;
     }
