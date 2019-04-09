@@ -1,6 +1,7 @@
 repo system 0 testtags <inline>
 #>=Pkg: A 1 1 noarch
 #>=Pkg: A2 1 1 noarch
+#>=Pkg: D 1 1 noarch
 repo available 0 testtags <inline>
 #>=Pkg: A 1 1 noarch
 #>=Pkg: A 2 1 noarch
@@ -16,6 +17,7 @@ repo available 0 testtags <inline>
 #>=Req: A2 = 2
 #>=Pkg: C 1 1 noarch
 #>=Req: B2
+#>=Pkg: D 2 1 noarch
 system i686 rpm system
 solverflags focusbest
 
