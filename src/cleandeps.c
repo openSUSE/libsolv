@@ -836,7 +836,7 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
 		    if (MAPTST(&solv->multiversion, p))
 		      break;
 		  if (p)
-		    continue;
+		    continue;	/* found a multiversion package that will not obsolate anything */
 		}
 
 	      om.size = 0;

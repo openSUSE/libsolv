@@ -1328,6 +1328,31 @@ solver_addfeaturerule(Solver *solv, Solvable *s)
     }
 }
 
+/* check if multiversion solvable s2 has an obsoletes for installed solvable s */
+static int
+is_multiversion_obsoleteed(Pool *pool, Solvable *s, Solvable *s2)
+{
+  Id *wp, obs, *obsp;
+
+  if (pool->obsoleteusescolors && !pool_colormatch(pool, s, s2))
+    return 0;
+  obsp = s2->repo->idarraydata + s2->obsoletes;
+  if (!pool->obsoleteusesprovides)
+    {
+      while ((obs = *obsp++) != 0)
+        if (pool_match_nevr(pool, s, obs))
+	  return 1;
+    }
+  else
+    {
+      while ((obs = *obsp++) != 0)
+        for (wp = pool_whatprovides_ptr(pool, obs); *wp; wp++)
+	  if (pool->solvables + *wp == s)
+	    return 1;
+    }
+  return 0;
+}
+
 /*-------------------------------------------------------------------
  *
  * add rule for update
@@ -1389,9 +1414,8 @@ solver_addupdaterule(Solver *solv, Solvable *s)
 	      if (MAPTST(&solv->multiversion, qs.elements[i]))
 		{
 		  Solvable *ps = pool->solvables + qs.elements[i];
-		  /* if keepexplicitobsoletes is set and the name is different,
-		   * we assume that there is an obsoletes. XXX: not 100% correct */
-		  if (solv->keepexplicitobsoletes && ps->name != s->name)
+		  /* check if there is an explicit obsoletes */
+		  if (solv->keepexplicitobsoletes && ps->obsoletes && is_multiversion_obsoleteed(pool, s, ps))
 		    {
 		      qs.elements[j++] = qs.elements[i];
 		      continue;
@@ -2189,7 +2213,7 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
 	  if (pool->solvables[p].repo == installed)
 	    return;
 	  if (solv->multiversion.size && MAPTST(&solv->multiversion, p) && !solv->keepexplicitobsoletes)
-	    return;
+	    return;		/* will not obsolete anything, so just return */
 	}
       omap.size = 0;
       qstart = q->count;
