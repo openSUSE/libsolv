@@ -30,9 +30,6 @@
 
 #ifdef _WIN32
   #include <direct.h>
-  #define PATH_SEP '\\'
-#else
-  #define PATH_SEP '/'
 #endif
 
 /* see repo_testcase.c */
@@ -100,6 +97,7 @@ static struct resultflags2str {
   { TESTCASE_RESULT_REASON,		"reason" },
   { TESTCASE_RESULT_CLEANDEPS,		"cleandeps" },
   { TESTCASE_RESULT_JOBS,		"jobs" },
+  { TESTCASE_RESULT_USERINSTALLED,	"userinstalled" },
   { 0, 0 }
 };
 
@@ -1373,6 +1371,24 @@ testcase_solverresult(Solver *solv, int resultflags)
       queue_free(&q);
       queue_free(&qf);
     }
+  if ((resultflags & TESTCASE_RESULT_USERINSTALLED) != 0)
+    {
+      Queue q;
+      solver_get_userinstalled(solv, &q, 0);
+      for (i = 0; i < q.count; i++)
+	{
+	  s = pool_tmpjoin(pool, "userinstalled pkg ", testcase_solvid2str(pool, q.elements[i]), 0);
+	  strqueue_push(&sq, s);
+	}
+      queue_empty(&q);
+      solver_get_userinstalled(solv, &q, GET_USERINSTALLED_NAMES | GET_USERINSTALLED_INVERTED);
+      for (i = 0; i < q.count; i++)
+	{
+	  s = pool_tmpjoin(pool, "autoinst name ", pool_id2str(pool, q.elements[i]), 0);
+	  strqueue_push(&sq, s);
+	}
+      queue_free(&q);
+    }
   if ((resultflags & TESTCASE_RESULT_ALTERNATIVES) != 0)
     {
       char *altprefix;
@@ -1963,7 +1979,13 @@ testcase_read(Pool *pool, FILE *fp, const char *testcase, Queue *job, char **res
       return 0;
     }
   testcasedir = solv_strdup(testcase);
-  if ((s = strrchr(testcasedir, PATH_SEP)) != 0)
+  s = strrchr(testcasedir, '/');
+#ifdef _WIN32
+  buf = strrchr(testcasedir, '\\');
+  if (!s || (buf && buf > s))
+    s = buf;
+#endif
+  if (s)
     s[1] = 0;
   else
     *testcasedir = 0;
