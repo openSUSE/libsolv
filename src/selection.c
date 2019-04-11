@@ -25,6 +25,9 @@
 #include "conda.h"
 #endif
 
+#ifdef _WIN32
+#include "strfncs.h"
+#endif
 
 static int
 str2archid(Pool *pool, const char *arch)

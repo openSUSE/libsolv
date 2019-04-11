@@ -1,0 +1,9 @@
+INCLUDE_DIRECTORIES (${PROJECT_SOURCE_DIR}/win32)
+SET (WIN32_COMPAT_SOURCES
+  ${PROJECT_SOURCE_DIR}/win32/fnmatch.c
+  ${PROJECT_SOURCE_DIR}/win32/getopt.c
+  ${PROJECT_SOURCE_DIR}/win32/regcomp.c
+  ${PROJECT_SOURCE_DIR}/win32/regexec.c
+  ${PROJECT_SOURCE_DIR}/win32/strfncs.c
+  ${PROJECT_SOURCE_DIR}/win32/tre-mem.c
+)

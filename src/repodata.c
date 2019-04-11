@@ -34,6 +34,10 @@
 #include "repopack.h"
 #include "repopage.h"
 
+#ifdef _WIN32
+  #include "strfncs.h"
+#endif
+
 #define REPODATA_BLOCK 255
 
 static unsigned char *data_skip_key(Repodata *data, unsigned char *dp, Repokey *key);
