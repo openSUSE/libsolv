@@ -72,18 +72,18 @@ static int
 skipspace(struct solv_jsonparser *jp)
 {
   int c = jp->nextc;
+  jp->nextc = ' ';
   while (c == ' ' || c == '\t' || c == '\r' || c == '\n')
     c = nextc(jp);
   jp->line = jp->nextline;
-  return (jp->nextc = c);
+  return c;
 }
 
 static int
-parseliteral(struct solv_jsonparser *jp)
+parseliteral(struct solv_jsonparser *jp, int c)
 {
   size_t nspace = jp->nspace;
-  int c;
-  savec(jp, jp->nextc);
+  savec(jp, c);
   for (;;)
     {
       c = nextc(jp);
@@ -103,10 +103,9 @@ parseliteral(struct solv_jsonparser *jp)
 }
 
 static int
-parsenumber(struct solv_jsonparser *jp)
+parsenumber(struct solv_jsonparser *jp, int c)
 {
-  int c;
-  savec(jp, jp->nextc);
+  savec(jp, c);
   for (;;)
     {
       c = nextc(jp);
@@ -193,7 +192,6 @@ parsestring(struct solv_jsonparser *jp)
 	}
       savec(jp, c);
     }
-  jp->nextc = ' ';
   savec(jp, 0);
   return JP_STRING;
 }
@@ -205,10 +203,9 @@ parsevalue(struct solv_jsonparser *jp)
   if (c == '"')
     return parsestring(jp);
   if ((c >= '0' && c <= '9') || c == '+' || c == '-' || c == '.')
-    return parsenumber(jp);
+    return parsenumber(jp, c);
   if ((c >= 'a' && c <= 'z'))
-    return parseliteral(jp);
-  jp->nextc = ' ';
+    return parseliteral(jp, c);
   if (c == '[')
     return JP_ARRAY;
   if (c == '{')
@@ -251,7 +248,6 @@ jsonparser_parse(struct solv_jsonparser *jp)
 	return JP_ERROR;
       if (skipspace(jp) != ':')
 	return JP_ERROR;
-      jp->nextc = ' ';
       type = parsevalue(jp);
       if (type == JP_OBJECT_END || type == JP_ARRAY_END)
 	return JP_ERROR;
@@ -263,7 +259,7 @@ jsonparser_parse(struct solv_jsonparser *jp)
       jp->value = jp->space + nspace;
       jp->valuelen = jp->nspace - nspace - 1;
     }
-  if (type == JP_ARRAY || type == JP_OBJECT)
+  if (type == JP_OBJECT || type == JP_ARRAY)
     {
       queue_push(&jp->stateq, jp->state);
       jp->state = type;
@@ -271,9 +267,9 @@ jsonparser_parse(struct solv_jsonparser *jp)
   else if (jp->state == JP_OBJECT || jp->state == JP_ARRAY)
     {
       int c = skipspace(jp);
-      if (c == ',')
-	jp->nextc = ' ';
-      else if (c != (jp->state == JP_OBJECT ? '}' : ']'))
+      if (c == (jp->state == JP_OBJECT ? '}' : ']'))
+	jp->nextc = c;
+      else if (c != ',')
 	return JP_ERROR;
     }
   return type;
