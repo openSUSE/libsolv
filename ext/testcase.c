@@ -368,10 +368,7 @@ testcase_solvid2str(Pool *pool, Id p)
   e = pool_id2str(pool, s->evr);
   a = pool_id2str(pool, s->arch);
   str = pool_alloctmpspace(pool, strlen(n) + strlen(e) + strlen(a) + 3);
-  if (s->arch)
-    sprintf(str, "%s-%s.%s", n, e, a);
-  else
-    sprintf(str, "%s-%s", n, e);
+  sprintf(str, "%s-%s", n, e);
   if (solvable_lookup_type(s, SOLVABLE_BUILDFLAVOR))
     {
       Queue flavorq;
@@ -383,16 +380,18 @@ testcase_solvid2str(Pool *pool, Id p)
 	str = pool_tmpappend(pool, str, "-", pool_id2str(pool, flavorq.elements[i]));
       queue_free(&flavorq);
     }
+  if (s->arch)
+    str = pool_tmpappend(pool, str, ".", a);
   if (!s->repo)
     return pool_tmpappend(pool, str, "@", 0);
   if (s->repo->name)
     {
       int l = strlen(str);
-      char *str2 = pool_tmpappend(pool, str, "@", s->repo->name);
-      for (; str2[l]; l++)
-	if (str2[l] == ' ' || str2[l] == '\t')
-	  str2[l] = '_';
-      return str2;
+      str = pool_tmpappend(pool, str, "@", s->repo->name);
+      for (; str[l]; l++)
+	if (str[l] == ' ' || str[l] == '\t')
+	  str[l] = '_';
+      return str;
     }
   sprintf(buf, "@#%d", s->repo->repoid);
   return pool_tmpappend(pool, str, buf, 0);
