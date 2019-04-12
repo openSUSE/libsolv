@@ -26,11 +26,11 @@ jsonparser_init(struct solv_jsonparser *jp, FILE *fp)
   queue_init(&jp->stateq);
 }
 
-struct solv_jsonparser *
+void
 jsonparser_free(struct solv_jsonparser *jp)
 {
+  solv_free(jp->space);
   queue_free(&jp->stateq);
-  return 0;
 }
 
 static void
