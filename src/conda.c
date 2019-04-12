@@ -24,6 +24,10 @@
 #include "util.h"
 #include "conda.h"
 
+#ifdef _WIN32
+#include "strfncs.h"
+#endif
+
 static const char *
 endseg(const char *seg, const char *end)
 {
