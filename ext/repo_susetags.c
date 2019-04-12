@@ -21,6 +21,10 @@
 #endif
 #include "repodata_diskusage.h"
 
+#ifdef _WIN32
+#include "strfncs.h"
+#endif
+
 struct datashare {
   Id name;
   Id evr;
