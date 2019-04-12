@@ -27,7 +27,10 @@ fmemopen(void *buf, size_t size, const char *mode)
     return 0;
   fp = _fdopen(_open_osfhandle((intptr_t)fh, 0), "w+b");
   if (!fp)
-    return 0;
+    {
+      CloseHandle(fh);
+      return 0;
+    }
   if (buf && size && fwrite(buf, size, 1, fp) != 1)
     {
       fclose(fp);
