@@ -104,9 +104,11 @@ ENDIF (ENABLE_APPDATA)
 
 IF (ENABLE_CONDA)
 ADD_EXECUTABLE (conda2solv conda2solv.c)
+ADD_EXECUTABLE (condatest condatest.c)
 TARGET_LINK_LIBRARIES (conda2solv toolstuff libsolvext libsolv ${SYSTEM_LIBRARIES})
+TARGET_LINK_LIBRARIES (condatest toolstuff libsolvext libsolv ${SYSTEM_LIBRARIES})
 
-SET (tools_list ${tools_list} conda2solv)
+SET (tools_list ${tools_list} conda2solv condatest)
 ENDIF (ENABLE_CONDA)
 
 IF (NOT WIN32)
