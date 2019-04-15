@@ -844,6 +844,16 @@ pool_buildversioncmp(Pool *pool, Solvable *s1, Solvable *s2)
   return 0;
 }
 
+static int
+pool_buildflavorcmp(Pool *pool, Solvable *s1, Solvable *s2)
+{
+  const char *f1 = solvable_lookup_str(s1, SOLVABLE_BUILDFLAVOR);
+  const char *f2 = solvable_lookup_str(s2, SOLVABLE_BUILDFLAVOR);
+  if (!f1 && !f2)
+    return 0;
+  return pool_evrcmp_str(pool, f1 ? f1 : "" , f2 ? f2 : "", EVRCMP_COMPARE);
+}
+
 /*
  * prune_to_best_version
  *
@@ -893,6 +903,8 @@ prune_to_best_version(Pool *pool, Queue *plist)
 #endif
       if (r == 0 && pool->disttype == DISTTYPE_CONDA)
 	r = pool_buildversioncmp(pool, best, s);
+      if (r == 0 && pool->disttype == DISTTYPE_CONDA)
+	r = pool_buildflavorcmp(pool, best, s);
       if (r < 0)
 	best = s;
     }
