@@ -239,9 +239,13 @@ regexmatch(const char *evr, const char *version, size_t versionlen, int icase)
   memcpy(buf, version, versionlen);
   buf[versionlen] = 0;
   if (regcomp(&reg, buf, REG_EXTENDED | REG_NOSUB | (icase ? REG_ICASE : 0)))
-    return 0;
+    {
+      solv_free(buf);
+      return 0;
+    }
   r = regexec(&reg, evr, 0, NULL, 0);
   regfree(&reg);
+  solv_free(buf);
   return r == 0;
 }
 
@@ -264,9 +268,13 @@ globmatch(const char *evr, const char *version, size_t versionlen, int icase)
   buf[j++] = '$';
   buf[j] = 0;
   if (regcomp(&reg, buf, REG_EXTENDED | REG_NOSUB | (icase ? REG_ICASE : 0)))
-    return 0;
+    {
+      solv_free(buf);
+      return 0;
+    }
   r = regexec(&reg, evr, 0, NULL, 0);
   regfree(&reg);
+  solv_free(buf);
   return r == 0;
 }
 
