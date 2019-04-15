@@ -562,7 +562,7 @@ pool_conda_matchspec(Pool *pool, const char *name)
   char *name2;
   char *p, *pp;
   char *build, *buildend, *version, *versionend;
-  Id nameid, evrid = 1;
+  Id nameid, evrid;
   int haveglob = 0;
 
   /* ignore channel and namespace for now */
@@ -592,6 +592,8 @@ pool_conda_matchspec(Pool *pool, const char *name)
 	  solv_free(name2);
 	  return nameid;		/* return a simple dependency if no glob/regex */
 	}
+      evrid = pool_str2id(pool, "*", 1);
+      solv_free(name2);
       return pool_rel2id(pool, nameid, evrid, REL_CONDA, 1);
     }
   /* have version */
