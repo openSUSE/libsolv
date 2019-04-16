@@ -645,8 +645,6 @@ pool_conda_matchspec(Pool *pool, const char *name)
 	  if (!build)
 	    version += 2;
 	}
-      else if (build)
-	version += 1;
       else
 	{
 	  for (p = version + 1; p < versionend; p++)
