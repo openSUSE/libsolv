@@ -58,7 +58,7 @@ parse_package(struct parsedata *pd, struct solv_jsonparser *jp, char *kfn)
     {
       if (type == JP_STRING && !strcmp(jp->key, "build"))
 	repodata_add_poolstr_array(data, handle, SOLVABLE_BUILDFLAVOR, jp->value);
-      else if (type == JP_STRING && !strcmp(jp->key, "build_number"))
+      else if (type == JP_NUMBER && !strcmp(jp->key, "build_number"))
 	repodata_set_str(data, handle, SOLVABLE_BUILDVERSION, jp->value);
       else if (type == JP_ARRAY && !strcmp(jp->key, "depends"))
 	type = parse_deps(pd, jp, &s->requires);
