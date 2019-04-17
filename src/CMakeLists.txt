@@ -31,6 +31,7 @@ SET (libsolv_HEADERS
 
 IF (ENABLE_CONDA)
     SET (libsolv_SRCS ${libsolv_SRCS} conda.c)
+    SET (libsolv_HEADERS ${libsolv_HEADERS} conda.h)
 ENDIF (ENABLE_CONDA)
 
 IF (NOT MSVC)
