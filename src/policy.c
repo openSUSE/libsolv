@@ -866,6 +866,8 @@ move_installed_to_front(Pool *pool, Queue *plist)
   Solvable *s;
   Id p, pp;
 
+  if (!pool->installed)
+    return;
   for (i = j = 0; i < plist->count; i++)
     {
       s = pool->solvables + plist->elements[i];
@@ -961,8 +963,6 @@ prune_to_best_version(Pool *pool, Queue *plist)
       else
         prune_obsoleted(pool, plist);
     }
-  if (plist->count > 1 && pool->installed)
-    move_installed_to_front(pool, plist);
 }
 
 
@@ -1343,6 +1343,7 @@ policy_filter_unwanted(Solver *solv, Queue *plist, int mode)
 #endif
 	  dislike_old_versions(pool, plist);
 	  sort_by_common_dep(pool, plist);
+	  move_installed_to_front(pool, plist);
 	  if (solv->urpmreorder)
 	    urpm_reorder(solv, plist);
 	  prefer_suggested(solv, plist);
@@ -1364,6 +1365,7 @@ pool_best_solvables(Pool *pool, Queue *plist, int flags)
     {
       dislike_old_versions(pool, plist);
       sort_by_common_dep(pool, plist);
+      move_installed_to_front(pool, plist);
     }
 }
 
