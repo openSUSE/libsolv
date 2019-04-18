@@ -2015,7 +2015,7 @@ testcase_solverresult(Solver *solv, int resultflags)
 		  if ((rtype & SOLVER_RULE_TYPEMASK) == SOLVER_RULE_JOB)
 		    {
 		      const char *js = testcase_job2str(pool, rq.elements[i + 2], rq.elements[i + 3]);
-		      char *s = pool_tmpjoin(pool, altprefix, num, " job ");
+		      char *s = pool_tmpjoin(pool, altprefix, num, "job ");
 		      s = pool_tmpappend(pool, s, js, 0);
 		      strqueue_push(&sq, s);
 		    }
@@ -2028,7 +2028,7 @@ testcase_solverresult(Solver *solv, int resultflags)
 		  else if (rtype == SOLVER_RULE_UPDATE || rtype == SOLVER_RULE_FEATURE)
 		    {
 		      const char *js = testcase_solvid2str(pool, rq.elements[i + 1]);
-		      char *s = pool_tmpjoin(pool, altprefix, num, " update ");
+		      char *s = pool_tmpjoin(pool, altprefix, num, "update ");
 		      s = pool_tmpappend(pool, s, js, 0);
 		      strqueue_push(&sq, s);
 		    }
