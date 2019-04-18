@@ -1434,6 +1434,13 @@ testcase_solverresult(Solver *solv, int resultflags)
 		      s = pool_tmpappend(pool, s, " requires ", testcase_dep2str(pool, rq.elements[i + 3]));
 		      strqueue_push(&sq, s);
 		    }
+		  else if (rtype == SOLVER_RULE_UPDATE || rtype == SOLVER_RULE_FEATURE)
+		    {
+		      const char *js = testcase_solvid2str(pool, rq.elements[i + 1]);
+		      char *s = pool_tmpjoin(pool, altprefix, num, " update ");
+		      s = pool_tmpappend(pool, s, js, 0);
+		      strqueue_push(&sq, s);
+		    }
 		}
 	    }
 	  for (i = 0; i < q.count; i++)
