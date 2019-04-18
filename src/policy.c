@@ -834,6 +834,9 @@ move_installed_to_front(Pool *pool, Queue *plist)
 static int
 pool_buildversioncmp(Pool *pool, Solvable *s1, Solvable *s2)
 {
+  if (s1->repo->subpriority != s2->repo->subpriority)
+    return s1->repo->subpriority - s2->repo->subpriority;
+
   const char *bv1 = solvable_lookup_str(s1, SOLVABLE_BUILDVERSION);
   const char *bv2 = solvable_lookup_str(s2, SOLVABLE_BUILDVERSION);
   if (!bv1 && !bv2)
