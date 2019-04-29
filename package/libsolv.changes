@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Wed Apr 24 15:34:44 CEST 2019 - mls@suse.de
+
+- always prefer to stay with the same package name if there are
+  multiple alternatives [bnc#1131823]
+
+-------------------------------------------------------------------
 Fri Mar 29 15:58:54 CET 2019 - mls@suse.de
 
 - repo_add_rpmdb: do not copy bad solvables from the old solv file
@@ -11,6 +17,7 @@ Wed Jan 30 15:51:36 CET 2019 - mls@suse.de
 
 - fixed a couple of null pointer derefs
   [bnc#1120629] [bnc#1120630] [bnc#1120631]
+  [CVE-2018-20532] [CVE-2018-20533] [CVE-2018-20534]
 - do favor evaluation before pruning allowing to (dis)favor
   specific package versions
 - no longer disable infarch rules when they don't conflict with
