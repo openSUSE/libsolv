@@ -16,7 +16,7 @@ result transaction,problems <inline>
 #
 nextjob
 job distupgrade all packages
-job lock name a = 2
+job lock name a = 2-1
 result transaction,problems <inline>
 #>problem 1889163e info problem with installed package a-1-1.i686
 #>problem 1889163e solution 25ae2253 allow a-1-1.i686@system
