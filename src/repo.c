@@ -1250,7 +1250,10 @@ Id
 repo_lookup_type(Repo *repo, Id entry, Id keyname)
 {
   Id type;
-  Repodata *data = repo_lookup_repodata_opt(repo, entry, keyname);
+  Repodata *data;
+  if (keyname >= SOLVABLE_NAME && keyname <= RPM_RPMDBID)
+    return repo_solvablekeys[keyname - SOLVABLE_NAME].type;
+  data = repo_lookup_repodata_opt(repo, entry, keyname);
   if (data && (type = repodata_lookup_type(data, entry, keyname)) != 0 && type != REPOKEY_TYPE_DELETED)
     return type;
   return 0;

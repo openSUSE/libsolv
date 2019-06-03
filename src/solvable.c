@@ -253,14 +253,14 @@ solvable_lookup_str_poollang(Solvable *s, Id keyname)
 const char *
 solvable_lookup_str_lang(Solvable *s, Id keyname, const char *lang, int usebase)
 {
-  if (s->repo)
-    {
-      Id id = pool_id2langid(s->repo->pool, keyname, lang, 0);
-      if (id)
-        return solvable_lookup_str_base(s, id, keyname, usebase);
-      if (!usebase)
-	return 0;
-    }
+  Id id;
+  if (!s->repo)
+    return 0;
+  id = pool_id2langid(s->repo->pool, keyname, lang, 0);
+  if (id)
+    return solvable_lookup_str_base(s, id, keyname, usebase);
+  if (!usebase)
+    return 0;
   return solvable_lookup_str(s, keyname);
 }
 
@@ -293,25 +293,27 @@ solvable_lookup_void(Solvable *s, Id keyname)
 int
 solvable_lookup_bool(Solvable *s, Id keyname)
 {
+  Id type;
   if (!s->repo)
     return 0;
   /* historic nonsense: there are two ways of storing a bool, as num == 1 or void. test both. */
-  if (repo_lookup_type(s->repo, s - s->repo->pool->solvables, keyname) == REPOKEY_TYPE_VOID)
+  type = repo_lookup_type(s->repo, s - s->repo->pool->solvables, keyname);
+  if (type == REPOKEY_TYPE_VOID)
     return 1;
-  return repo_lookup_num(s->repo, s - s->repo->pool->solvables, keyname, 0) == 1;
+  if (type == REPOKEY_TYPE_NUM || REPOKEY_TYPE_CONSTANT)
+    return repo_lookup_num(s->repo, s - s->repo->pool->solvables, keyname, 0) == 1;
+  return 0;
 }
 
 const unsigned char *
 solvable_lookup_bin_checksum(Solvable *s, Id keyname, Id *typep)
 {
-  Repo *repo = s->repo;
-
-  if (!repo)
+  if (!s->repo)
     {
       *typep = 0;
       return 0;
     }
-  return repo_lookup_bin_checksum(repo, s - repo->pool->solvables, keyname, typep);
+  return repo_lookup_bin_checksum(s->repo, s - s->repo->pool->solvables, keyname, typep);
 }
 
 const char *
