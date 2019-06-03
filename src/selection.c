@@ -1571,7 +1571,7 @@ selection_make_matchdeps_common(Pool *pool, Queue *selection, const char *name, 
 	  revr = pool_str2id(pool, r, 1);
 	  ret |= SELECTION_REL;
 	}
-      if ((flags & SELECTION_GLOB) != 0 && !strpbrk(rname, "[*?") != 0)
+      if ((flags & SELECTION_GLOB) != 0 && strpbrk(rname, "[*?") == 0)
 	flags &= ~SELECTION_GLOB;
 
       if ((flags & SELECTION_GLOB) == 0 && (flags & SELECTION_NOCASE) == 0 && (flags & SELECTION_MATCH_DEPSTR) == 0)

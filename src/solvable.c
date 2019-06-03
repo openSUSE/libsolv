@@ -300,7 +300,7 @@ solvable_lookup_bool(Solvable *s, Id keyname)
   type = repo_lookup_type(s->repo, s - s->repo->pool->solvables, keyname);
   if (type == REPOKEY_TYPE_VOID)
     return 1;
-  if (type == REPOKEY_TYPE_NUM || REPOKEY_TYPE_CONSTANT)
+  if (type == REPOKEY_TYPE_NUM || type == REPOKEY_TYPE_CONSTANT)
     return repo_lookup_num(s->repo, s - s->repo->pool->solvables, keyname, 0) == 1;
   return 0;
 }
