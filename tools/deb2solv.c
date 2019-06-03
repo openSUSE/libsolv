@@ -58,7 +58,6 @@ main(int argc, char **argv)
   Repo *repo;
   FILE *fp;
   char buf[4096], *p;
-  const char *basefile = 0;
   int is_repo = 0;
 
   while ((c = getopt(argc, argv, "0:m:r")) >= 0)
