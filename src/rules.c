@@ -2297,6 +2297,34 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
 #endif
 	  }
       return;
+
+    case SOLVER_LOCK:
+      if (!installed)
+	break;
+      qstart = q->count;
+      if (select == SOLVER_SOLVABLE_ALL || (select == SOLVER_SOLVABLE_REPO && what == installed->repoid))
+	{
+	  FOR_REPO_SOLVABLES(installed, p, s)
+	    {
+	      for (i = qstart; i < q->count; i += 2)
+		if (q->elements[i] == DISABLE_DUP && q->elements[i + 1] == pool->solvables[p].name)
+		  break;
+	      if (i == q->count)
+	        queue_push2(q, DISABLE_DUP, pool->solvables[p].name);
+	    }
+	}
+      FOR_JOB_SELECT(p, pp, select, what)
+	{
+	  if (pool->solvables[p].repo != installed)
+	    continue;
+	  for (i = qstart; i < q->count; i += 2)
+	    if (q->elements[i] == DISABLE_DUP && q->elements[i + 1] == pool->solvables[p].name)
+	      break;
+	  if (i == q->count)
+	    queue_push2(q, DISABLE_DUP, pool->solvables[p].name);
+	}
+      break;
+
     default:
       return;
     }
@@ -3284,8 +3312,19 @@ prune_to_dup_packages(Solver *solv, Id p, Queue *q)
   queue_truncate(q, j);
 }
 
+static void
+prune_best_update(Solver *solv, Id p, Queue *q)
+{
+  if (solv->update_targets && solv->update_targets->elements[p - solv->installed->start])
+    prune_to_update_targets(solv, solv->update_targets->elements + solv->update_targets->elements[p - solv->installed->start], q);
+  if (solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, p))
+    prune_to_dup_packages(solv, p, q);
+  /* select best packages, just look at prio and version */
+  policy_filter_unwanted(solv, q, POLICY_MODE_RECOMMEND);
+}
+
 void
-solver_addbestrules(Solver *solv, int havebestinstalljobs)
+solver_addbestrules(Solver *solv, int havebestinstalljobs, int haslockjob)
 {
   Pool *pool = solv->pool;
   Id p;
@@ -3295,12 +3334,26 @@ solver_addbestrules(Solver *solv, int havebestinstalljobs)
   Rule *r;
   Queue infoq;
   int i, oldcnt;
+  Map *lockedmap = 0;
 
   solv->bestrules = solv->nrules;
   queue_init(&q);
   queue_init(&q2);
   queue_init(&infoq);
 
+  if (haslockjob)
+    {
+      int i;
+      lockedmap = solv_calloc(1, sizeof(Map));
+      map_init(lockedmap, pool->nsolvables);
+      for (i = 0, r = solv->rules + solv->jobrules; i < solv->ruletojob.count; i++, r++)
+	{
+	  if (r->w2 || (solv->job.elements[solv->ruletojob.elements[i]] & SOLVER_JOBMASK) != SOLVER_LOCK)
+	    continue;
+	  p = r->p > 0 ? r->p : -r->p;
+	  MAPSET(lockedmap, p);
+	}
+    }
   if (havebestinstalljobs)
     {
       for (i = 0; i < solv->job.count; i += 2)
@@ -3308,7 +3361,7 @@ solver_addbestrules(Solver *solv, int havebestinstalljobs)
 	  Id how = solv->job.elements[i];
 	  if ((how & (SOLVER_JOBMASK | SOLVER_FORCEBEST)) == (SOLVER_INSTALL | SOLVER_FORCEBEST))
 	    {
-	      int j;
+	      int j, k;
 	      Id p2, pp2;
 	      for (j = 0; j < solv->ruletojob.count; j++)
 		{
@@ -3331,6 +3384,25 @@ solver_addbestrules(Solver *solv, int havebestinstalljobs)
 		  policy_filter_unwanted(solv, &q, POLICY_MODE_RECOMMEND);
 		  if (q.count == oldcnt)
 		    continue;	/* nothing filtered */
+		  if (lockedmap)
+		    {
+		      FOR_RULELITERALS(p2, pp2, r)
+			{
+			  if (p2 <= 0)
+			    continue;
+			  if (installed && pool->solvables[p2].repo == installed)
+			    {
+			      if (MAPTST(lockedmap, p2))
+			        queue_pushunique(&q, p2);		/* we always want that package */
+			    }
+			  else if (MAPTST(lockedmap, p2))
+			    continue;
+			  queue_push(&q2, p2);
+			}
+		      policy_filter_unwanted(solv, &q2, POLICY_MODE_RECOMMEND);
+		      for (k = 0; k < q2.count; k++)
+			queue_pushunique(&q, q2.elements[k]);
+		    }
 		  if (q2.count)
 		    queue_insertn(&q, 0, q2.count, q2.elements);
 		  p2 = queue_shift(&q);
@@ -3385,14 +3457,38 @@ solver_addbestrules(Solver *solv, int havebestinstalljobs)
 		if (p2 > 0)
 		  queue_push(&q, p2);
 	    }
-	  if (solv->update_targets && solv->update_targets->elements[p - installed->start])
-	    prune_to_update_targets(solv, solv->update_targets->elements + solv->update_targets->elements[p - installed->start], &q);
-	  if (solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, p))
-	    prune_to_dup_packages(solv, p, &q);
-	  /* select best packages, just look at prio and version */
-	  policy_filter_unwanted(solv, &q, POLICY_MODE_RECOMMEND);
+	  if (lockedmap)
+	    {
+	      queue_empty(&q2);
+	      queue_insertn(&q2, 0, q.count, q.elements);
+	    }
+	  prune_best_update(solv, p, &q);
 	  if (!q.count)
 	    continue;	/* orphaned */
+	  if (lockedmap)
+	    {
+	      int j;
+	      /* always ok to keep installed locked packages */
+	      if (MAPTST(lockedmap, p))
+		queue_pushunique(&q2, p);
+	      for (j = 0; j < q2.count; j++)
+		{
+		  Id p2 = q2.elements[j];
+		  if (pool->solvables[p2].repo == installed && MAPTST(lockedmap, p2))
+		    queue_pushunique(&q, p2);
+		}
+	      /* filter out locked packages */
+	      for (i = j = 0; j < q2.count; j++)
+		{
+		  Id p2 = q2.elements[j];
+		  if (pool->solvables[p2].repo == installed || !MAPTST(lockedmap, p2))
+		    q2.elements[i++] = p2;
+		}
+	      queue_truncate(&q2, i);
+	      prune_best_update(solv, p, &q2);
+	      for (j = 0; j < q2.count; j++)
+		queue_pushunique(&q, q2.elements[j]);
+	    }
 	  if (solv->bestobeypolicy)
 	    {
 	      /* also filter the best of the feature rule packages and add them */
@@ -3404,13 +3500,20 @@ solver_addbestrules(Solver *solv, int havebestinstalljobs)
 		  FOR_RULELITERALS(p2, pp2, r)
 		    if (p2 > 0)
 		      queue_push(&q2, p2);
-		  if (solv->update_targets && solv->update_targets->elements[p - installed->start])
-		    prune_to_update_targets(solv, solv->update_targets->elements + solv->update_targets->elements[p - installed->start], &q2);
-		  if (solv->dupinvolvedmap.size && MAPTST(&solv->dupinvolvedmap, p))
-		    prune_to_dup_packages(solv, p, &q2);
-		  policy_filter_unwanted(solv, &q2, POLICY_MODE_RECOMMEND);
+		  prune_best_update(solv, p, &q2);
 		  for (j = 0; j < q2.count; j++)
 		    queue_pushunique(&q, q2.elements[j]);
+		  if (lockedmap)
+		    {
+		      queue_empty(&q2);
+		      FOR_RULELITERALS(p2, pp2, r)
+			if (p2 > 0)
+			  if (pool->solvables[p2].repo == installed || !MAPTST(lockedmap, p2))
+			    queue_push(&q2, p2);
+		      prune_best_update(solv, p, &q2);
+		      for (j = 0; j < q2.count; j++)
+			queue_pushunique(&q, q2.elements[j]);
+		    }
 		}
 	    }
 	  if (solv->allowuninstall || solv->allowuninstall_all || (solv->allowuninstallmap.size && MAPTST(&solv->allowuninstallmap, p - installed->start)))
@@ -3451,6 +3554,11 @@ solver_addbestrules(Solver *solv, int havebestinstalljobs)
   queue_free(&q);
   queue_free(&q2);
   queue_free(&infoq);
+  if (lockedmap)
+    {
+      map_free(lockedmap);
+      solv_free(lockedmap);
+    }
 }
 
 

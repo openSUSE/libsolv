@@ -129,7 +129,7 @@ extern void solver_addchoicerules(struct s_Solver *solv);
 extern void solver_disablechoicerules(struct s_Solver *solv, Rule *r);
 
 /* best rules */
-extern void solver_addbestrules(struct s_Solver *solv, int havebestinstalljobs);
+extern void solver_addbestrules(struct s_Solver *solv, int havebestinstalljobs, int haslockjob);
 
 /* yumobs rules */
 extern void solver_addyumobsrules(struct s_Solver *solv);

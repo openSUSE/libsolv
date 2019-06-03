@@ -3346,6 +3346,7 @@ solver_solve(Solver *solv, Queue *job)
   int needduprules = 0;
   int hasbestinstalljob = 0;
   int hasfavorjob = 0;
+  int haslockjob = 0;
 
   solve_start = solv_timems(0);
 
@@ -3925,6 +3926,8 @@ solver_solve(Solver *solv, Queue *job)
 	    }
 	  FOR_JOB_SELECT(p, pp, select, what)
 	    solver_addjobrule(solv, installed && pool->solvables[p].repo == installed ? p : -p, 0, 0, i, weak);
+	  if (solv->nrules != oldnrules)
+	    haslockjob = 1;
 	  break;
 	case SOLVER_DISTUPGRADE:
 	  POOL_DEBUG(SOLV_DEBUG_JOB, "job: distupgrade %s\n", solver_select2str(pool, select, what));
@@ -3984,7 +3987,7 @@ solver_solve(Solver *solv, Queue *job)
 #endif
 
   if (solv->bestupdatemap_all || solv->bestupdatemap.size || hasbestinstalljob)
-    solver_addbestrules(solv, hasbestinstalljob);
+    solver_addbestrules(solv, hasbestinstalljob, haslockjob);
   else
     solv->bestrules = solv->bestrules_end = solv->bestrules_up = solv->nrules;
 
