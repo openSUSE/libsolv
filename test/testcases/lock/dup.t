@@ -20,6 +20,6 @@ job lock name a = 2-1
 result transaction,problems <inline>
 #>problem 1889163e info problem with installed package a-1-1.i686
 #>problem 1889163e solution 25ae2253 allow a-1-1.i686@system
-#>problem 1889163e solution d4b95104 deljob lock name a = 2
+#>problem 1889163e solution 06ec856f deljob lock name a = 2-1
 #>problem 1889163e solution e5fc66c9 erase a-1-1.i686@system
 #>upgrade a-1-1.i686@system a-2-1.i686@available
