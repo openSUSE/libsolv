@@ -844,7 +844,7 @@ repo_search_md(Repo *repo, Id p, Id keyname, struct matchdata *md)
 	  case RPM_RPMDBID:
 	    if (repo->rpmdbid)
 	      {
-		kv.num = repo->rpmdbid[p - repo->start];
+		kv.num = (unsigned int)repo->rpmdbid[p - repo->start];
 		kv.num2 = 0;
 		repo_matchvalue(md, s, 0, repo_solvablekeys + (RPM_RPMDBID - SOLVABLE_NAME), &kv);
 	      }
@@ -1097,7 +1097,7 @@ repo_lookup_num(Repo *repo, Id entry, Id keyname, unsigned long long notfound)
       if (keyname == RPM_RPMDBID)
 	{
 	  if (repo->rpmdbid && entry >= repo->start && entry < repo->end)
-	    return repo->rpmdbid[entry - repo->start];
+	    return (unsigned int)repo->rpmdbid[entry - repo->start];
 	  return notfound;
 	}
     }
@@ -1366,7 +1366,7 @@ repo_set_num(Repo *repo, Id p, Id keyname, unsigned long long num)
 	{
 	  if (!repo->rpmdbid)
 	    repo->rpmdbid = repo_sidedata_create(repo, sizeof(Id));
-	  repo->rpmdbid[p - repo->start] = num;
+	  repo->rpmdbid[p - repo->start] = (Id)num;
 	  return;
 	}
     }
