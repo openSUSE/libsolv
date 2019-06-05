@@ -23,7 +23,7 @@
 
 #ifdef RPM5
 # include <rpm/rpmversion.h>
-# if RPMLIB_VERSION_LT(5,3,_,0,0,_)
+# if RPMLIB_VERSION <  RPMLIB_VERSION_ENCODE(5,3,_,0,0,_)
 #  define RPM_INDEX_SIZE 8	/* rpmdbid + array index */
 # else
 #  define RPM_INDEX_SIZE 4	/* just the rpmdbid */
