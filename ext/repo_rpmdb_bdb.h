@@ -27,6 +27,13 @@
 # define RPM_INDEX_SIZE 8	/* rpmdbid + array index */
 #endif
 
+#ifdef RPM5
+# include <rpm/rpmversion.h>
+# if RPMLIB_VERSION_GE(5,3,_,0,0,_)
+#  define RPM5_BIG_ENDIAN_ID
+# endif
+#endif
+
 
 /******************************************************************/
 /*  Rpm Database stuff
@@ -66,11 +73,10 @@ stat_database(struct rpmdbstate *state, char *dbname, struct stat *statbuf, int 
   return 0;
 }
 
-
 static inline Id
 db2rpmdbid(unsigned char *db, int byteswapped)
 {
-#ifdef RPM5
+#ifdef RPM5_BIG_ENDIAN_ID
   return db[0] << 24 | db[1] << 16 | db[2] << 8 | db[3];
 #else
 # if defined(WORDS_BIGENDIAN)
@@ -87,7 +93,7 @@ db2rpmdbid(unsigned char *db, int byteswapped)
 static inline void
 rpmdbid2db(unsigned char *db, Id id, int byteswapped)
 {
-#ifdef RPM5
+#ifdef RPM5_BIG_ENDIAN_ID
   db[0] = id >> 24, db[1] = id >> 16, db[2] = id >> 8, db[3] = id;
 #else
 # if defined(WORDS_BIGENDIAN)
