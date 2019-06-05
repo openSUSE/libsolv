@@ -1220,7 +1220,7 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
 	default:
 	  if (id == RPM_RPMDBID && s && keys[key].type == REPOKEY_TYPE_NUM)
 	    {
-	      dp = data_read_id_max(dp, &id, 0, 0, &data);
+	      dp = data_read_id(dp, &id);
 	      if (!repo->rpmdbid)
 		repo->rpmdbid = repo_sidedata_create(repo, sizeof(Id));
 	      repo->rpmdbid[(s - pool->solvables) - repo->start] = id;
