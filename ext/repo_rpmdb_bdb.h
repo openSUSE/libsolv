@@ -22,16 +22,15 @@
 #endif
 
 #ifdef RPM5
-# define RPM_INDEX_SIZE 4	/* just the rpmdbid */
+# include <rpm/rpmversion.h>
+# if RPMLIB_VERSION_LT(5,3,_,0,0,_)
+#  define RPM_INDEX_SIZE 8	/* rpmdbid + array index */
+# else
+#  define RPM_INDEX_SIZE 4	/* just the rpmdbid */
+#  define RPM5_BIG_ENDIAN_ID
+#endif
 #else
 # define RPM_INDEX_SIZE 8	/* rpmdbid + array index */
-#endif
-
-#ifdef RPM5
-# include <rpm/rpmversion.h>
-# if RPMLIB_VERSION_GE(5,3,_,0,0,_)
-#  define RPM5_BIG_ENDIAN_ID
-# endif
 #endif
 
 
