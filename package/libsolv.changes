@@ -1,4 +1,14 @@
 -------------------------------------------------------------------
+Wed Jun 12 13:22:40 CEST 2019 - mls@suse.de
+
+- fix favorq leaking between solver runs if the solver is reused
+- fix SOLVER_FLAG_FOCUS_BEST updateing packages without reason
+- be more correct with multiversion packages that obsolete their
+  own name [bnc#1127155]
+- allow building with swig-4.0.0 [bnc#1135749]
+- bump version to 0.7.5
+
+-------------------------------------------------------------------
 Wed Apr 24 15:34:44 CEST 2019 - mls@suse.de
 
 - always prefer to stay with the same package name if there are

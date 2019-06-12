@@ -2,6 +2,17 @@
 This file contains the major changes between
 libsolv versions:
 
+Version 0.7.5
+- selected bug fixes:
+  * fix favorq leaking between solver runs if the solver is reused
+  * fix SOLVER_FLAG_FOCUS_BEST updateing packages without reason
+  * be more correct with multiversion packages that obsolete their
+    own name
+  * allow building with swig-4.0.0
+  * lock jobs now take precedence over dup and forcebest jobs
+- new features
+  * MSVC compilation support
+
 Version 0.7.4
 - selected bug fixes:
   * repo_add_rpmdb: do not copy bad solvables from the old solv file
