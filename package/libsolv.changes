@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Thu Jun 13 16:15:39 CEST 2019 - mls@suse.de
+
+- make cleandeps jobs on patterns work [bnc#1137977]
+
+-------------------------------------------------------------------
 Wed Jun 12 13:22:40 CEST 2019 - mls@suse.de
 
 - fix favorq leaking between solver runs if the solver is reused
