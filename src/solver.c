@@ -3858,6 +3858,10 @@ solver_solve(Solver *solv, Queue *job)
 		  name_s = s;
 		}
 	      solver_addjobrule(solv, -p, 0, 0, i, weak);
+#ifdef ENABLE_LINKED_PKGS
+	      if (solv->instbuddy && installed && s->repo == installed && solv->instbuddy[p - installed->start] > 1)
+	        solver_addjobrule(solv, -solv->instbuddy[p - installed->start], 0, 0, i, weak);
+#endif
 	    }
 	  /* special case for "erase a specific solvable": we also
 	   * erase all other solvables with that name, so that they
@@ -3925,7 +3929,14 @@ solver_solve(Solver *solv, Queue *job)
 		}
 	    }
 	  FOR_JOB_SELECT(p, pp, select, what)
-	    solver_addjobrule(solv, installed && pool->solvables[p].repo == installed ? p : -p, 0, 0, i, weak);
+	    {
+	      s = pool->solvables + p;
+	      solver_addjobrule(solv, installed && s->repo == installed ? p : -p, 0, 0, i, weak);
+#ifdef ENABLE_LINKED_PKGS
+	      if (solv->instbuddy && installed && s->repo == installed && solv->instbuddy[p - installed->start] > 1)
+	        solver_addjobrule(solv, solv->instbuddy[p - installed->start], 0, 0, i, weak);
+#endif
+	    }
 	  if (solv->nrules != oldnrules)
 	    haslockjob = 1;
 	  break;
