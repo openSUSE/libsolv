@@ -504,13 +504,42 @@ read_susetags_repo(Repo *repo, const char *dir)
 
 #ifdef ENABLE_RPMMD
 
+# ifdef ENABLE_ZCHUNK_COMPRESSION
+
+static int
+repomd_exists(const char *dir, const char *filename)
+{
+  char *path;
+  struct stat stb;
+  int r;
+  
+  if (!filename)
+    return 0;
+  path = solv_dupjoin(dir, "/", filename);
+  r = stat(path, &stb) == 0;
+  solv_free(path);
+  return r;
+}
+
+# endif
+
 static const char *
-repomd_find(Repo *repo, const char *what)
+repomd_find(Repo *repo, const char *dir, const char *what, int findzchunk)
 {
   Pool *pool = repo->pool;
   Dataiterator di;
   const char *filename;
 
+# ifdef ENABLE_ZCHUNK_COMPRESSION
+  if (findzchunk)
+    {
+      char *what_zck = solv_dupjoin(what, "_zck", 0);
+      filename = repomd_find(repo, dir, what_zck, 0);
+      solv_free(what_zck);
+      if (filename && repomd_exists(dir, filename))
+	return filename;
+    }
+# endif
   filename = 0;
   dataiterator_init(&di, pool, repo, SOLVID_META, REPOSITORY_REPOMD_TYPE, what, SEARCH_STRING);
   dataiterator_prepend_keyname(&di, REPOSITORY_REPOMD);
@@ -555,7 +584,7 @@ repomd_extend(Repo *repo, const char *dir, const char *what, const char *languag
   FILE *fp;
   char *tmp;
 
-  filename = repomd_find(repo, what);
+  filename = repomd_find(repo, dir, what, 1);
   if (!filename)
     return;
   fp = repomd_open(dir, filename, &tmp, missingok);
@@ -581,8 +610,20 @@ repomd_extend_languages(Repo *repo, const char *dir, int missingok)
   dataiterator_prepend_keyname(&di, REPOSITORY_REPOMD);
   while (dataiterator_step(&di))
     {
+      char *str = solv_strdup(di.kv.str);
+      size_t l = strlen(str);
+      if (l > 4 && !strcmp(str + l - 4, "_zck"))
+	str[l - 4] = 0;
+      for (i = 0; i < nsusedatas; i++)
+        if (!strcmp(susedatas[i], str))
+	  break;
+      if (i < nsusedatas)
+	{
+	  solv_free(str);
+	  continue;	/* already have that entry */
+	}
       susedatas = solv_extend(susedatas, nsusedatas, 1, sizeof(char *), 15);
-      susedatas[nsusedatas++] = solv_strdup(di.kv.str);
+      susedatas[nsusedatas++] = str;
     }
   dataiterator_free(&di);
   for (i = 0; i < nsusedatas; i++)
@@ -628,7 +669,7 @@ read_rpmmd_repo(Repo *repo, const char *dir)
     }
   fclose(fp);
   tmp = solv_free(tmp);
-  filename = repomd_find(repo, "suseinfo");
+  filename = repomd_find(repo, dir, "suseinfo", 0);
   if (filename && (fp = repomd_open(dir, filename, &tmp, 0)) != 0)
     {
       if (repo_add_repomdxml(repo, fp, REPO_REUSE_REPODATA))
@@ -641,7 +682,7 @@ read_rpmmd_repo(Repo *repo, const char *dir)
     }
   
   /* first all primary packages */
-  filename = repomd_find(repo, "primary");
+  filename = repomd_find(repo, dir, "primary", 1);
   if (filename)
     {
       add_rpmmd_file(repo, dir, filename, 0);
@@ -654,16 +695,16 @@ read_rpmmd_repo(Repo *repo, const char *dir)
     }
 
   /* some legacy stuff */
-  filename = repomd_find(repo, "products");
+  filename = repomd_find(repo, dir, "products", 0);
   if (!filename)
-    filename = repomd_find(repo, "product");
+    filename = repomd_find(repo, dir, "product", 0);
   if (filename)
     add_rpmmd_file(repo, dir, filename, 1);
-  filename = repomd_find(repo, "patterns");
+  filename = repomd_find(repo, dir, "patterns", 0);
     add_rpmmd_file(repo, dir, filename, 1);
   
   /* updateinfo */
-  filename = repomd_find(repo, "updateinfo");
+  filename = repomd_find(repo, dir, "updateinfo", 1);
   if (filename && (fp = repomd_open(dir, filename, &tmp, 0)) != 0)
     {
       if (repo_add_updateinfoxml(repo, fp, 0))
@@ -676,9 +717,9 @@ read_rpmmd_repo(Repo *repo, const char *dir)
     }
 
   /* deltainfo */
-  filename = repomd_find(repo, "deltainfo");
+  filename = repomd_find(repo, dir, "deltainfo", 1);
   if (!filename)
-    filename = repomd_find(repo, "prestodelta");
+    filename = repomd_find(repo, dir, "prestodelta", 1);
   if (filename && (fp = repomd_open(dir, filename, &tmp, 1)) != 0)
     {
       if (repo_add_deltainfoxml(repo, fp, 0))
@@ -692,7 +733,7 @@ read_rpmmd_repo(Repo *repo, const char *dir)
 
 #ifdef ENABLE_APPDATA
   /* appdata */
-  filename = add_appdata ? repomd_find(repo, "appdata") : 0;
+  filename = add_appdata ? repomd_find(repo, dir, "appdata", 1) : 0;
   if (filename && (fp = repomd_open(dir, filename, &tmp, 1)) != 0)
     {
       if (repo_add_appdata(repo, fp, 0))
