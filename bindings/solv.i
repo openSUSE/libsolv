@@ -2057,9 +2057,18 @@ typedef struct {
     queue_init(&q);
     int i;
     for (i = 2; i < $self->nsolvables; i++) {
-      if (!$self->solvables[i].repo)
-        continue;
-      if (!$self->considered || MAPTST($self->considered, i))
+      if ($self->solvables[i].repo && (!$self->considered || MAPTST($self->considered, i)))
+        queue_push(&q, i);
+    }
+    return q;
+  }
+
+  Queue get_disabled_list() {
+    Queue q;
+    queue_init(&q);
+    int i;
+    for (i = 2; i < $self->nsolvables; i++) {
+      if ($self->solvables[i].repo && ($self->considered && !MAPTST($self->considered, i)))
         queue_push(&q, i);
     }
     return q;
@@ -2078,6 +2087,28 @@ typedef struct {
       p = q.elements[i];
       if (p > 0 && p < $self->nsolvables)
         MAPSET($self->considered, p);
+    }
+  }
+
+  void set_disabled_list(Queue q) {
+    int i;
+    Id p;
+    if (!q.count) {
+      if ($self->considered) {
+        map_free($self->considered);
+        $self->considered = solv_free($self->considered);
+      }
+      return;
+    }
+    if (!$self->considered) {
+      $self->considered = solv_calloc(1, sizeof(Map));
+      map_init($self->considered, $self->nsolvables);
+    }
+    map_setall($self->considered);
+    for (i = 0; i < q.count; i++) {
+      p = q.elements[i];
+      if (p > 0 && p < $self->nsolvables)
+        MAPCLR($self->considered, p);
     }
   }
 
