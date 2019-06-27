@@ -1,4 +1,22 @@
 -------------------------------------------------------------------
+Thu Jun 27 16:36:00 CEST 2019 - mls@suse.de
+
+- make cleandeps jobs on patterns work [bnc#1137977]
+- fix SOLVER_FLAG_FOCUS_BEST updateing packages without reason
+- be more correct with multiversion packages that obsolete their
+  own name [bnc#1127155]
+- always prefer to stay with the same package name if there are
+  multiple alternatives [bnc#1131823]
+- fix cleandeps updates not updating all packages
+- fixed a couple of null pointer derefs
+  [bnc#1120629] [bnc#1120630] [bnc#1120631]
+  [CVE-2018-20532] [CVE-2018-20533] [CVE-2018-20534]
+- no longer disable infarch rules when they don't conflict with
+  the job
+- do not autouninstall packages because of forcebest updates
+- bump version to 0.6.36
+
+-------------------------------------------------------------------
 Thu Aug  9 17:09:41 CEST 2018 - mls@suse.de
 
 - refactor arch handling

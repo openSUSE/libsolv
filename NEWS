@@ -2,6 +2,18 @@
 This file contains the major changes between
 libsolv versions:
 
+Version 0.6.36
+- bug fixes:
+  * do not autouninstall packages because of forcebest updates
+  * fixed a couple of null pointer derefs and potential memory
+    leaks
+  * no longer disable infarch rules when they don't conflict with
+    the job
+  * fix cleandeps updates not updating all packages
+  * fix SOLVER_FLAG_FOCUS_BEST updateing packages without reason
+  * be more correct with multiversion packages that obsolete their
+    own name
+
 Version 0.6.35
 - new configuration options:
   * ENABLE_ZSTD_COMPRESSION: support zstd compression
