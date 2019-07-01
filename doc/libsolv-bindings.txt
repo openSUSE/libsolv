@@ -645,6 +645,35 @@ circular references (e.g. if the pool's appdata value points to some meta data
 structure that contains a pool handle). If used incorrectly, this method can
 lead to application crashes, so beware. (This method is a no-op for ruby and tcl.)
 
+	Id *get_considered_list()
+	my @ids = $pool->get_considered_list();
+	ids = pool.get_considered_list()
+	ids = pool.get_considered_list()
+
+	void set_considered_list(Id *ids)
+	$pool->set_considered_list(\@ids);
+	pool.set_considered_list(ids)
+	pool.set_considered_list(ids)
+
+Get/set the list of solvables that are eligible for installation. Note that
+you need to recreate the whatprovides hash after changing the list.
+
+	Id *get_disabled_list()
+	my @ids = $pool->get_disabled_list();
+	ids = pool.get_disabled_list()
+	ids = pool.get_disabled_list()
+
+	void set_disabled_list(Id *ids)
+	$pool->set_disabled_list(\@ids);
+	pool.set_disabled_list(ids)
+	pool.set_disabled_list(ids)
+
+Get/set the list of solvables that are not eligible for installation. This is
+basically the inverse of the ``considered'' methods above, i.e. calling
+``set_disabled_list()'' with an empty list will make all solvables eligible for
+installation. Note you need to recreate the whatprovides hash after changing the
+list.
+
 === DATA RETRIEVAL METHODS ===
 
 In the following functions, the _keyname_ argument describes what to retrieve.

@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 03/16/2019
+.\"      Date: 07/01/2019
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "03/16/2019" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "07/01/2019" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -1129,6 +1129,62 @@ Set the callback function called when repository metadata needs to be loaded on 
 .\}
 .sp
 Decrement the reference count of the appdata object\&. This can be used to break circular references (e\&.g\&. if the pool\(cqs appdata value points to some meta data structure that contains a pool handle)\&. If used incorrectly, this method can lead to application crashes, so beware\&. (This method is a no\-op for ruby and tcl\&.)
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId *get_considered_list()\fR
+my \fI@ids\fR \fB=\fR \fI$pool\fR\fB\->get_considered_list()\fR;
+\fIids\fR \fB=\fR \fIpool\fR\fB\&.get_considered_list()\fR
+\fIids\fR \fB=\fR \fIpool\fR\fB\&.get_considered_list()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid set_considered_list(Id *\fR\fIids\fR\fB)\fR
+\fI$pool\fR\fB\->set_considered_list(\e\fR\fI@ids\fR\fB)\fR;
+\fIpool\fR\fB\&.set_considered_list(\fR\fIids\fR\fB)\fR
+\fIpool\fR\fB\&.set_considered_list(\fR\fIids\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Get/set the list of solvables that are eligible for installation\&. Note that you need to recreate the whatprovides hash after changing the list\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId *get_disabled_list()\fR
+my \fI@ids\fR \fB=\fR \fI$pool\fR\fB\->get_disabled_list()\fR;
+\fIids\fR \fB=\fR \fIpool\fR\fB\&.get_disabled_list()\fR
+\fIids\fR \fB=\fR \fIpool\fR\fB\&.get_disabled_list()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid set_disabled_list(Id *\fR\fIids\fR\fB)\fR
+\fI$pool\fR\fB\->set_disabled_list(\e\fR\fI@ids\fR\fB)\fR;
+\fIpool\fR\fB\&.set_disabled_list(\fR\fIids\fR\fB)\fR
+\fIpool\fR\fB\&.set_disabled_list(\fR\fIids\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Get/set the list of solvables that are not eligible for installation\&. This is basically the inverse of the \(lqconsidered\(rq methods above, i\&.e\&. calling \(lqset_disabled_list()\(rq with an empty list will make all solvables eligible for installation\&. Note you need to recreate the whatprovides hash after changing the list\&.
 .SS "DATA RETRIEVAL METHODS"
 .sp
 In the following functions, the \fIkeyname\fR argument describes what to retrieve\&. For the standard cases you can use the available Id constants\&. For example,
