@@ -126,6 +126,8 @@ SET (ENABLE_HAIKU ON)
 SET (have_system ${have_system}x)
 ENDIF (HAIKU)
 
+SET (CMAKE_MACOSX_RPATH ON)
+
 IF (${have_system} STREQUAL x)
     MESSAGE (STATUS "Building for no system")
 ENDIF (${have_system} STREQUAL x)
