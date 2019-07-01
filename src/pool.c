@@ -1355,9 +1355,9 @@ pool_addrelproviders(Pool *pool, Id d)
 		  continue;
 		}
 	    }
-	  if (!s->provides)
+	  if (!s->provides || s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
 	    {
-	      /* no provides - check nevr */
+	      /* no provides or src rpm - check nevr */
 	      if (pool_match_nevr_rel(pool, s, MAKERELDEP(d)))
 	        queue_push(&plist, p);
 	      continue;
