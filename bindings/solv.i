@@ -650,6 +650,33 @@ SWIG_AsValDepId(void *obj, int *val) {
 
 
 /**
+ ** return $self
+ **/
+
+%define returnself(func)
+#if defined(SWIGPYTHON)
+%typemap(out) void func {
+  $result = obj0;
+  Py_INCREF($result);
+}
+#elif defined(SWIGPERL)
+%typemap(out) void func {
+  $result = sv_2mortal(SvREFCNT_inc(ST(0)));argvi++;
+}
+#elif defined(SWIGRUBY)
+%typemap(ret) void func {
+  return self;
+}
+#elif defined(SWIGTCL)
+%typemap(out) void func {
+  Tcl_IncrRefCount(objv[1]);
+  Tcl_SetObjResult(interp, objv[1]);
+}
+#endif
+%enddef
+
+
+/**
  ** misc stuff
  **/
 
@@ -1362,12 +1389,14 @@ typedef struct {
     s->flags = $self->flags;
     return s;
   }
+returnself(filter)
   void filter(Selection *lsel) {
     if ($self->pool != lsel->pool)
       queue_empty(&$self->q);
     else
       selection_filter($self->pool, &$self->q, &lsel->q);
   }
+returnself(add)
   void add(Selection *lsel) {
     if ($self->pool == lsel->pool)
       {
@@ -1375,29 +1404,35 @@ typedef struct {
         $self->flags |= lsel->flags;
       }
   }
+returnself(add_raw)
   void add_raw(Id how, Id what) {
     queue_push2(&$self->q, how, what);
   }
+returnself(subtract)
   void subtract(Selection *lsel) {
     if ($self->pool == lsel->pool)
       selection_subtract($self->pool, &$self->q, &lsel->q);
   }
 
+returnself(select)
   void select(const char *name, int flags) {
     if ((flags & SELECTION_MODEBITS) == 0)
       flags |= SELECTION_FILTER | SELECTION_WITH_ALL;
     $self->flags = selection_make($self->pool, &$self->q, name, flags);
   }
+returnself(matchdeps)
   void matchdeps(const char *name, int flags, Id keyname, Id marker = -1) {
     if ((flags & SELECTION_MODEBITS) == 0)
       flags |= SELECTION_FILTER | SELECTION_WITH_ALL;
     $self->flags = selection_make_matchdeps($self->pool, &$self->q, name, flags, keyname, marker);
   }
+returnself(matchdepid)
   void matchdepid(DepId dep, int flags, Id keyname, Id marker = -1) {
     if ((flags & SELECTION_MODEBITS) == 0)
       flags |= SELECTION_FILTER | SELECTION_WITH_ALL;
     $self->flags = selection_make_matchdepid($self->pool, &$self->q, dep, flags, keyname, marker);
   }
+returnself(matchsolvable)
   void matchsolvable(XSolvable *solvable, int flags, Id keyname, Id marker = -1) {
     if ((flags & SELECTION_MODEBITS) == 0)
       flags |= SELECTION_FILTER | SELECTION_WITH_ALL;
