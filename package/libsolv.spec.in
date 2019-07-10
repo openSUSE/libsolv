@@ -207,6 +207,7 @@ Perl bindings for libsolv.
 %setup -q
 
 %build
+%global _lto_cflags %{_lto_cflags} -ffat-lto-objects
 export CFLAGS="%{optflags}"
 export CXXFLAGS="$CFLAGS"
 
@@ -256,10 +257,6 @@ ln -s repo2solv %{buildroot}/%{_bindir}/repo2solv.sh
 %if %{with python3}
 %py3_compile %{buildroot}/%{python3_sitearch}
 %endif
-%endif
-%if %{with static}
-# we want to leave the .a file untouched
-export NO_BRP_STRIP_DEBUG=true
 %endif
 
 %check
