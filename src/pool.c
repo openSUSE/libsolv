@@ -814,6 +814,23 @@ pool_intersect_evrs(Pool *pool, int pflags, Id pevr, int flags, Id evr)
   return pool_match_flags_evr(pool, pflags, pevr, flags, evr);
 }
 
+
+static int
+is_interval_dep(Pool *pool, Id d1, Id d2)
+{
+  Reldep *rd1, *rd2;
+  if (!ISRELDEP(d1) || !ISRELDEP(d2))
+    return 0;
+  rd1 = GETRELDEP(pool, d1);
+  rd2 = GETRELDEP(pool, d2);
+  if (rd1->name != rd2->name || rd1->flags >= 8 || rd2->flags >= 8)
+    return 0;
+  if (((rd1->flags ^ rd2->flags) & (REL_LT|REL_GT)) != (REL_LT|REL_GT))
+    return 0;
+  return 1;
+}
+
+
 /* match two dependencies (d1 = provider) */
 
 int
@@ -830,6 +847,8 @@ pool_match_dep(Pool *pool, Id d1, Id d2)
       rd1 = GETRELDEP(pool, d1);
       if (rd1->flags == REL_AND || rd1->flags == REL_OR || rd1->flags == REL_WITH || rd1->flags == REL_WITHOUT || rd1->flags == REL_COND || rd1->flags == REL_UNLESS)
 	{
+	  if (rd1->flags == REL_WITH && is_interval_dep(pool, rd1->name, rd1->evr))
+	    return pool_match_dep(pool, rd1->name, d2) && pool_match_dep(pool, rd1->evr, d2);
 	  if (pool_match_dep(pool, rd1->name, d2))
 	    return 1;
 	  if ((rd1->flags == REL_COND || rd1->flags == REL_UNLESS) && ISRELDEP(rd1->evr))
@@ -849,6 +868,8 @@ pool_match_dep(Pool *pool, Id d1, Id d2)
       rd2 = GETRELDEP(pool, d2);
       if (rd2->flags == REL_AND || rd2->flags == REL_OR || rd2->flags == REL_WITH || rd2->flags == REL_WITHOUT || rd2->flags == REL_COND || rd2->flags == REL_UNLESS)
 	{
+	  if (rd2->flags == REL_WITH && is_interval_dep(pool, rd2->name, rd2->evr))
+	    return pool_match_dep(pool, d1, rd2->name) && pool_match_dep(pool, d1, rd2->evr);
 	  if (pool_match_dep(pool, d1, rd2->name))
 	    return 1;
 	  if ((rd2->flags == REL_COND || rd2->flags == REL_UNLESS) && ISRELDEP(rd2->evr))
