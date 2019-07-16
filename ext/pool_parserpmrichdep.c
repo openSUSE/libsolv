@@ -27,13 +27,23 @@ static struct RichOpComp {
   { NULL, 0, 0},
 };
 
+static inline const char *
+skipnonwhite(const char *p)
+{
+  int bl = 0;
+  while (*p && !(*p == ' ' || *p == ',' || (*p == ')' && bl-- <= 0)))
+    if (*p++ == '(')
+      bl++;
+  return p;
+}
+
 static Id
 parseRichDep(Pool *pool, const char **depp, Id chainfl)
 {
   const char *p = *depp;
   const char *n;
   Id id, evr;
-  int fl, bl;
+  int fl;
   struct RichOpComp *op;
 
   if (!chainfl && *p++ != '(')
@@ -51,10 +61,7 @@ parseRichDep(Pool *pool, const char **depp, Id chainfl)
   else
     {
       n = p;
-      bl = 0;
-      while (*p && !(*p == ' ' || *p == ',' || (*p == ')' && bl-- <= 0)))
-	if (*p++ == '(')
-	  bl++;
+      p = skipnonwhite(p);
       if (n == p)
 	return 0;
       id = pool_strn2id(pool, n, p - n, 1);
@@ -79,10 +86,7 @@ parseRichDep(Pool *pool, const char **depp, Id chainfl)
 	      while (*p == ' ')
 		p++;
 	      n = p;
-	      bl = 0;
-	      while (*p && !(*p == ' ' || *p == ',' || (*p == ')' && bl-- <= 0)))
-		if (*p++ == '(')
-		  bl++;
+	      p = skipnonwhite(p);
 	      if (p - n > 2 && n[0] == '0' && n[1] == ':')
 		n += 2;		/* strip zero epoch */
 	      if (n == p)
