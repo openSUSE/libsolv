@@ -495,6 +495,20 @@ a Dep object or a simple Id as argument.
 
 Filter list of solvables by repo priority, architecture and version.
 
+	Solvable *whatcontainsdep(Id keyname, DepId dep, Id marker = -1)
+	my @solvables = $pool->whatcontainsdep($keyname, $dep)
+	solvables = pool.whatcontainsdep(keyname, dep)
+	solvables = pool.whatcontainsdep(keyname, dep)
+
+Return all solvables for which keyname contains the dependency.
+
+	Solvable *whatmatchesdep(Id keyname, DepId dep, Id marker = -1)
+	my @solvables = $pool->whatmatchesdep($keyname, $sdep)
+	solvables = pool.whatmatchesdep(keyname, dep)
+	solvables = pool.whatmatchesdep(keyname, dep)
+
+Return all solvables that have dependencies in keyname that match the dependency.
+
 	Solvable *whatmatchessolvable(Id keyname, Solvable solvable, Id marker = -1)
 	my @solvables = $pool->whatmatchessolvable($keyname, $solvable)
 	solvables = pool.whatmatchessolvable(keyname, solvable)

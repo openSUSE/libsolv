@@ -2011,6 +2011,14 @@ returnself(matchsolvable)
     pool_flush_namespaceproviders($self, ns, evr);
   }
 
+  %typemap(out) Queue whatcontainsdep Queue2Array(XSolvable *, 1, new_XSolvable(arg1, id));
+  %newobject whatcontainsdep;
+  Queue whatcontainsdep(Id keyname, DepId dep, Id marker = -1) {
+    Queue q;
+    queue_init(&q);
+    pool_whatcontainsdep($self, keyname, dep, &q, marker);
+    return q;
+  }
 
   %typemap(out) Queue whatmatchesdep Queue2Array(XSolvable *, 1, new_XSolvable(arg1, id));
   %newobject whatmatchesdep;
