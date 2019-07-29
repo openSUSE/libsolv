@@ -850,7 +850,7 @@ Back reference to the pool this dependency belongs to.
 
 The id of this dependency.
 
-== Methods ==
+=== METHODS ===
 
 	Dep Rel(int flags, DepId evrid, bool create = 1)
 	my $reldep = $dep->Rel($flags, $evrdep);
