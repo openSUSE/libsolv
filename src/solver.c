@@ -1724,8 +1724,12 @@ resolve_installed(Solver *solv, int level, int disablerules, Queue *dq)
 		  if (rr->p == i && solv->decisionmap[i] >= 0)
 		    queue_push(dq, i);
 		  while ((p = pool->whatprovidesdata[d++]) != 0)
-		    if (solv->decisionmap[p] >= 0)
-		      queue_push(dq, p);
+		    {
+		      if (solv->decisionmap[p] >= 0)
+		        queue_push(dq, p);
+		      else if (solvable_identical(pool->solvables + p, pool->solvables + i) && rr->p == i && solv->decisionmap[i] >= 0)
+		        queue_push(dq, p);	/* identical to installed, put it on the list so we have a repo prio */
+		    }
 		  if (dq->count && solv->update_targets && solv->update_targets->elements[i - installed->start])
 		    prune_to_update_targets(solv, solv->update_targets->elements + solv->update_targets->elements[i - installed->start], dq);
 		  if (dq->count)
