@@ -1720,15 +1720,26 @@ resolve_installed(Solver *solv, int level, int disablerules, Queue *dq)
 	    {
 	      if (specialupdaters && (d = specialupdaters[i - installed->start]) != 0)
 		{
+		  int j;
 		  /* special multiversion handling, make sure best version is chosen */
 		  if (rr->p == i && solv->decisionmap[i] >= 0)
 		    queue_push(dq, i);
 		  while ((p = pool->whatprovidesdata[d++]) != 0)
+		    if (solv->decisionmap[p] >= 0)
+		      queue_push(dq, p);
+		  for (j = 0; j < dq->count; j++)
 		    {
-		      if (solv->decisionmap[p] >= 0)
-		        queue_push(dq, p);
-		      else if (solvable_identical(pool->solvables + p, pool->solvables + i) && rr->p == i && solv->decisionmap[i] >= 0)
-		        queue_push(dq, p);	/* identical to installed, put it on the list so we have a repo prio */
+		      Id p2 = dq->elements[j];
+		      if (pool->solvables[p2].repo != installed)
+			continue;
+		      d = specialupdaters[i - installed->start];
+		      while ((p = pool->whatprovidesdata[d++]) != 0)
+			{
+			  if (solv->decisionmap[p] >= 0 || pool->solvables[p].repo == installed)
+			    continue;
+			  if (solvable_identical(pool->solvables + p, pool->solvables + p2))
+		            queue_push(dq, p);	/* identical to installed, put it on the list so we have a repo prio */
+			}
 		    }
 		  if (dq->count && solv->update_targets && solv->update_targets->elements[i - installed->start])
 		    prune_to_update_targets(solv, solv->update_targets->elements + solv->update_targets->elements[i - installed->start], dq);
