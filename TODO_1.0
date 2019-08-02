@@ -9,6 +9,10 @@
 
 - write more manpages
 
+- forcebest pruning is not optimal: it should keep multiple packages
+  with the same version instead of reducing to just one package for
+  each name
+
 IDEAS:
 
 drop SEARCH_FILES and add SEARCH_BASENAME instead?
