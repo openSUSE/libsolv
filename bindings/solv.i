@@ -655,10 +655,17 @@ SWIG_AsValDepId(void *obj, int *val) {
 
 %define returnself(func)
 #if defined(SWIGPYTHON)
+#if SWIG_VERSION < 0x040000
 %typemap(out) void func {
   $result = obj0;
   Py_INCREF($result);
 }
+#else
+%typemap(out) void func {
+  $result = swig_obj[0];
+  Py_INCREF($result);
+}
+#endif
 #elif defined(SWIGPERL)
 %typemap(out) void func {
   $result = sv_2mortal(SvREFCNT_inc(ST(0)));argvi++;
