@@ -629,10 +629,8 @@ SWIG_AsValDepId(void *obj, int *val) {
 %typemap(out) disown_helper {
 #if defined(SWIGRUBY)
   SWIG_ConvertPtr(self, &argp1,SWIGTYPE_p_Pool, SWIG_POINTER_DISOWN |  0 );
-#elif defined(SWIGPYTHON) && SWIG_VERSION < 0x040000
-  SWIG_ConvertPtr(obj0, &argp1,SWIGTYPE_p_Pool, SWIG_POINTER_DISOWN |  0 );
 #elif defined(SWIGPYTHON)
-  SWIG_ConvertPtr(swig_obj[0], &argp1,SWIGTYPE_p_Pool, SWIG_POINTER_DISOWN |  0 );
+  SWIG_ConvertPtr($self, &argp1,SWIGTYPE_p_Pool, SWIG_POINTER_DISOWN |  0 );
 #elif defined(SWIGPERL)
   SWIG_ConvertPtr(ST(0), &argp1,SWIGTYPE_p_Pool, SWIG_POINTER_DISOWN |  0 );
 #elif defined(SWIGTCL)
@@ -656,7 +654,7 @@ SWIG_AsValDepId(void *obj, int *val) {
 %define returnself(func)
 #if defined(SWIGPYTHON)
 %typemap(out) void func {
-  $result = obj0;
+  $result = $self;
   Py_INCREF($result);
 }
 #elif defined(SWIGPERL)
