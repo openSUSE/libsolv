@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Tue Aug 13 00:27:42 CEST 2019 - Stefan Brüns <stefan.bruens@rwth-aachen.de>
+
+- Make code compatible with swig 4.0, remove obj0 instances
+
+-------------------------------------------------------------------
 Wed Jul 10 07:48:10 UTC 2019 - Martin Liška <mliska@suse.cz>
 
 - Add -ffat-lto-objects to $optflags as the package provides
