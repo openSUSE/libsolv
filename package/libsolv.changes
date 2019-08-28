@@ -1,4 +1,12 @@
 -------------------------------------------------------------------
+Wed Aug 28 14:49:19 CEST 2019 - mls@suse.de
+
+- Fix repository priority handling for multiversion packages
+- Make code compatible with swig 4.0, remove obj0 instances
+- repo2solv: support zchunk compressed data
+- bump version to 0.7.6
+
+-------------------------------------------------------------------
 Wed Jul 10 07:48:10 UTC 2019 - Martin Liška <mliska@suse.cz>
 
 - Add -ffat-lto-objects to $optflags as the package provides

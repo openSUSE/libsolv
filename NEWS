@@ -2,6 +2,16 @@
 This file contains the major changes between
 libsolv versions:
 
+Version 0.7.6
+- selected bug fixes:
+  * fix repository priority handling for multiversion packages
+  * better support of inverval deps in pool_match_dep()
+  * support src rpms that have non-empty provides
+- new features
+  * bindings: add get_disabled_list() and set_disabled_list()
+  * bindings: add whatcontainsdep()
+  * bindings: make the selection filters return the self object
+
 Version 0.7.5
 - selected bug fixes:
   * fix favorq leaking between solver runs if the solver is reused
