@@ -1910,6 +1910,8 @@ resolve_dependencies(Solver *solv, int level, int disablerules, Queue *dq)
   Rule *r;
   int origlevel = level;
   Id p, *dp;
+  int focusbest = solv->focus_best && solv->do_extra_reordering;
+  Repo *installed = solv->installed;
 
   /*
    * decide
@@ -1928,7 +1930,7 @@ resolve_dependencies(Solver *solv, int level, int disablerules, Queue *dq)
 	}
       if (i == solv->nrules)
 	i = 1;
-      if (solv->focus_best && solv->do_extra_reordering && i >= solv->featurerules)
+      if (focusbest && i >= solv->featurerules)
 	continue;
       r = solv->rules + i;
       if (r->d < 0)		/* ignore disabled rules */
@@ -1937,6 +1939,19 @@ resolve_dependencies(Solver *solv, int level, int disablerules, Queue *dq)
 	{
 	  if (r->d == 0 || solv->decisionmap[-r->p] <= 0)
 	    continue;
+	}
+      if (focusbest && r->d != 0 && installed)
+	{
+	  /* make sure at least one negative literal is from a new package */
+	  if (!(r->p < 0 && pool->solvables[-r->p].repo != installed))
+	    {
+	      dp = pool->whatprovidesdata + r->d;
+	      while ((p = *dp++) != 0)
+		if (p < 0 && solv->decisionmap[-p] > 0 && pool->solvables[-p].repo != installed)
+		  break;
+	      if (!p)
+		continue;		/* sorry */
+	    }
 	}
       if (dq->count)
 	queue_empty(dq);
