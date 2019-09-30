@@ -166,6 +166,7 @@ struct s_Pool {
   Id *whatprovidesauxdata;
   Offset whatprovidesauxdataoff;
 
+  int whatprovideswithdisabled;
 #endif
 };
 
@@ -204,6 +205,7 @@ struct s_Pool {
 #define POOL_FLAG_ADDFILEPROVIDESFILTERED		9
 #define POOL_FLAG_IMPLICITOBSOLETEUSESCOLORS		10
 #define POOL_FLAG_NOWHATPROVIDESAUX			11
+#define POOL_FLAG_WHATPROVIDESWITHDISABLED		12
 
 /* ----------------------------------------------- */
 

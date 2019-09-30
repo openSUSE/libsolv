@@ -152,6 +152,7 @@ static struct poolflags2str {
   { POOL_FLAG_NOOBSOLETESMULTIVERSION,      "noobsoletesmultiversion", 0 },
   { POOL_FLAG_ADDFILEPROVIDESFILTERED,      "addfileprovidesfiltered", 0 },
   { POOL_FLAG_NOWHATPROVIDESAUX,            "nowhatprovidesaux", 0 },
+  { POOL_FLAG_WHATPROVIDESWITHDISABLED,     "whatprovideswithdisabled", 0 },
   { 0, 0, 0 }
 };
 

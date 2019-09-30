@@ -123,6 +123,26 @@ static inline int pool_installable(const Pool *pool, Solvable *s)
   return 1;
 }
 
+#ifdef LIBSOLV_INTERNAL
+static inline int pool_installable_whatprovides(const Pool *pool, Solvable *s)
+{
+  /* we always need the installed solvable in the whatprovides data,
+     otherwise obsoletes/conflicts on them won't work */
+  if (s->repo != pool->installed)
+    {
+      if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC || pool_badarch_solvable(pool, s))
+	return 0;
+      if (pool->considered && !pool->whatprovideswithdisabled)
+	{
+	  Id id = s - pool->solvables;
+	  if (!MAPTST(pool->considered, id))
+	    return 0;
+	}
+    }
+  return 1;
+}
+#endif
+
 /* not in solvable.h because we need the repo definition */
 static inline Solvable *solvable_free(Solvable *s, int reuseids)
 {

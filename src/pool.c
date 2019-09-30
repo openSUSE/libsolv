@@ -202,6 +202,8 @@ pool_get_flag(Pool *pool, int flag)
       return pool->addfileprovidesfiltered;
     case POOL_FLAG_NOWHATPROVIDESAUX:
       return pool->nowhatprovidesaux;
+    case POOL_FLAG_WHATPROVIDESWITHDISABLED:
+      return pool->whatprovideswithdisabled;
     default:
       break;
     }
@@ -246,6 +248,9 @@ pool_set_flag(Pool *pool, int flag, int value)
       break;
     case POOL_FLAG_NOWHATPROVIDESAUX:
       pool->nowhatprovidesaux = value;
+      break;
+    case POOL_FLAG_WHATPROVIDESWITHDISABLED:
+      pool->whatprovideswithdisabled = value;
       break;
     default:
       break;
@@ -473,9 +478,7 @@ pool_createwhatprovides(Pool *pool)
       s = pool->solvables + i;
       if (!s->provides || !s->repo || s->repo->disabled)
 	continue;
-      /* we always need the installed solvable in the whatprovides data,
-         otherwise obsoletes/conflicts on them won't work */
-      if (s->repo != installed && !pool_installable(pool, s))
+      if (!pool_installable_whatprovides(pool, s))
 	continue;
       pp = s->repo->idarraydata + s->provides;
       while ((id = *pp++) != 0)
@@ -534,9 +537,8 @@ pool_createwhatprovides(Pool *pool)
       s = pool->solvables + i;
       if (!s->provides || !s->repo || s->repo->disabled)
 	continue;
-      if (s->repo != installed && !pool_installable(pool, s))
+      if (!pool_installable_whatprovides(pool, s))
 	continue;
-
       /* for all provides of this solvable */
       pp = s->repo->idarraydata + s->provides;
       while ((id = *pp++) != 0)
@@ -963,7 +965,7 @@ pool_addstdproviders(Pool *pool, Id d)
        * and those should not use filelist entries */
       if (s->repo->disabled)
 	continue;
-      if (s->repo != pool->installed && !pool_installable(pool, s))
+      if (!pool_installable_whatprovides(pool, s))
 	continue;
       queue_push(&q, di.solvid);
     }
@@ -1243,7 +1245,7 @@ pool_addrelproviders(Pool *pool, Id d)
 	      FOR_POOL_SOLVABLES(p)
 		{
 		  Solvable *s = pool->solvables + p;
-		  if (s->repo != pool->installed && !pool_installable(pool, s))
+		  if (!pool_installable_whatprovides(pool, s))
 		    continue;
 		  if (s->arch == evr)
 		    queue_push(&plist, p);

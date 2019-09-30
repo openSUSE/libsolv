@@ -3323,6 +3323,21 @@ prune_best_update(Solver *solv, Id p, Queue *q)
   policy_filter_unwanted(solv, q, POLICY_MODE_RECOMMEND);
 }
 
+static void
+prune_disabled(Pool *pool, Queue *q)
+{
+  int i, j;
+  for (i = j = 0; i < q->count; i++)
+    {
+      Id p = q->elements[i];
+      Solvable *s = pool->solvables + p;
+      if (s->repo && s->repo != pool->installed && !MAPTST(pool->considered, p))
+	continue;
+      q->elements[j++] = p;
+    }
+  queue_truncate(q, j);
+}
+
 void
 solver_addbestrules(Solver *solv, int havebestinstalljobs, int haslockjob)
 {
@@ -3377,6 +3392,8 @@ solver_addbestrules(Solver *solv, int havebestinstalljobs, int haslockjob)
 		      else if (p2 < 0)
 		        queue_push(&q2, p2);
 		    }
+		  if (pool->considered && pool->whatprovideswithdisabled)
+		    prune_disabled(pool, &q);
 		  if (!q.count)
 		    continue;	/* orphaned */
 		  /* select best packages, just look at prio and version */
@@ -3386,6 +3403,8 @@ solver_addbestrules(Solver *solv, int havebestinstalljobs, int haslockjob)
 		    continue;	/* nothing filtered */
 		  if (lockedmap)
 		    {
+		      queue_insertn(&q, 0, q2.count, q2.elements);
+		      queue_empty(&q2);
 		      FOR_RULELITERALS(p2, pp2, r)
 			{
 			  if (p2 <= 0)
@@ -3399,9 +3418,12 @@ solver_addbestrules(Solver *solv, int havebestinstalljobs, int haslockjob)
 			    continue;
 			  queue_push(&q2, p2);
 			}
+		      if (pool->considered && pool->whatprovideswithdisabled)
+			prune_disabled(pool, &q2);
 		      policy_filter_unwanted(solv, &q2, POLICY_MODE_RECOMMEND);
 		      for (k = 0; k < q2.count; k++)
 			queue_pushunique(&q, q2.elements[k]);
+		      queue_empty(&q2);
 		    }
 		  if (q2.count)
 		    queue_insertn(&q, 0, q2.count, q2.elements);

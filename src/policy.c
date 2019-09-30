@@ -1579,6 +1579,8 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
 	continue;
 
       ps = pool->solvables + p;
+      if (pool->considered && pool->whatprovideswithdisabled && ps->repo != pool->installed && pool_disabled_solvable(pool, ps)) 
+	continue;
       if (s->name == ps->name)	/* name match */
 	{
 	  if (pool->implicitobsoleteusescolors && !pool_colormatch(pool, s, ps))
