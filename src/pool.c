@@ -455,7 +455,6 @@ pool_createwhatprovides(Pool *pool)
   Offset *whatprovides;
   Id *whatprovidesdata, *dp, *whatprovidesauxdata;
   Offset *whatprovidesaux;
-  Repo *installed = pool->installed;
   unsigned int now;
 
   now = solv_timems(0);

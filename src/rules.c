@@ -1373,6 +1373,14 @@ solver_addupdaterule(Solver *solv, Solvable *s)
   int dupinvolved = 0;
 
   p = s - pool->solvables;
+
+  if (pool->considered && pool_disabled_solvable(pool, s))
+    {
+      /* disabled installed solvables must stay installed */
+      solver_addrule(solv, p, 0, 0);
+      return;
+    }
+
   /* Orphan detection. We cheat by looking at the feature rule, which
    * we already calculated */
   r = solv->rules + solv->featurerules + (p - solv->installed->start);
@@ -2003,6 +2011,8 @@ solver_addduprules(Solver *solv, Map *addedmap)
 	    continue;
 	  if (installed && ps->repo == installed)
 	    {
+	      if (pool->considered && pool_disabled_solvable(pool, ps))
+		continue;		/* always keep disabled installed packages */
 	      if (!MAPTST(&solv->dupmap, p))
 		{
 		  Id ip, ipp;
