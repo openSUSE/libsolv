@@ -598,6 +598,7 @@ breakcycle(struct orderdata *od, Id *cycle)
   POOL_DEBUG(SOLV_DEBUG_STATS, "\n");
 }
 
+#if 0
 static inline void
 dump_tes(struct orderdata *od)
 {
@@ -628,6 +629,7 @@ dump_tes(struct orderdata *od)
 	}
     }
 }
+#endif
 
 static void
 reachable(struct orderdata *od, Id i)

@@ -187,16 +187,6 @@ write_id(Repodata *data, Id x)
 }
 
 static inline void
-write_id_eof(Repodata *data, Id x, int eof)
-{
-  if (x >= 64)
-    x = (x & 63) | ((x & ~63) << 1);
-  write_id(data, x | (eof ? 0 : 64));
-}
-
-
-
-static inline void
 write_str(Repodata *data, const char *str)
 {
   if (data->error)
