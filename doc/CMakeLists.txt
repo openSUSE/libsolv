@@ -46,10 +46,15 @@ ENDIF (ENABLE_APPDATA)
 STRING(REGEX REPLACE "([^;]+)" "gen/\\1" libsolv_MANPAGES1 "${libsolv_MANPAGES1}")
 STRING(REGEX REPLACE "([^;]+)" "gen/\\1" libsolv_MANPAGES3 "${libsolv_MANPAGES3}")
 
+cpack_add_component("doc")
+
 INSTALL(FILES
     ${libsolv_MANPAGES3}
-    DESTINATION "${CMAKE_INSTALL_MANDIR}/man3")
+    DESTINATION "${CMAKE_INSTALL_MANDIR}/man3" COMPONENT "doc")
 
 INSTALL(FILES
     ${libsolv_MANPAGES1}
-    DESTINATION "${CMAKE_INSTALL_MANDIR}/man1")
+    DESTINATION "${CMAKE_INSTALL_MANDIR}/man1" COMPONENT "doc")
+
+set("CPACK_DEBIAN_DOC_PACKAGE_DEPENDS" "man")
+pass_through_cpack_vars()

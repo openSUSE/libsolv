@@ -20,3 +20,5 @@ ENDIF (ENABLE_RUBY)
 IF (ENABLE_TCL)
     ADD_SUBDIRECTORY (tcl)
 ENDIF (ENABLE_TCL)
+
+pass_through_cpack_vars()

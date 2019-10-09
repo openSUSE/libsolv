@@ -6,19 +6,14 @@
 # we cannot use FIND_PACKAGE PythonLibs here, as this would
 # clash with the python variables.
 #
-IF (NOT DEFINED PYTHON3_EXECUTABLE)
-SET (PYTHON3_EXECUTABLE "/usr/bin/python3")
-ENDIF (NOT DEFINED PYTHON3_EXECUTABLE)
-
-EXECUTE_PROCESS(COMMAND ${PYTHON3_EXECUTABLE} -c "from sys import stdout; from distutils import sysconfig; stdout.write(sysconfig.get_python_lib(True))" OUTPUT_VARIABLE PYTHON3_INSTALL_DIR)
-EXECUTE_PROCESS(COMMAND ${PYTHON3_EXECUTABLE} -c "from sys import stdout; from distutils import sysconfig; stdout.write(sysconfig.get_python_inc())" OUTPUT_VARIABLE PYTHON3_INCLUDE_DIR)
+find_package (Python3 COMPONENTS Interpreter Development)
 
 SET (SWIG_PY3_FLAGS -DPYTHON3=1)
 SET (SWIG_PY3_FLAGS ${SWIG_PY3_FLAGS} -DSWIG_PYTHON_LEGACY_BOOL=1)
 
-MESSAGE (STATUS "Python3 executable: ${PYTHON3_EXECUTABLE}")
-MESSAGE (STATUS "Python3 installation dir: ${PYTHON3_INSTALL_DIR}")
-MESSAGE (STATUS "Python3 include path: ${PYTHON3_INCLUDE_DIR}")
+MESSAGE (STATUS "Python3 executable: ${PYTHON_EXECUTABLE}")
+MESSAGE (STATUS "Python3 installation dir: ${Python3_STDARCH}")
+MESSAGE (STATUS "Python3 include path: ${Python3_INCLUDE_DIRS}")
 
 ADD_CUSTOM_COMMAND (
     OUTPUT solv_python.c
@@ -28,11 +23,20 @@ ADD_CUSTOM_COMMAND (
 )
 
 ADD_DEFINITIONS(-Wno-unused)
-INCLUDE_DIRECTORIES (${PYTHON3_INCLUDE_DIR})
+INCLUDE_DIRECTORIES (${Python3_INCLUDE_DIRS})
 
 ADD_LIBRARY (bindings_python3 SHARED solv_python.c)
 SET_TARGET_PROPERTIES (bindings_python3 PROPERTIES PREFIX "" OUTPUT_NAME "_solv")
 TARGET_LINK_LIBRARIES (bindings_python3 libsolvext libsolv ${SYSTEM_LIBRARIES})
 
-INSTALL (TARGETS bindings_python3 LIBRARY DESTINATION ${PYTHON3_INSTALL_DIR})
-INSTALL (FILES ${CMAKE_CURRENT_BINARY_DIR}/solv.py DESTINATION ${PYTHON3_INSTALL_DIR})
+cpack_add_component("python3"
+    DEPENDS "libsolv"
+)
+set("CPACK_DEBIAN_PYTHON3_PACKAGE_NAME" "python3-${PACKAGE}")
+set ("CPACK_DEBIAN_PYTHON3_PACKAGE_PROVIDES" "python3-${PACKAGE}")
+
+INSTALL (TARGETS bindings_python3 LIBRARY DESTINATION ${Python3_STDARCH} COMPONENT "python3" )
+INSTALL (FILES ${CMAKE_CURRENT_BINARY_DIR}/solv.py DESTINATION ${Python3_STDARCH} COMPONENT "python3" )
+
+set ("CPACK_DEBIAN_PYTHON3_PACKAGE_DEPENDS" "libpython${Python3_VERSION_MAJOR}.${Python3_VERSION_MINOR} (>=${Python3_VERSION}~), python${Python3_VERSION_MAJOR}.${Python3_VERSION_MINOR} (>=${Python3_VERSION}~), ${CPACK_DEBIAN_LIBSOLV_PACKAGE_NAME}")
+pass_through_cpack_vars()

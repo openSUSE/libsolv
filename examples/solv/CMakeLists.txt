@@ -23,7 +23,13 @@ repoinfo_type_susetags.c
 
 TARGET_LINK_LIBRARIES (solv libsolvext libsolv ${SYSTEM_LIBRARIES})
 
+cpack_add_component("examples")
+
 INSTALL(TARGETS
     solv
-    DESTINATION ${CMAKE_INSTALL_BINDIR})
+    DESTINATION ${CMAKE_INSTALL_BINDIR}
+    COMPONENT "examples")
 
+set("CPACK_DEBIAN_EXAMPLES_PACKAGE_DEPENDS" "${CPACK_DEBIAN_LIBSOLV_PACKAGE_NAME}, ${CPACK_DEBIAN_LIBSOLV_PACKAGE_NAME}-dev")
+
+pass_through_cpack_vars()

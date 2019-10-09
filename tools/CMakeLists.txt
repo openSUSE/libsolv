@@ -124,4 +124,15 @@ TARGET_LINK_LIBRARIES (mergesolv toolstuff libsolvext libsolv ${SYSTEM_LIBRARIES
 ADD_EXECUTABLE (testsolv testsolv.c)
 TARGET_LINK_LIBRARIES (testsolv libsolvext libsolv ${SYSTEM_LIBRARIES})
 
-INSTALL (TARGETS ${tools_list} DESTINATION ${CMAKE_INSTALL_BINDIR})
+cpack_add_component("tools"
+    DEPENDS "${PACKAGE}"
+)
+
+INSTALL (TARGETS ${tools_list}
+    DESTINATION ${CMAKE_INSTALL_BINDIR}
+    COMPONENT "tools"
+)
+
+set("CPACK_DEBIAN_TOOLS_PACKAGE_DEPENDS" "${CPACK_DEBIAN_LIBSOLV_PACKAGE_NAME}")
+
+pass_through_cpack_vars()
