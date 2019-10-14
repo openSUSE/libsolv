@@ -207,7 +207,7 @@ Perl bindings for libsolv.
 %setup -q
 
 %build
-%global _lto_cflags %{_lto_cflags} -ffat-lto-objects
+%global _lto_cflags %{?_lto_cflags} -ffat-lto-objects
 export CFLAGS="%{optflags}"
 export CXXFLAGS="$CFLAGS"
 
