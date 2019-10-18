@@ -217,7 +217,7 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
        */
     case STATE_UPDATE:
       {
-	const char *from = 0, *type = 0, *version = 0;
+	const char *from = 0, *type = 0, *version = 0, *status = 0;
 	for (; *atts; atts += 2)
 	  {
 	    if (!strcmp(*atts, "from"))
@@ -226,6 +226,8 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
 	      type = atts[1];
 	    else if (!strcmp(*atts, "version"))
 	      version = atts[1];
+	    else if (!strcmp(*atts, "status"))
+	      status = atts[1];
 	  }
 	solvable = pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->repo));
 	pd->handle = pd->solvable - pool->solvables;
@@ -235,6 +237,8 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
 	solvable->arch = ARCH_NOARCH;
 	if (type)
 	  repodata_set_str(pd->data, pd->handle, SOLVABLE_PATCHCATEGORY, type);
+	if (status)
+	  repodata_set_poolstr(pd->data, pd->handle, UPDATE_STATUS, status);
         pd->buildtime = (time_t)0;
       }
       break;
