@@ -262,6 +262,8 @@ KNOWNID(SOLVABLE_INSTALLSTATUS,		"solvable:installstatus"),	/* debian install st
 
 KNOWNID(SOLVABLE_PREREQ_IGNOREINST,	"solvable:prereq_ignoreinst"),	/* ignore these pre-requires for installed packages */
 
+KNOWNID(UPDATE_STATUS,			"update:status"),		/* "stable", "testing", ...*/
+
 KNOWNID(ID_NUM_INTERNAL,		0)
 
 #ifdef KNOWNID_INITIALIZE
