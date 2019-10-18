@@ -261,6 +261,8 @@ KNOWNID(UPDATE_MODULE_ARCH,		"update:module:arch"),		/* architecture */
 KNOWNID(SOLVABLE_BUILDVERSION,		"solvable:buildversion"),	/* conda */
 KNOWNID(SOLVABLE_BUILDFLAVOR,		"solvable:buildflavor"),	/* conda */
 
+KNOWNID(UPDATE_STATUS,			"update:status"),		/* "stable", "testing", ...*/
+
 KNOWNID(ID_NUM_INTERNAL,		0)
 
 #ifdef KNOWNID_INITIALIZE
