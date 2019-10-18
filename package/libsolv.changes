@@ -1,4 +1,12 @@
 -------------------------------------------------------------------
+Fri Oct 18 10:53:54 CEST 2019 - mls@suse.de
+
+- fix updating of too many packages in focusbest mode
+- fix handling of disabled installed packages in distupgrade
+- new POOL_FLAG_WHATPROVIDESWITHDISABLED pool flag
+- bump version to 0.7.7
+
+-------------------------------------------------------------------
 Wed Aug 28 14:49:19 CEST 2019 - mls@suse.de
 
 - Fix repository priority handling for multiversion packages
