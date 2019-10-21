@@ -1605,7 +1605,7 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
     }
 
   /* XXX: should get ro lock of Packages database! */
-  if (stat_database(&state, "Packages", &packagesstat, 1))
+  if (stat_database(&state, &packagesstat))
     {
       freestate(&state);
       return -1;

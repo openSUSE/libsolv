@@ -57,7 +57,7 @@ struct rpmdbstate {
 
 
 static int
-stat_database(struct rpmdbstate *state, char *dbname, struct stat *statbuf, int seterror)
+stat_database_name(struct rpmdbstate *state, char *dbname, struct stat *statbuf, int seterror)
 {
   char *dbpath;
   dbpath = solv_dupjoin(state->rootdir, state->is_ostree ? "/usr/share/rpm/" : "/var/lib/rpm/", dbname);
@@ -71,6 +71,13 @@ stat_database(struct rpmdbstate *state, char *dbname, struct stat *statbuf, int 
   free(dbpath);
   return 0;
 }
+
+static int
+stat_database(struct rpmdbstate *state, struct stat *statbuf)
+{
+  return stat_database_name(state, "Packages", statbuf, 1);
+}
+
 
 static inline Id
 db2rpmdbid(unsigned char *db, int byteswapped)
@@ -426,7 +433,7 @@ count_headers(struct rpmdbstate *state)
   DBT dbkey;
   DBT dbdata;
 
-  if (stat_database(state, "Name", &statbuf, 0))
+  if (stat_database_name(state, "Name", &statbuf, 0))
     return 0;
   memset(&dbkey, 0, sizeof(dbkey));
   memset(&dbdata, 0, sizeof(dbdata));

@@ -31,14 +31,13 @@ struct rpmdbstate {
 };
 
 static int
-stat_database(struct rpmdbstate *state, char *dbname, struct stat *statbuf, int seterror)
+stat_database(struct rpmdbstate *state, struct stat *statbuf)
 {
   char *dbpath;
-  dbpath = solv_dupjoin(state->rootdir, state->is_ostree ? "/usr/share/rpm/" : "/var/lib/rpm/", dbname);
+  dbpath = solv_dupjoin(state->rootdir, state->is_ostree ? "/usr/share/rpm/" : "/var/lib/rpm/", "Packages");
   if (stat(dbpath, statbuf))
     {
-      if (seterror)
-        pool_error(state->pool, -1, "%s: %s", dbpath, strerror(errno));
+      pool_error(state->pool, -1, "%s: %s", dbpath, strerror(errno));
       free(dbpath);
       return -1;
     }
