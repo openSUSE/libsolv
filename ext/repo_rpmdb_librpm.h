@@ -33,15 +33,32 @@ struct rpmdbstate {
 static int
 stat_database(struct rpmdbstate *state, struct stat *statbuf)
 {
-  char *dbpath;
-  dbpath = solv_dupjoin(state->rootdir, state->is_ostree ? "/usr/share/rpm/" : "/var/lib/rpm/", "Packages");
-  if (stat(dbpath, statbuf))
+  static const char *dbname[] = {
+    "Packages",
+    "Packages.db",
+    "rpmdb.sqlite",
+    "data.mdb",
+    "Packages",		/* for error reporting */
+    0,
+  };
+  int i;
+
+  for (i = 0; ; i++)
     {
-      pool_error(state->pool, -1, "%s: %s", dbpath, strerror(errno));
-      free(dbpath);
-      return -1;
+      char *dbpath = solv_dupjoin(state->rootdir, state->is_ostree ? "/usr/share/rpm/" : "/var/lib/rpm/", dbname[i]);
+      if (!stat(dbpath, statbuf))
+	{
+	  free(dbpath);
+	  return 0;
+	}
+      if (errno != ENOENT || !dbname[i + 1])
+	{
+	  pool_error(state->pool, -1, "%s: %s", dbpath, strerror(errno));
+	  solv_free(dbpath);
+	  return -1;
+	}
+      solv_free(dbpath);
     }
-  free(dbpath);
   return 0;
 }
 
