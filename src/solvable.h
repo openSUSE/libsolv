@@ -81,7 +81,7 @@ int solvable_identical(Solvable *s1, Solvable *s2);
 Id solvable_selfprovidedep(Solvable *s);
 
 int solvable_matchesdep(Solvable *s, Id keyname, Id dep, int marker);
-int solvable_matchessolvable(Solvable *s, Id keyname, int marker, Id solvid, Queue *depq);
+int solvable_matchessolvable(Solvable *s, Id keyname, Id solvid, Queue *depq, int marker);
 
 /* internal */
 int solvable_matchessolvable_int(Solvable *s, Id keyname, int marker, Id solvid, Map *solvidmap, Queue *depq, Map *missc, int reloff, Queue *outdepq);

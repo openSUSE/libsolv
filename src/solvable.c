@@ -720,7 +720,7 @@ solvable_matchessolvable_int(Solvable *s, Id keyname, int marker, Id solvid, Map
 }
 
 int
-solvable_matchessolvable(Solvable *s, Id keyname, int marker, Id solvid, Queue *depq)
+solvable_matchessolvable(Solvable *s, Id keyname, Id solvid, Queue *depq, int marker)
 {
   Pool *pool = s->repo->pool;
   Map missc;		/* cache for misses */
