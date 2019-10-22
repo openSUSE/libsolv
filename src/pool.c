@@ -1542,7 +1542,7 @@ pool_whatmatchessolvable(Pool *pool, Id keyname, Id solvid, Queue *q, int marker
 	continue;
       if (s->repo != pool->installed && !pool_installable(pool, s))
 	continue;
-      if (solvable_matchessolvable_int(s, keyname, marker, solvid, 0, &qq, &missc, reloff))
+      if (solvable_matchessolvable_int(s, keyname, marker, solvid, 0, &qq, &missc, reloff, 0))
         queue_push(q, p);
     }
   map_free(&missc);

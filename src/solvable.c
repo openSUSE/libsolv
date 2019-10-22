@@ -645,7 +645,7 @@ solvable_matchesdep(Solvable *s, Id keyname, Id dep, int marker)
 }
 
 int
-solvable_matchessolvable_int(Solvable *s, Id keyname, int marker, Id solvid, Map *solvidmap, Queue *depq, Map *missc, int reloff)
+solvable_matchessolvable_int(Solvable *s, Id keyname, int marker, Id solvid, Map *solvidmap, Queue *depq, Map *missc, int reloff, Queue *outdepq)
 {
   Pool *pool = s->repo->pool;
   int i, boff;
@@ -653,6 +653,8 @@ solvable_matchessolvable_int(Solvable *s, Id keyname, int marker, Id solvid, Map
 
   if (depq->count)
     queue_empty(depq);
+  if (outdepq && outdepq->count)
+    queue_empty(outdepq);
   solvable_lookup_deparray(s, keyname, depq, marker);
   for (i = 0; i < depq->count; i++)
     {
@@ -695,15 +697,46 @@ solvable_matchessolvable_int(Solvable *s, Id keyname, int marker, Id solvid, Map
 	{
 	  for (; *wp; wp++)
 	    if (MAPTST(solvidmap, *wp))
-	      return 1;
+	      break;
 	}
       else
 	{
 	  for (; *wp; wp++)
 	    if (*wp == solvid)
-	      return 1;
+	      break;
+	}
+      if (*wp)
+	{
+	  if (outdepq)
+	    {
+	      queue_pushunique(outdepq, dep);
+	      continue;
+	    }
+	  return 1;
 	}
       MAPSET(missc, boff);
     }
-  return 0;
+  return outdepq && outdepq->count ? 1 : 0;
+}
+
+int
+solvable_matchessolvable(Solvable *s, Id keyname, int marker, Id solvid, Queue *depq)
+{
+  Pool *pool = s->repo->pool;
+  Map missc;		/* cache for misses */
+  int res, reloff;
+  Queue qq;
+
+  if (depq && depq->count)
+    queue_empty(depq);
+  if (s - pool->solvables == solvid)
+    return 0;		/* no self-matches */
+
+  queue_init(&qq);
+  reloff = pool->ss.nstrings;
+  map_init(&missc, reloff + pool->nrels);
+  res = solvable_matchessolvable_int(s, keyname, marker, solvid, 0, &qq, &missc, reloff, depq);
+  map_free(&missc);
+  queue_free(&qq);
+  return res;
 }

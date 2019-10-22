@@ -1502,7 +1502,7 @@ selection_make_matchsolvable_common(Pool *pool, Queue *selection, Queue *solvidq
 	continue;
       if (!solvable_matches_selection_flags(pool, s, flags))
 	continue;
-      if (solvable_matchessolvable_int(s, keyname, marker, solvid, solvidq ? &m : 0, &q, &missc, reloff))
+      if (solvable_matchessolvable_int(s, keyname, marker, solvid, solvidq ? &m : 0, &q, &missc, reloff, 0))
         queue_push(selection, p);
     }
   queue_free(&q);
