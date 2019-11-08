@@ -646,6 +646,8 @@ create_transaction_info(Transaction *trans, Queue *decisionq)
       s = pool->solvables + p;
       if (!s->repo || s->repo == installed)
 	continue;
+      if (!MAPTST(&trans->transactsmap, p))
+	continue;
       multi = trans->multiversionmap.size && MAPTST(&trans->multiversionmap, p);
       FOR_PROVIDES(p2, pp2, s->name)
 	{
@@ -726,9 +728,10 @@ transaction_create_decisionq(Pool *pool, Queue *decisionq, Map *multiversionmap)
 {
   Repo *installed = pool->installed;
   int i, needmulti;
-  Id p;
+  Id p, pp;
   Solvable *s;
   Transaction *trans;
+  Map selfdestructmap;
 
   trans = transaction_create(pool);
   if (multiversionmap && !multiversionmap->size)
@@ -736,6 +739,13 @@ transaction_create_decisionq(Pool *pool, Queue *decisionq, Map *multiversionmap)
   queue_empty(&trans->steps);
   map_init(&trans->transactsmap, pool->nsolvables);
   needmulti = 0;
+  map_init(&selfdestructmap, 0);
+  FOR_PROVIDES(p, pp, LIBSOLV_SELF_DESTRUCT_PKG)
+    {
+      if (!selfdestructmap.size)
+	map_grow(&selfdestructmap, pool->nsolvables);
+      MAPSET(&selfdestructmap, p);
+    }
   for (i = 0; i < decisionq->count; i++)
     {
       p = decisionq->elements[i];
@@ -746,11 +756,14 @@ transaction_create_decisionq(Pool *pool, Queue *decisionq, Map *multiversionmap)
 	MAPSET(&trans->transactsmap, -p);
       if (!(installed && s->repo == installed) && p > 0)
 	{
+	  if (selfdestructmap.size && MAPTST(&selfdestructmap, p))
+	    continue;
 	  MAPSET(&trans->transactsmap, p);
 	  if (multiversionmap && MAPTST(multiversionmap, p))
 	    needmulti = 1;
 	}
     }
+  map_free(&selfdestructmap);
   MAPCLR(&trans->transactsmap, SYSTEMSOLVABLE);
   if (needmulti)
     map_init_clone(&trans->multiversionmap, multiversionmap);
