@@ -128,6 +128,8 @@ solver_printruleclass(Solver *solv, int type, Rule *r)
     POOL_DEBUG(type, "FEATURE ");
   else if (p >= solv->yumobsrules && p < solv->yumobsrules_end)
     POOL_DEBUG(type, "YUMOBS ");
+  else if (p >= solv->blackrules && p < solv->blackrules_end)
+    POOL_DEBUG(type, "BLACK ");
   else if (p >= solv->recommendsrules && p < solv->recommendsrules_end)
     POOL_DEBUG(type, "RECOMMENDS ");
   solver_printrule(solv, type, r);

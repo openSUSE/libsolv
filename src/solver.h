@@ -76,6 +76,9 @@ struct s_Solver {
   Id yumobsrules_end;
   Id *yumobsrules_info;			/* the dependency for each rule */
 
+  Id blackrules;			/* rules from blacklisted packages */
+  Id blackrules_end;
+
   Id choicerules;			/* choice rules (always weak) */
   Id choicerules_end;
   Id *choicerules_info;			/* the rule we used to generate the choice rule */
@@ -244,6 +247,7 @@ typedef struct s_Solver Solver;
 #define SOLVER_ALLOWUNINSTALL		0x0b00
 #define SOLVER_FAVOR			0x0c00
 #define SOLVER_DISFAVOR			0x0d00
+#define SOLVER_BLACKLIST		0x0e00
 
 #define SOLVER_JOBMASK			0xff00
 

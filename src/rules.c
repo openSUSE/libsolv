@@ -2101,6 +2101,97 @@ reenableduprule(Solver *solv, Id name)
     }
 }
 
+/***********************************************************************
+ ***
+ ***  Black rule part
+ ***/
+
+static inline void
+disableblackrule(Solver *solv, Id p)
+{
+  Rule *r;
+  int i;
+  for (i = solv->blackrules, r = solv->rules + i; i < solv->blackrules_end; i++, r++)
+    if (r->p == -p)
+      solver_disablerule(solv, r);
+}
+
+static inline void
+reenableblackrule(Solver *solv, Id p)
+{
+  Pool *pool = solv->pool;
+  Rule *r;
+  int i;
+  for (i = solv->blackrules, r = solv->rules + i; i < solv->blackrules_end; i++, r++)
+    if (r->p == -p)
+      {
+	solver_enablerule(solv, r);
+	IF_POOLDEBUG (SOLV_DEBUG_SOLUTIONS)
+	  {
+	    POOL_DEBUG(SOLV_DEBUG_SOLUTIONS, "@@@ re-enabling ");
+	    solver_printruleclass(solv, SOLV_DEBUG_SOLUTIONS, r);
+	  }
+      }
+}
+
+void
+solver_addblackrules(Solver *solv)
+{
+  int i;
+  Id how, select, what, p, pp;
+  Queue *job = &solv->job;
+  Pool *pool = solv->pool;
+  Repo *installed = solv->installed;
+  Map updatemap;
+
+  map_init(&updatemap, 0);
+  solv->blackrules = solv->nrules;
+  if (installed)
+    {
+      for (i = 0; i < job->count; i += 2)
+	{
+	  how = job->elements[i];
+	  select = job->elements[i] & SOLVER_SELECTMASK;
+	  what = job->elements[i + 1];
+	  switch (how & SOLVER_JOBMASK)
+	    {
+	    case SOLVER_BLACKLIST:
+	      FOR_JOB_SELECT(p, pp, select, what)
+		{
+		  Solvable *s = pool->solvables + p;
+		  if (s->repo != installed)
+		    continue;
+		  if (!updatemap.size)
+		    map_grow(&updatemap, pool->ss.nstrings);
+		  if (s->name > 0 && s->name < pool->ss.nstrings)
+		    MAPSET(&updatemap, s->name);
+		}
+	    }
+	}
+    }
+  for (i = 0; i < job->count; i += 2)
+    {
+      how = job->elements[i];
+      select = job->elements[i] & SOLVER_SELECTMASK;
+      what = job->elements[i + 1];
+      switch (how & SOLVER_JOBMASK)
+	{
+	case SOLVER_BLACKLIST:
+	  FOR_JOB_SELECT(p, pp, select, what)
+	    {
+	      Solvable *s = pool->solvables + p;
+	      if (s->repo == installed)
+		continue;
+	      if (updatemap.size && s->name > 0 && s->name < pool->ss.nstrings && MAPTST(&updatemap, s->name))
+		continue;	/* installed package with same name is already blacklisted */
+	      solver_addrule(solv, -p, 0, 0);
+	    }
+	  break;
+	}
+    }
+  map_free(&updatemap);
+  solv->blackrules_end = solv->nrules;
+}
 
 /***********************************************************************
  ***
@@ -2114,6 +2205,7 @@ reenableduprule(Solver *solv, Id name)
 #define DISABLE_UPDATE	1
 #define DISABLE_INFARCH	2
 #define DISABLE_DUP	3
+#define DISABLE_BLACK	4
 
 static void
 jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
@@ -2213,6 +2305,16 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
 		}
 	    }
 	}
+      if ((set & SOLVER_SETEVR) != 0 && solv->blackrules != solv->blackrules_end)
+        {
+	  if (select == SOLVER_SOLVABLE)
+	    queue_push2(q, DISABLE_BLACK, what);
+	  else
+	    {
+	      FOR_JOB_SELECT(p, pp, select, what)
+	        queue_push2(q, DISABLE_BLACK, p);
+	    }
+        }
       if (!installed || installed->end == installed->start)
 	return;
       /* now the hard part: disable some update rules */
@@ -2386,6 +2488,9 @@ solver_disablepolicyrules(Solver *solv)
 	case DISABLE_DUP:
 	  disableduprule(solv, arg);
 	  break;
+	case DISABLE_BLACK:
+	  disableblackrule(solv, arg);
+	  break;
 	default:
 	  break;
 	}
@@ -2488,6 +2593,9 @@ solver_reenablepolicyrules(Solver *solv, int jobidx)
 	  break;
 	case DISABLE_DUP:
 	  reenableduprule(solv, arg);
+	  break;
+	case DISABLE_BLACK:
+	  reenableblackrule(solv, arg);
 	  break;
 	}
     }
@@ -2815,6 +2923,12 @@ solver_ruleinfo(Solver *solv, Id rid, Id *fromp, Id *top, Id *depp)
 	*depp = solv->yumobsrules_info[rid - solv->yumobsrules];
       return SOLVER_RULE_YUMOBS;
     }
+  if (rid >= solv->blackrules && rid < solv->blackrules_end)
+    {
+      if (fromp)
+	*fromp = -r->p;
+      return SOLVER_RULE_BLACK;
+    }
   if (rid >= solv->choicerules && rid < solv->choicerules_end)
     return SOLVER_RULE_CHOICE;
   if (rid >= solv->recommendsrules && rid < solv->recommendsrules_end)
@@ -2845,10 +2959,14 @@ solver_ruleclass(Solver *solv, Id rid)
     return SOLVER_RULE_BEST;
   if (rid >= solv->yumobsrules && rid < solv->yumobsrules_end)
     return SOLVER_RULE_YUMOBS;
+  if (rid >= solv->blackrules && rid < solv->blackrules_end)
+    return SOLVER_RULE_BLACK;
   if (rid >= solv->choicerules && rid < solv->choicerules_end)
     return SOLVER_RULE_CHOICE;
   if (rid >= solv->recommendsrules && rid < solv->recommendsrules_end)
     return SOLVER_RULE_RECOMMENDS;
+  if (rid >= solv->blackrules && rid < solv->blackrules_end)
+    return SOLVER_RULE_BLACK;
   if (rid >= solv->learntrules && rid < solv->nrules)
     return SOLVER_RULE_LEARNT;
   return SOLVER_RULE_UNKNOWN;

@@ -22,11 +22,12 @@ extern "C" {
 
 struct s_Solver;
 
-#define SOLVER_SOLUTION_JOB             (0)
-#define SOLVER_SOLUTION_DISTUPGRADE     (-1)
-#define SOLVER_SOLUTION_INFARCH         (-2)
-#define SOLVER_SOLUTION_BEST            (-3)
-#define SOLVER_SOLUTION_POOLJOB         (-4)
+#define SOLVER_SOLUTION_JOB		(0)
+#define SOLVER_SOLUTION_DISTUPGRADE	(-1)
+#define SOLVER_SOLUTION_INFARCH		(-2)
+#define SOLVER_SOLUTION_BEST		(-3)
+#define SOLVER_SOLUTION_POOLJOB		(-4)
+#define SOLVER_SOLUTION_BLACK		(-5)
 
 void solver_recordproblem(struct s_Solver *solv, Id rid);
 void solver_fixproblem(struct s_Solver *solv, Id rid);

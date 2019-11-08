@@ -719,6 +719,12 @@ convertsolution(Solver *solv, Id why, Queue *solutionq)
 	}
       return;
     }
+  if (why >= solv->blackrules && why < solv->blackrules_end)
+    {
+      queue_push(solutionq, SOLVER_SOLUTION_BLACK);
+      assert(solv->rules[why].p < 0);
+      queue_push(solutionq, -solv->rules[why].p);
+    }
 }
 
 /*
@@ -980,6 +986,8 @@ solver_solutionelement_extrajobflags(Solver *solv, Id problem, Id solution)
  *    SOLVER_SOLUTION_DISTUPGRADE   pkgid
  *    -> add (SOLVER_INSTALL|SOLVER_SOLVABLE, rp) to the job
  *    SOLVER_SOLUTION_BEST          pkgid
+ *    -> add (SOLVER_INSTALL|SOLVER_SOLVABLE, rp) to the job
+ *    SOLVER_SOLUTION_BLACK         pkgid
  *    -> add (SOLVER_INSTALL|SOLVER_SOLVABLE, rp) to the job
  *    SOLVER_SOLUTION_JOB           jobidx
  *    -> remove job (jobidx - 1, jobidx) from job queue
@@ -1331,6 +1339,8 @@ solver_problemruleinfo2str(Solver *solv, SolverRuleinfo type, Id source, Id targ
       s = pool_tmpjoin(pool, "both package ", pool_solvid2str(pool, source), " and ");
       s = pool_tmpjoin(pool, s, pool_solvid2str(pool, target), " obsolete ");
       return pool_tmpappend(pool, s, pool_dep2str(pool, dep), 0);
+    case SOLVER_RULE_BLACK:
+      return pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), " can only be installed by a direct request");
     default:
       return "bad problem rule type";
     }
@@ -1384,6 +1394,11 @@ solver_solutionelement2str(Solver *solv, Id p, Id rp)
         return pool_tmpjoin(pool, "keep old ", pool_solvable2str(pool, s), 0);
       else
         return pool_tmpjoin(pool, "install ", pool_solvable2str(pool, s), " despite the old version");
+    }
+  else if (p == SOLVER_SOLUTION_BLACK)
+    {
+      Solvable *s = pool->solvables + rp;
+      return pool_tmpjoin(pool, "install ", pool_solvable2str(pool, s), 0);
     }
   else if (p > 0 && rp == 0)
     return pool_tmpjoin(pool, "allow deinstallation of ", pool_solvid2str(pool, p), 0);

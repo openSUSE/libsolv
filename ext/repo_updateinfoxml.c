@@ -490,3 +490,92 @@ repo_add_updateinfoxml(Repo *repo, FILE *fp, int flags)
   return pd.ret;
 }
 
+#ifdef SUSE
+
+static int
+repo_mark_retracted_packages_cmp(const void *ap, const void *bp, void *dp)
+{
+  Id *a = (Id *)ap;
+  Id *b = (Id *)bp;
+  if (a[1] != b[1])
+    return a[1] - b[1];
+  if (a[2] != b[2])
+    return a[2] - b[2];
+  if (a[0] != b[0])
+    return a[0] - b[0];
+  return 0;
+}
+
+
+void
+repo_mark_retracted_packages(Repo *repo, Id retractedmarker)
+{
+  Pool *pool = repo->pool;
+  int i, p;
+  Solvable *s;
+  Id con, *conp;
+  Id retractedname, retractedevr;
+
+  Queue q;
+  queue_init(&q);
+  for (p = 1; p < pool->nsolvables; p++)
+    {
+      const char *status;
+      s = pool->solvables + p;
+      if (strncmp(pool_id2str(pool, s->name), "patch:", 6) != 0)
+	{
+	  if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)
+	    continue;
+	  queue_push2(&q, p, s->name);
+	  queue_push2(&q, s->evr, s->arch);
+	  continue;
+	}
+      status = solvable_lookup_str(s, UPDATE_STATUS);
+      if (!status || strcmp(status, "retracted") != 0)
+	continue;
+      if (!s->conflicts)
+	continue;
+      conp = s->repo->idarraydata + s->conflicts;
+      while ((con = *conp++) != 0)
+	{
+	  Reldep *rd;
+	  Id name, evr, arch;
+	  if (!ISRELDEP(con))
+	    continue;
+	  rd = GETRELDEP(pool, con);
+	  if (rd->flags != REL_LT)
+	    continue;
+	  name = rd->name;
+	  evr = rd->evr;
+	  arch = 0;
+	  if (ISRELDEP(name))
+	    {
+	      rd = GETRELDEP(pool, name);
+	      name = rd->name;
+	      if (rd->flags == REL_ARCH)
+		arch = rd->evr;
+	    }
+	  queue_push2(&q, 0, name);
+	  queue_push2(&q, evr, arch);
+	}
+    }
+  if (q.count)
+    solv_sort(q.elements, q.count / 4, sizeof(Id) * 4, repo_mark_retracted_packages_cmp, repo->pool);
+  retractedname = retractedevr = 0;
+  for (i = 0; i < q.count; i += 4)
+    {
+      if (!q.elements[i])
+	{
+	  retractedname = q.elements[i + 1];
+	  retractedevr = q.elements[i + 2];
+	}
+      else if (q.elements[i + 1] == retractedname && q.elements[i + 2] == retractedevr)
+	{
+	  s = pool->solvables + q.elements[i];
+	  s->provides = repo_addid_dep(repo, s->provides, retractedmarker, 0);
+	}
+    }
+  queue_free(&q);
+}
+
+#endif

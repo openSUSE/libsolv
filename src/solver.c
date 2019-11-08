@@ -3377,6 +3377,7 @@ solver_solve(Solver *solv, Queue *job)
   int hasbestinstalljob = 0;
   int hasfavorjob = 0;
   int haslockjob = 0;
+  int hasblacklistjob = 0;
 
   solve_start = solv_timems(0);
 
@@ -3987,6 +3988,10 @@ solver_solve(Solver *solv, Queue *job)
 	  POOL_DEBUG(SOLV_DEBUG_JOB, "job: %s %s\n", (how & SOLVER_JOBMASK) == SOLVER_FAVOR ? "favor" : "disfavor", solver_select2str(pool, select, what));
 	  hasfavorjob = 1;
 	  break;
+	case SOLVER_BLACKLIST:
+	  POOL_DEBUG(SOLV_DEBUG_JOB, "job: blacklist %s\n", solver_select2str(pool, select, what));
+	  hasblacklistjob = 1;
+	  break;
 	default:
 	  POOL_DEBUG(SOLV_DEBUG_JOB, "job: unknown job\n");
 	  break;
@@ -4039,6 +4044,11 @@ solver_solve(Solver *solv, Queue *job)
     solver_addyumobsrules(solv);
   else
     solv->yumobsrules = solv->yumobsrules_end = solv->nrules;
+
+  if (hasblacklistjob)
+    solver_addblackrules(solv);
+  else
+    solv->blackrules = solv->blackrules_end = solv->nrules;
 
   if (solv->havedisfavored && solv->strongrecommends && solv->recommendsruleq)
     solver_addrecommendsrules(solv);
@@ -4850,6 +4860,9 @@ pool_job2str(Pool *pool, Id how, Id what, Id flagmask)
       break;
     case SOLVER_DISFAVOR:
       strstart = "disfavor ";
+      break;
+    case SOLVER_BLACKLIST:
+      strstart = "blacklist ";
       break;
     default:
       strstart = "unknown job ";

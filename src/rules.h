@@ -72,7 +72,8 @@ typedef enum {
   SOLVER_RULE_LEARNT = 0x800,
   SOLVER_RULE_BEST = 0x900,
   SOLVER_RULE_YUMOBS = 0xa00,
-  SOLVER_RULE_RECOMMENDS = 0xb00
+  SOLVER_RULE_RECOMMENDS = 0xb00,
+  SOLVER_RULE_BLACK = 0xc00
 } SolverRuleinfo;
 
 #define SOLVER_RULE_TYPEMASK    0xff00
@@ -133,6 +134,9 @@ extern void solver_addbestrules(struct s_Solver *solv, int havebestinstalljobs, 
 
 /* yumobs rules */
 extern void solver_addyumobsrules(struct s_Solver *solv);
+
+/* black rules */
+extern void solver_addblackrules(struct s_Solver *solv);
 
 /* recommends rules */
 extern void solver_addrecommendsrules(struct s_Solver *solv);
