@@ -498,6 +498,16 @@ add_package_link(Solver *solv, Solvable *s, Map *m, Queue *workq)
 
 #ifdef ENABLE_COMPLEX_DEPS
 
+#ifdef SUSE
+static inline int
+suse_isptf(Pool *pool, Solvable *s)
+{
+  if (!strncmp("ptf-", pool_id2str(pool, s->name), 4))
+    return 1;
+  return 0;
+}
+#endif
+
 static void
 add_complex_deprules(Solver *solv, Id p, Id dep, int type, int dontfix, Queue *workq, Map *m)
 {
@@ -511,6 +521,10 @@ add_complex_deprules(Solver *solv, Id p, Id dep, int type, int dontfix, Queue *w
   /* CNF expansion for requires, DNF + INVERT expansion for conflicts */
   if (type == SOLVER_RULE_PKG_CONFLICTS)
     flags |= CPLXDEPS_TODNF | CPLXDEPS_EXPAND | CPLXDEPS_INVERT;
+#ifdef SUSE
+  if (type == SOLVER_RULE_PKG_REQUIRES && suse_isptf(pool, pool->solvables + p))
+    flags |= CPLXDEPS_NAME;	/* do not match provides */
+#endif
 
   i = pool_normalize_complex_dep(pool, dep, &bq, flags);
   /* handle special cases */
