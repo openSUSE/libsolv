@@ -1,4 +1,17 @@
 -------------------------------------------------------------------
+Tue Nov 12 11:35:12 CET 2019 - mls@suse.de
+
+- support arch<->noarch package changes when creating patch
+  conflicts from the updateinfo data
+- support for SOLVER_BLACKLIST jobs that block the installation
+  of matched packages unless they are directly selected by an
+  SOLVER_INSTALL job
+- libsolv now also parses the patch status in the updateinfo
+  parser
+- new solvable_matchessolvable() function
+- bump version to 0.7.8
+
+-------------------------------------------------------------------
 Fri Oct 18 10:53:54 CEST 2019 - mls@suse.de
 
 - fix updating of too many packages in focusbest mode

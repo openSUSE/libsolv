@@ -2,6 +2,19 @@
 This file contains the major changes between
 libsolv versions:
 
+Version 0.7.8
+- selected bug fixes:
+  * support arch<->noarch package changes when creating patch
+    conflicts from the updateinfo data
+  * also support other rpm database types
+- new features:
+  * support for SOLVER_BLACKLIST jobs that block the installation
+    of matched packages unless they are directly selected by an
+    SOLVER_INSTALL job
+  * libsolv now also parses the patch status in the updateinfo
+    parser
+  * new solvable_matchessolvable() function
+
 Version 0.7.7
 - selected bug fixes:
   * fix updating of too many packages in focusbest mode
