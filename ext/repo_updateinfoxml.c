@@ -298,8 +298,7 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
       {
 	const char *arch = 0, *name = 0;
 	Id evr = makeevr_atts(pool, pd, atts); /* parse "epoch", "version", "release" */
-	Id n, a = 0;
-	Id rel_id;
+	Id n, a, id;
 
 	for (; *atts; atts += 2)
 	  {
@@ -308,17 +307,24 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
 	    else if (!strcmp(*atts, "name"))
 	      name = atts[1];
 	  }
-	/* generated Id for name */
-	n = pool_str2id(pool, name, 1);
-	rel_id = n;
-	if (arch)
+	n = name ? pool_str2id(pool, name, 1) : 0;
+	a = arch ? pool_str2id(pool, arch, 1) : 0;
+
+	/* generated conflicts for the package */
+	if (a && a != ARCH_NOARCH)
 	  {
-	    /*  generate Id for arch and combine with name */
-	    a = pool_str2id(pool, arch, 1);
-	    rel_id = pool_rel2id(pool, n, a, REL_ARCH, 1);
+	    id = pool_rel2id(pool, n, a, REL_ARCH, 1);
+	    id = pool_rel2id(pool, id, evr, REL_LT, 1);
+	    solvable->conflicts = repo_addid_dep(pd->repo, solvable->conflicts, id, 0);
+	    id = pool_rel2id(pool, n, ARCH_NOARCH, REL_ARCH, 1);
+	    id = pool_rel2id(pool, id, evr, REL_LT, 1);
+	    solvable->conflicts = repo_addid_dep(pd->repo, solvable->conflicts, id, 0);
 	  }
-	rel_id = pool_rel2id(pool, rel_id, evr, REL_LT, 1);
-	solvable->conflicts = repo_addid_dep(pd->repo, solvable->conflicts, rel_id, 0);
+	else
+	  {
+	    id = pool_rel2id(pool, n, evr, REL_LT, 1);
+	    solvable->conflicts = repo_addid_dep(pd->repo, solvable->conflicts, id, 0);
+	  }
 
         /* who needs the collection anyway? */
         pd->collhandle = repodata_new_handle(pd->data);
