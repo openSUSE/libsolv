@@ -665,6 +665,30 @@ add_complex_deprules(Solver *solv, Id p, Id dep, int type, int dontfix, Queue *w
 
 #endif
 
+#ifdef ENABLE_CONDA
+void
+add_conda_constrains_rule(Solver *solv, Id n, Id dep)
+{
+  Pool *pool = solv->pool;
+  Reldep *rd;
+  Id p, pp, pdep;
+  if (!ISRELDEP(dep))
+    return;
+  rd = GETRELDEP(pool, dep);
+  pdep = pool_whatprovides(pool, dep);
+  FOR_PROVIDES(p, pp, rd->name)
+    {
+      Id p2;
+      while ((p2 = pool->whatprovidesdata[pdep]) != 0 && p2 < p)
+	pdep++;
+      if (p == p2)
+	pdep++;
+      else
+        addpkgrule(solv, -n, -p, 0, SOLVER_RULE_PKG_CONSTRAINS, dep);
+    }
+}
+#endif
+
 /*-------------------------------------------------------------------
  *
  * add dependency rules for solvable
@@ -895,6 +919,17 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	      solv->lastpkgrule = 0;
 	    }
 	}
+
+#ifdef ENABLE_CONDA
+      if (pool->disttype == DISTTYPE_CONDA)
+	{
+	  if (prereqq.count)		/* reuse the prereq queue */
+	    queue_empty(&prereqq);
+	  solvable_lookup_idarray(s, SOLVABLE_CONSTRAINS, &prereqq);
+	  for (i = 0; i < prereqq.count; i++)
+	    add_conda_constrains_rule(solv, n, prereqq.elements[i]);
+	}
+#endif
 
       /* that's all we check for src packages */
       if (s->arch == ARCH_SRC || s->arch == ARCH_NOSRC)

@@ -461,6 +461,14 @@ testcase_write_testtags(Repo *repo, FILE *fp)
 	    fprintf(fp, "%s\n", testcase_dep2str(pool, q.elements[i]));
 	  fprintf(fp, "-Ipr:\n");
 	}
+      if (solvable_lookup_idarray(s, SOLVABLE_CONSTRAINS, &q))
+	{
+	  int i;
+	  fprintf(fp, "+Cns:\n");
+	  for (i = 0; i < q.count; i++)
+	    fprintf(fp, "%s\n", testcase_dep2str(pool, q.elements[i]));
+	  fprintf(fp, "-Cns:\n");
+	}
       if (s->vendor)
 	fprintf(fp, "=Vnd: %s\n", pool_id2str(pool, s->vendor));
       if (solvable_lookup_idarray(s, SOLVABLE_BUILDFLAVOR, &q))
@@ -690,6 +698,9 @@ testcase_add_testtags(Repo *repo, FILE *fp, int flags)
 	    repodata_add_idarray(data, s - pool->solvables, SOLVABLE_PREREQ_IGNOREINST, id);
 	    break;
 	  }
+	case 'C' << 16 | 'n' << 8 | 's':
+	  repodata_add_idarray(data, s - pool->solvables, SOLVABLE_CONSTRAINS, testcase_str2dep(pool, line + 6));
+	  break;
 	case 'F' << 16 | 'l' << 8 | 'v':
 	  repodata_add_poolstr_array(data, s - pool->solvables, SOLVABLE_BUILDFLAVOR, line + 6);
 	  break;

@@ -43,6 +43,24 @@ parse_deps(struct parsedata *pd, struct solv_jsonparser *jp, Offset *depp)
 }
 
 static int
+parse_otherdeps(struct parsedata *pd, struct solv_jsonparser *jp, Id handle, Id keyname)
+{
+  int type = JP_ARRAY;
+  while (type > 0 && (type = jsonparser_parse(jp)) > 0 && type != JP_ARRAY_END)
+    {
+      if (type == JP_STRING)
+	{
+	  Id id = pool_conda_matchspec(pd->pool, jp->value);
+	  if (id)
+	    repodata_add_idarray(pd->data, handle, keyname, id);
+	}
+      else
+	type = jsonparser_skip(jp, type);
+    }
+  return type;
+}
+
+static int
 parse_package(struct parsedata *pd, struct solv_jsonparser *jp, char *kfn)
 {
   int type = JP_OBJECT;
@@ -64,6 +82,8 @@ parse_package(struct parsedata *pd, struct solv_jsonparser *jp, char *kfn)
 	type = parse_deps(pd, jp, &s->requires);
       else if (type == JP_ARRAY && !strcmp(jp->key, "requires"))
 	type = parse_deps(pd, jp, &s->requires);
+      else if (type == JP_ARRAY && !strcmp(jp->key, "constrains"))
+	type = parse_otherdeps(pd, jp, handle, SOLVABLE_CONSTRAINS);
       else if (type == JP_STRING && !strcmp(jp->key, "license"))
 	repodata_add_poolstr_array(data, handle, SOLVABLE_LICENSE, jp->value);
       else if (type == JP_STRING && !strcmp(jp->key, "md5"))

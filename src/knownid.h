@@ -265,6 +265,8 @@ KNOWNID(UPDATE_STATUS,			"update:status"),		/* "stable", "testing", ...*/
 
 KNOWNID(LIBSOLV_SELF_DESTRUCT_PKG,      "libsolv-self-destruct-pkg()"),	/* this package will self-destruct on installation */
 
+KNOWNID(SOLVABLE_CONSTRAINS,		"solvable:constrains"),		/* conda */
+
 KNOWNID(ID_NUM_INTERNAL,		0)
 
 #ifdef KNOWNID_INITIALIZE

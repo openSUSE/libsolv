@@ -1341,6 +1341,10 @@ solver_problemruleinfo2str(Solver *solv, SolverRuleinfo type, Id source, Id targ
       return pool_tmpappend(pool, s, pool_dep2str(pool, dep), 0);
     case SOLVER_RULE_BLACK:
       return pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), " can only be installed by a direct request");
+    case SOLVER_RULE_PKG_CONSTRAINS:
+      s = pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), 0);
+      s = pool_tmpappend(pool, s, " has a constraint ", pool_dep2str(pool, dep));
+      return pool_tmpappend(pool, s, " conflicting with ", pool_solvid2str(pool, target));
     default:
       return "bad problem rule type";
     }
