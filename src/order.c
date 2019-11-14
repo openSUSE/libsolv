@@ -102,14 +102,14 @@ struct orderdata {
   int ncycles;
 };
 
-static int
+static void
 addteedge(struct orderdata *od, int from, int to, int type)
 {
   int i;
   struct s_TransactionElement *te;
 
   if (from == to)
-    return 0;
+    return;
 
   /* printf("edge %d(%s) -> %d(%s) type %x\n", from, pool_solvid2str(pool, od->tes[from].p), to, pool_solvid2str(pool, od->tes[to].p), type); */
 
@@ -117,13 +117,10 @@ addteedge(struct orderdata *od, int from, int to, int type)
   for (i = te->edges; od->edgedata[i]; i += 2)
     if (od->edgedata[i] == to)
       break;
-  /* test of brokenness */
-  if (type == TYPE_BROKEN)
-    return od->edgedata[i] && (od->edgedata[i + 1] & TYPE_BROKEN) != 0 ? 1 : 0;
   if (od->edgedata[i])
     {
       od->edgedata[i + 1] |= type;
-      return 0;
+      return;
     }
   if (i + 1 == od->nedgedata)
     {
@@ -145,10 +142,9 @@ addteedge(struct orderdata *od, int from, int to, int type)
   od->edgedata[i + 1] = type;
   od->edgedata[i + 2] = 0;	/* end marker */
   od->nedgedata = i + 3;
-  return 0;
 }
 
-static int
+static void
 addedge(struct orderdata *od, Id from, Id to, int type)
 {
   Transaction *trans = od->trans;
@@ -166,16 +162,15 @@ addedge(struct orderdata *od, Id from, Id to, int type)
 	from = trans->transaction_installed[from - pool->installed->start];
       else
 	{
-	  int ret = 0;
 	  Queue ti;
 	  Id tibuf[5];
 
 	  queue_init_buffer(&ti, tibuf, sizeof(tibuf)/sizeof(*tibuf));
 	  transaction_all_obs_pkgs(trans, from, &ti);
 	  for (i = 0; i < ti.count; i++)
-	    ret |= addedge(od, ti.elements[i], to, type);
+	    addedge(od, ti.elements[i], to, type);
 	  queue_free(&ti);
-	  return ret;
+	  return;
 	}
     }
   s = pool->solvables + to;
@@ -186,16 +181,15 @@ addedge(struct orderdata *od, Id from, Id to, int type)
 	to = trans->transaction_installed[to - pool->installed->start];
       else
 	{
-	  int ret = 0;
 	  Queue ti;
 	  Id tibuf[5];
 
 	  queue_init_buffer(&ti, tibuf, sizeof(tibuf)/sizeof(*tibuf));
 	  transaction_all_obs_pkgs(trans, to, &ti);
 	  for (i = 0; i < ti.count; i++)
-	    ret |= addedge(od, from, ti.elements[i], type);
+	    addedge(od, from, ti.elements[i], type);
 	  queue_free(&ti);
-	  return ret;
+	  return;
 	}
     }
 
@@ -204,16 +198,17 @@ addedge(struct orderdata *od, Id from, Id to, int type)
     if (te->p == to)
       break;
   if (i == od->ntes)
-    return 0;
+    return;
   to = i;
 
   for (i = 1, te = od->tes + i; i < od->ntes; i++, te++)
     if (te->p == from)
       break;
   if (i == od->ntes)
-    return 0;
+    return;
+  from = i;
 
-  return addteedge(od, i, to, type);
+  addteedge(od, from, to, type);
 }
 
 static inline int
