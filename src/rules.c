@@ -719,8 +719,8 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 
   Queue workq;	/* list of solvables we still have to work on */
   Id workqbuf[64];
-  Queue prereqq;	/* list of pre-req ids to ignore */
-  Id prereqbuf[16];
+  Queue depq;	/* list of pre-req ids to ignore */
+  Id depqbuf[16];
 
   int i;
   int dontfix;		/* ignore dependency errors for installed solvables */
@@ -736,7 +736,7 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
   queue_init_buffer(&workq, workqbuf, sizeof(workqbuf)/sizeof(*workqbuf));
   queue_push(&workq, s - pool->solvables);	/* push solvable Id to work queue */
 
-  queue_init_buffer(&prereqq, prereqbuf, sizeof(prereqbuf)/sizeof(*prereqbuf));
+  queue_init_buffer(&depq, depqbuf, sizeof(depqbuf)/sizeof(*depqbuf));
 
   /* loop until there's no more work left */
   while (workq.count)
@@ -796,20 +796,20 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		{
 		  if (installed && s->repo == installed)
 		    {
-		      if (prereqq.count)
-			queue_empty(&prereqq);
-		      solvable_lookup_idarray(s, SOLVABLE_PREREQ_IGNOREINST, &prereqq);
-		      filterpre = prereqq.count;
+		      if (depq.count)
+			queue_empty(&depq);
+		      solvable_lookup_idarray(s, SOLVABLE_PREREQ_IGNOREINST, &depq);
+		      filterpre = depq.count;
 		    }
 		  continue;
 		}
 	      if (filterpre)
 		{
-		  /* check if this id is filtered. assumes that prereqq.count is small */
-		  for (i = 0; i < prereqq.count; i++)
-		    if (req == prereqq.elements[i])
+		  /* check if this id is filtered. assumes that depq.count is small */
+		  for (i = 0; i < depq.count; i++)
+		    if (req == depq.elements[i])
 		      break;
-		  if (i < prereqq.count)
+		  if (i < depq.count)
 		    {
 		      POOL_DEBUG(SOLV_DEBUG_RULE_CREATION, "package %s: ignoring filtered pre-req dependency %s\n", pool_solvable2str(pool, s), pool_dep2str(pool, req));
 		      continue;
@@ -925,11 +925,11 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 #ifdef ENABLE_CONDA
       if (pool->disttype == DISTTYPE_CONDA)
 	{
-	  if (prereqq.count)		/* reuse the prereq queue */
-	    queue_empty(&prereqq);
-	  solvable_lookup_idarray(s, SOLVABLE_CONSTRAINS, &prereqq);
-	  for (i = 0; i < prereqq.count; i++)
-	    add_conda_constrains_rule(solv, n, prereqq.elements[i]);
+	  if (depq.count)
+	    queue_empty(&depq);
+	  solvable_lookup_idarray(s, SOLVABLE_CONSTRAINS, &depq);
+	  for (i = 0; i < depq.count; i++)
+	    add_conda_constrains_rule(solv, n, depq.elements[i]);
 	}
 #endif
 
@@ -1136,7 +1136,7 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	    }
 	}
     }
-  queue_free(&prereqq);
+  queue_free(&depq);
   queue_free(&workq);
 }
 
