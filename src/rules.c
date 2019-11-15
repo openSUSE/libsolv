@@ -667,7 +667,7 @@ add_complex_deprules(Solver *solv, Id p, Id dep, int type, int dontfix, Queue *w
 
 #ifdef ENABLE_CONDA
 void
-add_conda_constrains_rule(Solver *solv, Id n, Id dep)
+add_conda_constrains_rule(Solver *solv, Id n, Id dep, int dontfix)
 {
   Pool *pool = solv->pool;
   Reldep *rd;
@@ -680,6 +680,8 @@ add_conda_constrains_rule(Solver *solv, Id n, Id dep)
     {
       Id p2;
       if (p == n)
+	continue;
+      if (dontfix && pool->solvables[p].repo == solv->installed)
 	continue;
       while ((p2 = pool->whatprovidesdata[pdep]) != 0 && p2 < p)
 	pdep++;
@@ -925,7 +927,7 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 	{
 	  solvable_lookup_idarray(s, SOLVABLE_CONSTRAINS, &depq);
 	  for (i = 0; i < depq.count; i++)
-	    add_conda_constrains_rule(solv, n, depq.elements[i]);
+	    add_conda_constrains_rule(solv, n, depq.elements[i], dontfix);
 	}
 #endif
 
