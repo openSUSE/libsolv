@@ -796,8 +796,6 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 		{
 		  if (installed && s->repo == installed)
 		    {
-		      if (depq.count)
-			queue_empty(&depq);
 		      solvable_lookup_idarray(s, SOLVABLE_PREREQ_IGNOREINST, &depq);
 		      filterpre = depq.count;
 		    }
@@ -925,8 +923,6 @@ solver_addpkgrulesforsolvable(Solver *solv, Solvable *s, Map *m)
 #ifdef ENABLE_CONDA
       if (pool->disttype == DISTTYPE_CONDA)
 	{
-	  if (depq.count)
-	    queue_empty(&depq);
 	  solvable_lookup_idarray(s, SOLVABLE_CONSTRAINS, &depq);
 	  for (i = 0; i < depq.count; i++)
 	    add_conda_constrains_rule(solv, n, depq.elements[i]);
