@@ -679,6 +679,8 @@ add_conda_constrains_rule(Solver *solv, Id n, Id dep)
   FOR_PROVIDES(p, pp, rd->name)
     {
       Id p2;
+      if (p == n)
+	continue;
       while ((p2 = pool->whatprovidesdata[pdep]) != 0 && p2 < p)
 	pdep++;
       if (p == p2)
