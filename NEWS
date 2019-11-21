@@ -2,6 +2,10 @@
 This file contains the major changes between
 libsolv versions:
 
+Version 0.7.9
+- new features:
+  * support conda constrains dependencies
+
 Version 0.7.8
 - selected bug fixes:
   * support arch<->noarch package changes when creating patch
