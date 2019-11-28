@@ -7,6 +7,7 @@ OPTION (DISABLE_SHARED "Do not build a shared version of the libraries?" OFF)
 
 OPTION (ENABLE_PERL "Build the perl bindings?" OFF)
 OPTION (ENABLE_PYTHON "Build the python bindings?" OFF)
+OPTION (ENABLE_PYTHON3 "Build the python3 bindings?" OFF)
 OPTION (ENABLE_RUBY "Build the ruby bindings?" OFF)
 OPTION (ENABLE_TCL "Build the Tcl bindings?" OFF)
 
@@ -55,8 +56,13 @@ ENDIF (NOT PKGCONFIG_INSTALL_DIR)
 ####################################################################
 
 # where to look first for cmake modules, before ${CMAKE_ROOT}/Modules/ is checked
-SET (CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/modules)
-INSTALL( FILES ${CMAKE_MODULE_PATH}/FindLibSolv.cmake DESTINATION ${CMAKE_INSTALL_PREFIX}/share/cmake/Modules )
+SET (OUR_MODULES_DIR "${CMAKE_SOURCE_DIR}/cmake/modules")
+SET (CMAKE_MODULE_PATH "${OUR_MODULES_DIR}")
+IF (${CMAKE_VERSION} VERSION_LESS "3.12")
+  SET (CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH};${CMAKE_SOURCE_DIR}/cmake/FindPythonFromGit")
+ENDIF ()
+
+INSTALL( FILES "${OUR_MODULES_DIR}/FindLibSolv.cmake" DESTINATION "${CMAKE_INSTALL_PREFIX}/share/cmake/Modules" COMPONENT "libsolv-dev")
 
 # for shared libraries on windows (DLLs), we just export all symbols for now
 SET(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
