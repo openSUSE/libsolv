@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Tue Dec 10 14:18:36 CET 2019 - mls@suse.de
+
+- added two new function to make libzypp independent of the rpm
+  database format
+- bump version to 0.7.10
+
+-------------------------------------------------------------------
 Thu Nov 21 16:34:52 CET 2019 - mls@suse.de
 
 - support conda constrains dependencies
