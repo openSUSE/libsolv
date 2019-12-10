@@ -7,6 +7,7 @@
 
 #include "queue.h"
 #include "repo.h"
+#include "chksum.h"
 
 struct headerToken_s;
 
@@ -39,7 +40,11 @@ extern void *rpm_state_create(Pool *pool, const char *rootdir);
 extern void *rpm_state_free(void *rpmstate);
 
 /* return all matching rpmdbids */
-extern int  rpm_installedrpmdbids(void *rpmstate, const char *index, const char *match, Queue *rpmdbidq);
+extern int rpm_installedrpmdbids(void *rpmstate, const char *index, const char *match, Queue *rpmdbidq);
+/* stat the package database */
+extern int rpm_stat_database(void *rpmstate, void *stb);
+/* hash the state of the package database */
+extern int rpm_hash_database_state(void *rpmstate, Chksum *chk);
 
 /* return handles to a rpm header */
 extern void *rpm_byrpmdbid(void *rpmstate, Id rpmdbid);

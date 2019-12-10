@@ -56,11 +56,31 @@ struct rpmdbstate {
 };
 
 
+static inline int
+access_rootdir(struct rpmdbstate *state, const char *dir, int mode)
+{
+  if (state->rootdir)
+    {
+      char *path = solv_dupjoin(state->rootdir, dir, 0);
+      int r = access(path, mode);
+      free(path);
+      return r;
+    }
+  return access(dir, mode);
+}
+
+static void
+detect_ostree(struct rpmdbstate *state)
+{
+  state->is_ostree = access_rootdir(state, "/var/lib/rpm", W_OK) == -1 &&
+                     access_rootdir(state, "/usr/share/rpm/Packages", R_OK) == 0 ? 1 : -1;
+}
+
 static int
 stat_database_name(struct rpmdbstate *state, char *dbname, struct stat *statbuf, int seterror)
 {
   char *dbpath;
-  dbpath = solv_dupjoin(state->rootdir, state->is_ostree ? "/usr/share/rpm/" : "/var/lib/rpm/", dbname);
+  dbpath = solv_dupjoin(state->rootdir, state->is_ostree > 0 ? "/usr/share/rpm/" : "/var/lib/rpm/", dbname);
   if (stat(dbpath, statbuf))
     {
       if (seterror)
@@ -75,6 +95,8 @@ stat_database_name(struct rpmdbstate *state, char *dbname, struct stat *statbuf,
 static int
 stat_database(struct rpmdbstate *state, struct stat *statbuf)
 {
+  if (!state->is_ostree)
+    detect_ostree(state);
   return stat_database_name(state, "Packages", statbuf, 1);
 }
 
@@ -160,6 +182,7 @@ opendbenv(struct rpmdbstate *state)
   dbenv->set_thread_count(dbenv, 8);
 #endif
   dbpath = solv_dupjoin(rootdir, "/var/lib/rpm", 0);
+  state->is_ostree = -1;
   if (access(dbpath, W_OK) == -1)
     {
       free(dbpath);
@@ -167,7 +190,7 @@ opendbenv(struct rpmdbstate *state)
       if (access(dbpath, R_OK) == 0)
 	state->is_ostree = 1;
       free(dbpath);
-      dbpath = solv_dupjoin(rootdir, state->is_ostree ? "/usr/share/rpm" : "/var/lib/rpm", 0);
+      dbpath = solv_dupjoin(rootdir, state->is_ostree > 0 ? "/usr/share/rpm" : "/var/lib/rpm", 0);
       r = dbenv->open(dbenv, dbpath, DB_CREATE|DB_PRIVATE|DB_INIT_MPOOL, 0);
     }
   else
@@ -209,6 +232,12 @@ closedbenv(struct rpmdbstate *state)
   uint32_t eflags = 0;
 #endif
 
+  if (state->db)
+    {
+      state->db->close(state->db, 0);
+      state->db = 0;
+    }
+  state->pkgdbopened = 0;
   if (!state->dbenv)
     return;
 #if defined(FEDORA) || defined(MAGEIA)
@@ -262,16 +291,6 @@ openpkgdb(struct rpmdbstate *state)
     }
   state->pkgdbopened = 1;
   return 1;
-}
-
-static void
-closepkgdb(struct rpmdbstate *state)
-{
-  if (!state->db)
-    return;
-  state->db->close(state->db, 0);
-  state->db = 0;
-  state->pkgdbopened = 0;
 }
 
 /* get the rpmdbids of all installed packages from the Name index database.
@@ -464,6 +483,8 @@ count_headers(struct rpmdbstate *state)
 static int
 pkgdb_cursor_open(struct rpmdbstate *state)
 {
+  if (state->pkgdbopened != 1 && !openpkgdb(state))
+    return -1;
   if (state->db->cursor(state->db, NULL, &state->dbc, 0))
     return pool_error(state->pool, -1, "db->cursor failed");
   return 0;
@@ -496,4 +517,21 @@ pkgdb_cursor_getrpm(struct rpmdbstate *state)
     }
   return 0;	/* no more entries */
 }
+
+static int
+hash_name_index(struct rpmdbstate *state, Chksum *chk)
+{
+  char *dbpath;
+  int fd, l;
+  char buf[4096];
+
+  dbpath = solv_dupjoin(state->rootdir, state->is_ostree > 0 ? "/usr/share/rpm/" : "/var/lib/rpm/", "Name");
+  if ((fd = open(dbpath, O_RDONLY)) < 0)
+    return -1;
+  while ((l = read(fd, buf, sizeof(buf))) > 0)
+    solv_chksum_add(chk, buf, l);
+  close(fd);
+  return 0;
+}
+
 

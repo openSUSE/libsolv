@@ -1329,8 +1329,6 @@ freestate(struct rpmdbstate *state)
 {
   /* close down */
 #ifdef ENABLE_RPMDB
-  if (state->pkgdbopened)
-    closepkgdb(state);
   if (state->dbenvopened)
     closedbenv(state);
 #endif
@@ -1624,11 +1622,6 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
 	repo_empty(ref, 1);	/* get it out of the way */
       if ((flags & RPMDB_REPORT_PROGRESS) != 0)
 	count = count_headers(&state);
-      if (!openpkgdb(&state))
-	{
-	  freestate(&state);
-	  return -1;
-	}
       if (pkgdb_cursor_open(&state))
 	{
 	  freestate(&state);
@@ -2392,6 +2385,28 @@ rpm_installedrpmdbids(void *rpmstate, const char *index, const char *match, Queu
     }
   solv_free(entries);
   return nentries;
+}
+
+int
+rpm_hash_database_state(void *rpmstate, Chksum *chk)
+{
+  struct rpmdbstate *state = rpmstate;
+  struct stat stb;
+  if (stat_database(state, &stb))
+    return -1;
+  if (state->dbenvopened != 1 && !opendbenv(state))
+    return -1;
+  solv_chksum_add(chk, &stb.st_mtime, sizeof(stb.st_mtime));
+  solv_chksum_add(chk, &stb.st_size, sizeof(stb.st_size));
+  solv_chksum_add(chk, &stb.st_ino, sizeof(stb.st_ino));
+  hash_name_index(rpmstate, chk);
+  return 0;
+}
+
+int
+rpm_stat_database(void *rpmstate, void *stb)
+{
+  return stat_database((struct rpmdbstate *)rpmstate, (struct stat *)stb) ? -1 : 0;
 }
 
 void *

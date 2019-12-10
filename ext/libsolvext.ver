@@ -47,10 +47,12 @@ SOLV_1.0 {
 		rpm_byfp;
 		rpm_byrpmdbid;
 		rpm_byrpmh;
+		rpm_hash_database_state;
 		rpm_installedrpmdbids;
 		rpm_iterate_filelist;
 		rpm_query;
 		rpm_query_num;
+		rpm_stat_database;
 		rpm_state_create;
 		rpm_state_free;
 		solv_verify_sig;
