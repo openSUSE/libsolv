@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Tue Dec 10 21:02:31 CET 2019 - mls@suse.de
+
+- build with -DENABLE_RPMDB_LIBRPM=1 on SUSE to support
+  multiple rpm database backends
+
+-------------------------------------------------------------------
 Tue Dec 10 14:18:36 CET 2019 - mls@suse.de
 
 - added two new function to make libzypp independent of the rpm
