@@ -20,7 +20,7 @@ struct rpmdbstate {
   char *rootdir;
 
   RpmHead *rpmhead;	/* header storage space */
-  int rpmheadsize;
+  unsigned int rpmheadsize;
 
   int dbenvopened;	/* database environment opened */
   int is_ostree;	/* read-only db that lives in /usr/share/rpm */
@@ -194,33 +194,7 @@ getinstalledrpmdbids(struct rpmdbstate *state, const char *index, const char *ma
 }
 
 #if defined(HAVE_RPMDBNEXTITERATORHEADERBLOB) && !defined(ENABLE_RPMPKG_LIBRPM)
-static int
-rpm_byrpmhdrblob(struct rpmdbstate *state, const unsigned char *data, unsigned int size)
-{
-  unsigned int dsize, cnt, len;
-  RpmHead *rpmhead;
-  if (size < 8)
-    return pool_error(state->pool, 0, "corrupt rpm database (size)");
-  cnt = getu32(data);
-  dsize = getu32(data + 4);
-  if (cnt >= MAX_HDR_CNT || dsize >= MAX_HDR_DSIZE)
-    return pool_error(state->pool, 0, "corrupt rpm database (cnt/dcnt)");
-  if (8 + cnt * 16 + dsize > size)
-    return pool_error(state->pool, 0, "corrupt rpm database (data size)");
-  len = 16 * cnt + dsize;
-  if (len + 1 > state->rpmheadsize)
-    {
-      state->rpmheadsize = len + 128;
-      state->rpmhead = solv_realloc(state->rpmhead, sizeof(*state->rpmhead) + state->rpmheadsize);
-    }
-  rpmhead = state->rpmhead;
-  memcpy(rpmhead->data, data + 8, len);
-  rpmhead->data[len] = 0;
-  rpmhead->cnt = cnt;
-  rpmhead->dcnt = dsize;
-  rpmhead->dp = rpmhead->data + cnt * 16;
-  return 1;
-}
+static int headfromhdrblob(struct rpmdbstate *state, const unsigned char *data, unsigned int size);
 #endif
 
 /* retrive header by rpmdbid, returns 0 if not found, -1 on error */
@@ -248,7 +222,7 @@ getrpm_dbid(struct rpmdbstate *state, Id rpmdbid)
       rpmdbFreeIterator(mi);
       return 0;
     }
-  if (!rpm_byrpmhdrblob(state, uh, uhlen))
+  if (!headfromhdrblob(state, uh, uhlen))
     {
       rpmdbFreeIterator(mi);
       return -1;
@@ -307,7 +281,7 @@ pkgdb_cursor_getrpm(struct rpmdbstate *state)
   while ((uh = rpmdbNextIteratorHeaderBlob(state->mi, &uhlen)) != 0)
     {
       Id dbid = rpmdbGetIteratorOffset(state->mi);
-      if (!rpm_byrpmhdrblob(state, uh, uhlen))
+      if (!headfromhdrblob(state, uh, uhlen))
 	continue;
       return dbid;
     }

@@ -43,7 +43,7 @@ struct rpmdbstate {
   char *rootdir;
 
   RpmHead *rpmhead;	/* header storage space */
-  int rpmheadsize;
+  unsigned int rpmheadsize;
 
   int dbenvopened;	/* database environment opened */
   int pkgdbopened;	/* package database openend */
@@ -387,35 +387,7 @@ getinstalledrpmdbids(struct rpmdbstate *state, const char *index, const char *ma
   return entries;
 }
 
-/* common code, return dbid on success, -1 on error */
-static int
-getrpm_dbdata(struct rpmdbstate *state, DBT *dbdata, int dbid)
-{
-  unsigned int dsize, cnt, l;
-  RpmHead *rpmhead;
-
-  if (dbdata->size < 8)
-    return pool_error(state->pool, -1, "corrupt rpm database (size)");
-  cnt = getu32((const unsigned char *)dbdata->data);
-  dsize = getu32((const unsigned char *)dbdata->data + 4);
-  if (cnt >= MAX_HDR_CNT || dsize >= MAX_HDR_DSIZE)
-    return pool_error(state->pool, -1, "corrupt rpm database (cnt/dcnt)");
-  l = cnt * 16 + dsize;
-  if (8 + l > dbdata->size)
-    return pool_error(state->pool, -1, "corrupt rpm database (data size)");
-  if (l + 1 > state->rpmheadsize)
-    {
-      state->rpmheadsize = l + 128;
-      state->rpmhead = solv_realloc(state->rpmhead, sizeof(*rpmhead) + state->rpmheadsize);
-    }
-  rpmhead = state->rpmhead;
-  rpmhead->cnt = cnt;
-  rpmhead->dcnt = dsize;
-  memcpy(rpmhead->data, (unsigned char *)dbdata->data + 8, l);
-  rpmhead->data[l] = 0;
-  rpmhead->dp = rpmhead->data + cnt * 16;
-  return dbid;
-}
+static int headfromhdrblob(struct rpmdbstate *state, const unsigned char *data, unsigned int size);
 
 /* retrive header by rpmdbid, returns 0 if not found, -1 on error */
 static int
@@ -438,7 +410,9 @@ getrpm_dbid(struct rpmdbstate *state, Id dbid)
   dbdata.size = 0;
   if (state->db->get(state->db, NULL, &dbkey, &dbdata, 0))
     return 0;
-  return getrpm_dbdata(state, &dbdata, dbid);
+  if (!headfromhdrblob(state, (const unsigned char *)dbdata.data, (unsigned int)dbdata.size))
+    return -1;
+  return dbid;
 }
 
 static int
@@ -512,8 +486,11 @@ pkgdb_cursor_getrpm(struct rpmdbstate *state)
       if (dbkey.size != 4)
 	return pool_error(state->pool, -1, "corrupt Packages database (key size)");
       dbid = db2rpmdbid(dbkey.data, state->byteswapped);
-      if (dbid)		/* ignore join key */
-        return getrpm_dbdata(state, &dbdata, dbid);
+      if (!dbid)
+	continue;	/* ignore join key */
+      if (!headfromhdrblob(state, (const unsigned char *)dbdata.data, (unsigned int)dbdata.size))
+	return -1;
+      return dbid;
     }
   return 0;	/* no more entries */
 }
@@ -533,5 +510,4 @@ hash_name_index(struct rpmdbstate *state, Chksum *chk)
   close(fd);
   return 0;
 }
-
 
