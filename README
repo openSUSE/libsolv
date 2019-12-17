@@ -13,9 +13,9 @@ The code is based on two major, but independent, blocks:
     resolving package dependencies.
 
 The sat-solver code has been written to aim for the newest packages,
-record the decision tree to provide introspection, and also allows to
-provide the user with suggestions on how to deal with unsolvable
-problems. It also takes advantage of the repository storage to
+record the decision tree to provide introspection, and also provides
+the user with suggestions on how to deal with unsolvable
+problems. It also takes advantage of repository storage to
 minimize memory usage.
 
 Supported package formats:
