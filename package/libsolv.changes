@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Thu Dec 19 16:29:52 CET 2019 - mls@suse.de
+
+- fix solv_zchunk decoding error if large chunks are used
+  [bnc#1159314]
+
+-------------------------------------------------------------------
 Tue Dec 10 21:02:31 CET 2019 - mls@suse.de
 
 - build with -DENABLE_RPMDB_LIBRPM=1 on SUSE to support
