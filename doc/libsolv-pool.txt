@@ -844,7 +844,7 @@ changes for an installed package is calculated by building the union
 of all of the equivalence classes the vendor of the installed package
 is part of.
 
-You can turn off the architecture replacement checks with the Solver's
+You can turn off the vendor replacement checks with the Solver's
 SOLVER_FLAG_ALLOW_VENDORCHANGE flag.
 
 
