@@ -107,6 +107,13 @@ parse_package(struct parsedata *pd, struct solv_jsonparser *jp, char *kfn)
 	    ts /= 1000;
 	  repodata_set_num(data, handle, SOLVABLE_BUILDTIME, ts);
 	}
+      else if (type == JP_STRING && !strcmp(jp->key, "track_features"))
+	{
+	  unsigned long long count = 1;
+	  for (unsigned long long i=0; jp->value[i]; i++)
+	    count += (jp->value[i] == ',' || jp->value[i] == ' ');
+	  repodata_set_num(data, handle, SOLVABLE_TRACK_FEATURES, count);
+	}
       else
 	type = jsonparser_skip(jp, type);
     }

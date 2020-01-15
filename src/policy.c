@@ -846,6 +846,11 @@ pool_buildversioncmp(Pool *pool, Solvable *s1, Solvable *s2)
 static int
 pool_buildflavorcmp(Pool *pool, Solvable *s1, Solvable *s2)
 {
+  unsigned long long tf1 = solvable_lookup_num(s1, SOLVABLE_TRACK_FEATURES, 0);
+  unsigned long long tf2 = solvable_lookup_num(s2, SOLVABLE_TRACK_FEATURES, 0);
+  if (tf1 != tf2)
+    return tf1 > tf2 ? -1 : 1;
+
   const char *f1 = solvable_lookup_str(s1, SOLVABLE_BUILDFLAVOR);
   const char *f2 = solvable_lookup_str(s2, SOLVABLE_BUILDFLAVOR);
   if (!f1 && !f2)
