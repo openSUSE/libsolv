@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 07/01/2019
+.\"      Date: 01/21/2020
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "07/01/2019" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "01/21/2020" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -866,6 +866,36 @@ Filter list of solvables by repo priority, architecture and version\&.
 .RS 4
 .\}
 .nf
+\fBSolvable *whatcontainsdep(Id\fR \fIkeyname\fR\fB, DepId\fR \fIdep\fR\fB, Id\fR \fImarker\fR \fB= \-1)\fR
+my \fI@solvables\fR \fB=\fR \fI$pool\fR\fB\->whatcontainsdep(\fR\fI$keyname\fR\fB,\fR \fI$dep\fR\fB)\fR
+\fIsolvables\fR \fB=\fR \fIpool\fR\fB\&.whatcontainsdep(\fR\fIkeyname\fR\fB,\fR \fIdep\fR\fB)\fR
+\fIsolvables\fR \fB=\fR \fIpool\fR\fB\&.whatcontainsdep(\fR\fIkeyname\fR\fB,\fR \fIdep\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return all solvables for which keyname contains the dependency\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSolvable *whatmatchesdep(Id\fR \fIkeyname\fR\fB, DepId\fR \fIdep\fR\fB, Id\fR \fImarker\fR \fB= \-1)\fR
+my \fI@solvables\fR \fB=\fR \fI$pool\fR\fB\->whatmatchesdep(\fR\fI$keyname\fR\fB,\fR \fI$sdep\fR\fB)\fR
+\fIsolvables\fR \fB=\fR \fIpool\fR\fB\&.whatmatchesdep(\fR\fIkeyname\fR\fB,\fR \fIdep\fR\fB)\fR
+\fIsolvables\fR \fB=\fR \fIpool\fR\fB\&.whatmatchesdep(\fR\fIkeyname\fR\fB,\fR \fIdep\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return all solvables that have dependencies in keyname that match the dependency\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
 \fBSolvable *whatmatchessolvable(Id\fR \fIkeyname\fR\fB, Solvable\fR \fIsolvable\fR\fB, Id\fR \fImarker\fR \fB= \-1)\fR
 my \fI@solvables\fR \fB=\fR \fI$pool\fR\fB\->whatmatchessolvable(\fR\fI$keyname\fR\fB,\fR \fI$solvable\fR\fB)\fR
 \fIsolvables\fR \fB=\fR \fIpool\fR\fB\&.whatmatchessolvable(\fR\fIkeyname\fR\fB,\fR \fIsolvable\fR\fB)\fR
@@ -1491,7 +1521,7 @@ Back reference to the pool this dependency belongs to\&.
 .\}
 .sp
 The id of this dependency\&.
-.SH "METHODS"
+.SS "METHODS"
 .sp
 .if n \{\
 .RS 4
