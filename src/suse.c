@@ -376,7 +376,11 @@ solvable_is_irrelevant_patch(Solvable *s, Map *installedmap)
   Pool *pool = s->repo->pool;
   Id con, *conp;
   int hadpatchpackage = 0;
+  const char *status;
 
+  status = solvable_lookup_str(s, UPDATE_STATUS);
+  if (status && !strcmp(status, "retracted"))
+    return 1;
   if (!s->conflicts)
     return 0;
   conp = s->repo->idarraydata + s->conflicts;
