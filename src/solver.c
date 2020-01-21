@@ -3106,6 +3106,12 @@ add_update_target(Solver *solv, Id p, Id how)
   if (s->repo == installed)
     {
       queue_push2(solv->update_targets, p, p);
+      FOR_PROVIDES(pi, pip, s->name)
+	{
+	  Solvable *si = pool->solvables + pi;
+	  if (si->repo == installed && si->name == s->name && pi != p)
+	    queue_push2(solv->update_targets, pi, p);
+	}
       return;
     }
   identicalp = 0;
