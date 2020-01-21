@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Pool
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 10/22/2018
+.\"      Date: 01/21/2020
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-POOL" "3" "10/22/2018" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-POOL" "3" "01/21/2020" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -1287,7 +1287,7 @@ Vendor in this case means the SOLVABLE_VENDOR string stored in each solvable\&. 
 .sp
 There can be multiple equivalence classes, the set of allowed vendor changes for an installed package is calculated by building the union of all of the equivalence classes the vendor of the installed package is part of\&.
 .sp
-You can turn off the architecture replacement checks with the Solver\(cqs SOLVER_FLAG_ALLOW_VENDORCHANGE flag\&.
+You can turn off the vendor replacement checks with the Solver\(cqs SOLVER_FLAG_ALLOW_VENDORCHANGE flag\&.
 .SH "BOOLEAN DEPENDENCIES"
 .sp
 Boolean Dependencies allow to build complex expressions from simple dependencies\&. Note that depending on the package manager only a subset of those may be useful\&. For example, debian currently only allows an "OR" expression\&.
