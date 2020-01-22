@@ -1,4 +1,12 @@
 -------------------------------------------------------------------
+Wed Jan 22 13:52:48 CET 2020 - mls@suse.de
+
+- fixed solv_zchunk decoding error if large chunks are used
+- treat retracted pathes as irrelevant
+- made add_update_target work with multiversion installs
+- bump version to 0.7.11
+
+-------------------------------------------------------------------
 Thu Dec 19 16:29:52 CET 2019 - mls@suse.de
 
 - fix solv_zchunk decoding error if large chunks are used

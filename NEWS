@@ -2,6 +2,13 @@
 This file contains the major changes between
 libsolv versions:
 
+Version 0.7.11
+- ENABLE_RPMDB_LIBRPM is now the default
+- selected bug fixes:
+  * fixed solv_zchunk decoding error if large chunks are used
+  * treat retracted pathes as irrelevant
+  * made add_update_target work with multiversion installs
+
 Version 0.7.10
 - new features:
   * new rpm_stat_database() function
