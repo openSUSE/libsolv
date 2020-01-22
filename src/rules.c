@@ -1656,13 +1656,16 @@ solver_addinfarchrules(Solver *solv, Map *addedmap)
 	    }
 	}
       if (first)
-	continue;
+	continue;		/* not the first in the group */
+
+      if (!bestscore)
+	continue;		/* did not find a score for this group */
 
       /* speed up common case where installed package already has best arch */
       if (allowedarchs.count == 1 && bests && allowedarchs.elements[0] == bests->arch)
 	allowedarchs.count--;	/* installed arch is best */
 
-      if (allowedarchs.count && pool->implicitobsoleteusescolors && installed && bestscore)
+      if (allowedarchs.count && pool->implicitobsoleteusescolors && installed)
 	{
 	  /* need an extra pass for lockstep checking: we only allow to keep an inferior arch
 	   * if the corresponding installed package is not lock-stepped */
@@ -1707,7 +1710,7 @@ solver_addinfarchrules(Solver *solv, Map *addedmap)
 	  if (ps->name != s->name || !MAPTST(addedmap, p))
 	    continue;
 	  a = pool_arch2score(pool, ps->arch);
-	  if (a != 1 && bestscore && ((a ^ bestscore) & 0xffff0000) != 0)
+	  if (a != 1 && ((a ^ bestscore) & 0xffff0000) != 0)
 	    {
 	      if (installed && ps->repo == installed)
 		{
