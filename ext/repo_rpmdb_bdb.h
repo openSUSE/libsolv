@@ -47,7 +47,7 @@ struct rpmdbstate {
 
   int dbenvopened;	/* database environment opened */
   int pkgdbopened;	/* package database openend */
-  int is_ostree;	/* read-only db that lives in /usr/share/rpm */
+  const char *dbpath;	/* path to the database */
 
   DB_ENV *dbenv;	/* database environment */
   DB *db;		/* packages database */
@@ -70,17 +70,20 @@ access_rootdir(struct rpmdbstate *state, const char *dir, int mode)
 }
 
 static void
-detect_ostree(struct rpmdbstate *state)
+detect_dbpath(struct rpmdbstate *state)
 {
-  state->is_ostree = access_rootdir(state, "/var/lib/rpm", W_OK) == -1 &&
-                     access_rootdir(state, "/usr/share/rpm/Packages", R_OK) == 0 ? 1 : -1;
+  state->dbpath = access_rootdir(state, "/var/lib/rpm", W_OK) == -1
+                  && access_rootdir(state, "/usr/share/rpm/Packages", R_OK) == 0
+                  ? "/usr/share/rpm" : "/var/lib/rpm";
 }
 
 static int
 stat_database_name(struct rpmdbstate *state, char *dbname, struct stat *statbuf, int seterror)
 {
   char *dbpath;
-  dbpath = solv_dupjoin(state->rootdir, state->is_ostree > 0 ? "/usr/share/rpm/" : "/var/lib/rpm/", dbname);
+  if (!state->dbpath)
+    detect_dbpath(state);
+  dbpath = solv_dupjoin(state->rootdir, state->dbpath, dbname);
   if (stat(dbpath, statbuf))
     {
       if (seterror)
@@ -95,9 +98,7 @@ stat_database_name(struct rpmdbstate *state, char *dbname, struct stat *statbuf,
 static int
 stat_database(struct rpmdbstate *state, struct stat *statbuf)
 {
-  if (!state->is_ostree)
-    detect_ostree(state);
-  return stat_database_name(state, "Packages", statbuf, 1);
+  return stat_database_name(state, "/Packages", statbuf, 1);
 }
 
 
@@ -171,7 +172,6 @@ serialize_dbenv_ops(struct rpmdbstate *state)
 static int
 opendbenv(struct rpmdbstate *state)
 {
-  const char *rootdir = state->rootdir;
   char *dbpath;
   DB_ENV *dbenv = 0;
   int r;
@@ -181,16 +181,16 @@ opendbenv(struct rpmdbstate *state)
 #if (defined(FEDORA) || defined(MAGEIA)) && (DB_VERSION_MAJOR >= 5 || (DB_VERSION_MAJOR == 4 && DB_VERSION_MINOR >= 5))
   dbenv->set_thread_count(dbenv, 8);
 #endif
-  dbpath = solv_dupjoin(rootdir, "/var/lib/rpm", 0);
-  state->is_ostree = -1;
+  state->dbpath = "/var/lib/rpm";
+  dbpath = solv_dupjoin(state->rootdir, state->dbpath, 0);
   if (access(dbpath, W_OK) == -1)
     {
-      free(dbpath);
-      dbpath = solv_dupjoin(rootdir, "/usr/share/rpm/Packages", 0);
-      if (access(dbpath, R_OK) == 0)
-	state->is_ostree = 1;
-      free(dbpath);
-      dbpath = solv_dupjoin(rootdir, state->is_ostree > 0 ? "/usr/share/rpm" : "/var/lib/rpm", 0);
+      if (access_rootdir(state, "/usr/share/rpm/Packages", R_OK) == 0)
+	{
+	  state->dbpath = "/usr/share/rpm";
+	  free(dbpath);
+	  dbpath = solv_dupjoin(state->rootdir, state->dbpath, 0);
+	}
       r = dbenv->open(dbenv, dbpath, DB_CREATE|DB_PRIVATE|DB_INIT_MPOOL, 0);
     }
   else
@@ -426,7 +426,7 @@ count_headers(struct rpmdbstate *state)
   DBT dbkey;
   DBT dbdata;
 
-  if (stat_database_name(state, "Name", &statbuf, 0))
+  if (stat_database_name(state, "/Name", &statbuf, 0))
     return 0;
   memset(&dbkey, 0, sizeof(dbkey));
   memset(&dbdata, 0, sizeof(dbdata));
@@ -502,7 +502,9 @@ hash_name_index(struct rpmdbstate *state, Chksum *chk)
   int fd, l;
   char buf[4096];
 
-  dbpath = solv_dupjoin(state->rootdir, state->is_ostree > 0 ? "/usr/share/rpm/" : "/var/lib/rpm/", "Name");
+  if (!state->dbpath)
+    detect_dbpath(state);
+  dbpath = solv_dupjoin(state->rootdir, state->dbpath, "/Name");
   if ((fd = open(dbpath, O_RDONLY)) < 0)
     return -1;
   while ((l = read(fd, buf, sizeof(buf))) > 0)

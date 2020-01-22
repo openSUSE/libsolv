@@ -23,7 +23,7 @@ struct rpmdbstate {
   unsigned int rpmheadsize;
 
   int dbenvopened;	/* database environment opened */
-  int is_ostree;	/* read-only db that lives in /usr/share/rpm */
+  const char *dbpath;	/* path to the database */
 
   rpmts ts;
   rpmdbMatchIterator mi;	/* iterator over packages database */
@@ -43,21 +43,22 @@ access_rootdir(struct rpmdbstate *state, const char *dir, int mode)
 }
 
 static void
-detect_ostree(struct rpmdbstate *state)
+detect_dbpath(struct rpmdbstate *state)
 {
-  state->is_ostree = access_rootdir(state, "/var/lib/rpm", W_OK) == -1 &&
-                     access_rootdir(state, "/usr/share/rpm/Packages", R_OK) == 0 ? 1 : -1;
+  state->dbpath = access_rootdir(state, "/var/lib/rpm", W_OK) == -1
+                  && access_rootdir(state, "/usr/share/rpm/Packages", R_OK) == 0
+                  ? "/usr/share/rpm" : "/var/lib/rpm";
 }
 
 static int
 stat_database(struct rpmdbstate *state, struct stat *statbuf)
 {
   static const char *dbname[] = {
-    "Packages",
-    "Packages.db",
-    "rpmdb.sqlite",
-    "data.mdb",
-    "Packages",		/* for error reporting */
+    "/Packages",
+    "/Packages.db",
+    "/rpmdb.sqlite",
+    "/data.mdb",
+    "/Packages",		/* for error reporting */
     0,
   };
   int i;
@@ -66,11 +67,11 @@ stat_database(struct rpmdbstate *state, struct stat *statbuf)
   if (state->dbenvopened == 1)
     return rpmdbFStat(rpmtsGetRdb(state->ts), statbuf);
 #endif
-  if (!state->is_ostree)
-    detect_ostree(state);
+  if (!state->dbpath)
+    detect_dbpath(state);
   for (i = 0; ; i++)
     {
-      char *dbpath = solv_dupjoin(state->rootdir, state->is_ostree > 0 ? "/usr/share/rpm/" : "/var/lib/rpm/", dbname[i]);
+      char *dbpath = solv_dupjoin(state->rootdir, state->dbpath, dbname[i]);
       if (!stat(dbpath, statbuf))
 	{
 	  free(dbpath);
@@ -92,11 +93,12 @@ stat_database(struct rpmdbstate *state, struct stat *statbuf)
 static int
 opendbenv(struct rpmdbstate *state)
 {
-  const char *rootdir = state->rootdir;
   rpmts ts;
   char *dbpath;
-  detect_ostree(state);
-  dbpath = solv_dupjoin("_dbpath ", rootdir, state->is_ostree > 0 ? "/usr/share/rpm" : "/var/lib/rpm");
+
+  if (!state->dbpath)
+    detect_dbpath(state);
+  dbpath = solv_dupjoin("_dbpath ", state->rootdir, state->dbpath);
   rpmDefineMacro(NULL, dbpath, 0);
   solv_free(dbpath);
   ts = rpmtsCreate();
