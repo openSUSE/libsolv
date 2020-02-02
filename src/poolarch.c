@@ -60,6 +60,8 @@ static const char *archpolicies[] = {
   "geode",	"geode:i586:i486:i386",
   "ppc64iseries", "ppc64iseries:ppc64:ppc",
   "ppc64pseries", "ppc64pseries:ppc64:ppc",
+  "znver1",	"znver1:x86_64:athlon:i686:i586:i486:i386",
+  "znver1_32",	"znver1_32:athlon:i686:i586:i486:i386",
 #endif
   0
 };
