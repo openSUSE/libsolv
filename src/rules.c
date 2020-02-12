@@ -613,7 +613,7 @@ add_complex_deprules(Solver *solv, Id p, Id dep, int type, int dontfix, Queue *w
 	}
       else
 	{
-	  Id *qele;
+	  Id *qele, d;
 	  int qcnt;
 
 	  qele = bq.elements + i;
@@ -653,7 +653,17 @@ add_complex_deprules(Solver *solv, Id p, Id dep, int type, int dontfix, Queue *w
 	      break;
 	  if (j < qcnt)
 	    continue;
-	  addpkgrule(solv, qele[0], 0, pool_ids2whatprovides(pool, qele + 1, qcnt - 1), type, dep);
+	  d = pool_ids2whatprovides(pool, qele + 1, qcnt - 1);
+	  if (solv->ruleinfoq && qele[0] != p)
+	    {
+	      int oldcount = solv->ruleinfoq->count;
+	      addpkgrule(solv, qele[0], 0, d, type, dep);
+	      /* fixup from element of ruleinfo */
+	      if (solv->ruleinfoq->count > oldcount)
+		solv->ruleinfoq->elements[oldcount + 1] = p;
+	    }
+	  else
+	    addpkgrule(solv, qele[0], 0, d, type, dep);
 	  if (m)
 	    for (j = 0; j < qcnt; j++)
 	      if (qele[j] > 0 && !MAPTST(m, qele[j]))
@@ -2639,7 +2649,8 @@ addpkgruleinfo(Solver *solv, Id p, Id p2, Id d, int type, Id dep)
 	  if (*odp)
 	    return;
 	}
-      if (p < 0 && pool->whatprovidesdata[d] < 0 && type == SOLVER_RULE_PKG_CONFLICTS)
+      /* set p2 for multiversion conflicts */
+      if (p < 0 && pool->whatprovidesdata[d] < 0 && pool->whatprovidesdata[d + 1] >= 0 && type == SOLVER_RULE_PKG_CONFLICTS)
 	p2 = pool->whatprovidesdata[d];
     }
   else
