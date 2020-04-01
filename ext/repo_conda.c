@@ -161,11 +161,11 @@ parse_main(struct parsedata *pd, struct solv_jsonparser *jp)
     {
       if (type == JP_OBJECT && !strcmp("packages", jp->key))
 	type = parse_packages(pd, jp);
-      if (type == JP_ARRAY && !strcmp("packages", jp->key))
+      else if (type == JP_ARRAY && !strcmp("packages", jp->key))
 	type = parse_packages2(pd, jp);
-      if (type == JP_OBJECT && !strcmp("packages.conda", jp->key))
+      else if (type == JP_OBJECT && !strcmp("packages.conda", jp->key))
 	type = parse_packages(pd, jp);
-      if (type == JP_ARRAY && !strcmp("packages.conda", jp->key))
+      else if (type == JP_ARRAY && !strcmp("packages.conda", jp->key))
 	type = parse_packages2(pd, jp);
       else
 	type = jsonparser_skip(jp, type);
