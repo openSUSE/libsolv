@@ -841,6 +841,57 @@ repodata_lookup_binary(Repodata *data, Id solvid, Id keyname, int *lenp)
   return dp;
 }
 
+unsigned int
+repodata_lookup_count(Repodata *data, Id solvid, Id keyname)
+{
+  unsigned char *dp;
+  Repokey *key;
+  unsigned int cnt = 0;
+
+  dp = find_key_data(data, solvid, keyname, &key);
+  if (!dp)
+    return 0;
+  switch (key->type)
+    {
+    case REPOKEY_TYPE_IDARRAY:
+    case REPOKEY_TYPE_REL_IDARRAY:
+      for (cnt = 1; (*dp & 0xc0) != 0; dp++)
+	if ((*dp & 0xc0) == 0x40)
+	  cnt++;
+      return cnt;
+    case REPOKEY_TYPE_FIXARRAY:
+    case REPOKEY_TYPE_FLEXARRAY:
+      data_read_id(dp, (int *)&cnt);
+      return cnt;
+    case REPOKEY_TYPE_DIRSTRARRAY:
+      for (;;)
+	{
+	  cnt++;
+	  while (*dp & 0x80)
+	    dp++;
+	  if (!(*dp++ & 0x40))
+	    return cnt;
+	  dp += strlen((const char *)dp) + 1;
+	}
+    case REPOKEY_TYPE_DIRNUMNUMARRAY:
+      for (;;)
+	{
+	  cnt++;
+	  while (*dp++ & 0x80)
+	    ;
+	  while (*dp++ & 0x80)
+	    ;
+	  while (*dp & 0x80)
+	    dp++;
+	  if (!(*dp++ & 0x40))
+	    return cnt;
+	}
+      default:
+	break;
+    }
+  return 1;
+}
+
 /* highly specialized function to speed up fileprovides adding.
  * - repodata must be available
  * - solvid must be >= data->start and < data->end
