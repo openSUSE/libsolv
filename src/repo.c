@@ -737,6 +737,32 @@ domatch_idarray(Solvable *s, Id keyname, struct matchdata *md, Id *ida)
     }
 }
 
+static Offset *
+solvable_offsetptr(Solvable *s, Id keyname)
+{
+  switch(keyname)
+  {
+  case SOLVABLE_PROVIDES:
+    return &s->provides;
+  case SOLVABLE_OBSOLETES:
+    return &s->obsoletes;
+  case SOLVABLE_CONFLICTS:
+    return &s->conflicts;
+  case SOLVABLE_REQUIRES:
+    return &s->requires;
+  case SOLVABLE_RECOMMENDS:
+    return &s->recommends;
+  case SOLVABLE_SUGGESTS:
+    return &s->suggests;
+  case SOLVABLE_SUPPLEMENTS:
+    return &s->supplements;
+  case SOLVABLE_ENHANCES:
+    return &s->enhances;
+  default:
+    return 0;
+  }
+}
+
 static void
 repo_search_md(Repo *repo, Id p, Id keyname, struct matchdata *md)
 {
@@ -1131,18 +1157,6 @@ repo_lookup_id(Repo *repo, Id entry, Id keyname)
   return 0;
 }
 
-static int
-lookup_idarray_solvable(Repo *repo, Offset off, Queue *q)
-{
-  Id *p;
-
-  queue_empty(q);
-  if (off)
-    for (p = repo->idarraydata + off; *p; p++)
-      queue_push(q, *p);
-  return 1;
-}
-
 int
 repo_lookup_idarray(Repo *repo, Id entry, Id keyname, Queue *q)
 {
@@ -1150,24 +1164,25 @@ repo_lookup_idarray(Repo *repo, Id entry, Id keyname, Queue *q)
   int i;
   if (entry >= 0)
     {
+      Offset *offp;
       switch (keyname)
         {
 	case SOLVABLE_PROVIDES:
-	  return lookup_idarray_solvable(repo, repo->pool->solvables[entry].provides, q);
 	case SOLVABLE_OBSOLETES:
-	  return lookup_idarray_solvable(repo, repo->pool->solvables[entry].obsoletes, q);
 	case SOLVABLE_CONFLICTS:
-	  return lookup_idarray_solvable(repo, repo->pool->solvables[entry].conflicts, q);
 	case SOLVABLE_REQUIRES:
-	  return lookup_idarray_solvable(repo, repo->pool->solvables[entry].requires, q);
 	case SOLVABLE_RECOMMENDS:
-	  return lookup_idarray_solvable(repo, repo->pool->solvables[entry].recommends, q);
 	case SOLVABLE_SUGGESTS:
-	  return lookup_idarray_solvable(repo, repo->pool->solvables[entry].suggests, q);
 	case SOLVABLE_SUPPLEMENTS:
-	  return lookup_idarray_solvable(repo, repo->pool->solvables[entry].supplements, q);
 	case SOLVABLE_ENHANCES:
-	  return lookup_idarray_solvable(repo, repo->pool->solvables[entry].enhances, q);
+	  offp = solvable_offsetptr(repo->pool->solvables + entry, keyname);
+	  if (*offp)
+	    {
+	      Id *p;
+	      for (p = repo->idarraydata + *offp; *p; p++)
+	        queue_push(q, *p);
+	    }
+	  return 1;
         }
     }
   data = repo_lookup_repodata_opt(repo, entry, keyname);
@@ -1268,6 +1283,37 @@ repo_lookup_binary(Repo *repo, Id entry, Id keyname, int *lenp)
     return bin;
   *lenp = 0;
   return 0;
+}
+
+unsigned int
+repo_lookup_count(Repo *repo, Id entry, Id keyname)
+{
+  Repodata *data;
+  if (keyname >= SOLVABLE_NAME && keyname <= RPM_RPMDBID)
+  if (entry >= 0 && keyname >= SOLVABLE_NAME && keyname <= RPM_RPMDBID)
+    {
+      Id *p;
+      Offset *offp;
+      unsigned int cnt;
+      switch (keyname)
+        {
+	case SOLVABLE_PROVIDES:
+	case SOLVABLE_OBSOLETES:
+	case SOLVABLE_CONFLICTS:
+	case SOLVABLE_REQUIRES:
+	case SOLVABLE_RECOMMENDS:
+	case SOLVABLE_SUGGESTS:
+	case SOLVABLE_SUPPLEMENTS:
+	case SOLVABLE_ENHANCES:
+	  offp = solvable_offsetptr(repo->pool->solvables + entry, keyname);
+	  for (cnt = 0, p = repo->idarraydata + *offp; *p; p++)
+	    cnt++;
+	  return cnt;
+        }
+      return 1;
+    }
+  data = repo_lookup_repodata_opt(repo, entry, keyname);
+  return data ? repodata_lookup_count(data, entry, keyname) : 0;
 }
 
 /***********************************************************************/
@@ -1429,32 +1475,19 @@ repo_add_deparray(Repo *repo, Id p, Id keyname, Id dep, Id marker)
     marker = solv_depmarker(keyname, marker);
   if (p >= 0)
     {
-      Solvable *s = repo->pool->solvables + p;
+      Offset *offp;
       switch (keyname)
 	{
 	case SOLVABLE_PROVIDES:
-	  s->provides = repo_addid_dep(repo, s->provides, dep, marker);
-	  return;
 	case SOLVABLE_OBSOLETES:
-	  s->obsoletes = repo_addid_dep(repo, s->obsoletes, dep, marker);
-	  return;
 	case SOLVABLE_CONFLICTS:
-	  s->conflicts = repo_addid_dep(repo, s->conflicts, dep, marker);
-	  return;
 	case SOLVABLE_REQUIRES:
-	  s->requires = repo_addid_dep(repo, s->requires, dep, marker);
-	  return;
 	case SOLVABLE_RECOMMENDS:
-	  s->recommends = repo_addid_dep(repo, s->recommends, dep, marker);
-	  return;
 	case SOLVABLE_SUGGESTS:
-	  s->suggests = repo_addid_dep(repo, s->suggests, dep, marker);
-	  return;
 	case SOLVABLE_SUPPLEMENTS:
-	  s->supplements = repo_addid_dep(repo, s->supplements, dep, marker);
-	  return;
 	case SOLVABLE_ENHANCES:
-	  s->enhances = repo_addid_dep(repo, s->enhances, dep, marker);
+	  offp = solvable_offsetptr(repo->pool->solvables + p, keyname);
+	  *offp = repo_addid_dep(repo, *offp, dep, marker);
 	  return;
 	}
     }
@@ -1466,16 +1499,6 @@ void
 repo_add_idarray(Repo *repo, Id p, Id keyname, Id id)
 {
   repo_add_deparray(repo, p, keyname, id, 0);
-}
-
-static Offset
-repo_set_idarray_solvable(Repo *repo, Queue *q)
-{
-  Offset o = 0;
-  int i;
-  for (i = 0; i < q->count; i++)
-    repo_addid_dep(repo, o, q->elements[i], 0);
-  return o;
 }
 
 void
@@ -1512,32 +1535,23 @@ repo_set_deparray(Repo *repo, Id p, Id keyname, Queue *q, Id marker)
     }
   if (p >= 0)
     {
-      Solvable *s = repo->pool->solvables + p;
+      Offset off, *offp;
+      int i;
       switch (keyname)
 	{
 	case SOLVABLE_PROVIDES:
-	  s->provides = repo_set_idarray_solvable(repo, q);
-	  return;
 	case SOLVABLE_OBSOLETES:
-	  s->obsoletes = repo_set_idarray_solvable(repo, q);
-	  return;
 	case SOLVABLE_CONFLICTS:
-	  s->conflicts = repo_set_idarray_solvable(repo, q);
-	  return;
 	case SOLVABLE_REQUIRES:
-	  s->requires = repo_set_idarray_solvable(repo, q);
-	  return;
 	case SOLVABLE_RECOMMENDS:
-	  s->recommends = repo_set_idarray_solvable(repo, q);
-	  return;
 	case SOLVABLE_SUGGESTS:
-	  s->suggests = repo_set_idarray_solvable(repo, q);
-	  return;
 	case SOLVABLE_SUPPLEMENTS:
-	  s->supplements = repo_set_idarray_solvable(repo, q);
-	  return;
 	case SOLVABLE_ENHANCES:
-	  s->enhances = repo_set_idarray_solvable(repo, q);
+	  off = 0;
+	  for (i = 0; i < q->count; i++)
+	    off = repo_addid_dep(repo, off, q->elements[i], 0);
+	  offp = solvable_offsetptr(repo->pool->solvables + p, keyname);
+	  *offp = off;
 	  return;
 	}
     }

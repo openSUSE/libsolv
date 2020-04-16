@@ -323,6 +323,12 @@ solvable_lookup_checksum(Solvable *s, Id keyname, Id *typep)
   return chk ? pool_bin2hex(s->repo->pool, chk, solv_chksum_len(*typep)) : 0;
 }
 
+unsigned int
+solvable_lookup_count(Solvable *s, Id keyname)
+{
+  return s->repo ? repo_lookup_count(s->repo, s - s->repo->pool->solvables, keyname) : 0;
+}
+
 static inline const char *
 evrid2vrstr(Pool *pool, Id evrid)
 {

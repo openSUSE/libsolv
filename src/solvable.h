@@ -64,6 +64,7 @@ const unsigned char *solvable_lookup_bin_checksum(Solvable *s, Id keyname, Id *t
 const char *solvable_lookup_checksum(Solvable *s, Id keyname, Id *typep);
 int solvable_lookup_idarray(Solvable *s, Id keyname, Queue *q);
 int solvable_lookup_deparray(Solvable *s, Id keyname, Queue *q, Id marker);
+unsigned int solvable_lookup_count(Solvable *s, Id keyname);	/* internal */
 
 /* setter functions */
 void solvable_set_id(Solvable *s, Id keyname, Id id);
