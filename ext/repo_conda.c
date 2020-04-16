@@ -61,6 +61,30 @@ parse_otherdeps(struct parsedata *pd, struct solv_jsonparser *jp, Id handle, Id 
 }
 
 static int
+parse_trackfeatures(struct parsedata *pd, struct solv_jsonparser *jp, Id handle)
+{
+  int type = JP_ARRAY;
+  while (type > 0 && (type = jsonparser_parse(jp)) > 0 && type != JP_ARRAY_END)
+    {
+      if (type == JP_STRING)
+	{
+	  char *p = jp->value, *pe;
+	  while (*p == ' ' || *p == '\t')
+	    p++;
+	  if (!*p)
+	    continue;
+	  for (pe = p + strlen(p) - 1; pe > p; pe--)
+	    if (*pe != ' ' && *pe != '\t')
+	      break;
+	  repodata_add_idarray(pd->data, handle, SOLVABLE_TRACK_FEATURES, pool_strn2id(pd->pool, p, pe - p + 1, 1));
+	}
+      else
+	type = jsonparser_skip(jp, type);
+    }
+  return type;
+}
+
+static int
 parse_package(struct parsedata *pd, struct solv_jsonparser *jp, char *kfn)
 {
   int type = JP_OBJECT;
@@ -107,6 +131,22 @@ parse_package(struct parsedata *pd, struct solv_jsonparser *jp, char *kfn)
 	    ts /= 1000;
 	  repodata_set_num(data, handle, SOLVABLE_BUILDTIME, ts);
 	}
+      else if (type == JP_STRING && !strcmp(jp->key, "track_features"))
+	{
+	  char *p = jp->value, *pe;
+	  for (; *p; p++)
+	    {
+	      if (*p == ' ' || *p == '\t' || *p == ',')
+		continue;
+	      pe = p + 1;
+	      while (*pe && *pe != ' ' && *pe != '\t' && *pe != ',')
+		pe++;
+	      repodata_add_idarray(data, handle, SOLVABLE_TRACK_FEATURES, pool_strn2id(pool, p, pe - p, 1));
+	      p = pe - 1;
+	    }
+	}
+      else if (type == JP_ARRAY && !strcmp(jp->key, "track_features"))
+	type = parse_trackfeatures(pd, jp, handle);
       else
 	type = jsonparser_skip(jp, type);
     }

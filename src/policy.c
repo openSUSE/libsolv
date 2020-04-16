@@ -846,8 +846,14 @@ pool_buildversioncmp(Pool *pool, Solvable *s1, Solvable *s2)
 static int
 pool_buildflavorcmp(Pool *pool, Solvable *s1, Solvable *s2)
 {
-  const char *f1 = solvable_lookup_str(s1, SOLVABLE_BUILDFLAVOR);
-  const char *f2 = solvable_lookup_str(s2, SOLVABLE_BUILDFLAVOR);
+  const char *f1, *f2;
+  unsigned int cnt1, cnt2;
+  cnt1 = solvable_lookup_count(s1, SOLVABLE_TRACK_FEATURES);
+  cnt2 = solvable_lookup_count(s2, SOLVABLE_TRACK_FEATURES);
+  if (cnt1 != cnt2)
+    return cnt1 > cnt2 ? -1 : 1;
+  f1 = solvable_lookup_str(s1, SOLVABLE_BUILDFLAVOR);
+  f2 = solvable_lookup_str(s2, SOLVABLE_BUILDFLAVOR);
   if (!f1 && !f2)
     return 0;
   return pool_evrcmp_str(pool, f1 ? f1 : "" , f2 ? f2 : "", EVRCMP_COMPARE);
