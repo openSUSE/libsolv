@@ -61,7 +61,15 @@ static FILE *cookieopen(void *cookie, const char *mode,
 
 static ssize_t cookie_gzread(void *cookie, char *buf, size_t nbytes)
 {
-  return gzread((gzFile)cookie, buf, nbytes);
+  ssize_t r = gzread((gzFile)cookie, buf, nbytes);
+  if (r == 0)
+    {
+      int err = 0;
+      gzerror((gzFile)cookie, &err);
+      if (err == Z_BUF_ERROR)
+	r = -1;
+    }
+  return r;
 }
 
 static ssize_t cookie_gzwrite(void *cookie, const char *buf, size_t nbytes)
