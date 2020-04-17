@@ -22,6 +22,9 @@ struct parsedata {
   Pool *pool;
   Repo *repo;
   Repodata *data;
+
+  Stringpool fnpool;
+  Queue fndata;
 };
 
 static int
@@ -84,6 +87,39 @@ parse_trackfeatures(struct parsedata *pd, struct solv_jsonparser *jp, Id handle)
   return type;
 }
 
+static void 
+swap_solvables(Repo *repo, Repodata *data, Id pa, Id pb)
+{
+  Pool *pool = repo->pool;
+  Solvable tmp; 
+
+  tmp = pool->solvables[pa];
+  pool->solvables[pa] = pool->solvables[pb];
+  pool->solvables[pb] = tmp; 
+  repodata_swap_attrs(data, pa, pb); 
+}
+
+static Id *
+fn2data(struct parsedata *pd, const char *fn, Id *fntypep, int create)
+{
+  size_t l = strlen(fn), extl = 0;
+  Id fnid;
+  if (l > 6 && !strcmp(fn + l - 6, ".conda"))
+    extl = 6;
+  else if (l > 8 && !strcmp(fn + l - 8, ".tar.bz2"))
+    extl = 8;
+  else
+    return 0;
+  fnid = stringpool_strn2id(&pd->fnpool, fn, l - extl, create);
+  if (!fnid)
+    return 0;
+  if (fnid * 2 + 2 > pd->fndata.count)
+    queue_insertn(&pd->fndata, pd->fndata.count, fnid * 2 + 2 - pd->fndata.count, 0);
+  if (fntypep)
+    *fntypep = extl == 8 ? 1 : 2;	/* 1: legacy .tar.bz2  2: .conda */
+  return pd->fndata.elements + 2 * fnid;
+}
+
 static int
 parse_package(struct parsedata *pd, struct solv_jsonparser *jp, char *kfn)
 {
@@ -91,11 +127,13 @@ parse_package(struct parsedata *pd, struct solv_jsonparser *jp, char *kfn)
   Pool *pool= pd->pool;
   Repodata *data = pd->data;
   Solvable *s;
-  Id handle = repo_add_solvable(pd->repo);
-  s = pool_id2solvable(pool, handle);
+  Id handle;
   char *fn = 0;
   char *subdir = 0;
+  Id *fndata = 0, fntype = 0;
 
+  handle = repo_add_solvable(pd->repo);
+  s = pool_id2solvable(pool, handle);
   while (type > 0 && (type = jsonparser_parse(jp)) > 0 && type != JP_OBJECT_END)
     {
       if (type == JP_STRING && !strcmp(jp->key, "build"))
@@ -151,13 +189,36 @@ parse_package(struct parsedata *pd, struct solv_jsonparser *jp, char *kfn)
 	type = jsonparser_skip(jp, type);
     }
   if (fn || kfn)
-    repodata_set_location(data, handle, 0, subdir, fn ? fn : kfn);
+    {
+      repodata_set_location(data, handle, 0, subdir, fn ? fn : kfn);
+      fndata = fn2data(pd, fn ? fn : kfn, &fntype, 1);
+    }
   solv_free(fn);
   solv_free(subdir);
   if (!s->evr)
     s->evr = 1;
   if (s->name)
     s->provides = repo_addid_dep(pd->repo, s->provides, pool_rel2id(pool, s->name, s->evr, REL_EQ, 1), 0);
+
+  if (fndata)
+    {
+      /* deal with legacy package entries */
+      if (fndata[0] && fndata[0] > fntype)
+	{
+	  /* ignore this package */
+	  repo_free_solvable(pd->repo, handle, 1);
+	  return type;
+	}
+      if (fndata[0] && fndata[0] < fntype)
+	{
+	  /* replace old package */
+	  swap_solvables(pd->repo, data, handle, fndata[1]);
+	  repo_free_solvable(pd->repo, handle, 1);
+	  handle = fndata[1];
+	}
+      fndata[0] = fntype;
+      fndata[1] = handle;
+    }
   return type;
 }
 
@@ -228,6 +289,8 @@ repo_add_conda(Repo *repo, FILE *fp, int flags)
   pd.pool = pool;
   pd.repo = repo;
   pd.data = data;
+  stringpool_init_empty(&pd.fnpool);
+  queue_init(&pd.fndata);
 
   jsonparser_init(&jp, fp);
   if ((type = jsonparser_parse(&jp)) != JP_OBJECT)
@@ -236,6 +299,8 @@ repo_add_conda(Repo *repo, FILE *fp, int flags)
     ret = pool_error(pool, -1, "parse error line %d", jp.line);
   jsonparser_free(&jp);
 
+  queue_free(&pd.fndata);
+  stringpool_free(&pd.fnpool);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
 
