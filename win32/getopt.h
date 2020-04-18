@@ -5,9 +5,12 @@
 extern "C" {
 #endif
 
+#include "config.h"
+
 int getopt(int, char * const [], const char *);
-extern char *optarg;
-extern int optind, opterr, optopt, optreset;
+
+SOLV_API extern char *optarg;
+SOLV_API extern int optind, opterr, optopt, optreset;
 
 struct option {
 	const char *name;

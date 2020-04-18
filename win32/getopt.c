@@ -5,8 +5,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-char *optarg;
-int optind=1, opterr=1, optopt, __optpos, __optreset=0;
+#include "config.h"
+
+SOLV_API char *optarg;
+SOLV_API int optind=1, opterr=1, optopt, __optpos, __optreset=0;
 
 #define optpos __optpos
 
