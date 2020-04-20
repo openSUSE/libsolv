@@ -524,7 +524,7 @@ repo_mark_retracted_packages(Repo *repo, Id retractedmarker)
 
   Queue q;
   queue_init(&q);
-  for (p = 1; p < pool->nsolvables; p++)
+  FOR_REPO_SOLVABLES(repo, p, s)
     {
       const char *status;
       s = pool->solvables + p;
@@ -578,7 +578,7 @@ repo_mark_retracted_packages(Repo *repo, Id retractedmarker)
       else if (q.elements[i + 1] == retractedname && q.elements[i + 2] == retractedevr)
 	{
 	  s = pool->solvables + q.elements[i];
-	  s->provides = repo_addid_dep(repo, s->provides, retractedmarker, 0);
+	  s->provides = repo_addid_dep(s->repo, s->provides, retractedmarker, 0);
 	}
     }
   queue_free(&q);
