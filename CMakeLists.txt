@@ -58,6 +58,9 @@ ENDIF (NOT PKGCONFIG_INSTALL_DIR)
 SET (CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/modules)
 INSTALL( FILES ${CMAKE_MODULE_PATH}/FindLibSolv.cmake DESTINATION ${CMAKE_INSTALL_PREFIX}/share/cmake/Modules )
 
+# for shared libraries on windows (DLLs), we just export all symbols for now
+SET(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+
 INCLUDE (${CMAKE_SOURCE_DIR}/VERSION.cmake)
 
 SET (have_system x)
