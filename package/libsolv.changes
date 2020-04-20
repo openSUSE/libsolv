@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Mon Apr 20 17:24:21 CEST 2020 - mls@suse.de
+
+- fix ruleinfo of complex dependencies returning the wrong origin
+- bump version to 0.7.12
+
+-------------------------------------------------------------------
 Wed Jan 22 13:52:48 CET 2020 - mls@suse.de
 
 - fixed solv_zchunk decoding error if large chunks are used

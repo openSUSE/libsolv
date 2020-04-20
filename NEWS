@@ -2,6 +2,13 @@
 This file contains the major changes between
 libsolv versions:
 
+Version 0.7.12
+- conda: support packages.conda repositories
+- conda: de-priorize track features
+- allow win32 to build shared lib
+- selected bug fixes:
+  * fix ruleinfo of complex dependencies returning the wrong origin
+
 Version 0.7.11
 - ENABLE_RPMDB_LIBRPM is now the default
 - selected bug fixes:
