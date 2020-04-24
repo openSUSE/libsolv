@@ -64,7 +64,7 @@ parse_otherdeps(struct parsedata *pd, struct solv_jsonparser *jp, Id handle, Id 
 }
 
 static int
-parse_trackfeatures(struct parsedata *pd, struct solv_jsonparser *jp, Id handle)
+parse_trackfeatures_array(struct parsedata *pd, struct solv_jsonparser *jp, Id handle)
 {
   int type = JP_ARRAY;
   while (type > 0 && (type = jsonparser_parse(jp)) > 0 && type != JP_ARRAY_END)
@@ -87,10 +87,25 @@ parse_trackfeatures(struct parsedata *pd, struct solv_jsonparser *jp, Id handle)
   return type;
 }
 
-static void 
-swap_solvables(Repo *repo, Repodata *data, Id pa, Id pb)
+static void
+parse_trackfeatures_string(struct parsedata *pd, const char *p, Id handle)
 {
-  Pool *pool = repo->pool;
+  const char *pe;
+  for (; *p; p++)
+    {
+      if (*p == ' ' || *p == '\t' || *p == ',')
+	continue;
+      pe = p + 1;
+      while (*pe && *pe != ' ' && *pe != '\t' && *pe != ',')
+	pe++;
+      repodata_add_idarray(pd->data, handle, SOLVABLE_TRACK_FEATURES, pool_strn2id(pd->pool, p, pe - p, 1));
+      p = pe - 1;
+    }
+}
+
+static void 
+swap_solvables(Pool *pool, Repodata *data, Id pa, Id pb)
+{
   Solvable tmp; 
 
   tmp = pool->solvables[pa];
@@ -170,21 +185,9 @@ parse_package(struct parsedata *pd, struct solv_jsonparser *jp, char *kfn)
 	  repodata_set_num(data, handle, SOLVABLE_BUILDTIME, ts);
 	}
       else if (type == JP_STRING && !strcmp(jp->key, "track_features"))
-	{
-	  char *p = jp->value, *pe;
-	  for (; *p; p++)
-	    {
-	      if (*p == ' ' || *p == '\t' || *p == ',')
-		continue;
-	      pe = p + 1;
-	      while (*pe && *pe != ' ' && *pe != '\t' && *pe != ',')
-		pe++;
-	      repodata_add_idarray(data, handle, SOLVABLE_TRACK_FEATURES, pool_strn2id(pool, p, pe - p, 1));
-	      p = pe - 1;
-	    }
-	}
+	parse_trackfeatures_string(pd, jp->value, handle);
       else if (type == JP_ARRAY && !strcmp(jp->key, "track_features"))
-	type = parse_trackfeatures(pd, jp, handle);
+	type = parse_trackfeatures_array(pd, jp, handle);
       else
 	type = jsonparser_skip(jp, type);
     }
@@ -212,7 +215,7 @@ parse_package(struct parsedata *pd, struct solv_jsonparser *jp, char *kfn)
       if (fndata[0] && fndata[0] < fntype)
 	{
 	  /* replace old package */
-	  swap_solvables(pd->repo, data, handle, fndata[1]);
+	  swap_solvables(pool, data, handle, fndata[1]);
 	  repo_free_solvable(pd->repo, handle, 1);
 	  handle = fndata[1];
 	}
