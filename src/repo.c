@@ -213,6 +213,8 @@ repo_free_solvable_block(Repo *repo, Id start, int count, int reuseids)
 	      int j;
 	      for (j = dstart; j < dend; j++)	
 		data->attrs[j - data->start] = solv_free(data->attrs[j - data->start]);
+	      if (data->lasthandle >= dstart && data->lasthandle < dend)
+	        data->lasthandle = 0;
 	    }
 	  if (data->incoreoffset)
 	    memset(data->incoreoffset + (dstart - data->start), 0, (dend - dstart) * sizeof(Id));

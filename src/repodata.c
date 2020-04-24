@@ -3100,6 +3100,8 @@ repodata_swap_attrs(Repodata *data, Id dest, Id src)
   tmpattrs = data->attrs[dest - data->start];
   data->attrs[dest - data->start] = data->attrs[src - data->start];
   data->attrs[src - data->start] = tmpattrs;
+  if (data->lasthandle == src || data->lasthandle == dest)
+    data->lasthandle = 0;
 }
 
 
