@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Fri Apr 24 12:00:30 CEST 2020 - mls@suse.de
+
+- Fix solvable swapping messing up idarrays
+- bump version to 0.7.13
+
+-------------------------------------------------------------------
 Mon Apr 20 17:24:21 CEST 2020 - mls@suse.de
 
 - fix ruleinfo of complex dependencies returning the wrong origin

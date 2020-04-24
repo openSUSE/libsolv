@@ -2,6 +2,9 @@
 This file contains the major changes between
 libsolv versions:
 
+Version 0.7.13
+- fix solvable swapping messing up uninternalized idarrays
+
 Version 0.7.12
 - conda: support packages.conda repositories
 - conda: de-priorize track features
