@@ -38,6 +38,19 @@ mpcpy(int len, mp_t *target, mp_t *source)
   memcpy(target, source, len * MP_T_BYTES);
 }
 
+static void
+mpsetfrombe(int len, mp_t *target, const unsigned char *buf, int bufl)
+{
+  int i, mpl = len * MP_T_BYTES;
+  buf += bufl;
+  if (bufl >= mpl)
+    bufl = mpl;
+  if (mpl)
+    memset(target, 0, mpl);
+  for (i = 0; bufl > 0; bufl--, i++)
+    target[i / MP_T_BYTES] |= (int)(*--buf) << (8 * (i % MP_T_BYTES));
+}
+
 #if 0
 static void mpdump(int l, mp_t *a, char *s)
 {
@@ -350,20 +363,10 @@ static mp_t *
 mpbuild(const unsigned char *d, int dbits, int tbits, int *mplp)
 {
   int l = (tbits + MP_T_BITS - 1) / MP_T_BITS;
-  int dl, i;
-
   mp_t *out = mpnew(l ? l : 1);
   if (mplp)
     *mplp = l;
-  dl = (dbits + 7) / 8;
-  d += dl;
-  if (dbits > tbits)
-    dl = (tbits + 7) / 8;
-  for (i = 0; dl > 0; dl--, i++)
-    {
-      int x = *--d;
-      out[i / MP_T_BYTES] |= x << (8 * (i % MP_T_BYTES));
-    }
+  mpsetfrombe(l, out, d, (dbits + 7) / 8);
   return out;
 }
 
