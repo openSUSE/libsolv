@@ -123,7 +123,7 @@ mpdomod(int len, mp_t *target, mp2_t x, mp_t *mod)
 
 /* target += src * m */
 static void
-mpmult_add_int(int len, mp_t *target, mp_t *src, mp2_t m, mp_t *mod)
+mpmul_add_int(int len, mp_t *target, mp_t *src, mp2_t m, mp_t *mod)
 {
   int i;
   mp2_t x = 0;
@@ -152,7 +152,7 @@ mpshift(int len, mp_t *target, mp_t *mod)
 
 /* target += m1 * m2 */
 static void
-mpmult_add(int len, mp_t *target, mp_t *m1, int m2len, mp_t *m2, mp_t *tmp, mp_t *mod)
+mpmul_add(int len, mp_t *target, mp_t *m1, int m2len, mp_t *m2, mp_t *tmp, mp_t *mod)
 {
   int i, j;
   for (j = m2len - 1; j >= 0; j--)
@@ -164,19 +164,19 @@ mpmult_add(int len, mp_t *target, mp_t *m1, int m2len, mp_t *m2, mp_t *tmp, mp_t
   for (i = 0; i < j; i++)
     {
       if (m2[i])
-        mpmult_add_int(len, target, tmp, m2[i], mod);
+        mpmul_add_int(len, target, tmp, m2[i], mod);
       mpshift(len, tmp, mod);
     }
   if (m2[i])
-    mpmult_add_int(len, target, tmp, m2[i], mod);
+    mpmul_add_int(len, target, tmp, m2[i], mod);
 }
 
 /* target = target * m */
 static void
-mpmult_inplace(int len, mp_t *target, mp_t *m, mp_t *tmp1, mp_t *tmp2, mp_t *mod)
+mpmul_inplace(int len, mp_t *target, mp_t *m, mp_t *tmp1, mp_t *tmp2, mp_t *mod)
 {
   mpzero(len, tmp1);
-  mpmult_add(len, tmp1, target, len, m, tmp2, mod);
+  mpmul_add(len, tmp1, target, len, m, tmp2, mod);
   mpcpy(len, target, tmp1);
 }
 
@@ -185,12 +185,12 @@ static void
 mppow_int(int len, mp_t *target, mp_t *t, mp_t *mod, int e)
 {
   mp_t *t2 = t + len * 16;
-  mpmult_inplace(len, target, target, t, t2, mod);
-  mpmult_inplace(len, target, target, t, t2, mod);
-  mpmult_inplace(len, target, target, t, t2, mod);
-  mpmult_inplace(len, target, target, t, t2, mod);
+  mpmul_inplace(len, target, target, t, t2, mod);
+  mpmul_inplace(len, target, target, t, t2, mod);
+  mpmul_inplace(len, target, target, t, t2, mod);
+  mpmul_inplace(len, target, target, t, t2, mod);
   if (e)
-    mpmult_inplace(len, target, t + len * e, t, t2, mod);
+    mpmul_inplace(len, target, t + len * e, t, t2, mod);
 }
 
 /* target = b ^ e (b has to be < mod) */
@@ -209,7 +209,7 @@ mppow(int len, mp_t *target, mp_t *b, int elen, mp_t *e, mp_t *mod)
   t = mpnew(len * 17);
   mpcpy(len, t + len, b);
   for (j = 2; j < 16; j++)
-    mpmult_add(len, t + len * j, b, len, t + len * j - len, t + len * 16, mod);
+    mpmul_add(len, t + len * j, b, len, t + len * j - len, t + len * 16, mod);
   for (; i >= 0; i--)
     {
 #if MP_T_BYTES == 4
@@ -231,11 +231,11 @@ mppow(int len, mp_t *target, mp_t *b, int elen, mp_t *e, mp_t *mod)
 
 /* target = m1 * m2 (m1 has to be < mod) */
 static void
-mpmult(int len, mp_t *target, mp_t *m1, int m2len, mp_t *m2, mp_t *mod)
+mpmul(int len, mp_t *target, mp_t *m1, int m2len, mp_t *m2, mp_t *mod)
 {
   mp_t *tmp = mpnew(len);
   mpzero(len, target);
-  mpmult_add(len, target, m1, m2len, m2, tmp, mod);
+  mpmul_add(len, target, m1, m2len, m2, tmp, mod);
   free(tmp);
 }
 
@@ -306,20 +306,20 @@ mpdsa(int pl, mp_t *p, int ql, mp_t *q, mp_t *g, mp_t *y, mp_t *r, mp_t *s, int 
   mppow(ql, w, s, ql, tmp, q);		/* w = s ^ tmp (s ^ -1) */
   u1 = mpnew(pl);			/* note pl */
   /* order is important here: h can be >= q */
-  mpmult(ql, u1, w, hl, h, q);		/* u1 = w * h */
+  mpmul(ql, u1, w, hl, h, q);		/* u1 = w * h */
   u2 = mpnew(ql);			/* u2 = 0 */
-  mpmult(ql, u2, w, ql, r, q);		/* u2 = w * r */
+  mpmul(ql, u2, w, ql, r, q);		/* u2 = w * r */
   free(w);
   gu1 = mpnew(pl);
   yu2 = mpnew(pl);
   mppow(pl, gu1, g, ql, u1, p);		/* gu1 = g ^ u1 */
   mppow(pl, yu2, y, ql, u2, p);		/* yu2 = y ^ u2 */
-  mpmult(pl, u1, gu1, pl, yu2, p);	/* u1 = gu1 * yu2 */
+  mpmul(pl, u1, gu1, pl, yu2, p);	/* u1 = gu1 * yu2 */
   free(gu1);
   free(yu2);
   mpzero(ql, u2);
   u2[0] = 1;				/* u2 = 1 */
-  mpmult(ql, tmp, u2, pl, u1, q);	/* tmp = u2 * u1 */
+  mpmul(ql, tmp, u2, pl, u1, q);	/* tmp = u2 * u1 */
   free(u1);
   free(u2);
 #if 0
