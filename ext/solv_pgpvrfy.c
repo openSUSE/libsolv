@@ -101,7 +101,7 @@ mpdomod(int len, mp_t *target, mp2_t x, mp_t *mod)
       n = 0;
       for (j = 0; j <= i; j++)
 	{
-	  mp2_t n2 = mod[j] + n;
+	  mp2_t n2 = (mp2_t)mod[j] + n;
 	  n = n2 > target[j] ? 1 : 0;
 	  target[j] -= (mp_t)n2;
 	}
