@@ -274,8 +274,6 @@ mpdec(int len, mp_t *a)
   for (i = 0; i < len; i++)
     if (a[i]--)
       return;
-    else
-      a[i] = -(mp_t)1;
 }
 
 static int
