@@ -252,6 +252,12 @@ mpisless(int len, mp_t *a, mp_t *b)
 }
 
 static int
+mpisequal(int len, mp_t *a, mp_t *b)
+{
+  return memcmp(a, b, len * MP_T_BYTES) == 0;
+}
+
+static int
 mpiszero(int len, mp_t *a)
 {
   int i;
@@ -321,7 +327,7 @@ mpdsa(int pl, mp_t *p, int ql, mp_t *q, mp_t *g, mp_t *y, mp_t *r, mp_t *s, int 
 #if 0
   mpdump(ql, tmp, "res = ");
 #endif
-  if (memcmp(tmp, r, ql * MP_T_BYTES) != 0)
+  if (!mpisequal(ql, tmp, r))
     {
       free(tmp);
       return 0;
@@ -349,7 +355,7 @@ mprsa(int nl, mp_t *n, int el, mp_t *e, mp_t *m, mp_t *c)
 #if 0
   mpdump(nl, tmp, "res = ");
 #endif
-  if (memcmp(tmp, c, nl * MP_T_BYTES) != 0)
+  if (!mpisequal(nl, tmp, c))
     {
       free(tmp);
       return 0;
