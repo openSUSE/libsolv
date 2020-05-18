@@ -1,11 +1,11 @@
 /*
- * Copyright (c) 2013, SUSE Inc.
+ * Copyright (c) 2013-2020, SUSE LLC.
  *
  * This program is licensed under the BSD license, read LICENSE.BSD
  * for further information
  */
 
-/* simple and slow rsa/dsa verification code. */
+/* simple and slow pgp signature verification code. */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,6 +13,10 @@
 
 #include "util.h"
 #include "solv_pgpvrfy.h"
+
+#ifndef ENABLE_PGPVRFY_ED25519
+#define ENABLE_PGPVRFY_ED25519 1
+#endif
 
 typedef unsigned int mp_t;
 typedef unsigned long long mp2_t;
@@ -63,6 +67,30 @@ static void mpdump(int l, mp_t *a, char *s)
 }
 #endif
 
+/* subtract mod if target >= mod */
+static inline void mpsubmod(int len, mp_t *target, mp_t *mod)
+{
+  int i;
+  mp2_t n;
+  if (target[len - 1] < mod[len - 1])
+    return;
+  if (target[len - 1] == mod[len - 1])
+    {
+      for (i = len - 2; i >= 0; i--)
+	if (target[i] < mod[i])
+	  return;
+	else if (target[i] > mod[i])
+	  break;
+    }
+  /* target >= mod, subtract mod */
+  for (n = 0, i = 0; i < len; i++)
+    {
+      mp2_t n2 = (mp2_t)mod[i] + n;
+      n = n2 > target[i] ? 1 : 0;
+      target[i] -= (mp_t)n2;
+    }
+}
+
 /* target[len] = x, target = target % mod
  * assumes that target < (mod << MP_T_BITS)! */
 static void
@@ -100,25 +128,7 @@ mpdomod(int len, mp_t *target, mp2_t x, mp_t *mod)
     }
   target[i] = x;
   if (x >= mod[i])
-    {
-      mp_t n;
-      if (x == mod[i])
-	{
-	  for (j = i - 1; j >= 0; j--)
-	    if (target[j] < mod[j])
-	      return;
-	    else if (target[j] > mod[j])
-	      break;
-	}
-      /* target >= mod, subtract mod */
-      n = 0;
-      for (j = 0; j <= i; j++)
-	{
-	  mp2_t n2 = (mp2_t)mod[j] + n;
-	  n = n2 > target[j] ? 1 : 0;
-	  target[j] -= (mp_t)n2;
-	}
-    }
+    mpsubmod(i + 1, target, mod);
 }
 
 /* target += src * m */
@@ -164,7 +174,7 @@ mpmul_add(int len, mp_t *target, mp_t *m1, int m2len, mp_t *m2, mp_t *tmp, mp_t 
   for (i = 0; i < j; i++)
     {
       if (m2[i])
-        mpmul_add_int(len, target, tmp, m2[i], mod);
+	mpmul_add_int(len, target, tmp, m2[i], mod);
       mpshift(len, tmp, mod);
     }
   if (m2[i])
@@ -276,6 +286,55 @@ mpdec(int len, mp_t *a)
       return;
 }
 
+#if ENABLE_PGPVRFY_ED25519
+/* target = m1 + m2 (m1, m2 < mod). target may be m1 or m2 */
+static void
+mpadd(int len, mp_t *target, mp_t *m1, mp_t *m2, mp_t *mod)
+{
+  int i;
+  mp2_t x = 0;
+  for (i = 0; i < len; i++)
+    {
+      x += (mp2_t)m1[i] + m2[i];
+      target[i] = x;
+      x >>= MP_T_BITS;
+    }
+  if (x || !mpisless(len, target, mod))
+    {
+      for (x = 0, i = 0; i < len; i++)
+	{
+	  x = (mp2_t)target[i] - mod[i] - x;
+	  target[i] = x;
+	  x = x & ((mp2_t)1 << MP_T_BITS) ? 1 : 0;
+	}
+    }
+}
+
+/* target = m1 - m2 (m1, m2 < mod). target may be m1 or m2 */
+static void
+mpsub(int len, mp_t *target, mp_t *m1, mp_t *m2, mp_t *mod)
+{
+  int i;
+  mp2_t x = 0;
+  for (i = 0; i < len; i++)
+    {
+      x = (mp2_t)m1[i] - m2[i] - x;
+      target[i] = x;
+      x = x & ((mp2_t)1 << MP_T_BITS) ? 1 : 0;
+    }
+  if (x)
+    {
+      for (x = 0, i = 0; i < len; i++)
+	{
+	  x += (mp2_t)target[i] + mod[i];
+	  target[i] = x;
+	  x >>= MP_T_BITS;
+	}
+    }
+}
+#endif
+
+
 static int
 mpdsa(int pl, mp_t *p, int ql, mp_t *q, mp_t *g, mp_t *y, mp_t *r, mp_t *s, int hl, mp_t *h)
 {
@@ -362,6 +421,10 @@ mprsa(int nl, mp_t *n, int el, mp_t *e, mp_t *m, mp_t *c)
   return 1;
 }
 
+#if ENABLE_PGPVRFY_ED25519
+# include "solv_ed25519.h"
+#endif
+
 /* create mp with size tbits from data with size dbits */
 static mp_t *
 mpbuild(const unsigned char *d, int dbits, int tbits, int *mplp)
@@ -397,6 +460,8 @@ findmpi(const unsigned char **mpip, int *mpilp, int maxbits, int *outlen)
   return mpi + 2;
 }
 
+/* sig: 0:algo 1:hash 2-:mpidata */
+/* pub: 0:algo 1-:mpidata */
 int
 solv_pgpvrfy(const unsigned char *pub, int publ, const unsigned char *sig, int sigl)
 {
@@ -522,6 +587,36 @@ solv_pgpvrfy(const unsigned char *pub, int publ, const unsigned char *sig, int s
 	free(hx);
 	break;
       }
+#if ENABLE_PGPVRFY_ED25519
+    case 22:		/* EdDSA */
+      {
+	unsigned char sigdata[64];
+	const unsigned char *r, *s;
+	int rlen, slen;
+
+	/* check the curve */
+	if (publ < 11 || memcmp(pub + 1, "\011\053\006\001\004\001\332\107\017\001", 10) != 0)
+	  return 0;	/* we only support the Ed25519 curve */
+	/* the pubkey always has 7 + 256 bits */
+	if (publ != 1 + 10 + 2 + 1 + 32 || pub[1 + 10 + 0] != 1 || pub[1 + 10 + 1] != 7 || pub[1 + 10 + 2] != 0x40)
+	  return 0;
+	mpi = sig + 2 + hashl;
+	mpil = sigl - (2 + hashl);
+	r = findmpi(&mpi, &mpil, 256, &rlen);
+	s = findmpi(&mpi, &mpil, 256, &slen);
+	if (!r || !s)
+	  return 0;
+	memset(sigdata, 0, 64);
+	rlen = (rlen + 7) / 8;
+	slen = (slen + 7) / 8;
+	if (rlen)
+	  memcpy(sigdata + 32 - rlen, r, rlen);
+	if (slen)
+	  memcpy(sigdata + 64 - slen, s, rlen);
+	res = mped25519(pub + 1 + 10 + 2 + 1, sigdata, sigdata + 32, sig + 2, hashl);
+	break;
+      }
+#endif
     default:
       return 0;		/* unsupported pubkey algo */
     }
