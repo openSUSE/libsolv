@@ -28,8 +28,6 @@ static mp_t ed25519_q[] =		/* mod prime */
   MPED25519_CONST(0x7FFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFED);
 static mp_t ed25519_d[] = 		/* -(121665/121666) */
   MPED25519_CONST(0x52036CEE, 0x2B6FFE73, 0x8CC74079, 0x7779E898, 0x00700A4D, 0x4141D8AB, 0x75EB4DCA, 0x135978A3);
-static mp_t ed25519_p58[] =		/* (q-5)/8 */
-  MPED25519_CONST(0x0FFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFD);
 static mp_t ed25519_sqrtm1[] =		/* sqrt(-1) */
   MPED25519_CONST(0x2B832480, 0x4FC1DF0B, 0x2B4D0099, 0x3DFBD7A7, 0x2F431806, 0xAD2FE478, 0xC4EE1B27, 0x4A0EA0B0);
 static mp_t ed25519_n[] = 		/* l */
@@ -40,8 +38,6 @@ static mp_t ed25519_gy[] = 		/* base point */
   MPED25519_CONST(0x66666666, 0x66666666, 0x66666666, 0x66666666, 0x66666666, 0x66666666, 0x66666666, 0x66666658);
 static mp_t ed25519_one[] = 		/* 1 */
   MPED25519_CONST(0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000001);
-static mp_t ed25519_qm2[] = 		/* mod - 2 */
-  MPED25519_CONST(0x7FFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFEB);
 
 /* small helpers to save some typing */
 static inline void
@@ -98,10 +94,51 @@ mped25519_mul(mp_t *target, mp_t *m1, mp_t *m2)
   mpcpy(MPED25519_LEN, target, tmp);
 }
 
-static inline void
+static void
+mped25519_pow_252_4(mp_t *out, mp_t *a, mp_t *a_11)
+{
+  static const int todo[14] = { 5, 0, 10, 1, 20, 2, 10, 1, 50, 4, 100, 5, 50, 4 };
+  mp_t t[MPED25519_LEN];
+  mp_t data[7][MPED25519_LEN];
+  int i, j;
+
+  mpcpy(MPED25519_LEN, out, a);
+  mped25519_mul(out, out, out);
+  mpcpy(MPED25519_LEN, a_11, out);
+  mped25519_mul(out, out, out);
+  mped25519_mul(out, out, out);
+  mped25519_mul(t, out, a);		/* t = 9 */
+  mped25519_mul(a_11, t, a_11);		/* a_11 = 11 */
+  mped25519_mul(out, a_11, a_11);
+  mped25519_mul(out, out, t);		/* out = 31 */
+  for (i = 0; i < 7; i++)
+    {
+      mpcpy(MPED25519_LEN, data[i], out);
+      for (j = todo[i * 2]; j-- > 0;)
+        mped25519_mul(out, out, out);
+      mped25519_mul(out, out, data[todo[i * 2 + 1]]);
+    }
+  mped25519_mul(out, out, out);
+  mped25519_mul(out, out, out);
+}
+
+static void
+mped25519_pow_252_3(mp_t *target, mp_t *a)
+{
+  mp_t t11[MPED25519_LEN];
+  mped25519_pow_252_4(target, a, t11);
+  mped25519_mul(target, target, a);
+}
+
+static void
 mped25519_inv(mp_t *target, mp_t *a)
 {
-  mppow(MPED25519_LEN, target, a, MPED25519_LEN, ed25519_qm2, ed25519_q);
+  mp_t t[MPED25519_LEN], t11[MPED25519_LEN];
+  mped25519_pow_252_4(t, a, t11);
+  mped25519_mul(t, t, t);
+  mped25519_mul(t, t, t);
+  mped25519_mul(t, t, t);	/* 2^255 - 32 */
+  mped25519_mul(target, t, t11);
 }
 
 /* recover x coordinate from y and sign */
@@ -119,13 +156,13 @@ mped25519_recover_x(mp_t *x, mp_t *y, int sign)
   mped25519_sub(num, num, ed25519_one);
   mped25519_add(den, den, ed25519_one);
 
-  /* calculate x = num*den^3 * (num*den^7)^p58 */
+  /* calculate x = num*den^3 * (num*den^7)^((q-5)/8) */
   mped25519_mul(tmp1, den, den);	/* tmp1 = den^2 */
   mped25519_mul(tmp2, tmp1, den);	/* tmp2 = den^3 */
   mped25519_mul(tmp1, tmp2, tmp2);	/* tmp1 = den^6 */
   mped25519_mul(x, tmp1, den);		/* x = den^7 */
   mped25519_mul(tmp1, x, num);		/* tmp1 = num * den^7 */
-  mppow(MPED25519_LEN, x, tmp1, MPED25519_LEN, ed25519_p58, ed25519_q);	/* x = tmp1 ^ p58 */
+  mped25519_pow_252_3(x, tmp1);		/* x = tmp1^((q-5)/8) */
   mped25519_mul(tmp1, x, tmp2);		/* tmp1 = x * den^3 */
   mped25519_mul(x, tmp1, num);		/* x = tmp1 * num */
 
