@@ -92,7 +92,8 @@ mped25519_mul(mp_t *target, mp_t *m1, mp_t *m2)
       tmp[i] = x;
       x >>= MP_T_BITS;
     }
-  if (tmp[MPED25519_LEN - 1] >= ed25519_q[MPED25519_LEN - 1])
+  if (tmp[MPED25519_LEN - 1] > ed25519_q[MPED25519_LEN - 1] ||
+      (tmp[MPED25519_LEN - 1] == ed25519_q[MPED25519_LEN - 1] && !mpisless(MPED25519_LEN - 1, tmp, ed25519_q)))
     mpsubmod(MPED25519_LEN, tmp, ed25519_q);
   mpcpy(MPED25519_LEN, target, tmp);
 }
@@ -144,28 +145,6 @@ mped25519_recover_x(mp_t *x, mp_t *y, int sign)
   if ((x[0] & 1) != sign)
     mped25519_sub(x, ed25519_q, x);
   return 1;
-}
-
-static void
-mped25519_setfromle(int len, mp_t *out, const unsigned char *buf, int bufl, int highmask)
-{
-  unsigned char lebuf[64];	/* bufl must be <= 64 */
-  int i;
-  for (i = 0; i < bufl; i++)
-    lebuf[bufl - 1 - i] = buf[i];
-  lebuf[0] &= highmask;
-  mpsetfrombe(len, out, lebuf, bufl);
-}
-
-static void
-mped25519_modn_fromle(mp_t *out, const unsigned char *buf, int bufl)
-{
-  mp_t tmp[64 / MP_T_BYTES];	/* bufl must be <= 64 */
-  mp_t tmp2[MPED25519_LEN];
-  int len = (bufl + MP_T_BYTES - 1) / MP_T_BYTES;
-  mped25519_setfromle(len, tmp, buf, bufl, 0xff);
-  mpzero(MPED25519_LEN, out);
-  mpmul_add(MPED25519_LEN, out, ed25519_one, len, tmp, tmp2, ed25519_n);
 }
 
 /* see https://hyperelliptic.org/EFD/g1p/auto-twisted-projective.html */
@@ -318,6 +297,17 @@ mped25519_scmult2(mp_t *r_x, mp_t *r_y, mp_t *s1, mp_t *p1_x, mp_t * p1_y, mp_t 
   return mpiszero(MPED25519_LEN, p_z) ? 0 : 1;
 }
 
+static void
+mped25519_setfromle(int len, mp_t *out, const unsigned char *buf, int bufl, int highmask)
+{
+  unsigned char lebuf[64];	/* bufl must be <= 64 */
+  int i;
+  for (i = 0; i < bufl; i++)
+    lebuf[bufl - 1 - i] = buf[i];
+  lebuf[0] &= highmask;
+  mpsetfrombe(len, out, lebuf, bufl);
+}
+
 static int
 mped25519(const unsigned char *pub, const unsigned char *sigr, const unsigned char *sigs, const unsigned char *data, unsigned int datal)
 {
@@ -325,11 +315,13 @@ mped25519(const unsigned char *pub, const unsigned char *sigr, const unsigned ch
   int i;
   mp_t pub_x[MPED25519_LEN], pub_y[MPED25519_LEN];
   mp_t h[MPED25519_LEN], s[MPED25519_LEN];
+  mp_t h2[MPED25519_LEN* 2], htmp[MPED25519_LEN];
   mp_t r_x[MPED25519_LEN], r_y[MPED25519_LEN];
   Chksum *chk;
 
-  if ((sigs[31] & 0xe0) != 0)
-    return 0;
+  mped25519_setfromle(MPED25519_LEN, s, sigs, 32, 0xff);
+  if (!mpisless(MPED25519_LEN, s, ed25519_n))
+    return 0;		/* bad s */
   /* uncompress pubkey, we invert the sign to get -pub */
   mped25519_setfromle(MPED25519_LEN, pub_y, pub, 32, 0x7f);
   if (!mped25519_recover_x(pub_x, pub_y, pub[31] & 0x80 ? 0 : 1))
@@ -337,7 +329,7 @@ mped25519(const unsigned char *pub, const unsigned char *sigr, const unsigned ch
 #if 0
   mped25519_ptdump(pub_x, pub_y, 0, "pub = ");
 #endif
-  /* calculate h and s */
+  /* calculate h2 */
   chk = solv_chksum_create(REPOKEY_TYPE_SHA512);
   if (!chk)
     return 0;
@@ -345,8 +337,10 @@ mped25519(const unsigned char *pub, const unsigned char *sigr, const unsigned ch
   solv_chksum_add(chk, pub, 32);
   solv_chksum_add(chk, data, datal);
   solv_chksum_free(chk, hbuf);
-  mped25519_modn_fromle(h, hbuf, 64);
-  mped25519_modn_fromle(s, sigs, 32);
+  /* calculate h = h2 mod n */
+  mped25519_setfromle(MPED25519_LEN * 2, h2, hbuf, 64, 0xff);
+  mpzero(MPED25519_LEN, h);
+  mpmul_add(MPED25519_LEN, h, ed25519_one, MPED25519_LEN * 2, h2, htmp, ed25519_n);
 #if 0
   mped25519_mpdump(s, "s     = ", 0);
   mped25519_mpdump(h, "h     = ", 0);
