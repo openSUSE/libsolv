@@ -547,7 +547,7 @@ parsepubkey(Solvable *s, Repodata *data, unsigned char *p, int pl, int flags)
 	      repodata_set_str(data, s - pool->solvables, PUBKEY_KEYID, keyidstr);
 	      /* build rpm-style evr */
 	      strcpy(evr, keyidstr + 8);
-	      sprintf(evr + 8, "-%08x", pool->disttype == DISTTYPE_RPM ? rpmsigcr : maxsigcr);
+	      sprintf(evr + 8, "-%08x", (flags & USE_RPM_PUBKEY_BUILTTIME) ? rpmsigcr : maxsigcr);
 	      s->evr = pool_str2id(pool, evr, 1);
 	    }
 	  if (insubkey && *subkeyofstr)
