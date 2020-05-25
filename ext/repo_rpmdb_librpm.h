@@ -46,7 +46,7 @@ static void
 detect_dbpath(struct rpmdbstate *state)
 {
   state->dbpath = access_rootdir(state, "/var/lib/rpm", W_OK) == -1
-                  && access_rootdir(state, "/usr/share/rpm/Packages", R_OK) == 0
+                  && (access_rootdir(state, "/usr/share/rpm/Packages", R_OK) == 0 || access_rootdir(state, "/usr/share/rpm/rpmdb.sqlite", R_OK) == 0)
                   ? "/usr/share/rpm" : "/var/lib/rpm";
 }
 
