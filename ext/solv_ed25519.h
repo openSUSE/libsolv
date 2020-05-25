@@ -30,7 +30,7 @@ static mp_t ed25519_d[] = 		/* -(121665/121666) */
   MPED25519_CONST(0x52036CEE, 0x2B6FFE73, 0x8CC74079, 0x7779E898, 0x00700A4D, 0x4141D8AB, 0x75EB4DCA, 0x135978A3);
 static mp_t ed25519_sqrtm1[] =		/* sqrt(-1) */
   MPED25519_CONST(0x2B832480, 0x4FC1DF0B, 0x2B4D0099, 0x3DFBD7A7, 0x2F431806, 0xAD2FE478, 0xC4EE1B27, 0x4A0EA0B0);
-static mp_t ed25519_n[] = 		/* l */
+static mp_t ed25519_l[] = 		/* order of base point */
   MPED25519_CONST(0x10000000, 0x00000000, 0x00000000, 0x00000000, 0x14DEF9DE, 0xA2F79CD6, 0x5812631A, 0x5CF5D3ED);
 static mp_t ed25519_gx[] = 		/* base point */
   MPED25519_CONST(0x216936D3, 0xCD6E53FE, 0xC0A4E231, 0xFDD6DC5C, 0x692CC760, 0x9525A7B2, 0xC9562D60, 0x8F25D51A);
@@ -52,6 +52,36 @@ mped25519_sub(mp_t *target, mp_t *m1, mp_t *m2)
   mpsub(MPED25519_LEN, target, m1, m2, ed25519_q);
 }
 
+/* target = 512 bit input modulo ed25519_q */
+static void
+mped25519_reduce512(mp_t *target, mp_t *a)
+{
+  int i;
+  mp2_t x;
+
+  for (x = 0, i = 0; i < MPED25519_LEN; i++)
+    {
+      x += (mp2_t)a[i] + (mp2_t)a[i + MPED25519_LEN] * 38;
+      target[i] = x;
+      x >>= MP_T_BITS;
+    }
+  x *= 38;
+  if ((target[MPED25519_LEN - 1] & (1 << (MP_T_BITS - 1))) != 0)
+    {
+      x += 19;
+      target[MPED25519_LEN - 1] -= 1 << (MP_T_BITS - 1);
+    }
+  for (i = 0; x && i < MPED25519_LEN; i++)
+    {
+      x += (mp2_t)target[i];
+      target[i] = x;
+      x >>= MP_T_BITS;
+    }
+  if (target[MPED25519_LEN - 1] > ed25519_q[MPED25519_LEN - 1] ||
+      (target[MPED25519_LEN - 1] == ed25519_q[MPED25519_LEN - 1] && !mpisless(MPED25519_LEN - 1, target, ed25519_q)))
+    mpsubmod(MPED25519_LEN, target, ed25519_q);
+}
+
 static void
 mped25519_mul(mp_t *target, mp_t *m1, mp_t *m2)
 {
@@ -70,58 +100,41 @@ mped25519_mul(mp_t *target, mp_t *m1, mp_t *m2)
 	}
       tmp[i + j] = x;
     }
-  for (x = 0, i = 0; i < MPED25519_LEN; i++)
-    {
-      x += (mp2_t)tmp[i] + (mp2_t)tmp[i + MPED25519_LEN] * 38;
-      tmp[i] = x;
-      x >>= MP_T_BITS;
-    }
-  x *= 38;
-  if ((tmp[MPED25519_LEN - 1] & (1 << (MP_T_BITS - 1))) != 0)
-    {
-      x += 19;
-      tmp[MPED25519_LEN - 1] -= 1 << (MP_T_BITS - 1);
-    }
-  for (i = 0; x && i < MPED25519_LEN; i++)
-    {
-      x += (mp2_t)tmp[i];
-      tmp[i] = x;
-      x >>= MP_T_BITS;
-    }
-  if (tmp[MPED25519_LEN - 1] > ed25519_q[MPED25519_LEN - 1] ||
-      (tmp[MPED25519_LEN - 1] == ed25519_q[MPED25519_LEN - 1] && !mpisless(MPED25519_LEN - 1, tmp, ed25519_q)))
-    mpsubmod(MPED25519_LEN, tmp, ed25519_q);
-  mpcpy(MPED25519_LEN, target, tmp);
+  mped25519_reduce512(target, tmp);
 }
 
-static void
-mped25519_pow_252_4(mp_t *out, mp_t *a, mp_t *a_11)
+static inline void
+mped25519_sqr(mp_t *target, mp_t *m)
 {
-  static const int todo[14] = { 5, 0, 10, 1, 20, 2, 10, 1, 50, 4, 100, 5, 50, 4 };
-  mp_t t[MPED25519_LEN];
-  mp_t data[7][MPED25519_LEN];
+  mped25519_mul(target, m, m);
+}
+
+/* target = a ^ (2^252 - 4), a11 = a ^ 11 */
+static void
+mped25519_pow_252_4(mp_t *target, mp_t *a, mp_t *a_11)
+{
+  static const int todo[16] = { 0, 5, 1, 10, 2, 20, 3, 10, 2, 50, 5, 100, 6, 50, 5, 2 };
+  mp_t data[9][MPED25519_LEN];
   int i, j;
 
-  mpcpy(MPED25519_LEN, out, a);
-  mped25519_mul(out, out, out);
-  mpcpy(MPED25519_LEN, a_11, out);
-  mped25519_mul(out, out, out);
-  mped25519_mul(out, out, out);
-  mped25519_mul(t, out, a);		/* t = 9 */
-  mped25519_mul(a_11, t, a_11);		/* a_11 = 11 */
-  mped25519_mul(out, a_11, a_11);
-  mped25519_mul(out, out, t);		/* out = 31 */
-  for (i = 0; i < 7; i++)
+  mpcpy(MPED25519_LEN, target, a);
+  mped25519_sqr(target, target);
+  mpcpy(MPED25519_LEN, a_11, target);
+  mped25519_sqr(target, target);
+  mped25519_sqr(target, target);
+  mped25519_mul(data[0], target, a);		/* data[0] = 9 */
+  mped25519_mul(a_11, data[0], a_11);		/* a_11 = 11 */
+  mped25519_mul(target, a_11, a_11);		/* target = 22 */
+  for (i = 0; i < 8; i++)
     {
-      mpcpy(MPED25519_LEN, data[i], out);
-      for (j = todo[i * 2]; j-- > 0;)
-        mped25519_mul(out, out, out);
-      mped25519_mul(out, out, data[todo[i * 2 + 1]]);
+      mped25519_mul(target, target, data[todo[i * 2]]);
+      mpcpy(MPED25519_LEN, data[i + 1], target);
+      for (j = todo[i * 2 + 1]; j-- > 0;)
+        mped25519_sqr(target, target);
     }
-  mped25519_mul(out, out, out);
-  mped25519_mul(out, out, out);
 }
 
+/* target = a ^ (2^252 - 3) */
 static void
 mped25519_pow_252_3(mp_t *target, mp_t *a)
 {
@@ -130,15 +143,24 @@ mped25519_pow_252_3(mp_t *target, mp_t *a)
   mped25519_mul(target, target, a);
 }
 
+/* target = a ^ -1 = a ^ (2^255 - 21) */
 static void
 mped25519_inv(mp_t *target, mp_t *a)
 {
   mp_t t[MPED25519_LEN], t11[MPED25519_LEN];
   mped25519_pow_252_4(t, a, t11);
-  mped25519_mul(t, t, t);
-  mped25519_mul(t, t, t);
-  mped25519_mul(t, t, t);	/* 2^255 - 32 */
+  mped25519_sqr(t, t);
+  mped25519_sqr(t, t);
+  mped25519_sqr(t, t);		/* 2^255 - 32 */
   mped25519_mul(target, t, t11);
+}
+
+static void
+mped25519_reduce512_l(mp_t *target, mp_t *a)
+{
+  mp_t tmp[MPED25519_LEN];
+  mpzero(MPED25519_LEN, target);
+  mpmul_add(MPED25519_LEN, target, ed25519_one, MPED25519_LEN * 2, a, tmp, ed25519_l);
 }
 
 /* recover x coordinate from y and sign */
@@ -151,15 +173,15 @@ mped25519_recover_x(mp_t *x, mp_t *y, int sign)
   if (!mpisless(MPED25519_LEN, y, ed25519_q))
     return 0;
   /* calculate num=y^2-1 and den=dy^2+1 */
-  mped25519_mul(num, y, y);
+  mped25519_sqr(num, y);
   mped25519_mul(den, num, ed25519_d);
   mped25519_sub(num, num, ed25519_one);
   mped25519_add(den, den, ed25519_one);
 
   /* calculate x = num*den^3 * (num*den^7)^((q-5)/8) */
-  mped25519_mul(tmp1, den, den);	/* tmp1 = den^2 */
+  mped25519_sqr(tmp1, den);		/* tmp1 = den^2 */
   mped25519_mul(tmp2, tmp1, den);	/* tmp2 = den^3 */
-  mped25519_mul(tmp1, tmp2, tmp2);	/* tmp1 = den^6 */
+  mped25519_sqr(tmp1, tmp2);		/* tmp1 = den^6 */
   mped25519_mul(x, tmp1, den);		/* x = den^7 */
   mped25519_mul(tmp1, x, num);		/* tmp1 = num * den^7 */
   mped25519_pow_252_3(x, tmp1);		/* x = tmp1^((q-5)/8) */
@@ -167,12 +189,11 @@ mped25519_recover_x(mp_t *x, mp_t *y, int sign)
   mped25519_mul(x, tmp1, num);		/* x = tmp1 * num */
 
   /* check if den*x^2 == num */
-  mped25519_mul(tmp2, x, x);
+  mped25519_sqr(tmp2, x);
   mped25519_mul(tmp1, tmp2, den);
   if (!mpisequal(MPED25519_LEN, tmp1, num)) {
-    mped25519_mul(tmp1, x, ed25519_sqrtm1);	/* x = x * sqrt(-1) */
-    mpcpy(MPED25519_LEN, x, tmp1);
-    mped25519_mul(tmp2, x, x);
+    mped25519_mul(x, x, ed25519_sqrtm1);	/* x = x * sqrt(-1) */
+    mped25519_sqr(tmp2, x);
     mped25519_mul(tmp1, tmp2, den);
     if (!mpisequal(MPED25519_LEN, tmp1, num))
       return 0;
@@ -193,11 +214,11 @@ mped25519_ptdouble(mp_t *p_x, mp_t *p_y, mp_t *p_z)
   mp_t F[MPED25519_LEN], H[MPED25519_LEN], J[MPED25519_LEN];
   
   mped25519_add(C, p_x, p_y);
-  mped25519_mul(B, C, C);
-  mped25519_mul(C, p_x, p_x);
-  mped25519_mul(D, p_y, p_y);
+  mped25519_sqr(B, C);
+  mped25519_sqr(C, p_x);
+  mped25519_sqr(D, p_y);
   mped25519_sub(F, C, D);
-  mped25519_mul(H, p_z, p_z);
+  mped25519_sqr(H, p_z);
   mped25519_add(H, H, H);
   mped25519_add(J, F, H);
   mped25519_add(H, C, D);
@@ -216,7 +237,7 @@ mped25519_ptadd(mp_t *p_x, mp_t *p_y, mp_t *p_z, mp_t *q_x, mp_t *q_y, mp_t *q_z
   mp_t G[MPED25519_LEN], H[MPED25519_LEN], J[MPED25519_LEN];
   
   mped25519_mul(A, p_z, q_z);
-  mped25519_mul(B, A, A);
+  mped25519_sqr(B, A);
   mped25519_mul(C, p_x, q_x);
   mped25519_mul(D, p_y, q_y);
   mped25519_mul(F, ed25519_d, C);
@@ -256,20 +277,15 @@ mped25519_mpdump(mp_t *p, char *s, int c)
 static void
 mped25519_ptdump(mp_t *p_x, mp_t *p_y, mp_t *p_z, char *s)
 {
-  if (p_z)
-    {
-      mp_t zi[MPED25519_LEN], px[MPED25519_LEN], py[MPED25519_LEN];
-      mped25519_mpdump(p_x, s, 'X');
-      mped25519_mpdump(p_y, s, 'Y');
-      mped25519_mpdump(p_z, s, 'Z');
-      mped25519_inv(zi, p_z);
-      mped25519_mul(px, p_x, zi);
-      mped25519_mul(py, p_y, zi);
-      p_x = px;
-      p_y = py;
-    }
-  mped25519_mpdump(p_x, s, 'x');
-  mped25519_mpdump(p_y, s, 'y');
+  mp_t zi[MPED25519_LEN], px[MPED25519_LEN], py[MPED25519_LEN];
+  mped25519_mpdump(p_x, s, 'X');
+  mped25519_mpdump(p_y, s, 'Y');
+  mped25519_mpdump(p_z, s, 'Z');
+  mped25519_inv(zi, p_z);
+  mped25519_mul(px, p_x, zi);
+  mped25519_mul(py, p_y, zi);
+  mped25519_mpdump(px, s, 'x');
+  mped25519_mpdump(py, s, 'y');
 }
 #endif
 
@@ -281,9 +297,7 @@ mped25519_scmult2(mp_t *r_x, mp_t *r_y, mp_t *s1, mp_t *p1_x, mp_t * p1_y, mp_t 
 {
   mp_t p_x[MPED25519_LEN], p_y[MPED25519_LEN], p_z[MPED25519_LEN];
   mp_t pi_z[MPED25519_LEN];
-  mp_t tabx[16][MPED25519_LEN];
-  mp_t taby[16][MPED25519_LEN];
-  mp_t tabz[16][MPED25519_LEN];
+  mp_t tabx[16][MPED25519_LEN], taby[16][MPED25519_LEN], tabz[16][MPED25519_LEN];
   int i, x, dodouble = 0;
 
   mpzero(MPED25519_LEN, p_x);
@@ -317,8 +331,9 @@ mped25519_scmult2(mp_t *r_x, mp_t *r_y, mp_t *s1, mp_t *p1_x, mp_t * p1_y, mp_t 
       if (i > 0)
 	{
 	  i--;
+	  if (dodouble)
+	    mped25519_ptdouble(p_x, p_y, p_z);
 	  x <<= 1;
-	  mped25519_ptdouble(p_x, p_y, p_z);
 	  x |= s1[i / MP_T_BITS] & (1 << (i % MP_T_BITS)) ? 4 : 0;
 	  x |= s2[i / MP_T_BITS] & (1 << (i % MP_T_BITS)) ? 1 : 0;
 	}
@@ -337,47 +352,45 @@ mped25519_scmult2(mp_t *r_x, mp_t *r_y, mp_t *s1, mp_t *p1_x, mp_t * p1_y, mp_t 
 static void
 mped25519_setfromle(int len, mp_t *out, const unsigned char *buf, int bufl, int highmask)
 {
-  unsigned char lebuf[64];	/* bufl must be <= 64 */
+  unsigned char bebuf[64];	/* bufl must be <= 64 */
   int i;
   for (i = 0; i < bufl; i++)
-    lebuf[bufl - 1 - i] = buf[i];
-  lebuf[0] &= highmask;
-  mpsetfrombe(len, out, lebuf, bufl);
+    bebuf[bufl - 1 - i] = buf[i];
+  bebuf[0] &= highmask;
+  mpsetfrombe(len, out, bebuf, bufl);
 }
 
 static int
-mped25519(const unsigned char *pub, const unsigned char *sigr, const unsigned char *sigs, const unsigned char *data, unsigned int datal)
+mped25519(const unsigned char *pub, const unsigned char *sig, const unsigned char *data, unsigned int datal)
 {
   unsigned char hbuf[64], rbuf[32];
   int i;
   mp_t pub_x[MPED25519_LEN], pub_y[MPED25519_LEN];
-  mp_t h[MPED25519_LEN], s[MPED25519_LEN];
-  mp_t h2[MPED25519_LEN* 2], htmp[MPED25519_LEN];
+  mp_t h[MPED25519_LEN], s[MPED25519_LEN], h2[MPED25519_LEN * 2];
   mp_t r_x[MPED25519_LEN], r_y[MPED25519_LEN];
   Chksum *chk;
 
-  mped25519_setfromle(MPED25519_LEN, s, sigs, 32, 0xff);
-  if (!mpisless(MPED25519_LEN, s, ed25519_n))
+  mped25519_setfromle(MPED25519_LEN, s, sig + 32, 32, 0xff);
+  if (!mpisless(MPED25519_LEN, s, ed25519_l))
     return 0;		/* bad s */
   /* uncompress pubkey, we invert the sign to get -pub */
   mped25519_setfromle(MPED25519_LEN, pub_y, pub, 32, 0x7f);
   if (!mped25519_recover_x(pub_x, pub_y, pub[31] & 0x80 ? 0 : 1))
     return 0;		/* bad pubkey */
 #if 0
-  mped25519_ptdump(pub_x, pub_y, 0, "pub = ");
+  mped25519_mpdump(pub_x, "-pubx = ", 0);
+  mped25519_mpdump(pub_y, "puby  = ", 0);
 #endif
-  /* calculate h2 */
+  /* calculate h = H(sig[0..31]|pub|data) mod l */
   chk = solv_chksum_create(REPOKEY_TYPE_SHA512);
   if (!chk)
     return 0;
-  solv_chksum_add(chk, sigr, 32);
+  solv_chksum_add(chk, sig, 32);
   solv_chksum_add(chk, pub, 32);
   solv_chksum_add(chk, data, datal);
   solv_chksum_free(chk, hbuf);
-  /* calculate h = h2 mod n */
   mped25519_setfromle(MPED25519_LEN * 2, h2, hbuf, 64, 0xff);
-  mpzero(MPED25519_LEN, h);
-  mpmul_add(MPED25519_LEN, h, ed25519_one, MPED25519_LEN * 2, h2, htmp, ed25519_n);
+  mped25519_reduce512_l(h, h2);
 #if 0
   mped25519_mpdump(s, "s     = ", 0);
   mped25519_mpdump(h, "h     = ", 0);
@@ -385,11 +398,11 @@ mped25519(const unsigned char *pub, const unsigned char *sigr, const unsigned ch
   /* calculate r = s * G - h * pub */
   if (!mped25519_scmult2(r_x, r_y, s, ed25519_gx, ed25519_gy, h, pub_x, pub_y))
     return 0;
-  /* compress r into rbuf and verify that it matches sigr */
+  /* compress r into rbuf and verify that it matches sig */
   for (i = 0; i < 32; i++)
     rbuf[i] = r_y[i / MP_T_BYTES] >> (8 * (i % MP_T_BYTES));
   if ((r_x[0] & 1) != 0)
     rbuf[31] |= 0x80;
-  return memcmp(sigr, rbuf, 32) == 0 ? 1 : 0;
+  return memcmp(sig, rbuf, 32) == 0 ? 1 : 0;
 }
 
