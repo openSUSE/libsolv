@@ -1068,10 +1068,10 @@ solver_take_solution(Solver *solv, Id problem, Id solution, Queue *job)
  */
 
 static void
-findproblemrule_internal(Solver *solv, Id idx, Id *reqrp, Id *conrp, Id *sysrp, Id *jobrp, Map *rseen)
+findproblemrule_internal(Solver *solv, Id idx, Id *reqrp, Id *conrp, Id *sysrp, Id *jobrp, Id *blkrp, Map *rseen)
 {
   Id rid, d;
-  Id lreqr, lconr, lsysr, ljobr;
+  Id lreqr, lconr, lsysr, ljobr, lblkr;
   Rule *r;
   Id jobassert = 0;
   int i, reqset = 0;	/* 0: unset, 1: installed, 2: jobassert, 3: assert */
@@ -1093,7 +1093,7 @@ findproblemrule_internal(Solver *solv, Id idx, Id *reqrp, Id *conrp, Id *sysrp, 
 
   /* the problem rules are somewhat ordered from "near to the problem" to
    * "near to the job" */
-  lreqr = lconr = lsysr = ljobr = 0;
+  lreqr = lconr = lsysr = ljobr = lblkr = 0;
   while ((rid = solv->learnt_pool.elements[idx++]) != 0)
     {
       assert(rid > 0);
@@ -1102,9 +1102,9 @@ findproblemrule_internal(Solver *solv, Id idx, Id *reqrp, Id *conrp, Id *sysrp, 
 	  if (MAPTST(rseen, rid - solv->learntrules))
 	    continue;
 	  MAPSET(rseen, rid - solv->learntrules);
-	  findproblemrule_internal(solv, solv->learnt_why.elements[rid - solv->learntrules], &lreqr, &lconr, &lsysr, &ljobr, rseen);
+	  findproblemrule_internal(solv, solv->learnt_why.elements[rid - solv->learntrules], &lreqr, &lconr, &lsysr, &ljobr, &lblkr, rseen);
 	}
-      else if ((rid >= solv->jobrules && rid < solv->jobrules_end) || (rid >= solv->infarchrules && rid < solv->infarchrules_end) || (rid >= solv->duprules && rid < solv->duprules_end) || (rid >= solv->bestrules && rid < solv->bestrules_end) || (rid >= solv->yumobsrules && rid <= solv->yumobsrules_end))
+      else if ((rid >= solv->jobrules && rid < solv->jobrules_end) || (rid >= solv->infarchrules && rid < solv->infarchrules_end) || (rid >= solv->duprules && rid < solv->duprules_end) || (rid >= solv->bestrules && rid < solv->bestrules_end) || (rid >= solv->yumobsrules && rid < solv->yumobsrules_end))
 	{
 	  if (!*jobrp)
 	    *jobrp = rid;
@@ -1113,6 +1113,11 @@ findproblemrule_internal(Solver *solv, Id idx, Id *reqrp, Id *conrp, Id *sysrp, 
 	{
 	  if (!*sysrp)
 	    *sysrp = rid;
+	}
+      else if (rid >= solv->blackrules && rid < solv->blackrules_end)
+	{
+	  if (!*blkrp)
+	    *blkrp = rid;
 	}
       else
 	{
@@ -1176,6 +1181,8 @@ findproblemrule_internal(Solver *solv, Id idx, Id *reqrp, Id *conrp, Id *sysrp, 
     *jobrp = ljobr;
   if (!*sysrp && lsysr)
     *sysrp = lsysr;
+  if (!*blkrp && lblkr)
+    *blkrp = lblkr;
 }
 
 /*
@@ -1190,12 +1197,12 @@ findproblemrule_internal(Solver *solv, Id idx, Id *reqrp, Id *conrp, Id *sysrp, 
 Id
 solver_findproblemrule(Solver *solv, Id problem)
 {
-  Id reqr, conr, sysr, jobr;
+  Id reqr, conr, sysr, jobr, blkr;
   Id idx = solv->problems.elements[2 * problem - 2];
   Map rseen;
-  reqr = conr = sysr = jobr = 0;
+  reqr = conr = sysr = jobr = blkr = 0;
   map_init(&rseen, solv->learntrules ? solv->nrules - solv->learntrules : 0);
-  findproblemrule_internal(solv, idx, &reqr, &conr, &sysr, &jobr, &rseen);
+  findproblemrule_internal(solv, idx, &reqr, &conr, &sysr, &jobr, &blkr, &rseen);
   map_free(&rseen);
   /* check if the request is about a not-installed package requiring a installed
    * package conflicting with the non-installed package. In that case return the conflict */
@@ -1223,6 +1230,8 @@ solver_findproblemrule(Solver *solv, Id problem)
     return reqr;	/* some requires */
   if (conr)
     return conr;	/* some conflict */
+  if (blkr)
+    return blkr;	/* a blacklisted package */
   if (sysr)
     return sysr;	/* an update rule */
   if (jobr)
