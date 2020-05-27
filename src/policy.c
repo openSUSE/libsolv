@@ -906,10 +906,14 @@ prune_to_best_version(Pool *pool, Queue *plist)
       if (r == 0 && has_package_link(pool, s))
         r = pool_link_evrcmp(pool, best, s);
 #endif
+#ifdef ENABLE_CONDA
+      if (r == 0 && pool->disttype == DISTTYPE_CONDA)
+	r = best->repo->subpriority - s->repo->subpriority;
       if (r == 0 && pool->disttype == DISTTYPE_CONDA)
 	r = pool_buildversioncmp(pool, best, s);
       if (r == 0 && pool->disttype == DISTTYPE_CONDA)
 	r = pool_buildflavorcmp(pool, best, s);
+#endif
       if (r < 0)
 	best = s;
     }
