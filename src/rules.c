@@ -3210,7 +3210,7 @@ solver_addchoicerules(Solver *solv)
   Map m, mneg;
   Rule *r;
   Queue q, qi, qcheck, infoq;
-  int i, j, rid, havechoice;
+  int i, j, rid, havechoice, negcnt;
   Id p, d, pp;
   Id p2, pp2;
   Solvable *s, *s2;
@@ -3389,9 +3389,12 @@ solver_addchoicerules(Solver *solv)
 	      qi.elements[j] = 0;
 	}
       /* empty map again */
+      negcnt = 0;
       FOR_RULELITERALS(p, pp, r)
         if (p > 0)
 	  MAPCLR(&m, p);
+	else
+	  negcnt++;
       if (i == qi.count)
 	{
 #if 0
@@ -3400,7 +3403,14 @@ solver_addchoicerules(Solver *solv)
 #endif
 	  continue;
 	}
-
+      /* add neg elements to the front */
+      if (negcnt > 1)
+	{
+	  i = 0;
+	  FOR_RULELITERALS(p, pp, r)
+	   if (p < 0 && p != r->p)
+	     queue_insert(&q, i++, p);
+	}
       /* don't add identical rules */
       if (lastaddedp == r->p && lastaddedcnt == q.count)
 	{
