@@ -833,6 +833,7 @@ move_installed_to_front(Pool *pool, Queue *plist)
     }
 }
 
+#ifdef ENABLE_CONDA
 static int
 pool_buildversioncmp(Pool *pool, Solvable *s1, Solvable *s2)
 {
@@ -858,6 +859,7 @@ pool_buildflavorcmp(Pool *pool, Solvable *s1, Solvable *s2)
     return 0;
   return pool_evrcmp_str(pool, f1 ? f1 : "" , f2 ? f2 : "", EVRCMP_COMPARE);
 }
+#endif
 
 /*
  * prune_to_best_version
@@ -907,12 +909,15 @@ prune_to_best_version(Pool *pool, Queue *plist)
         r = pool_link_evrcmp(pool, best, s);
 #endif
 #ifdef ENABLE_CONDA
-      if (r == 0 && pool->disttype == DISTTYPE_CONDA)
-	r = best->repo->subpriority - s->repo->subpriority;
-      if (r == 0 && pool->disttype == DISTTYPE_CONDA)
-	r = pool_buildversioncmp(pool, best, s);
-      if (r == 0 && pool->disttype == DISTTYPE_CONDA)
-	r = pool_buildflavorcmp(pool, best, s);
+      if (pool->disttype == DISTTYPE_CONDA)
+	{
+	  if (r == 0)
+	    r = (best->repo ? best->repo->subpriority : 0) - (s->repo ? s->repo->subpriority : 0);
+	  if (r == 0)
+	    r = pool_buildversioncmp(pool, best, s);
+	  if (r == 0)
+	    r = pool_buildflavorcmp(pool, best, s);
+	}
 #endif
       if (r < 0)
 	best = s;
