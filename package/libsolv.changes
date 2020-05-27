@@ -1,4 +1,13 @@
 -------------------------------------------------------------------
+Wed May 27 11:48:46 CEST 2020 - mls@suse.de
+
+- Support blacklisted packages in solver_findproblemrule()
+  [bnc#1172135]
+- Support rules with multiple negative literals in choice rule
+  generation
+- bump version to 0.7.14
+
+-------------------------------------------------------------------
 Fri Apr 24 12:00:30 CEST 2020 - mls@suse.de
 
 - Fix solvable swapping messing up idarrays

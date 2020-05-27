@@ -2,6 +2,14 @@
 This file contains the major changes between
 libsolv versions:
 
+Version 0.7.14
+- added support for ed25519 signatures
+- selected bug fixes:
+  * Support blacklisted packages in solver_findproblemrule()
+  * Support rules with multiple negative literals in choice rule
+    generation
+  * Also detect rpmdb.sqlite in /usr/share/rpm
+
 Version 0.7.13
 - fix solvable swapping messing up uninternalized idarrays
 
