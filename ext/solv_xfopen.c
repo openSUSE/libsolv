@@ -796,6 +796,7 @@ solv_xfopen_iscompressed(const char *fn)
 struct bufcookie {
   char **bufp;
   size_t *buflp;
+  char *curmem;
   char *freemem;
   size_t bufl_int;
 };
@@ -860,7 +861,11 @@ solv_xfopen_buf(const char *fn, char **bufp, size_t *buflp, const char *mode)
     }
   fp = cookieopen(bc, mode, cookie_bufread, cookie_bufwrite, cookie_bufclose);
   if (!strcmp(mode, "rf"))	/* auto-free */
-    bc->freemem = *bufp;
+    { /* need to capture *bufp locally #389 */
+      bc->bufp = &bc->curmem;
+      bc->curmem = *bufp;
+      bc->freemem = *bufp;
+    }
   if (!fp)
     {
       if (*mode == 'w')

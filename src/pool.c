@@ -62,6 +62,7 @@ pool_create(void)
   queue_init(&pool->vendormap);
   queue_init(&pool->pooljobs);
   queue_init(&pool->lazywhatprovidesq);
+  pool->considered = 0;
 
 #if defined(DEBIAN)
   pool->disttype = DISTTYPE_DEB;
@@ -117,6 +118,11 @@ pool_free(Pool *pool)
   queue_free(&pool->vendormap);
   queue_free(&pool->pooljobs);
   queue_free(&pool->lazywhatprovidesq);
+  if (pool->considered)
+    {
+      map_free(pool->considered);
+      solv_free(pool->considered);
+    }
   for (i = 0; i < POOL_TMPSPACEBUF; i++)
     solv_free(pool->tmpspace.buf[i]);
   for (i = 0; i < pool->nlanguages; i++)

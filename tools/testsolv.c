@@ -150,6 +150,7 @@ main(int argc, char **argv)
 	  if (!solv)
 	    {
 	      pool_free(pool);
+	      queue_free(&job);
 	      exit(resultflags == 77 ? 77 : 1);
 	    }
 	  if (reusesolv)
