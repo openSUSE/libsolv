@@ -66,6 +66,16 @@ reportsolutioncb(Solver *solv, void *cbdata)
   return 0;
 }
 
+static void
+free_considered(Pool *pool)
+{
+  if (pool->considered)
+    {
+      map_free(pool->considered);
+      pool->considered = solv_free(pool->considered);
+    }
+}
+
 int
 main(int argc, char **argv)
 {
@@ -149,7 +159,9 @@ main(int argc, char **argv)
 	  solv = testcase_read(pool, fp, argv[optind], &job, &result, &resultflags);
 	  if (!solv)
 	    {
+	      free_considered(pool);
 	      pool_free(pool);
+	      queue_free(&job);
 	      exit(resultflags == 77 ? 77 : 1);
 	    }
 	  if (reusesolv)
@@ -349,6 +361,7 @@ main(int argc, char **argv)
 	}
       if (reusesolv)
 	solver_free(reusesolv);
+      free_considered(pool);
       pool_free(pool);
       fclose(fp);
     }

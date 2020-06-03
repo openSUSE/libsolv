@@ -150,6 +150,7 @@ selection_flatten(Pool *pool, Queue *selection)
   if (!q.count)
     {
       queue_empty(selection);
+      queue_free(&q);
       return;
     }
   queue_truncate(selection, 2);
@@ -163,6 +164,7 @@ selection_flatten(Pool *pool, Queue *selection)
       selection->elements[0] = SOLVER_SOLVABLE | SOLVER_NOAUTOSET;
       selection->elements[1] = q.elements[0];
     }
+  queue_free(&q);
 }
 
 /* only supports simple rels plus REL_ARCH */
