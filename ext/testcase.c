@@ -2071,7 +2071,7 @@ testcase_read(Pool *pool, FILE *fp, const char *testcase, Queue *job, char **res
 		{
 		  char *idata = read_inline_file(fp, &buf, &bufp, &bufl);
 		  rdata = "<inline>";
-		  rfp = solv_xfopen_buf(rdata, &idata, 0, "rf");
+		  rfp = solv_fmemopen(idata, strlen(idata), "rf");
 		}
 	      else
 		{

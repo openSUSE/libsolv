@@ -798,6 +798,7 @@ struct bufcookie {
   size_t *buflp;
   char *freemem;
   size_t bufl_int;
+  char *buf_int;
 };
 
 static ssize_t cookie_bufread(void *cookie, char *buf, size_t nbytes)
@@ -870,30 +871,48 @@ solv_xfopen_buf(const char *fn, char **bufp, size_t *buflp, const char *mode)
   return fp;
 }
 
+FILE *
+solv_fmemopen(const char *buf, size_t bufl, const char *mode)
+{
+  struct bufcookie *bc;
+  FILE *fp;
+  if (*mode != 'r')
+    return 0;
+  bc = solv_calloc(1, sizeof(*bc));
+  bc->buf_int = (char *)buf;
+  bc->bufl_int = bufl;
+  bc->bufp = &bc->buf_int;
+  bc->buflp = &bc->bufl_int;
+  fp = cookieopen(bc, mode, cookie_bufread, cookie_bufwrite, cookie_bufclose);
+  if (!strcmp(mode, "rf"))	/* auto-free */
+    bc->freemem = bc->buf_int;
+  if (!fp)
+    cookie_bufclose(bc);
+  return fp;
+}
+
 #else
 
 FILE *
-solv_xfopen_buf(const char *fn, char **bufp, size_t *buflp, const char *mode)
+solv_fmemopen(const char *buf, size_t bufl, const char *mode)
 {
   FILE *fp;
-  size_t l;
   if (*mode != 'r')
     return 0;
-  l = buflp ? *buflp : strlen(*bufp);
   if (!strcmp(mode, "rf"))
     {
-      if (!(fp = fmemopen(0, l, "r+")))
+      if (!(fp = fmemopen(0, bufl, "r+")))
 	return 0;
-      if (l && fwrite(*bufp, l, 1, fp) != 1)
+      if (bufl && fwrite(buf, bufl, 1, fp) != 1)
 	{
 	  fclose(fp);
 	  return 0;
 	}
-      solv_free(*bufp);
+      solv_free((char *)buf);
       rewind(fp);
     }
   else
-    fp = fmemopen(*bufp, l, "r");
+    fp = fmemopen((char *)buf, bufl, "r");
   return fp;
 }
 

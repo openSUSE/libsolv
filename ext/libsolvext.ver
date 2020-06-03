@@ -55,6 +55,7 @@ SOLV_1.0 {
 		rpm_stat_database;
 		rpm_state_create;
 		rpm_state_free;
+		solv_fmemopen;
 		solv_verify_sig;
 		solv_xfopen;
 		solv_xfopen_buf;
