@@ -669,6 +669,7 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
   queue_init(&iq);
   queue_init(&xsuppq);
 
+  /* setup userinstalled map and search for special namespace cleandeps erases */
   for (i = 0; i < job->count; i += 2)
     {
       how = job->elements[i];
@@ -874,23 +875,38 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
     }
   queue_init_clone(&iqcopy, &iq);
 
-  if (!unneeded)
-    {
-      if (solv->cleandeps_updatepkgs)
-	for (i = 0; i < solv->cleandeps_updatepkgs->count; i++)
-	  queue_push(&iq, solv->cleandeps_updatepkgs->elements[i]);
-    }
-
   if (unneeded)
     queue_empty(&iq);	/* just in case... */
 
-  /* clear userinstalled bit for the packages we really want to delete/update */
+  /* clear userinstalled bits for the packages we really want to delete */
   for (i = 0; i < iq.count; i++)
     {
       p = iq.elements[i];
-      if (pool->solvables[p].repo != installed)
-	continue;
-      MAPCLR(&userinstalled, p - installed->start);
+      if (pool->solvables[p].repo == installed)
+        MAPCLR(&userinstalled, p - installed->start);
+    }
+  /* set userinstalled bits for all packages not in the considered map */
+  if (pool->considered)
+    {
+      for (p = installed->start; p < installed->end; p++)
+        if (!MAPTST(pool->considered, p))
+	  MAPSET(&userinstalled, p - installed->start);	/* we may not remove those */
+    }
+  if (!unneeded && solv->cleandeps_updatepkgs)
+    {
+      /* find update seeds */
+      queue_init(&updatepkgs_filtered);
+      find_update_seeds(solv, &updatepkgs_filtered, &userinstalled);
+      /* clear userinstalled bit for the packages we want to update */
+      /* also add them to the erase list */
+      for (i = 0; i < solv->cleandeps_updatepkgs->count; i++)
+	{
+	  p = solv->cleandeps_updatepkgs->elements[i];
+	  if (pool->considered && !MAPTST(pool->considered, p))
+	    continue;
+	  queue_push(&iq, p);
+	  MAPCLR(&userinstalled, p - installed->start);
+	}
     }
 
   for (p = installed->start; p < installed->end; p++)
@@ -898,21 +914,12 @@ solver_createcleandepsmap(Solver *solv, Map *cleandepsmap, int unneeded)
       if (pool->solvables[p].repo != installed)
 	continue;
       MAPSET(&installedm, p);
-      if (pool->considered && !MAPTST(pool->considered, p))
-	MAPSET(&userinstalled, p - installed->start);	/* we may not remove those */
       if (unneeded && !MAPTST(&userinstalled, p - installed->start))
 	continue;
       MAPSET(&im, p);
     }
   MAPSET(&installedm, SYSTEMSOLVABLE);
   MAPSET(&im, SYSTEMSOLVABLE);
-
-  if (!unneeded && solv->cleandeps_updatepkgs)
-    {
-      /* find update "seeds" */
-      queue_init(&updatepkgs_filtered);
-      find_update_seeds(solv, &updatepkgs_filtered, &userinstalled);
-    }
 
 #ifdef CLEANDEPSDEBUG
   printf("REMOVE PASS\n");
