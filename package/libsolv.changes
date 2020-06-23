@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Tue Jun 23 12:43:16 CEST 2020 - ma@suse.de
+
+- Enable zstd compression support for sle15
+
+-------------------------------------------------------------------
 Thu May 28 11:51:27 CEST 2020 - mls@suse.de
 
 - Enable zstd compression support for sle15-sp2
