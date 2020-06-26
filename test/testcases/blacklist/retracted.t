@@ -10,6 +10,7 @@ system i686 * system
 
 job blacklist provides retracted-patch-package()
 job install name patch
+result transaction,problems <inline>
 #>problem 3a66200a info package patch-1-1.noarch conflicts with B < 2-1 provided by B-1-1.noarch
 #>problem 3a66200a solution 14805cf8 deljob install name patch
 #>problem 3a66200a solution 4a9277b8 allow B-2-1.noarch@available

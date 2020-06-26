@@ -28,7 +28,7 @@ nextjob
 job blacklist provides ptf-package()
 job install name ptf-1
 result transaction,problems <inline>
-#>problem 021b17e2 info package ptf-1-1-1.noarch cannot only be installed by a direct request
+#>problem 021b17e2 info package ptf-1-1-1.noarch can only be installed by a direct request
 #>problem 021b17e2 solution 932a6c2f deljob install name ptf-1
 #>problem 021b17e2 solution b79aeb6f allow ptf-1-1-1.noarch@available
 
