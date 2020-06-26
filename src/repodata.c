@@ -388,7 +388,7 @@ repodata_dir2str(Repodata *data, Id did, const char *suf)
       comps = stringpool_id2str(data->localpool ? &data->spool : &pool->ss, comp);
       l = strlen(comps);
       p -= l;
-      strncpy(p, comps, l);
+      memcpy(p, comps, l);
       parent = dirpool_parent(&data->dirpool, parent);
       if (parent)
         *--p = '/';
