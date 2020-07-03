@@ -212,7 +212,7 @@ pool_evrcmp_conda_int(const char *evr1, const char *evr1e, const char *evr2, con
   r = solv_vercmp_conda(evr1, r1 ? r1 : s1, evr2, r2 ? r2 : s2, r2 ? 0 : startswith);
   if (r)
     return r;
-  if (!r1 && !r2)
+  if ((!r2 && startswith) || (!r1 && !r2))
     return 0;
   if (!r1 && r2)
     return -1;
