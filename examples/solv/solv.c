@@ -710,7 +710,7 @@ rerunsolver:
       if (testcase)
 	{
 	  printf("Writing solver testcase:\n");
-	  if (!testcase_write(solv, testcase, TESTCASE_RESULT_TRANSACTION | TESTCASE_RESULT_PROBLEMS, 0, 0))
+	  if (!testcase_write(solv, testcase, TESTCASE_RESULT_TRANSACTION | TESTCASE_RESULT_PROBLEMS, 0, 0, 0))
 	    printf("%s\n", pool_errstr(pool));
 	  testcase = 0;
 	}

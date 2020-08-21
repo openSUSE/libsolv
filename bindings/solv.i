@@ -3685,7 +3685,7 @@ rb_eval_string(
   }
 
   bool write_testcase(const char *dir) {
-    return testcase_write($self, dir, TESTCASE_RESULT_TRANSACTION | TESTCASE_RESULT_PROBLEMS, 0, 0);
+    return testcase_write($self, dir, TESTCASE_RESULT_TRANSACTION | TESTCASE_RESULT_PROBLEMS, 0, 0, 0);
   }
 
   Queue raw_decisions(int filter=0) {

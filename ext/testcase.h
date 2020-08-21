@@ -39,6 +39,6 @@ extern const char *testcase_getsolverflags(Solver *solv);
 extern int testcase_setsolverflags(Solver *solv, const char *str);
 extern void testcase_resetsolverflags(Solver *solv);
 extern char *testcase_solverresult(Solver *solv, int flags);
-extern int testcase_write(Solver *solv, const char *dir, int resultflags, const char *testcasename, const char *resultname);
+extern int testcase_write(Solver *solv, const char *dir, int resultflags, const char *testcasename, const char *resultname, char **repoFileNames );
 extern Solver *testcase_read(Pool *pool, FILE *fp, const char *testcase, Queue *job, char **resultp, int *resultflagsp);
 extern char *testcase_resultdiff(const char *result1, const char *result2);

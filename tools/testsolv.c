@@ -298,7 +298,7 @@ main(int argc, char **argv)
 	    {
 	      int pcnt = solver_solve(solv, &job);
 	      if (writetestcase)
-		testcase_write(solv, writetestcase, resultflags, 0, 0);
+		testcase_write(solv, writetestcase, resultflags, 0, 0, 0);
 	      if (pcnt && solq.count)
 		{
 		  int i, taken = 0;

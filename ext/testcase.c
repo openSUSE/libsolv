@@ -1582,7 +1582,7 @@ testcase_solverresult(Solver *solv, int resultflags)
 
 
 static int
-testcase_write_mangled(Solver *solv, const char *dir, int resultflags, const char *testcasename, const char *resultname)
+testcase_write_mangled(Solver *solv, const char *dir, int resultflags, const char *testcasename, const char *resultname, char **repoFileNames)
 {
   Pool *pool = solv->pool;
   Repo *repo;
@@ -1626,6 +1626,14 @@ testcase_write_mangled(Solver *solv, const char *dir, int resultflags, const cha
       cmd = pool_tmpappend(pool, cmd, priobuf, " ");
       cmd = pool_tmpappend(pool, cmd, "testtags ", out);
       strqueue_push(&sq, cmd);
+
+			if (repoFileNames)
+			{
+				repoFileNames[repoid] = solv_malloc( strlen( out ) + 1 );
+				strncpy(repoFileNames[repoid], out, strlen(out));
+				repoFileNames[repoid][strlen(out)] = 0;
+			}
+
       out = pool_tmpjoin(pool, dir, "/", out);
       if (!(fp = solv_xfopen(out, "w")))
 	{
@@ -1810,7 +1818,7 @@ testcase_write_mangled(Solver *solv, const char *dir, int resultflags, const cha
 }
 
 int
-testcase_write(Solver *solv, const char *dir, int resultflags, const char *testcasename, const char *resultname)
+testcase_write(Solver *solv, const char *dir, int resultflags, const char *testcasename, const char *resultname, char **repoFileNames )
 {
   Pool *pool = solv->pool;
   int i, r, repoid;
@@ -1844,7 +1852,7 @@ testcase_write(Solver *solv, const char *dir, int resultflags, const char *testc
 	}
       repo->name = buf;
     }
-  r = testcase_write_mangled(solv, dir, resultflags, testcasename, resultname);
+  r = testcase_write_mangled(solv, dir, resultflags, testcasename, resultname, repoFileNames);
   for (repoid = 1; repoid < pool->nrepos; repoid++)
     {
       Repo *repo = pool_id2repo(pool, repoid);
