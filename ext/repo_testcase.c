@@ -444,7 +444,7 @@ testcase_write_testtags(Repo *repo, FILE *fp)
 	   continue;
 	 if (strchr(value, '\n'))
 	   continue;
-	 fprintf(fp, "=Met: %s %s\n", pool_id2str(pool, di.key->name), value);
+	 fprintf(fp, "=Met: %s \"%s\"\n", pool_id2str(pool, di.key->name), value);
        }
      dataiterator_free(&di);
    }
@@ -631,12 +631,15 @@ testcase_add_testtags(Repo *repo, FILE *fp, int flags)
 	case 'M' << 16 | 'e' << 8 | 't':
 	  if (split(line + 5, sp, 2) != 2 || !sp[0][0])
 	    break;
+	  if (sp[1][0] != '"' || !sp[1][1] || sp[1][strlen(sp[1]) - 1] != '"')
+	    break;
+	  sp[1][strlen(sp[1]) - 1] = 0;
 	  if (!metah)
 	    {
 	      metah = repodata_new_handle(data);
 	      repodata_add_flexarray(data, SOLVID_META, REPOSITORY_TESTCASE_META, metah);
 	    }
-	  repodata_set_str(data, metah, pool_str2id(pool, sp[0], 1), sp[1]);
+	  repodata_set_str(data, metah, pool_str2id(pool, sp[0], 1), sp[1] + 1);
 	  break;
 	default:
 	  break;
