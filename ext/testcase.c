@@ -1233,6 +1233,28 @@ dump_genid(Pool *pool, Strqueue *sq, Id id, int cnt)
   return cnt;
 }
 
+/* convenience: add comments with the meta data */
+static void
+dump_repo_meta(Pool *pool, Strqueue *sq, Repo *repo)
+{
+  Dataiterator di;
+  dataiterator_init(&di, pool, repo, SOLVID_META, 0, 0, 0);
+  dataiterator_prepend_keyname(&di, REPOSITORY_TESTCASE_META);
+  char *line;
+
+  while (dataiterator_step(&di))
+    {
+      const char *key = pool_id2str(pool, di.key->name);
+      const char *value = repodata_stringify(pool, di.data, di.key, &di.kv, di.flags);
+      if (!key || !value || strchr(key, '\n') != 0 || strchr(value, '\n') != 0)
+        continue;
+      line = pool_tmpjoin(pool, "# ", key, 0);
+      line = pool_tmpappend(pool, line, " ", value);
+      strqueue_push(sq, line);
+    }
+  dataiterator_free(&di);
+}
+
 char *
 testcase_solverresult(Solver *solv, int resultflags)
 {
@@ -1604,12 +1626,14 @@ testcase_write_mangled(Solver *solv, const char *dir, int resultflags, const cha
 #else
   if (mkdir(dir, 0777) && errno != EEXIST)
 #endif
-    return pool_error(solv->pool, 0, "testcase_write: could not create directory '%s'", dir);
+    return pool_error(pool, 0, "testcase_write: could not create directory '%s'", dir);
   strqueue_init(&sq);
   FOR_REPOS(repoid, repo)
     {
       const char *name = testcase_repoid2str(pool, repoid);
       char priobuf[50];
+      if (repo_lookup_type(repo, SOLVID_META, REPOSITORY_TESTCASE_META))
+        dump_repo_meta(pool, &sq, repo);
       if (repo->subpriority)
 	sprintf(priobuf, "%d.%d", repo->priority, repo->subpriority);
       else
@@ -1629,14 +1653,14 @@ testcase_write_mangled(Solver *solv, const char *dir, int resultflags, const cha
       out = pool_tmpjoin(pool, dir, "/", out);
       if (!(fp = solv_xfopen(out, "w")))
 	{
-	  pool_error(solv->pool, 0, "testcase_write: could not open '%s' for writing", out);
+	  pool_error(pool, 0, "testcase_write: could not open '%s' for writing", out);
 	  strqueue_free(&sq);
 	  return 0;
 	}
       testcase_write_testtags(repo, fp);
       if (fclose(fp))
 	{
-	  pool_error(solv->pool, 0, "testcase_write: write error");
+	  pool_error(pool, 0, "testcase_write: write error");
 	  strqueue_free(&sq);
 	  return 0;
 	}
@@ -1662,7 +1686,7 @@ testcase_write_mangled(Solver *solv, const char *dir, int resultflags, const cha
   if (pool->installed)
     cmd = pool_tmpappend(pool, cmd, " ", testcase_repoid2str(pool, pool->installed->repoid));
   strqueue_push(&sq, cmd);
-  s = testcase_getpoolflags(solv->pool);
+  s = testcase_getpoolflags(pool);
   if (*s)
     {
       cmd = pool_tmpjoin(pool, "poolflags ", s, 0);
@@ -1759,14 +1783,14 @@ testcase_write_mangled(Solver *solv, const char *dir, int resultflags, const cha
 	  out = pool_tmpjoin(pool, dir, "/", resultname);
 	  if (!(fp = fopen(out, "w")))
 	    {
-	      pool_error(solv->pool, 0, "testcase_write: could not open '%s' for writing", out);
+	      pool_error(pool, 0, "testcase_write: could not open '%s' for writing", out);
 	      solv_free(result);
 	      strqueue_free(&sq);
 	      return 0;
 	    }
 	  if (result && *result && fwrite(result, strlen(result), 1, fp) != 1)
 	    {
-	      pool_error(solv->pool, 0, "testcase_write: write error");
+	      pool_error(pool, 0, "testcase_write: write error");
 	      solv_free(result);
 	      strqueue_free(&sq);
 	      fclose(fp);
@@ -1774,7 +1798,7 @@ testcase_write_mangled(Solver *solv, const char *dir, int resultflags, const cha
 	    }
 	  if (fclose(fp))
 	    {
-	      pool_error(solv->pool, 0, "testcase_write: write error");
+	      pool_error(pool, 0, "testcase_write: write error");
 	      solv_free(result);
 	      strqueue_free(&sq);
 	      return 0;
@@ -1788,20 +1812,20 @@ testcase_write_mangled(Solver *solv, const char *dir, int resultflags, const cha
   out = pool_tmpjoin(pool, dir, "/", testcasename);
   if (!(fp = fopen(out, "w")))
     {
-      pool_error(solv->pool, 0, "testcase_write: could not open '%s' for writing", out);
+      pool_error(pool, 0, "testcase_write: could not open '%s' for writing", out);
       solv_free(result);
       return 0;
     }
   if (*result && fwrite(result, strlen(result), 1, fp) != 1)
     {
-      pool_error(solv->pool, 0, "testcase_write: write error");
+      pool_error(pool, 0, "testcase_write: write error");
       solv_free(result);
       fclose(fp);
       return 0;
     }
   if (fclose(fp))
     {
-      pool_error(solv->pool, 0, "testcase_write: write error");
+      pool_error(pool, 0, "testcase_write: write error");
       solv_free(result);
       return 0;
     }
