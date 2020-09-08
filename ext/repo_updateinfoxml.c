@@ -113,6 +113,7 @@ struct parsedata {
   Id pkghandle;
   struct solv_xmlparser xmlp;
   struct joindata jd;
+  Id collhandle;
 };
 
 /*
@@ -287,6 +288,12 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
       }
       break;
 
+    case STATE_COLLECTION:
+      {
+        pd->collhandle = repodata_new_handle(pd->data);
+      }
+      break;
+
       /*   <package arch="ppc64" name="imlib-debuginfo" release="6.fc8"
        *            src="http://download.fedoraproject.org/pub/fedora/linux/updates/8/ppc64/imlib-debuginfo-1.9.15-6.fc8.ppc64.rpm"
        *            version="1.9.15">
@@ -364,6 +371,7 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
         if (arch)
           repodata_set_poolstr(pd->data, module_handle, UPDATE_MODULE_ARCH, arch);
         repodata_add_flexarray(pd->data, pd->handle, UPDATE_MODULE, module_handle);
+        repodata_add_flexarray(pd->data, pd->collhandle, UPDATE_MODULE, module_handle);
         break;
       }
 
@@ -427,8 +435,14 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
       repodata_set_str(pd->data, pd->handle, UPDATE_MESSAGE, content);
       break;
 
+    case STATE_COLLECTION:
+      repodata_add_flexarray(pd->data, pd->handle, UPDATE_COLLECTIONLIST, pd->collhandle);
+      pd->collhandle = 0;
+      break;
+
     case STATE_PACKAGE:
       repodata_add_flexarray(pd->data, pd->handle, UPDATE_COLLECTION, pd->pkghandle);
+      repodata_add_flexarray(pd->data, pd->collhandle, UPDATE_COLLECTION, pd->pkghandle);
       pd->pkghandle = 0;
       break;
 
