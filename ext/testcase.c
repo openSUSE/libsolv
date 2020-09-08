@@ -1809,49 +1809,65 @@ testcase_write_mangled(Solver *solv, const char *dir, int resultflags, const cha
   return 1;
 }
 
-int
-testcase_write(Solver *solv, const char *dir, int resultflags, const char *testcasename, const char *resultname)
+const char **
+testcase_mangle_repo_names(Pool *pool)
 {
-  Pool *pool = solv->pool;
-  int i, r, repoid;
-  int mangle = 1;
-  const char **orignames;
-
-  /* mangle repo names so that there are no conflicts */
-  orignames = solv_calloc(pool->nrepos, sizeof(char *));
-  for (repoid = 1; repoid < pool->nrepos; repoid++)
+  int i, repoid, mangle = 1;
+  Repo *repo;
+  const char **names = solv_calloc(pool->nrepos, sizeof(char *));
+  FOR_REPOS(repoid, repo)
     {
-      Repo *repo = pool_id2repo(pool, repoid);
-      char *buf = solv_malloc((repo->name ? strlen(repo->name) : 0) + 40);
-      char *mp;
-      orignames[repoid] = repo->name;
+      char *buf, *mp;
+      buf = solv_malloc((repo->name ? strlen(repo->name) : 0) + 40);
       if (!repo->name || !repo->name[0])
         sprintf(buf, "#%d", repoid);
       else
 	strcpy(buf, repo->name);
-      for (i = 0; buf[i]; i++)
-	if (buf[i] == ' ' || buf[i] == '\t' || buf[i] == '/')
-	  buf[i] = '_';
-      mp = buf + strlen(buf);
+      for (mp = buf; *mp; mp++)
+	if (*mp == ' ' || *mp == '\t' || *mp == '/')
+	  *mp = '_';
       for (;;)
 	{
 	  for (i = 1; i < repoid; i++)
-	    if (!strcmp(buf, pool_id2repo(pool, i)->name))
+	    if (!strcmp(buf, names[i]))
 	      break;
 	  if (i == repoid)
 	    break;
           sprintf(mp, "_%d", mangle++);
 	}
-      repo->name = buf;
+      names[repoid] = buf;
     }
-  r = testcase_write_mangled(solv, dir, resultflags, testcasename, resultname);
-  for (repoid = 1; repoid < pool->nrepos; repoid++)
+  return names;
+}
+
+static void
+swap_repo_names(Pool *pool, const char **names)
+{
+  int repoid;
+  Repo *repo;
+  FOR_REPOS(repoid, repo)
     {
-      Repo *repo = pool_id2repo(pool, repoid);
-      solv_free((void *)repo->name);
-      repo->name = orignames[repoid];
+      const char *n = repo->name;
+      repo->name = names[repoid];
+      names[repoid] = n;
     }
-  solv_free(orignames);
+}
+
+int
+testcase_write(Solver *solv, const char *dir, int resultflags, const char *testcasename, const char *resultname)
+{
+  Pool *pool = solv->pool;
+  int r, repoid;
+  const char **names;
+
+  /* mangle repo names so that there are no conflicts */
+  names = testcase_mangle_repo_names(pool);
+  swap_repo_names(pool, names);
+  r = testcase_write_mangled(solv, dir, resultflags, testcasename, resultname);
+  swap_repo_names(pool, names);
+  for (repoid = 1; repoid < pool->nrepos; repoid++)
+    solv_free((void *)names[repoid]);
+  solv_free((void *)names);
   return r;
 }
 

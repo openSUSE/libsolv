@@ -67,6 +67,7 @@ SOLV_1.0 {
 		testcase_add_testtags;
 		testcase_dep2str;
 		testcase_job2str;
+		testcase_mangle_repo_names;
 		testcase_solvid2str;
 		testcase_str2dep;
 		testcase_str2job;
