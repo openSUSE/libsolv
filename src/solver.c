@@ -3205,7 +3205,7 @@ deduceq2addedmap(Solver *solv, Map *addedmap)
       if (p > 0)
 	MAPSET(addedmap, p);
       else
-	MAPCLR(addedmap, p);
+	MAPCLR(addedmap, -p);
     }
 }
 
