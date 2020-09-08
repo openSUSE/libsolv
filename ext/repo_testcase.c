@@ -432,23 +432,6 @@ testcase_write_testtags(Repo *repo, FILE *fp)
   Queue q;
 
   fprintf(fp, "=Ver: 3.0\n");
-  if (repo_lookup_type(repo, SOLVID_META, REPOSITORY_TESTCASE_META))
-   {
-     Dataiterator di;
-     dataiterator_init(&di, pool, repo, SOLVID_META, 0, 0, 0);
-     dataiterator_prepend_keyname(&di, REPOSITORY_TESTCASE_META);
-     while (dataiterator_step(&di))
-       {
-	 const char *value = repodata_stringify(pool, di.data, di.key, &di.kv, di.flags);
-	 if (!value)
-	   continue;
-	 if (strchr(value, '\n'))
-	   continue;
-	 fprintf(fp, "=Met: %s \"%s\"\n", pool_id2str(pool, di.key->name), value);
-       }
-     dataiterator_free(&di);
-   }
-
   queue_init(&q);
   FOR_REPO_SOLVABLES(repo, p, s)
     {
@@ -554,7 +537,6 @@ testcase_add_testtags(Repo *repo, FILE *fp, int flags)
   int nfilelist = 0;
   int tagsversion = 0;
   int addselfprovides = 1;	/* for compat reasons */
-  Id metah = 0;
 
   data = repo_add_repodata(repo, flags);
   s = 0;
@@ -628,19 +610,6 @@ testcase_add_testtags(Repo *repo, FILE *fp, int flags)
 	  s->evr = makeevr(pool, sp[1]);
 	  s->arch = strcmp(sp[3], "-") ? pool_str2id(pool, sp[3], 1) : 0;
 	  continue;
-	case 'M' << 16 | 'e' << 8 | 't':
-	  if (split(line + 5, sp, 2) != 2 || !sp[0][0])
-	    break;
-	  if (sp[1][0] != '"' || !sp[1][1] || sp[1][strlen(sp[1]) - 1] != '"')
-	    break;
-	  sp[1][strlen(sp[1]) - 1] = 0;
-	  if (!metah)
-	    {
-	      metah = repodata_new_handle(data);
-	      repodata_add_flexarray(data, SOLVID_META, REPOSITORY_TESTCASE_META, metah);
-	    }
-	  repodata_set_str(data, metah, pool_str2id(pool, sp[0], 1), sp[1] + 1);
-	  break;
 	default:
 	  break;
 	}

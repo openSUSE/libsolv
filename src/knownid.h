@@ -268,8 +268,6 @@ KNOWNID(LIBSOLV_SELF_DESTRUCT_PKG,      "libsolv-self-destruct-pkg()"),	/* this 
 KNOWNID(SOLVABLE_CONSTRAINS,		"solvable:constrains"),		/* conda */
 KNOWNID(SOLVABLE_TRACK_FEATURES,	"solvable:track_features"),	/* conda */
 
-KNOWNID(REPOSITORY_TESTCASE_META,	"repository:testcase:meta"),
-
 KNOWNID(ID_NUM_INTERNAL,		0)
 
 #ifdef KNOWNID_INITIALIZE
