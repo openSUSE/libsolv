@@ -1189,6 +1189,9 @@ rpmhead2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhe
       u32 = headint32(rpmhead, TAG_BUILDTIME);
       if (u32)
         repodata_set_num(data, handle, SOLVABLE_BUILDTIME, u32);
+      str = headstring(rpmhead, TAG_BUILDHOST);
+      if (str)
+	repodata_set_str(data, handle, SOLVABLE_BUILDHOST, str);
       u32 = headint32(rpmhead, TAG_INSTALLTIME);
       if (u32)
         repodata_set_num(data, handle, SOLVABLE_INSTALLTIME, u32);

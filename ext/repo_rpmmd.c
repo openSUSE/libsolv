@@ -96,6 +96,7 @@ enum state {
   STATE_FRESHENS,
   STATE_SOURCERPM,
   STATE_HEADERRANGE,
+  STATE_BUILDHOST,
 
   STATE_PROVIDESENTRY,
   STATE_REQUIRESENTRY,
@@ -196,6 +197,7 @@ static struct solv_xmlparser_element stateswitches[] = {
   { STATE_SOLVABLE,    "rpm:freshens",    STATE_FRESHENS,     0 },
   { STATE_SOLVABLE,    "rpm:sourcerpm",   STATE_SOURCERPM,    1 },
   { STATE_SOLVABLE,    "rpm:header-range", STATE_HEADERRANGE, 0 },
+  { STATE_SOLVABLE,    "rpm:buildhost",   STATE_BUILDHOST,    1 },
   { STATE_SOLVABLE,    "file",            STATE_FILE, 1 },
   { STATE_SOLVABLE,    "changelog",       STATE_CHANGELOG, 1 },
 
@@ -1035,6 +1037,10 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
     case STATE_PACKAGER:
       if (*content)
 	repodata_set_poolstr(pd->data, handle, SOLVABLE_PACKAGER, content);
+      break;
+    case STATE_BUILDHOST:
+      if (*content)
+	repodata_set_str(pd->data, handle, SOLVABLE_BUILDHOST, content);
       break;
     case STATE_SOURCERPM:
       if (*content)
