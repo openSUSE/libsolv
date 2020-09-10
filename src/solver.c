@@ -3240,7 +3240,7 @@ addedmap2deduceq(Solver *solv, Map *addedmap)
       p = -r->p;
       if (!MAPTST(addedmap, p))
 	{
-	  /* should never happen, but... */
+	  /* this can happen with complex dependencies that have more than one pos literal */
 	  if (!solv->addedmap_deduceq.count || solv->addedmap_deduceq.elements[solv->addedmap_deduceq.count - 1] != -p)
             queue_push(&solv->addedmap_deduceq, -p);
 	  continue;
