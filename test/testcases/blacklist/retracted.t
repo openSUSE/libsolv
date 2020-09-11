@@ -6,7 +6,7 @@ repo available 0 testtags <inline>
 #>=Pkg: B 2 1 noarch
 #>=Prv: retracted-patch-package()
 
-system i686 * system
+system unset * system
 
 job blacklist provides retracted-patch-package()
 job install name patch

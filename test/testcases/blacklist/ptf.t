@@ -9,7 +9,7 @@ repo available 0 testtags <inline>
 #>=Pkg: A 1 1 noarch
 #>=Req: ptf-1
 
-system i686 * system
+system unset * system
 
 #
 # test 1: a ptf package cannot be pulled in via a dependency
