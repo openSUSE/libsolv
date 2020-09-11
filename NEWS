@@ -2,6 +2,17 @@
 This file contains the major changes between
 libsolv versions:
 
+Version 0.7.15
+- selected bug fixes:
+  * fix deduceq2addedmap clearing bits outside of the map
+  * conda: feature depriorization first
+  * conda: fix startswith implementation
+  * move find_update_seeds() call in cleandeps calculation
+- new features:
+  * set SOLVABLE_BUILDHOST in rpm and rpmmd parsers
+  * new testcase_mangle_repo_names() function
+  * new solv_fmemopen() function
+
 Version 0.7.14
 - added support for ed25519 signatures
 - selected bug fixes:

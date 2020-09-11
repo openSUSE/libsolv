@@ -1,4 +1,16 @@
 -------------------------------------------------------------------
+Fri Sep 11 12:31:27 CEST 2020 - mls@suse.de
+
+- fix deduceq2addedmap clearing bits outside of the map
+- conda: feature depriorization first
+- conda: fix startswith implementation
+- move find_update_seeds() call in cleandeps calculation
+- set SOLVABLE_BUILDHOST in rpm and rpmmd parsers
+- new testcase_mangle_repo_names() function
+- new solv_fmemopen() function
+- bump version to 0.7.15
+
+-------------------------------------------------------------------
 Tue Jun 23 12:43:16 CEST 2020 - ma@suse.de
 
 - Enable zstd compression support for sle15
