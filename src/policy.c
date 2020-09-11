@@ -835,14 +835,21 @@ move_installed_to_front(Pool *pool, Queue *plist)
 
 #ifdef ENABLE_CONDA
 static int
-pool_buildversioncmp(Pool *pool, Solvable *s1, Solvable *s2)
+pool_featurecountcmp(Pool *pool, Solvable *s1, Solvable *s2)
 {
-  const char *bv1, *bv2;
   unsigned int cnt1, cnt2;
   cnt1 = solvable_lookup_count(s1, SOLVABLE_TRACK_FEATURES);
   cnt2 = solvable_lookup_count(s2, SOLVABLE_TRACK_FEATURES);
   if (cnt1 != cnt2)
     return cnt1 > cnt2 ? -1 : 1;
+  else
+    return 0;
+}
+
+static int
+pool_buildversioncmp(Pool *pool, Solvable *s1, Solvable *s2)
+{
+  const char *bv1, *bv2;
   bv1 = solvable_lookup_str(s1, SOLVABLE_BUILDVERSION);
   bv2 = solvable_lookup_str(s2, SOLVABLE_BUILDVERSION);
   if (!bv1 && !bv2)
@@ -903,7 +910,16 @@ prune_to_best_version(Pool *pool, Queue *plist)
           best = s;		/* take current as new best */
           continue;
         }
-      r = best->evr != s->evr ? pool_evrcmp(pool, best->evr, s->evr, EVRCMP_COMPARE) : 0;
+     
+      r = 0; 
+#ifdef ENABLE_CONDA
+      if (pool->disttype == DISTTYPE_CONDA)
+	{
+          r = pool_featurecountcmp(pool, best, s);
+	}
+#endif
+      if (r == 0)
+        r = best->evr != s->evr ? pool_evrcmp(pool, best->evr, s->evr, EVRCMP_COMPARE) : 0;
 #ifdef ENABLE_LINKED_PKGS
       if (r == 0 && has_package_link(pool, s))
         r = pool_link_evrcmp(pool, best, s);
