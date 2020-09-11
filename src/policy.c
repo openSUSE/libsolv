@@ -840,10 +840,7 @@ pool_featurecountcmp(Pool *pool, Solvable *s1, Solvable *s2)
   unsigned int cnt1, cnt2;
   cnt1 = solvable_lookup_count(s1, SOLVABLE_TRACK_FEATURES);
   cnt2 = solvable_lookup_count(s2, SOLVABLE_TRACK_FEATURES);
-  if (cnt1 != cnt2)
-    return cnt1 > cnt2 ? -1 : 1;
-  else
-    return 0;
+  return cnt1 == cnt2 ? 0 : cnt1 > cnt2 ? -1 : 1;
 }
 
 static int
@@ -914,9 +911,7 @@ prune_to_best_version(Pool *pool, Queue *plist)
       r = 0; 
 #ifdef ENABLE_CONDA
       if (pool->disttype == DISTTYPE_CONDA)
-	{
-          r = pool_featurecountcmp(pool, best, s);
-	}
+        r = pool_featurecountcmp(pool, best, s);
 #endif
       if (r == 0)
         r = best->evr != s->evr ? pool_evrcmp(pool, best->evr, s->evr, EVRCMP_COMPARE) : 0;
