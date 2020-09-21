@@ -113,6 +113,7 @@ struct parsedata {
   Id pkghandle;
   struct solv_xmlparser xmlp;
   struct joindata jd;
+  Id collhandle;
 };
 
 /*
@@ -201,6 +202,112 @@ makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
   return pool_str2id(pool, space, 1);
 }
 
+/*
+ * create nevra (as Id) from 'name', 'epoch:version-release' and 'arch'
+ */
+static Id
+make_nevra(Pool *pool, struct parsedata *pd, Id name, Id epochversionrelease, Id arch)
+{
+  const char *n, *evr, *a;
+  char *nevra_tmp, *nevra;
+  int l = 0;
+
+  n = pool_id2str(pool, name);
+  evr = pool_id2str(pool, epochversionrelease);
+  a = pool_id2str(pool, arch);
+
+
+  if (n)
+      l += strlen(n) + 1;
+  if (evr)
+      l += strlen(evr) + 1;
+  if (a)
+      l += strlen(a) + 1;
+
+  nevra_tmp = nevra = solv_xmlparser_contentspace(&pd->xmlp, l);
+
+  if (n)
+   {
+       strcpy(nevra_tmp, n);
+       nevra_tmp += strlen(n);
+   }
+  if (evr)
+   {
+       *nevra_tmp++ = '-';
+       strcpy(nevra_tmp, evr);
+       nevra_tmp += strlen(evr);
+   }
+  if (a)
+   {
+       *nevra_tmp++ = '.';
+       strcpy(nevra_tmp, a);
+       nevra_tmp += strlen(a);
+   }
+  *nevra_tmp = 0;
+  if (!*nevra)
+      return 0;
+
+  return pool_str2id(pool, nevra, 1);
+}
+
+/*
+ * create nsvca (as Id) from 'name', 'stream', 'version', 'context' and 'arch'
+ */
+static Id
+make_nsvca(Pool *pool, struct parsedata *pd, const char* n, const char* s, const char* v, const char* c, const char* a)
+{
+  char *nsvca_tmp, *nsvca;
+  int l = 0;
+
+  if (n)
+      l += strlen(n) + 1;
+  if (s)
+      l += strlen(s) + 1;
+  if (v)
+      l += strlen(v) + 1;
+  if (c)
+      l += strlen(c) + 1;
+  if (a)
+      l += strlen(a) + 1;
+
+  nsvca_tmp = nsvca = solv_xmlparser_contentspace(&pd->xmlp, l);
+
+  if (n)
+   {
+       strcpy(nsvca_tmp, n);
+       nsvca_tmp += strlen(n);
+   }
+  if (s)
+   {
+       *nsvca_tmp++ = ':';
+       strcpy(nsvca_tmp, s);
+       nsvca_tmp += strlen(s);
+   }
+  if (v)
+   {
+       *nsvca_tmp++ = ':';
+       strcpy(nsvca_tmp, v);
+       nsvca_tmp += strlen(v);
+   }
+  if (c)
+   {
+       *nsvca_tmp++ = ':';
+       strcpy(nsvca_tmp, c);
+       nsvca_tmp += strlen(c);
+   }
+  if (a)
+   {
+       *nsvca_tmp++ = ':';
+       strcpy(nsvca_tmp, a);
+       nsvca_tmp += strlen(a);
+   }
+
+  *nsvca_tmp = 0;
+  if (!*nsvca)
+      return 0;
+
+  return pool_str2id(pool, nsvca, 1);
+}
 
 
 static void
@@ -287,6 +394,12 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
       }
       break;
 
+    case STATE_COLLECTION:
+      {
+        pd->collhandle = repodata_new_handle(pd->data);
+      }
+      break;
+
       /*   <package arch="ppc64" name="imlib-debuginfo" release="6.fc8"
        *            src="http://download.fedoraproject.org/pub/fedora/linux/updates/8/ppc64/imlib-debuginfo-1.9.15-6.fc8.ppc64.rpm"
        *            version="1.9.15">
@@ -332,7 +445,8 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
 	repodata_set_id(pd->data, pd->pkghandle, UPDATE_COLLECTION_EVR, evr);
 	if (a)
 	  repodata_set_id(pd->data, pd->pkghandle, UPDATE_COLLECTION_ARCH, a);
-        break;
+    repodata_add_idarray(pd->data, pd->collhandle, UPDATE_COLLECTION, make_nevra(pool, pd, n, evr, a));
+    break;
       }
     case STATE_MODULE:
       {
@@ -364,6 +478,7 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
         if (arch)
           repodata_set_poolstr(pd->data, module_handle, UPDATE_MODULE_ARCH, arch);
         repodata_add_flexarray(pd->data, pd->handle, UPDATE_MODULE, module_handle);
+        repodata_add_idarray(pd->data, pd->collhandle, UPDATE_MODULE, make_nsvca(pool, pd, name, stream, version, context, arch));
         break;
       }
 
@@ -425,6 +540,11 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
        */
     case STATE_MESSAGE:
       repodata_set_str(pd->data, pd->handle, UPDATE_MESSAGE, content);
+      break;
+
+    case STATE_COLLECTION:
+      repodata_add_flexarray(pd->data, pd->handle, UPDATE_COLLECTIONLIST, pd->collhandle);
+      pd->collhandle = 0;
       break;
 
     case STATE_PACKAGE:
