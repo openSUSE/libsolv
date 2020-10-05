@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Mon Oct  5 13:06:44 CEST 2020 - mls@suse.de
+
+- make testcase_mangle_repo_names deal correctly with freed repos
+  [bnc#1177238]
+
+-------------------------------------------------------------------
 Fri Sep 11 12:31:27 CEST 2020 - mls@suse.de
 
 - fix deduceq2addedmap clearing bits outside of the map
