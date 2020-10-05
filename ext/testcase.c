@@ -1826,14 +1826,12 @@ testcase_mangle_repo_names(Pool *pool)
       for (mp = buf; *mp; mp++)
 	if (*mp == ' ' || *mp == '\t' || *mp == '/')
 	  *mp = '_';
-      for (;;)
-	{
-	  for (i = 1; i < repoid; i++)
-	    if (!strcmp(buf, names[i]))
-	      break;
-	  if (i == repoid)
-	    break;
+      for (i = 1; i < repoid; i++)
+        {
+	  if (!names[i] || strcmp(buf, names[i]) != 0)
+	    continue;
           sprintf(mp, "_%d", mangle++);
+	  i = 0;	/* restart conflict check */
 	}
       names[repoid] = buf;
     }
