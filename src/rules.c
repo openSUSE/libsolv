@@ -3187,6 +3187,44 @@ solver_choicerulecheck(Solver *solv, Id pi, Rule *r, Map *m, Queue *q)
   return 1;	/* none of the new packages provided it */
 }
 
+static int
+solver_choicerulecheck2(Solver *solv, Id pi, Id pt, Queue *q)
+{
+  Pool *pool = solv->pool;
+  Rule *ur;
+  Id p, pp;
+  int i;
+
+  if (!q->count || q->elements[0] != pi)
+    {
+      if (q->count)
+        queue_empty(q);
+      ur = solv->rules + solv->updaterules + (pi - pool->installed->start);
+      if (!ur->p)
+        ur = solv->rules + solv->featurerules + (pi - pool->installed->start);
+      if (!ur->p)
+	return 0;
+      queue_push2(q, pi, 0);
+      FOR_RULELITERALS(p, pp, ur)
+	if (p > 0 && p != pi)
+	  queue_push(q, p);
+      queue_push(q, pi);
+    }
+  if (q->count <= 3)
+    return q->count == 3 && q->elements[2] == pt ? 1 : 0;
+  if (!q->elements[1])
+    {
+      queue_deleten(q, 0, 2);
+      policy_filter_unwanted(solv, q, POLICY_MODE_CHOOSE);
+      queue_unshift(q, 1);	/* filter mark */
+      queue_unshift(q, pi);
+    }
+  for (i = 2; i < q->count; i++)
+    if (q->elements[i] == pt)
+      return 1;
+  return 0;	/* not newest */
+}
+
 static inline void
 queue_removeelement(Queue *q, Id el)
 {
@@ -3251,13 +3289,14 @@ solver_addchoicerules(Solver *solv)
   Pool *pool = solv->pool;
   Map m, mneg;
   Rule *r;
-  Queue q, qi, qcheck, infoq;
+  Queue q, qi, qcheck, qcheck2, infoq;
   int i, j, rid, havechoice, negcnt;
   Id p, d, pp, p2;
   Solvable *s;
   Id lastaddedp, lastaddedd;
   int lastaddedcnt;
   unsigned int now;
+  int isnewest = 0;
 
   solv->choicerules = solv->nrules;
   if (!pool->installed)
@@ -3270,6 +3309,7 @@ solver_addchoicerules(Solver *solv)
   queue_init(&q);
   queue_init(&qi);
   queue_init(&qcheck);
+  queue_init(&qcheck2);
   queue_init(&infoq);
   map_init(&m, pool->nsolvables);
   map_init(&mneg, pool->nsolvables);
@@ -3301,6 +3341,7 @@ solver_addchoicerules(Solver *solv)
 	    continue;
 	  if (s->repo == pool->installed)
 	    {
+	      queue_push2(&qi, p, p);
 	      queue_push(&q, p);
 	      continue;
 	    }
@@ -3319,6 +3360,9 @@ solver_addchoicerules(Solver *solv)
 	  /* package p is independent of the installed ones */
 	  havechoice = 1;
 	}
+#if 0
+      printf("havechoice: %d qcount %d qicount %d\n", havechoice, q.count, qi.count);
+#endif
       if (!havechoice || !q.count || !qi.count)
 	continue;	/* no choice */
 
@@ -3326,13 +3370,25 @@ solver_addchoicerules(Solver *solv)
         if (p > 0)
 	  MAPSET(&m, p);
 
+      isnewest = 1;
+      FOR_RULELITERALS(p, pp, r)
+	{
+	  if (p > 0)
+	    break;
+	  p2 = choicerule_find_installed(pool, -p);
+	  if (p2 && !solver_choicerulecheck2(solv, p2, -p, &qcheck2))
+	    {
+	      isnewest = 0;
+	      break;
+	    }
+	}
       /* do extra checking */
       for (i = j = 0; i < qi.count; i += 2)
 	{
 	  p2 = qi.elements[i];
 	  if (!p2)
 	    continue;
-	  if (solver_choicerulecheck(solv, p2, r, &m, &qcheck))
+	  if (isnewest && solver_choicerulecheck(solv, p2, r, &m, &qcheck))
 	    {
 	      /* oops, remove element p from q */
 	      queue_removeelement(&q, qi.elements[i + 1]);
@@ -3426,6 +3482,7 @@ solver_addchoicerules(Solver *solv)
   queue_free(&q);
   queue_free(&qi);
   queue_free(&qcheck);
+  queue_free(&qcheck2);
   queue_free(&infoq);
   map_free(&m);
   map_free(&mneg);
