@@ -3203,6 +3203,48 @@ queue_removeelement(Queue *q, Id el)
     }
 }
 
+static Id
+choicerule_find_installed(Pool *pool, Id p)
+{
+  Solvable *s = pool->solvables + p;
+  Id p2, pp2;
+
+  if (!s->repo)
+    return 0;
+  if (s->repo == pool->installed)
+    return p;
+  FOR_PROVIDES(p2, pp2, s->name)
+    {
+      Solvable *s2 = pool->solvables + p2;
+      if (s2->repo != pool->installed)
+	continue;
+      if (!pool->implicitobsoleteusesprovides && s->name != s2->name)
+	continue;
+      if (pool->implicitobsoleteusescolors && !pool_colormatch(pool, s, s2))
+	continue;
+      return p2;
+    }
+  if (s->obsoletes)
+    {
+      Id obs, *obsp = s->repo->idarraydata + s->obsoletes;
+      while ((obs = *obsp++) != 0)
+	{
+	  FOR_PROVIDES(p2, pp2, obs)
+	    {
+	      Solvable *s2 = pool->solvables + p2;
+	      if (s2->repo != pool->installed)
+		continue;
+	      if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p2, obs))
+		continue;
+	      if (pool->obsoleteusescolors && !pool_colormatch(pool, s, s2))
+		continue;
+	      return p2;
+	    }
+	}
+    }
+  return 0;
+}
+
 void
 solver_addchoicerules(Solver *solv)
 {
@@ -3211,9 +3253,8 @@ solver_addchoicerules(Solver *solv)
   Rule *r;
   Queue q, qi, qcheck, infoq;
   int i, j, rid, havechoice, negcnt;
-  Id p, d, pp;
-  Id p2, pp2;
-  Solvable *s, *s2;
+  Id p, d, pp, p2;
+  Solvable *s;
   Id lastaddedp, lastaddedd;
   int lastaddedcnt;
   unsigned int now;
@@ -3263,73 +3304,17 @@ solver_addchoicerules(Solver *solv)
 	      queue_push(&q, p);
 	      continue;
 	    }
-	  /* check if this package is "blocked" by a installed package */
-	  s2 = 0;
-	  FOR_PROVIDES(p2, pp2, s->name)
-	    {
-	      s2 = pool->solvables + p2;
-	      if (s2->repo != pool->installed)
-		continue;
-	      if (!pool->implicitobsoleteusesprovides && s->name != s2->name)
-	        continue;
-	      if (pool->implicitobsoleteusescolors && !pool_colormatch(pool, s, s2))
-	        continue;
-	      break;
-	    }
+	  /* find an installed package p2 that we can update/downgrade to p */
+	  p2 = choicerule_find_installed(pool, p);
 	  if (p2)
 	    {
-	      /* found installed package p2 that we can update to p */
 	      if (MAPTST(&mneg, p))
 		continue;
-	      if (policy_is_illegal(solv, s2, s, 0))
+	      if (policy_is_illegal(solv, pool->solvables + p2, s, 0))
 		continue;
-#if 0
-	      if (solver_choicerulecheck(solv, p2, r, &m))
-		continue;
-	      queue_push(&qi, p2);
-#else
 	      queue_push2(&qi, p2, p);
-#endif
 	      queue_push(&q, p);
 	      continue;
-	    }
-	  if (s->obsoletes)
-	    {
-	      Id obs, *obsp = s->repo->idarraydata + s->obsoletes;
-	      s2 = 0;
-	      while ((obs = *obsp++) != 0)
-		{
-		  FOR_PROVIDES(p2, pp2, obs)
-		    {
-		      s2 = pool->solvables + p2;
-		      if (s2->repo != pool->installed)
-			continue;
-		      if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, pool->solvables + p2, obs))
-			continue;
-		      if (pool->obsoleteusescolors && !pool_colormatch(pool, s, s2))
-			continue;
-		      break;
-		    }
-		  if (p2)
-		    break;
-		}
-	      if (obs)
-		{
-		  /* found installed package p2 that we can update to p */
-		  if (MAPTST(&mneg, p))
-		    continue;
-		  if (policy_is_illegal(solv, s2, s, 0))
-		    continue;
-#if 0
-		  if (solver_choicerulecheck(solv, p2, r, &m))
-		    continue;
-		  queue_push(&qi, p2);
-#else
-		  queue_push2(&qi, p2, p);
-#endif
-		  queue_push(&q, p);
-		  continue;
-		}
 	    }
 	  /* package p is independent of the installed ones */
 	  havechoice = 1;
