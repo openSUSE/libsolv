@@ -263,6 +263,11 @@ export NO_BRP_STRIP_DEBUG=true
 %endif
 
 %check
+%if %{with shared}
+# The test suite doesn't automatically know to look at the "built"
+# library, so we force it by creating an LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=%{buildroot}%{_libdir}
+%endif
 make ARGS=--output-on-failure test
 
 %if %{with shared}
