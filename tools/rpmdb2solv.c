@@ -41,8 +41,9 @@ static void
 usage(int status)
 {
   fprintf(stderr, "\nUsage:\n"
-	  "rpmdb2solv [-P] [-C] [-n] [-b <basefile>] [-p <productsdir>] [-r <root>]\n"
+	  "rpmdb2solv [-P] [-C] [-n] [H] [-b <basefile>] [-p <productsdir>] [-r <root>]\n"
 	  " -n : No packages, do not read rpmdb, useful to only parse products\n"
+	  " -H : use rpmdb in user's home directory\n"
 	  " -p <productsdir> : Scan <productsdir> for .prod files, representing installed products\n"
 	  " -r <root> : Prefix rpmdb path and <productsdir> with <root>\n"
 	  " -o <solv> : Write .solv to file instead of stdout\n"
@@ -63,6 +64,7 @@ main(int argc, char **argv)
   int c, percent = 0;
   int nopacks = 0;
   int add_changelog = 0;
+  int homedir = 0;
   const char *root = 0;
   const char *refname = 0;
 #ifdef ENABLE_SUSEREPO
@@ -83,7 +85,7 @@ main(int argc, char **argv)
    * parse arguments
    */
   
-  while ((c = getopt(argc, argv, "ACPhnkxXr:p:o:")) >= 0)
+  while ((c = getopt(argc, argv, "ACPhnHkxXr:p:o:")) >= 0)
     switch (c)
       {
       case 'h':
@@ -127,6 +129,9 @@ main(int argc, char **argv)
       case 'C':
 	add_changelog = 1;
 	break;
+      case 'H':
+        homedir = 1;
+        break;
       default:
 	usage(1);
       }
@@ -171,6 +176,8 @@ main(int argc, char **argv)
 	flags |= RPMDB_REPORT_PROGRESS;
       if (add_changelog)
 	flags |= RPM_ADD_WITH_CHANGELOG;
+      if (homedir)
+        flags |= RPMDB_USE_HOMEDIR;
       if (repo_add_rpmdb_reffp(repo, reffp, flags))
 	{
 	  fprintf(stderr, "rpmdb2solv: %s\n", pool_errstr(pool));
