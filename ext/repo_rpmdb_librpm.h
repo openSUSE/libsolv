@@ -21,6 +21,8 @@ struct rpmdbstate {
 
   RpmHead *rpmhead;	/* header storage space */
   unsigned int rpmheadsize;
+  int use_homedir;	/* force usage of private rpmdb in home dir */
+  int open_home_rpmdb;	/* internal; tracks rpmdb in homedir usage */
 
   int dbenvopened;	/* database environment opened */
   const char *dbpath;	/* path to the database */
@@ -45,9 +47,28 @@ access_rootdir(struct rpmdbstate *state, const char *dir, int mode)
 static void
 detect_dbpath(struct rpmdbstate *state)
 {
+
+  char *dbpath_prefix = solv_dupjoin(state->rootdir, "/", 0);
+
   state->dbpath = access_rootdir(state, "/var/lib/rpm", W_OK) == -1
                   && (access_rootdir(state, "/usr/share/rpm/Packages", R_OK) == 0 || access_rootdir(state, "/usr/share/rpm/rpmdb.sqlite", R_OK) == 0)
                   ? "/usr/share/rpm" : "/var/lib/rpm";
+
+  if (state->open_home_rpmdb)
+    {
+      char *home_dir = get_homedir();
+
+      if (home_dir)
+        {
+          state->dbpath = solv_dupjoin(dbpath_prefix, home_dir, "/.rpmdb/");
+
+          solv_free(home_dir);
+          home_dir = NULL;
+        }
+    }
+
+  solv_free(dbpath_prefix);
+  dbpath_prefix = NULL;
 }
 
 static int

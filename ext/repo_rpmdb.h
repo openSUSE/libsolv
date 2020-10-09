@@ -27,6 +27,7 @@ extern Id repo_add_rpm(Repo *repo, const char *rpm, int flags);
 #define RPM_ADD_WITH_CHANGELOG	(1 << 17)
 #define RPM_ADD_FILTERED_FILELIST (1 << 18)
 #define RPMDB_KEEP_GPG_PUBKEY   (1 << 19)
+#define RPMDB_USE_HOMEDIR	(1 << 20)
 
 #define RPMDB_EMPTY_REFREPO	(1 << 30)	/* internal */
 
@@ -35,8 +36,14 @@ extern Id repo_add_rpm(Repo *repo, const char *rpm, int flags);
 #define RPM_ITERATE_FILELIST_WITHCOL	(1 << 2)
 #define RPM_ITERATE_FILELIST_NOGHOSTS	(1 << 3)
 
-/* create and free internal state, rootdir is the rootdir of the rpm database */
+/*
+ * create and free internal state, rootdir is the rootdir of the rpm database
+ * and use_homedir a boolean value that prefers a rpmdb located the user's home directory
+ * instead of the system locations, but will fall back to the latter if there is no
+ * database in the user's home directory
+ */
 extern void *rpm_state_create(Pool *pool, const char *rootdir);
+extern void *rpm_state_create_real(Pool *pool, const char *rootdir, int use_homedir);
 extern void *rpm_state_free(void *rpmstate);
 
 /* return all matching rpmdbids */

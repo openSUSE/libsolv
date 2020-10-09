@@ -54,6 +54,7 @@ SOLV_1.0 {
 		rpm_query_num;
 		rpm_stat_database;
 		rpm_state_create;
+		rpm_state_create_real;
 		rpm_state_free;
 		solv_fmemopen;
 		solv_verify_sig;

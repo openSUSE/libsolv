@@ -23,6 +23,7 @@
 #include <assert.h>
 #include <stdint.h>
 #include <errno.h>
+#include <pwd.h>
 
 #ifdef ENABLE_RPMDB
 
@@ -1228,6 +1229,55 @@ getu32(const unsigned char *dp)
   return dp[0] << 24 | dp[1] << 16 | dp[2] << 8 | dp[3];
 }
 
+static char *
+get_homedir(void)
+{
+  char *home_dir = NULL;
+
+  const char *home_env = getenv("HOME");
+
+  if (home_env)
+    {
+      home_dir = solv_strdup(home_env);
+    }
+  else
+    {
+      /* HOME unset, try password database. */
+      struct passwd pwd = { 0 };
+      struct passwd *pwd_res = NULL;
+      char *buf = NULL;
+      long buf_size = sysconf(_SC_GETPW_R_SIZE_MAX);
+
+      if (-1 == buf_size)
+        {
+          buf_size = 32768;
+        }
+
+      buf = solv_calloc(1, buf_size);
+
+      if (buf)
+        {
+          int ret = getpwuid_r(getuid(), &pwd, buf, buf_size, &pwd_res);
+
+          /*
+           * No pwd_res can either mean that the user ID is unknown
+           * to the system or some other type of error occurred.
+           * Whatever the case, we do not distinguish here, but just
+           * treat it as a common failure.
+           */
+          if ((!ret) && (pwd_res) && (pwd.pw_dir))
+            {
+              home_dir = solv_strdup(pwd.pw_dir);
+            }
+
+          solv_free(buf);
+          buf = NULL;
+        }
+    }
+
+  return home_dir;
+}
+
 #ifdef ENABLE_RPMDB
 
 struct rpmdbentry {
@@ -1253,6 +1303,8 @@ struct rpmdbstate {
 
   RpmHead *rpmhead;	/* header storage space */
   unsigned int rpmheadsize;
+  int use_homedir;	/* force usage of private rpmdb in home dir */
+  int open_home_rpmdb;	/* internal; tracks rpmdb in homedir usage */
 };
 
 #endif
@@ -1358,11 +1410,19 @@ freestate(struct rpmdbstate *state)
 void *
 rpm_state_create(Pool *pool, const char *rootdir)
 {
+  return rpm_state_create_real(pool, rootdir, 0);
+}
+
+void *
+rpm_state_create_real(Pool *pool, const char *rootdir, int use_homedir)
+{
   struct rpmdbstate *state;
   state = solv_calloc(1, sizeof(*state));
   state->pool = pool;
   if (rootdir)
     state->rootdir = solv_strdup(rootdir);
+  state->use_homedir = !!use_homedir;
+  state->open_home_rpmdb = 0;
   return state;
 }
 
@@ -1604,6 +1664,9 @@ repo_add_rpmdb(Repo *repo, Repo *ref, int flags)
   state.pool = pool;
   if (flags & REPO_USE_ROOTDIR)
     state.rootdir = solv_strdup(pool_get_rootdir(pool));
+
+  state.use_homedir = flags & RPMDB_USE_HOMEDIR;
+  state.open_home_rpmdb = 0;
 
   data = repo_add_repodata(repo, flags);
 
