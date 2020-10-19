@@ -1198,7 +1198,7 @@ createbranch(Solver *solv, int level, Queue *dq, Id p, Id data)
   int i;
   IF_POOLDEBUG (SOLV_DEBUG_POLICY)
     {
-      POOL_DEBUG (SOLV_DEBUG_POLICY, "creating a branch:\n");
+      POOL_DEBUG (SOLV_DEBUG_POLICY, "creating a branch [data=%d]:\n", data);
       for (i = 0; i < dq->count; i++)
 	POOL_DEBUG (SOLV_DEBUG_POLICY, "  - %s\n", pool_solvid2str(pool, dq->elements[i]));
     }
@@ -1218,7 +1218,7 @@ takebranch(Solver *solv, int pos, int end, const char *msg, int disablerules)
 #if 0
   {
     int i;
-    printf("branch group level %d [%d-%d] %d %d:\n", solv->branches.elements[end - 1], start, end, solv->branches.elements[end - 4], solv->branches.elements[end - 3]);
+    printf("branch group level %d [%d-%d] %d %d:\n", solv->branches.elements[end - 1], end - solv->branches.elements[end - 2], end, solv->branches.elements[end - 4], solv->branches.elements[end - 3]);
     for (i = end - solv->branches.elements[end - 2]; i < end - 4; i++)
       printf("%c %c%s\n", i == pos ? 'x' : ' ', solv->branches.elements[i] >= 0 ? ' ' : '-', pool_solvid2str(pool, solv->branches.elements[i] >= 0 ? solv->branches.elements[i] : -solv->branches.elements[i]));
   }
@@ -2089,6 +2089,8 @@ add_complex_recommends(Solver *solv, Id rec, Queue *dq, Map *dqmap)
 	      queue_truncate(dq, blkcnt);
 	      break;
 	    }
+	  if (solv->decisionmap[p] < 0)
+	    continue;
 	  if (dqmap)
 	    {
 	      if (!MAPTST(dqmap, p))
@@ -2096,8 +2098,6 @@ add_complex_recommends(Solver *solv, Id rec, Queue *dq, Map *dqmap)
 	    }
 	  else
 	    {
-	      if (solv->decisionmap[p] < 0)
-		continue;
 	      if (solv->process_orphans && solv->installed && pool->solvables[p].repo == solv->installed && (solv->droporphanedmap_all || (solv->droporphanedmap.size && MAPTST(&solv->droporphanedmap, p - solv->installed->start))))
 		continue;
 	    }
