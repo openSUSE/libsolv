@@ -2,6 +2,16 @@
 This file contains the major changes between
 libsolv versions:
 
+Version 0.7.16
+- selected bug fixes:
+  * do not ask the namespace callback for splitprovides when writing
+    a testcase
+  * fix add_complex_recommends() selecting conflicted packages in
+    rare cases leading to crashes
+  * improve choicerule generation so that package updates are
+    prefered in more cases
+  * deal with missing repos in testcase_mangle_repo_names
+
 Version 0.7.15
 - selected bug fixes:
   * fix deduceq2addedmap clearing bits outside of the map

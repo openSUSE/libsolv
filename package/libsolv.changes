@@ -1,4 +1,15 @@
 -------------------------------------------------------------------
+Tue Oct 20 12:04:00 CEST 2020 - mls@suse.de
+
+- do not ask the namespace callback for splitprovides when writing
+  a testcase
+- fix add_complex_recommends() selecting conflicted packages in
+  rare cases leading to crashes
+- improve choicerule generation so that package updates are
+  prefered in more cases
+- bump version to 0.7.16
+
+-------------------------------------------------------------------
 Mon Oct  5 13:06:44 CEST 2020 - mls@suse.de
 
 - make testcase_mangle_repo_names deal correctly with freed repos
