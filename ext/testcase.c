@@ -1711,7 +1711,7 @@ testcase_write_mangled(Solver *solv, const char *dir, int resultflags, const cha
       for (rid = 1; rid < pool->nrels; rid++)
 	{
 	  Reldep *rd = pool->rels + rid;
-	  if (rd->flags != REL_NAMESPACE || rd->name == NAMESPACE_OTHERPROVIDERS)
+	  if (rd->flags != REL_NAMESPACE || rd->name == NAMESPACE_OTHERPROVIDERS || rd->name == NAMESPACE_SPLITPROVIDES)
 	    continue;
 	  /* evaluate all namespace ids, skip empty results */
 	  d = pool_whatprovides(pool, MAKERELDEP(rid));
