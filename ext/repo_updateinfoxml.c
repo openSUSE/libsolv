@@ -110,9 +110,10 @@ struct parsedata {
   Id handle;
   Solvable *solvable;
   time_t buildtime;
-  Id collhandle;
+  Id pkghandle;
   struct solv_xmlparser xmlp;
   struct joindata jd;
+  Id collhandle;
 };
 
 /*
@@ -287,6 +288,12 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
       }
       break;
 
+    case STATE_COLLECTION:
+      {
+        pd->collhandle = repodata_new_handle(pd->data);
+      }
+      break;
+
       /*   <package arch="ppc64" name="imlib-debuginfo" release="6.fc8"
        *            src="http://download.fedoraproject.org/pub/fedora/linux/updates/8/ppc64/imlib-debuginfo-1.9.15-6.fc8.ppc64.rpm"
        *            version="1.9.15">
@@ -326,12 +333,12 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
 	    solvable->conflicts = repo_addid_dep(pd->repo, solvable->conflicts, id, 0);
 	  }
 
-        /* who needs the collection anyway? */
-        pd->collhandle = repodata_new_handle(pd->data);
-	repodata_set_id(pd->data, pd->collhandle, UPDATE_COLLECTION_NAME, n);
-	repodata_set_id(pd->data, pd->collhandle, UPDATE_COLLECTION_EVR, evr);
+        /* UPDATE_COLLECTION is misnamed, it should have been UPDATE_PACKAGE */
+        pd->pkghandle = repodata_new_handle(pd->data);
+	repodata_set_id(pd->data, pd->pkghandle, UPDATE_COLLECTION_NAME, n);
+	repodata_set_id(pd->data, pd->pkghandle, UPDATE_COLLECTION_EVR, evr);
 	if (a)
-	  repodata_set_id(pd->data, pd->collhandle, UPDATE_COLLECTION_ARCH, a);
+	  repodata_set_id(pd->data, pd->pkghandle, UPDATE_COLLECTION_ARCH, a);
         break;
       }
     case STATE_MODULE:
@@ -364,6 +371,7 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
         if (arch)
           repodata_set_poolstr(pd->data, module_handle, UPDATE_MODULE_ARCH, arch);
         repodata_add_flexarray(pd->data, pd->handle, UPDATE_MODULE, module_handle);
+        repodata_add_flexarray(pd->data, pd->collhandle, UPDATE_MODULE, module_handle);
         break;
       }
 
@@ -427,15 +435,21 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
       repodata_set_str(pd->data, pd->handle, UPDATE_MESSAGE, content);
       break;
 
-    case STATE_PACKAGE:
-      repodata_add_flexarray(pd->data, pd->handle, UPDATE_COLLECTION, pd->collhandle);
+    case STATE_COLLECTION:
+      repodata_add_flexarray(pd->data, pd->handle, UPDATE_COLLECTIONLIST, pd->collhandle);
       pd->collhandle = 0;
+      break;
+
+    case STATE_PACKAGE:
+      repodata_add_flexarray(pd->data, pd->handle, UPDATE_COLLECTION, pd->pkghandle);
+      repodata_add_flexarray(pd->data, pd->collhandle, UPDATE_COLLECTION, pd->pkghandle);
+      pd->pkghandle = 0;
       break;
 
       /* <filename>libntlm-0.4.2-1.fc8.x86_64.rpm</filename> */
       /* <filename>libntlm-0.4.2-1.fc8.x86_64.rpm</filename> */
     case STATE_FILENAME:
-      repodata_set_str(pd->data, pd->collhandle, UPDATE_COLLECTION_FILENAME, content);
+      repodata_set_str(pd->data, pd->pkghandle, UPDATE_COLLECTION_FILENAME, content);
       break;
 
       /* <reboot_suggested>True</reboot_suggested> */
@@ -444,7 +458,7 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
 	{
 	  /* FIXME: this is per-package, the global flag should be computed at runtime */
 	  repodata_set_void(pd->data, pd->handle, UPDATE_REBOOT);
-	  repodata_set_void(pd->data, pd->collhandle, UPDATE_REBOOT);
+	  repodata_set_void(pd->data, pd->pkghandle, UPDATE_REBOOT);
 	}
       break;
 
@@ -454,7 +468,7 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
 	{
 	  /* FIXME: this is per-package, the global flag should be computed at runtime */
 	  repodata_set_void(pd->data, pd->handle, UPDATE_RESTART);
-	  repodata_set_void(pd->data, pd->collhandle, UPDATE_RESTART);
+	  repodata_set_void(pd->data, pd->pkghandle, UPDATE_RESTART);
 	}
       break;
 
@@ -464,7 +478,7 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
 	{
 	  /* FIXME: this is per-package, the global flag should be computed at runtime */
 	  repodata_set_void(pd->data, pd->handle, UPDATE_RELOGIN);
-	  repodata_set_void(pd->data, pd->collhandle, UPDATE_RELOGIN);
+	  repodata_set_void(pd->data, pd->pkghandle, UPDATE_RELOGIN);
 	}
       break;
     default:
