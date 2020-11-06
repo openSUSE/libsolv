@@ -570,25 +570,29 @@ collect_needed_cb(void *vcbdata, Solvable *s, Repodata *data, Repokey *key, KeyV
 	break;
       case REPOKEY_TYPE_FIXARRAY:
       case REPOKEY_TYPE_FLEXARRAY:
-	if (kv->entry == 0)
+	if (kv->entry)
 	  {
-	    if (kv->eof != 2)
-	      *cbdata->sp++ = 0;	/* mark start */
-	  }
-	else
-	  {
-	    /* just finished a schema, rewind to start */
+	    /* finish schema, rewind to start */
 	    Id *sp = cbdata->sp - 1;
 	    *sp = 0;
 	    while (sp[-1])
 	      sp--;
-	    if (kv->entry == 1 || key->type == REPOKEY_TYPE_FLEXARRAY)
+	    if (sp[-2] >= 0)
+	      cbdata->subschemata[sp[-2]] = repodata_schema2id(cbdata->target, sp, 1);
+	    cbdata->sp = sp - 2;
+	  }
+	if (kv->eof != 2)
+	  {
+	    /* start new schema */
+	    if (kv->entry == 0 || key->type == REPOKEY_TYPE_FLEXARRAY)
 	      {
 		cbdata->subschemata = solv_extend(cbdata->subschemata, cbdata->nsubschemata, 1, sizeof(Id), SCHEMATA_BLOCK);
-		cbdata->subschemata[cbdata->nsubschemata++] = repodata_schema2id(cbdata->target, sp, 1);
+		*cbdata->sp++ = cbdata->nsubschemata++;
 	      }
-	    cbdata->sp = kv->eof == 2 ? sp - 1: sp;
-	  }
+	    else
+	      *cbdata->sp++ = -1;
+	    *cbdata->sp++ = 0;
+          }
 	break;
       default:
 	break;
