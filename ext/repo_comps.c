@@ -29,7 +29,6 @@
  * TODO:
  *
  * what's the difference between group/category?
- * handle "default" and "langonly".
  *
  * maybe handle REL_COND in solver recommends handling?
  */
@@ -195,6 +194,18 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
 
     case STATE_USERVISIBLE:
       repodata_set_void(pd->data, pd->handle, SOLVABLE_ISVISIBLE);
+      break;
+
+    case STATE_DEFAULT:
+      repodata_set_void(pd->data, pd->handle, SOLVABLE_ISDEFAULT);
+      break;
+
+    case STATE_LANG_ONLY:
+      repodata_set_str(pd->data, pd->handle, SOLVABLE_LANGONLY, content);
+      break;
+
+    case STATE_LANGONLY:
+      repodata_set_str(pd->data, pd->handle, SOLVABLE_LANGONLY, content);
       break;
 
     case STATE_DISPLAY_ORDER:
