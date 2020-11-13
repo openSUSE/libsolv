@@ -3225,6 +3225,40 @@ solver_choicerulecheck2(Solver *solv, Id pi, Id pt, Queue *q)
   return 0;	/* not newest */
 }
 
+static int
+solver_choicerulecheck3(Solver *solv, Id pt, Queue *q)
+{
+  Pool *pool = solv->pool;
+  Id p, pp;
+  int i;
+
+  if (!q->count || q->elements[0] != pt)
+    {
+      Solvable *s = pool->solvables + pt;
+      if (q->count)
+        queue_empty(q);
+      /* no installed package, so check all with same name */
+      queue_push2(q, pt, 0);
+      FOR_PROVIDES(p, pp, s->name)
+        if (pool->solvables[p].name == s->name && p != pt)
+          queue_push(q, p);
+      queue_push(q, pt);
+    }
+  if (q->count <= 3)
+    return q->count == 3 && q->elements[2] == pt ? 1 : 0;
+  if (!q->elements[1])
+    {
+      queue_deleten(q, 0, 2);
+      policy_filter_unwanted(solv, q, POLICY_MODE_CHOOSE);
+      queue_unshift(q, 1);	/* filter mark */
+      queue_unshift(q, pt);
+    }
+  for (i = 2; i < q->count; i++)
+    if (q->elements[i] == pt)
+      return 1;
+  return 0;	/* not newest */
+}
+
 static inline void
 queue_removeelement(Queue *q, Id el)
 {
@@ -3377,6 +3411,11 @@ solver_addchoicerules(Solver *solv)
 	    break;
 	  p2 = choicerule_find_installed(pool, -p);
 	  if (p2 && !solver_choicerulecheck2(solv, p2, -p, &qcheck2))
+	    {
+	      isnewest = 0;
+	      break;
+	    }
+	  if (!p2 && !solver_choicerulecheck3(solv, -p, &qcheck2))
 	    {
 	      isnewest = 0;
 	      break;
