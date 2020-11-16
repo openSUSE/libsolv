@@ -44,7 +44,11 @@ typedef struct {
 #if defined(SWIGPYTHON)
     const void *pybuf = 0;
     Py_ssize_t pysize = 0;
+#if PY_VERSION_HEX >= 0x03000000
+    res = PyBytes_AsStringAndSize($input, &pybuf, &pysize);
+#else
     res = PyObject_AsReadBuffer($input, &pybuf, &pysize);
+#endif
     if (res < 0) {
       %argument_fail(res, "BinaryBlob", $symname, $argnum);
     } else {
