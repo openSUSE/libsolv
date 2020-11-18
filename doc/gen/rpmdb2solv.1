@@ -2,12 +2,12 @@
 .\"     Title: rpmdb2solv
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 09/14/2018
+.\"      Date: 11/18/2020
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "RPMDB2SOLV" "1" "09/14/2018" "libsolv" "LIBSOLV"
+.TH "RPMDB2SOLV" "1" "11/18/2020" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -55,6 +55,13 @@ Use
 as root directory\&.
 .RE
 .PP
+\fB\-D\fR \fIDBPATH\fR
+.RS 4
+Use the database in the
+\fIDBPATH\fR
+directory\&.
+.RE
+.PP
 \fB\-k\fR
 .RS 4
 Read pubkeys from the rpm database instead of installed packages\&. Note that many distributions stopped storing pubkeys in the database but use a directory like
@@ -81,6 +88,11 @@ Also read SUSE product files from directory
 Do not read any packages from the rpm database\&. This is useful together with
 \fB\-p\fR
 to only convert SUSE products\&.
+.RE
+.PP
+\fB\-C\fR
+.RS 4
+Include the package changelog in the generated solv file\&.
 .RE
 .PP
 \fB\-X\fR

@@ -29,6 +29,9 @@ format is like rpm's --percent option.
 *-r* 'ROOTDIR'::
 Use 'ROOTDIR' as root directory.
 
+*-D* 'DBPATH'::
+Use the database in the 'DBPATH' directory.
+
 *-k*::
 Read pubkeys from the rpm database instead of installed packages.
 Note that many distributions stopped storing pubkeys in the
