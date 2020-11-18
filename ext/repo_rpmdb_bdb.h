@@ -48,6 +48,7 @@ struct rpmdbstate {
   int dbenvopened;	/* database environment opened */
   int pkgdbopened;	/* package database openend */
   const char *dbpath;	/* path to the database */
+  int dbpath_allocated;	/* do we need to free the path? */
 
   DB_ENV *dbenv;	/* database environment */
   DB *db;		/* packages database */

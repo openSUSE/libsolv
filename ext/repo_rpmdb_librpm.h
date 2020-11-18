@@ -24,6 +24,7 @@ struct rpmdbstate {
 
   int dbenvopened;	/* database environment opened */
   const char *dbpath;	/* path to the database */
+  int dbpath_allocated;	/* do we need to free the path? */
 
   rpmts ts;
   rpmdbMatchIterator mi;	/* iterator over packages database */
@@ -45,6 +46,13 @@ access_rootdir(struct rpmdbstate *state, const char *dir, int mode)
 static void
 detect_dbpath(struct rpmdbstate *state)
 {
+  state->dbpath = rpmExpand("%{?_dbpath}", NULL);
+  if (state->dbpath && *state->dbpath)
+    {
+      state->dbpath_allocated = 1;
+      return;
+    }
+  solv_free((char *)state->dbpath);
   state->dbpath = access_rootdir(state, "/var/lib/rpm", W_OK) == -1
                   && (access_rootdir(state, "/usr/share/rpm/Packages", R_OK) == 0 || access_rootdir(state, "/usr/share/rpm/rpmdb.sqlite", R_OK) == 0)
                   ? "/usr/share/rpm" : "/var/lib/rpm";

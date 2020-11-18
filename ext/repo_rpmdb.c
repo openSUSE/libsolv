@@ -1349,6 +1349,8 @@ freestate(struct rpmdbstate *state)
 #ifdef ENABLE_RPMDB
   if (state->dbenvopened)
     closedbenv(state);
+  if (state->dbpath_allocated)
+    solv_free((char *)state->dbpath);
 #endif
   if (state->rootdir)
     solv_free(state->rootdir);
