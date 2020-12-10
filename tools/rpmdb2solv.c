@@ -20,6 +20,11 @@
 #include <string.h>
 #include <unistd.h>
 
+#ifdef ENABLE_RPMDB_LIBRPM
+#include <rpm/rpmmacro.h>
+#endif
+
+
 #include "pool.h"
 #include "repo.h"
 #include "repo_rpmdb.h"
@@ -64,6 +69,7 @@ main(int argc, char **argv)
   int nopacks = 0;
   int add_changelog = 0;
   const char *root = 0;
+  const char *dbpath = 0;
   const char *refname = 0;
 #ifdef ENABLE_SUSEREPO
   char *proddir = 0;
@@ -83,7 +89,7 @@ main(int argc, char **argv)
    * parse arguments
    */
   
-  while ((c = getopt(argc, argv, "ACPhnkxXr:p:o:")) >= 0)
+  while ((c = getopt(argc, argv, "ACD:PhnkxXr:p:o:")) >= 0)
     switch (c)
       {
       case 'h':
@@ -91,6 +97,9 @@ main(int argc, char **argv)
 	break;
       case 'r':
         root = optarg;
+        break;
+      case 'D':
+        dbpath = optarg;
         break;
       case 'n':
 	nopacks = 1;
@@ -160,6 +169,21 @@ main(int argc, char **argv)
 
   if (root && *root)
     pool_set_rootdir(pool, root);
+#ifdef ENABLE_PUBKEY
+  if (dbpath && *dbpath && (!nopacks || pubkeys))
+#else
+  if (dbpath && *dbpath && !nopacks)
+#endif
+    {
+#ifdef ENABLE_RPMDB_LIBRPM
+      char *macro = solv_dupjoin("_dbpath ", dbpath, 0);
+      rpmDefineMacro(NULL, macro, 0);
+      free(macro);
+#else
+      fprintf(stderr, "cannot set dbpath without librpm\n");
+      exit(1);
+#endif
+    }
 
   repo = repo_create(pool, "installed");
   data = repo_add_repodata(repo, 0);
