@@ -12,6 +12,7 @@
  *
  */
 
+#include <rpm/rpmlib.h>
 #include <rpm/rpmts.h>
 #include <rpm/rpmmacro.h>
 
@@ -98,6 +99,24 @@ stat_database(struct rpmdbstate *state, struct stat *statbuf)
   return 0;
 }
 
+/* rpm-4.16.0 cannot read the database if _db_backend is not set */
+#ifndef HAVE_RPMDBNEXTITERATORHEADERBLOB
+static void
+set_db_backend()
+{
+  static int db_backend_set;
+  char *db_backend;
+
+  if (db_backend_set)
+    return;
+  db_backend_set = 1;
+  db_backend = rpmExpand("%{?_db_backend}", NULL);
+  if (!db_backend || !*db_backend)
+    rpmReadConfigFiles(NULL, NULL);
+  solv_free(db_backend);
+}
+#endif
+
 static int
 opendbenv(struct rpmdbstate *state)
 {
@@ -116,6 +135,10 @@ opendbenv(struct rpmdbstate *state)
       delMacro(NULL, "_dbpath");
       return 0;
     }
+#ifndef HAVE_RPMDBNEXTITERATORHEADERBLOB
+  if (!strcmp(RPMVERSION, "4.16.0"))
+    set_db_backend();
+#endif
   if (rpmtsOpenDB(ts, O_RDONLY))
     {
       pool_error(state->pool, 0, "rpmtsOpenDB failed: %s", strerror(errno));
