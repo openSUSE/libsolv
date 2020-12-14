@@ -1991,6 +1991,7 @@ testcase_read(Pool *pool, FILE *fp, const char *testcase, Queue *job, char **res
   Id *genid = 0;
   int ngenid = 0;
   Queue autoinstq;
+  int oldjobsize = job ? job->count : 0;
 
   if (resultp)
     *resultp = 0;
@@ -2065,6 +2066,21 @@ testcase_read(Pool *pool, FILE *fp, const char *testcase, Queue *job, char **res
 	  int prio, subprio;
 	  const char *rdata;
 
+	  if (pool->considered)
+	    {
+	      pool_error(pool, 0, "testcase_read: cannot add repos after packages were disabled");
+	      continue;
+	    }
+	  if (solv)
+	    {
+	      pool_error(pool, 0, "testcase_read: cannot add repos after the solver was created");
+	      continue;
+	    }
+	  if (job && job->count != oldjobsize)
+	    {
+	      pool_error(pool, 0, "testcase_read: cannot add repos after jobs have been created");
+	      continue;
+	    }
 	  prepared = 0;
           if (!poolflagsreset)
 	    {
@@ -2125,6 +2141,11 @@ testcase_read(Pool *pool, FILE *fp, const char *testcase, Queue *job, char **res
 	  int i;
 
 	  /* must set the disttype before the arch */
+	  if (job && job->count != oldjobsize)
+	    {
+	      pool_error(pool, 0, "testcase_read: cannot change the system after jobs have been created");
+	      continue;
+	    }
 	  prepared = 0;
 	  if (strcmp(pieces[2], "*") != 0)
 	    {
