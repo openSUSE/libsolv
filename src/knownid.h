@@ -267,6 +267,8 @@ KNOWNID(LIBSOLV_SELF_DESTRUCT_PKG,      "libsolv-self-destruct-pkg()"),	/* this 
 
 KNOWNID(SOLVABLE_CONSTRAINS,		"solvable:constrains"),		/* conda */
 KNOWNID(SOLVABLE_TRACK_FEATURES,	"solvable:track_features"),	/* conda */
+KNOWNID(SOLVABLE_ISDEFAULT,		"solvable:isdefault"),
+KNOWNID(SOLVABLE_LANGONLY,		"solvable:langonly"),
 
 KNOWNID(UPDATE_COLLECTIONLIST,      "update:collectionlist"),  /* list of UPDATE_COLLECTION (actually packages) and UPDATE_MODULE */
 

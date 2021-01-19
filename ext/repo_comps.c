@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <stdbool.h>
 
 #include "pool.h"
 #include "repo.h"
@@ -29,7 +30,6 @@
  * TODO:
  *
  * what's the difference between group/category?
- * handle "default" and "langonly".
  *
  * maybe handle REL_COND in solver recommends handling?
  */
@@ -101,6 +101,21 @@ struct parsedata {
 };
 
 
+const bool COMPS_DEFAULT_USERVISIBLE = true;
+const bool COMPS_DEFAULT_DEFAULT = false;
+
+
+/* Return true if "true", false if "false", default_value otherwise */
+bool
+parse_boolean(char *content, bool default_value)
+{
+  if (!strcmp(content, "true"))
+    return true;
+  if (!strcmp(content, "false"))
+    return false;
+  return default_value;
+}
+
 
 static void
 startElement(struct solv_xmlparser *xmlp, int state, const char *name, const char **atts)
@@ -116,6 +131,10 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
       s = pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->repo));
       pd->handle = s - pool->solvables;
       pd->kind = state == STATE_GROUP ? "group" : "category";
+      if (COMPS_DEFAULT_USERVISIBLE)
+        repodata_set_void(pd->data, pd->handle, SOLVABLE_ISVISIBLE);
+      if (COMPS_DEFAULT_DEFAULT)
+        repodata_set_void(pd->data, pd->handle, SOLVABLE_ISDEFAULT);
       break;
 
     case STATE_NAME:
@@ -194,7 +213,25 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
       break;
 
     case STATE_USERVISIBLE:
-      repodata_set_void(pd->data, pd->handle, SOLVABLE_ISVISIBLE);
+      if (parse_boolean(content, COMPS_DEFAULT_USERVISIBLE))
+        repodata_set_void(pd->data, pd->handle, SOLVABLE_ISVISIBLE);
+      else
+        repodata_unset(pd->data, pd->handle, SOLVABLE_ISVISIBLE);
+      break;
+
+    case STATE_DEFAULT:
+      if (parse_boolean(content, COMPS_DEFAULT_DEFAULT))
+        repodata_set_void(pd->data, pd->handle, SOLVABLE_ISDEFAULT);
+      else
+        repodata_unset(pd->data, pd->handle, SOLVABLE_ISDEFAULT);
+      break;
+
+    case STATE_LANG_ONLY:
+      repodata_set_str(pd->data, pd->handle, SOLVABLE_LANGONLY, content);
+      break;
+
+    case STATE_LANGONLY:
+      repodata_set_str(pd->data, pd->handle, SOLVABLE_LANGONLY, content);
       break;
 
     case STATE_DISPLAY_ORDER:
