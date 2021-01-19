@@ -1,4 +1,17 @@
 -------------------------------------------------------------------
+Tue Jan 19 15:09:12 CET 2021 - mls@suse.de
+
+- repo_write: fix handling of nested flexarray
+- improve choicerule generation a bit more to cover more cases
+- harden testcase parser against repos being added too late
+- support python-3.10
+- check %_dbpath macro in rpmdb code
+- handle default/visible/langonly attributes in comps parser
+- support multiple collections in updateinfo parser
+- add '-D' option in rpmdb2solv to set the dbpath
+- bump version to 0.7.17
+
+-------------------------------------------------------------------
 Tue Oct 20 12:04:00 CEST 2020 - mls@suse.de
 
 - do not ask the namespace callback for splitprovides when writing

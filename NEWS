@@ -2,6 +2,18 @@
 This file contains the major changes between
 libsolv versions:
 
+Version 0.7.17
+- selected bug fixes:
+  * repo_write: fix handling of nested flexarray
+  * improve choicerule generation a bit more to cover more cases
+  * harden testcase parser against repos being added too late
+  * support python-3.10
+  * check %_dbpath macro in rpmdb code
+- new features:
+  * handle default/visible/langonly attributes in comps parser
+  * support multiple collections in updateinfo parser
+  * add '-D' option in rpmdb2solv to set the dbpath
+
 Version 0.7.16
 - selected bug fixes:
   * do not ask the namespace callback for splitprovides when writing
