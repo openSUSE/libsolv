@@ -16,7 +16,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include <stdbool.h>
 
 #include "pool.h"
 #include "repo.h"
@@ -97,22 +96,23 @@ struct parsedata {
 
   Solvable *solvable;
   const char *kind;
+  int isdefault;
+  int isvisible;
   Id handle;
 };
 
 
-const bool COMPS_DEFAULT_USERVISIBLE = true;
-const bool COMPS_DEFAULT_DEFAULT = false;
-
+#define COMPS_DEFAULT_ISVISIBLE 1
+#define COMPS_DEFAULT_ISDEFAULT 0
 
 /* Return true if "true", false if "false", default_value otherwise */
-bool
-parse_boolean(char *content, bool default_value)
+static int
+parse_boolean(char *content, int default_value)
 {
   if (!strcmp(content, "true"))
-    return true;
+    return 1;
   if (!strcmp(content, "false"))
-    return false;
+    return 0;
   return default_value;
 }
 
@@ -131,10 +131,8 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
       s = pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->repo));
       pd->handle = s - pool->solvables;
       pd->kind = state == STATE_GROUP ? "group" : "category";
-      if (COMPS_DEFAULT_USERVISIBLE)
-        repodata_set_void(pd->data, pd->handle, SOLVABLE_ISVISIBLE);
-      if (COMPS_DEFAULT_DEFAULT)
-        repodata_set_void(pd->data, pd->handle, SOLVABLE_ISDEFAULT);
+      pd->isvisible = COMPS_DEFAULT_ISVISIBLE;
+      pd->isdefault = COMPS_DEFAULT_ISDEFAULT;
       break;
 
     case STATE_NAME:
@@ -185,6 +183,10 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
 	s->evr = ID_EMPTY;
       if (s->name && s->arch != ARCH_SRC && s->arch != ARCH_NOSRC)
 	s->provides = repo_addid_dep(pd->repo, s->provides, pool_rel2id(pd->pool, s->name, s->evr, REL_EQ, 1), 0);
+      if (pd->isvisible)
+        repodata_set_void(pd->data, pd->handle, SOLVABLE_ISVISIBLE);
+      if (pd->isdefault)
+        repodata_set_void(pd->data, pd->handle, SOLVABLE_ISDEFAULT);
       pd->solvable = 0;
       break;
 
@@ -213,17 +215,11 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
       break;
 
     case STATE_USERVISIBLE:
-      if (parse_boolean(content, COMPS_DEFAULT_USERVISIBLE))
-        repodata_set_void(pd->data, pd->handle, SOLVABLE_ISVISIBLE);
-      else
-        repodata_unset(pd->data, pd->handle, SOLVABLE_ISVISIBLE);
+      pd->isvisible = parse_boolean(content, COMPS_DEFAULT_ISVISIBLE);
       break;
 
     case STATE_DEFAULT:
-      if (parse_boolean(content, COMPS_DEFAULT_DEFAULT))
-        repodata_set_void(pd->data, pd->handle, SOLVABLE_ISDEFAULT);
-      else
-        repodata_unset(pd->data, pd->handle, SOLVABLE_ISDEFAULT);
+      pd->isdefault = parse_boolean(content, COMPS_DEFAULT_ISDEFAULT);
       break;
 
     case STATE_LANG_ONLY:
