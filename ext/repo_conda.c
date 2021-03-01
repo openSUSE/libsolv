@@ -258,7 +258,7 @@ parse_packages2(struct parsedata *pd, struct solv_jsonparser *jp)
 }
 
 static int
-parse_main(struct parsedata *pd, struct solv_jsonparser *jp)
+parse_main(struct parsedata *pd, struct solv_jsonparser *jp, int flags)
 {
   int type = JP_OBJECT;
   while (type > 0 && (type = jsonparser_parse(jp)) > 0 && type != JP_OBJECT_END)
@@ -267,9 +267,9 @@ parse_main(struct parsedata *pd, struct solv_jsonparser *jp)
 	type = parse_packages(pd, jp);
       else if (type == JP_ARRAY && !strcmp("packages", jp->key))
 	type = parse_packages2(pd, jp);
-      else if (type == JP_OBJECT && !strcmp("packages.conda", jp->key))
+      else if (type == JP_OBJECT && !strcmp("packages.conda", jp->key) && !(flags & CONDA_ADD_USE_ONLY_TAR_BZ2))
 	type = parse_packages(pd, jp);
-      else if (type == JP_ARRAY && !strcmp("packages.conda", jp->key))
+      else if (type == JP_ARRAY && !strcmp("packages.conda", jp->key) && !(flags & CONDA_ADD_USE_ONLY_TAR_BZ2))
 	type = parse_packages2(pd, jp);
       else
 	type = jsonparser_skip(jp, type);
@@ -298,7 +298,7 @@ repo_add_conda(Repo *repo, FILE *fp, int flags)
   jsonparser_init(&jp, fp);
   if ((type = jsonparser_parse(&jp)) != JP_OBJECT)
     ret = pool_error(pool, -1, "repository does not start with an object");
-  else if ((type = parse_main(&pd, &jp)) != JP_OBJECT_END)
+  else if ((type = parse_main(&pd, &jp, flags)) != JP_OBJECT_END)
     ret = pool_error(pool, -1, "parse error line %d", jp.line);
   jsonparser_free(&jp);
 
