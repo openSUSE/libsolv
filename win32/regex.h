@@ -12,7 +12,8 @@ extern "C" {
 #define CHARCLASS_NAME_MAX 14
 #define RE_DUP_MAX 255
 
-typedef size_t regoff_t;
+#include <BaseTsd.h>
+typedef SSIZE_T regoff_t;
 // #include <bits/alltypes.h>
 
 typedef struct re_pattern_buffer {
