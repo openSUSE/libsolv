@@ -3339,7 +3339,6 @@ solver_addchoicerules(Solver *solv)
       return;
     }
   now = solv_timems(0);
-  solv->choicerules_info = solv_calloc(solv->pkgrules_end, sizeof(Id));
   queue_init(&q);
   queue_init(&qi);
   queue_init(&qcheck);
