@@ -231,7 +231,7 @@ tre_tnfa_run_parallel(const tre_tnfa_t *tnfa, const void *string,
     pbytes = sizeof(*reach_pos) * tnfa->num_states;
     xbytes = sizeof(regoff_t) * num_tags;
     total_bytes =
-      (sizeof(long) - 1) * 4 /* for alignment paddings */
+      (sizeof(size_t) - 1) * 4 /* for alignment paddings */
       + (rbytes + xbytes * tnfa->num_states) * 2 + tbytes + pbytes;
 
     /* Allocate the memory. */
@@ -242,16 +242,16 @@ tre_tnfa_run_parallel(const tre_tnfa_t *tnfa, const void *string,
     /* Get the various pointers within tmp_buf (properly aligned). */
     tmp_tags = (void *)buf;
     tmp_buf = buf + tbytes;
-    tmp_buf += ALIGN(tmp_buf, long);
+    tmp_buf += ALIGN(tmp_buf, size_t);
     reach_next = (void *)tmp_buf;
     tmp_buf += rbytes;
-    tmp_buf += ALIGN(tmp_buf, long);
+    tmp_buf += ALIGN(tmp_buf, size_t);
     reach = (void *)tmp_buf;
     tmp_buf += rbytes;
-    tmp_buf += ALIGN(tmp_buf, long);
+    tmp_buf += ALIGN(tmp_buf, size_t);
     reach_pos = (void *)tmp_buf;
     tmp_buf += pbytes;
-    tmp_buf += ALIGN(tmp_buf, long);
+    tmp_buf += ALIGN(tmp_buf, size_t);
     for (i = 0; i < tnfa->num_states; i++)
       {
   reach[i].tags = (void *)tmp_buf;
