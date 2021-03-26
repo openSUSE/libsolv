@@ -2,6 +2,13 @@
 This file contains the major changes between
 libsolv versions:
 
+Version 0.7.18
+- selected bug fixes:
+  * fixed regex code on win32
+  * fixed memory leak in choice rule generation
+- new features:
+  * repo_add_conda: add flag to skip v2 packages
+
 Version 0.7.17
 - selected bug fixes:
   * repo_write: fix handling of nested flexarray

@@ -1,4 +1,12 @@
 -------------------------------------------------------------------
+Fri Mar 26 14:17:46 CET 2021 - mls@suse.de
+
+- fixed regex code on win32
+- fixed memory leak in choice rule generation
+- repo_add_conda: add flag to skip v2 packages
+- bump version to 0.7.18
+
+-------------------------------------------------------------------
 Tue Jan 19 15:09:12 CET 2021 - mls@suse.de
 
 - repo_write: fix handling of nested flexarray
