@@ -1473,6 +1473,7 @@ testcase_solverresult(Solver *solv, int resultflags)
       SolverRuleinfo rclass;
       Queue q;
       int i;
+      char *prefix;
 
       queue_init(&q);
       for (rid = 1; (rclass = solver_ruleclass(solv, rid)) != SOLVER_RULE_UNKNOWN; rid++)
@@ -1480,7 +1481,7 @@ testcase_solverresult(Solver *solv, int resultflags)
 	  solver_ruleliterals(solv, rid, &q);
 	  if (rclass == SOLVER_RULE_FEATURE && q.count == 1 && q.elements[0] == -SYSTEMSOLVABLE)
 	    continue;
-	  char *prefix = solv_dupjoin("rule ", testcase_rclass2str(rclass), " ");
+	  prefix = solv_dupjoin("rule ", testcase_rclass2str(rclass), " ");
 	  prefix = solv_dupappend(prefix, testcase_ruleid(solv, rid), 0);
 	  for (i = 0; i < q.count; i++)
 	    {
