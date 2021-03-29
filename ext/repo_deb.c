@@ -792,5 +792,6 @@ pool_deb_get_autoinstalled(Pool *pool, FILE *fp, Queue *q, int flags)
 	  break;
 	}
     }
+    solv_free(buf);
 }
 
