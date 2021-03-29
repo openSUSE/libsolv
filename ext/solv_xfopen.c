@@ -165,7 +165,7 @@ static LZFILE *lzopen(const char *path, const char *mode, int fd, int isxz)
   LZFILE *lzfile;
   lzma_ret ret;
 
-  if (!path && fd < 0)
+  if ((!path && fd < 0) || (path && fd >= 0))
     return 0;
   for (; *mode; mode++)
     {
@@ -176,14 +176,7 @@ static LZFILE *lzopen(const char *path, const char *mode, int fd, int isxz)
       else if (*mode >= '1' && *mode <= '9')
 	level = *mode - '0';
     }
-  if (fd != -1)
-    fp = fdopen(fd, encoding ? "w" : "r");
-  else
-    fp = fopen(path, encoding ? "w" : "r");
-  if (!fp)
-    return 0;
   lzfile = solv_calloc(1, sizeof(*lzfile));
-  lzfile->file = fp;
   lzfile->encoding = encoding;
   lzfile->eof = 0;
   lzfile->strm = stream_init;
@@ -198,10 +191,20 @@ static LZFILE *lzopen(const char *path, const char *mode, int fd, int isxz)
     ret = lzma_auto_decoder(&lzfile->strm, 100 << 20, 0);
   if (ret != LZMA_OK)
     {
-      fclose(fp);
       solv_free(lzfile);
       return 0;
     }
+  if (!path)
+    fp = fdopen(fd, encoding ? "w" : "r");
+  else
+    fp = fopen(path, encoding ? "w" : "r");
+  if (!fp)
+    {
+      lzma_end(&lzfile->strm);
+      solv_free(lzfile);
+      return 0;
+    }
+  lzfile->file = fp;
   return lzfile;
 }
 
@@ -346,7 +349,7 @@ static ZSTDFILE *zstdopen(const char *path, const char *mode, int fd)
   FILE *fp;
   ZSTDFILE *zstdfile;
 
-  if (!path && fd < 0)
+  if ((!path && fd < 0) || (path && fd >= 0))
     return 0;
   for (; *mode; mode++)
     {
@@ -357,12 +360,6 @@ static ZSTDFILE *zstdopen(const char *path, const char *mode, int fd)
       else if (*mode >= '1' && *mode <= '9')
 	level = *mode - '0';
     }
-  if (fd != -1)
-    fp = fdopen(fd, encoding ? "w" : "r");
-  else
-    fp = fopen(path, encoding ? "w" : "r");
-  if (!fp)
-    return 0;
   zstdfile = solv_calloc(1, sizeof(*zstdfile));
   zstdfile->encoding = encoding;
   if (encoding)
@@ -372,14 +369,12 @@ static ZSTDFILE *zstdopen(const char *path, const char *mode, int fd)
       if (!zstdfile->cstream)
 	{
 	  solv_free(zstdfile);
-	  fclose(fp);
 	  return 0;
 	}
       if (ZSTD_isError(ZSTD_initCStream(zstdfile->cstream, level)))
  	{
 	  ZSTD_freeCStream(zstdfile->cstream);
 	  solv_free(zstdfile);
-	  fclose(fp);
 	  return 0;
 	}
       zstdfile->out.dst = zstdfile->buf;
@@ -393,12 +388,24 @@ static ZSTDFILE *zstdopen(const char *path, const char *mode, int fd)
  	{
 	  ZSTD_freeDStream(zstdfile->dstream);
 	  solv_free(zstdfile);
-	  fclose(fp);
 	  return 0;
 	}
       zstdfile->in.src = zstdfile->buf;
       zstdfile->in.pos = 0;
       zstdfile->in.size = 0;
+    }
+  if (!path)
+    fp = fdopen(fd, encoding ? "w" : "r");
+  else
+    fp = fopen(path, encoding ? "w" : "r");
+  if (!fp)
+    {
+      if (encoding)
+	ZSTD_freeCStream(zstdfile->cstream);
+      else
+	ZSTD_freeDStream(zstdfile->dstream);
+      solv_free(zstdfile);
+      return 0;
     }
   zstdfile->file = fp;
   return zstdfile;
