@@ -548,9 +548,9 @@ static void *zchunkopen(const char *path, const char *mode, int fd)
 {
   zckCtx *f;
 
-  if (!path && fd < 0)
+  if ((!path && fd < 0) || (path && fd >= 0))
     return 0;
-  if (fd == -1)
+  if (path)
     {
       if (*mode != 'w')
         fd = open(path, O_RDONLY);
@@ -562,18 +562,29 @@ static void *zchunkopen(const char *path, const char *mode, int fd)
   f = zck_create();
   if (!f)
     {
-      close(fd);
+      if (path)
+	close(fd);
       return 0;
     }
   if (*mode != 'w')
     {
       if(!zck_init_read(f, fd))
-        return 0;
+	{
+	  zck_free(&f);
+	  if (path)
+	    close(fd);
+	  return 0;
+	}
     }
    else
     {
       if(!zck_init_write(f, fd))
-        return 0;
+	{
+	  zck_free(&f);
+	  if (path)
+	    close(fd);
+	  return 0;
+	}
     }
   return cookieopen(f, mode, cookie_zckread, cookie_zckwrite, cookie_zckclose);
 }
@@ -587,19 +598,32 @@ static void *zchunkopen(const char *path, const char *mode, int fd)
 {
   FILE *fp;
   void *f;
-  if (!path && fd < 0)
+  int tmpfd;
+  if ((!path && fd < 0) || (path && fd >= 0))
     return 0;
-  if (fd != -1)
+  if (strcmp(mode, "r") != 0)
+    return 0;
+  if (!path)
     fp = fdopen(fd, mode);
   else
     fp = fopen(path, mode);
   if (!fp)
     return 0;
-  if (strcmp(mode, "r") != 0)
-    return 0;
   f = solv_zchunk_open(fp, 1);
   if (!f)
-    fclose(fp);
+    {
+      /* When 0 is returned, fd passed by user must not be closed! */
+      /* Dup (save) the original fd to a temporary variable and then back. */
+      /* It is ugly and thread unsafe hack (non atomical sequence fclose dup2). */
+      if (!path)
+	tmpfd = dup(fd);
+      fclose(fp);
+      if (!path)
+	{
+	  dup2(tmpfd, fd);
+	  close(tmpfd);
+	}
+    }
   return cookieopen(f, mode, (ssize_t (*)(void *, char *, size_t))solv_zchunk_read, 0, (int (*)(void *))solv_zchunk_close);
 }
 
