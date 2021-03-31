@@ -183,7 +183,7 @@ indent(struct parsedata *pd, int il)
       if (xmlp->lcontent + il + 1 > xmlp->acontent)
 	{
 	  xmlp->acontent = xmlp->lcontent + il + 256;
-	  xmlp->content = realloc(xmlp->content, xmlp->acontent);
+	  xmlp->content = solv_realloc(xmlp->content, xmlp->acontent);
 	}
       memmove(xmlp->content + l + il, xmlp->content + l, xmlp->lcontent - l + 1);
       for (i = 0; i < il; i++)

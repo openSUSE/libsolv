@@ -1446,7 +1446,7 @@ for (i = 1; i < target.nkeys; i++)
       reloff += 3 * target.nkeys;
     }
 
-  needid = calloc(reloff + pool->nrels, sizeof(*needid));
+  needid = solv_calloc(reloff + pool->nrels, sizeof(*needid));
   needid[0].map = reloff;	/* remember size in case we need to grow */
 
   cbdata.needid = needid;

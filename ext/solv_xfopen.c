@@ -182,12 +182,7 @@ static LZFILE *lzopen(const char *path, const char *mode, int fd, int isxz)
     fp = fopen(path, encoding ? "w" : "r");
   if (!fp)
     return 0;
-  lzfile = calloc(1, sizeof(*lzfile));
-  if (!lzfile)
-    {
-      fclose(fp);
-      return 0;
-    }
+  lzfile = solv_calloc(1, sizeof(*lzfile));
   lzfile->file = fp;
   lzfile->encoding = encoding;
   lzfile->eof = 0;

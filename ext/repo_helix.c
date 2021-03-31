@@ -655,7 +655,7 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
       if (xmlp->lcontent + 1 + pd->levrspace > pd->aevrspace)
 	{
 	  pd->aevrspace = xmlp->lcontent + 1 + pd->levrspace + 256;
-	  pd->evrspace = (char *)realloc(pd->evrspace, pd->aevrspace);
+	  pd->evrspace = (char *)solv_realloc(pd->evrspace, pd->aevrspace);
 	}
       memcpy(pd->evrspace + pd->levrspace, xmlp->content, xmlp->lcontent + 1);
       if (state == STATE_EPOCH)
