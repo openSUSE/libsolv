@@ -1629,6 +1629,7 @@ resolve_jobrules(Solver *solv, int level, int disablerules, Queue *dq)
 	}
       olevel = level;
       level = selectandinstall(solv, level, dq, disablerules, i, SOLVER_REASON_RESOLVE_JOB);
+      r = solv->rules + i;    /* selectandinstall may have added more rules */
       if (level <= olevel)
 	{
 	  if (level == olevel)
