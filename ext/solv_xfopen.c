@@ -199,7 +199,7 @@ static LZFILE *lzopen(const char *path, const char *mode, int fd, int isxz)
   if (ret != LZMA_OK)
     {
       fclose(fp);
-      free(lzfile);
+      solv_free(lzfile);
       return 0;
     }
   return lzfile;
@@ -232,7 +232,7 @@ static int lzclose(void *cookie)
     }
   lzma_end(&lzfile->strm);
   rc = fclose(lzfile->file);
-  free(lzfile);
+  solv_free(lzfile);
   return rc;
 }
 
@@ -432,7 +432,7 @@ static int zstdclose(void *cookie)
       ZSTD_freeDStream(zstdfile->dstream);
     }
   rc = fclose(zstdfile->file);
-  free(zstdfile);
+  solv_free(zstdfile);
   return rc;
 }
 
