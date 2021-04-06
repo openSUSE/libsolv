@@ -598,7 +598,6 @@ static void *zchunkopen(const char *path, const char *mode, int fd)
 {
   FILE *fp;
   void *f;
-  int tmpfd;
   if ((!path && fd < 0) || (path && fd >= 0))
     return 0;
   if (strcmp(mode, "r") != 0)
@@ -612,16 +611,19 @@ static void *zchunkopen(const char *path, const char *mode, int fd)
   f = solv_zchunk_open(fp, 1);
   if (!f)
     {
-      /* When 0 is returned, fd passed by user must not be closed! */
-      /* Dup (save) the original fd to a temporary variable and then back. */
-      /* It is ugly and thread unsafe hack (non atomical sequence fclose dup2). */
-      if (!path)
-	tmpfd = dup(fd);
-      fclose(fp);
       if (!path)
 	{
+	  /* The fd passed by user must not be closed! */
+	  /* Dup (save) the original fd to a temporary variable and then back. */
+	  /* It is ugly and thread unsafe hack (non atomical sequence fclose dup2). */
+	  int tmpfd = dup(fd);
+	  fclose(fp);
 	  dup2(tmpfd, fd);
 	  close(tmpfd);
+	}
+      else
+	{
+	  fclose(fp);
 	}
     }
   return cookieopen(f, mode, (ssize_t (*)(void *, char *, size_t))solv_zchunk_read, 0, (int (*)(void *))solv_zchunk_close);
