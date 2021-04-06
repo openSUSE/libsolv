@@ -165,7 +165,7 @@ static LZFILE *lzopen(const char *path, const char *mode, int fd, int isxz)
   LZFILE *lzfile;
   lzma_ret ret;
 
-  if (!path && fd < 0)
+  if ((!path && fd < 0) || (path && fd >= 0))
     return 0;
   for (; *mode; mode++)
     {
@@ -176,14 +176,7 @@ static LZFILE *lzopen(const char *path, const char *mode, int fd, int isxz)
       else if (*mode >= '1' && *mode <= '9')
 	level = *mode - '0';
     }
-  if (fd != -1)
-    fp = fdopen(fd, encoding ? "w" : "r");
-  else
-    fp = fopen(path, encoding ? "w" : "r");
-  if (!fp)
-    return 0;
   lzfile = solv_calloc(1, sizeof(*lzfile));
-  lzfile->file = fp;
   lzfile->encoding = encoding;
   lzfile->eof = 0;
   lzfile->strm = stream_init;
@@ -198,10 +191,20 @@ static LZFILE *lzopen(const char *path, const char *mode, int fd, int isxz)
     ret = lzma_auto_decoder(&lzfile->strm, 100 << 20, 0);
   if (ret != LZMA_OK)
     {
-      fclose(fp);
-      free(lzfile);
+      solv_free(lzfile);
       return 0;
     }
+  if (!path)
+    fp = fdopen(fd, encoding ? "w" : "r");
+  else
+    fp = fopen(path, encoding ? "w" : "r");
+  if (!fp)
+    {
+      lzma_end(&lzfile->strm);
+      solv_free(lzfile);
+      return 0;
+    }
+  lzfile->file = fp;
   return lzfile;
 }
 
@@ -232,7 +235,7 @@ static int lzclose(void *cookie)
     }
   lzma_end(&lzfile->strm);
   rc = fclose(lzfile->file);
-  free(lzfile);
+  solv_free(lzfile);
   return rc;
 }
 
@@ -346,7 +349,7 @@ static ZSTDFILE *zstdopen(const char *path, const char *mode, int fd)
   FILE *fp;
   ZSTDFILE *zstdfile;
 
-  if (!path && fd < 0)
+  if ((!path && fd < 0) || (path && fd >= 0))
     return 0;
   for (; *mode; mode++)
     {
@@ -357,12 +360,6 @@ static ZSTDFILE *zstdopen(const char *path, const char *mode, int fd)
       else if (*mode >= '1' && *mode <= '9')
 	level = *mode - '0';
     }
-  if (fd != -1)
-    fp = fdopen(fd, encoding ? "w" : "r");
-  else
-    fp = fopen(path, encoding ? "w" : "r");
-  if (!fp)
-    return 0;
   zstdfile = solv_calloc(1, sizeof(*zstdfile));
   zstdfile->encoding = encoding;
   if (encoding)
@@ -372,14 +369,12 @@ static ZSTDFILE *zstdopen(const char *path, const char *mode, int fd)
       if (!zstdfile->cstream)
 	{
 	  solv_free(zstdfile);
-	  fclose(fp);
 	  return 0;
 	}
       if (ZSTD_isError(ZSTD_initCStream(zstdfile->cstream, level)))
  	{
 	  ZSTD_freeCStream(zstdfile->cstream);
 	  solv_free(zstdfile);
-	  fclose(fp);
 	  return 0;
 	}
       zstdfile->out.dst = zstdfile->buf;
@@ -393,12 +388,24 @@ static ZSTDFILE *zstdopen(const char *path, const char *mode, int fd)
  	{
 	  ZSTD_freeDStream(zstdfile->dstream);
 	  solv_free(zstdfile);
-	  fclose(fp);
 	  return 0;
 	}
       zstdfile->in.src = zstdfile->buf;
       zstdfile->in.pos = 0;
       zstdfile->in.size = 0;
+    }
+  if (!path)
+    fp = fdopen(fd, encoding ? "w" : "r");
+  else
+    fp = fopen(path, encoding ? "w" : "r");
+  if (!fp)
+    {
+      if (encoding)
+	ZSTD_freeCStream(zstdfile->cstream);
+      else
+	ZSTD_freeDStream(zstdfile->dstream);
+      solv_free(zstdfile);
+      return 0;
     }
   zstdfile->file = fp;
   return zstdfile;
@@ -432,7 +439,7 @@ static int zstdclose(void *cookie)
       ZSTD_freeDStream(zstdfile->dstream);
     }
   rc = fclose(zstdfile->file);
-  free(zstdfile);
+  solv_free(zstdfile);
   return rc;
 }
 
@@ -541,9 +548,9 @@ static void *zchunkopen(const char *path, const char *mode, int fd)
 {
   zckCtx *f;
 
-  if (!path && fd < 0)
+  if ((!path && fd < 0) || (path && fd >= 0))
     return 0;
-  if (fd == -1)
+  if (path)
     {
       if (*mode != 'w')
         fd = open(path, O_RDONLY);
@@ -555,18 +562,29 @@ static void *zchunkopen(const char *path, const char *mode, int fd)
   f = zck_create();
   if (!f)
     {
-      close(fd);
+      if (path)
+	close(fd);
       return 0;
     }
   if (*mode != 'w')
     {
       if(!zck_init_read(f, fd))
-        return 0;
+	{
+	  zck_free(&f);
+	  if (path)
+	    close(fd);
+	  return 0;
+	}
     }
    else
     {
       if(!zck_init_write(f, fd))
-        return 0;
+	{
+	  zck_free(&f);
+	  if (path)
+	    close(fd);
+	  return 0;
+	}
     }
   return cookieopen(f, mode, cookie_zckread, cookie_zckwrite, cookie_zckclose);
 }
@@ -580,19 +598,32 @@ static void *zchunkopen(const char *path, const char *mode, int fd)
 {
   FILE *fp;
   void *f;
-  if (!path && fd < 0)
+  int tmpfd;
+  if ((!path && fd < 0) || (path && fd >= 0))
     return 0;
-  if (fd != -1)
+  if (strcmp(mode, "r") != 0)
+    return 0;
+  if (!path)
     fp = fdopen(fd, mode);
   else
     fp = fopen(path, mode);
   if (!fp)
     return 0;
-  if (strcmp(mode, "r") != 0)
-    return 0;
   f = solv_zchunk_open(fp, 1);
   if (!f)
-    fclose(fp);
+    {
+      /* When 0 is returned, fd passed by user must not be closed! */
+      /* Dup (save) the original fd to a temporary variable and then back. */
+      /* It is ugly and thread unsafe hack (non atomical sequence fclose dup2). */
+      if (!path)
+	tmpfd = dup(fd);
+      fclose(fp);
+      if (!path)
+	{
+	  dup2(tmpfd, fd);
+	  close(tmpfd);
+	}
+    }
   return cookieopen(f, mode, (ssize_t (*)(void *, char *, size_t))solv_zchunk_read, 0, (int (*)(void *))solv_zchunk_close);
 }
 
