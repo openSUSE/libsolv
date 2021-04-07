@@ -2,6 +2,13 @@
 This file contains the major changes between
 libsolv versions:
 
+Version 0.7.19
+- selected bug fixes:
+  * fix rare segfault in resolve_jobrules() that could happen
+    if new rules are learnt
+  * fix a couple of memory leaks in error cases
+  * fix error handling in solv_xfopen_fd()
+
 Version 0.7.18
 - selected bug fixes:
   * fixed regex code on win32
