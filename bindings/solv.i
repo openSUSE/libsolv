@@ -63,7 +63,7 @@ typedef struct {
   $2 = size;
 }
 
-%typemap(freearg,noblock=1,match="in") (const unsigned char *str, int len) {
+%typemap(freearg,noblock=1,match="in") (const unsigned char *str, size_t len) {
   if (alloc$argnum == SWIG_NEWOBJ) %delete_array(buf$argnum);
 }
 
