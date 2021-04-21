@@ -5,7 +5,7 @@
 extern "C" {
 #endif
 
-#include "config.h"
+#include "win32_config.h"
 
 int getopt(int, char * const [], const char *);
 

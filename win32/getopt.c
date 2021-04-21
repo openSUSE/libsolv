@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include "config.h"
+#include "win32_config.h"
 
 SOLV_API char *optarg;
 SOLV_API int optind=1, opterr=1, optopt, __optpos, __optreset=0;
