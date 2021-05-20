@@ -75,12 +75,12 @@ getuint(unsigned char *p, unsigned char *endp, unsigned int *dp)
     }
   if (++p < endp && (*p & 0x80) != 0)
     {
-      *dp = p[-3] ^ (p[-2] << 7) ^ (p[1] << 14) ^ ((p[0] ^ 0x80) << 21);
+      *dp = p[-3] ^ (p[-2] << 7) ^ (p[-1] << 14) ^ ((p[0] ^ 0x80) << 21);
       return p + 1;
     }
   if (++p < endp && (*p & 0xf0) == 0x80)
     {
-      *dp = p[-4] ^ (p[-3] << 7) ^ (p[2] << 14) ^ (p[1] << 21) ^ ((p[0] ^ 0x80) << 28);
+      *dp = p[-4] ^ (p[-3] << 7) ^ (p[-2] << 14) ^ (p[-1] << 21) ^ ((p[0] ^ 0x80) << 28);
       return p + 1;
     }
   return 0;
