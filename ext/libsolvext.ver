@@ -41,6 +41,7 @@ SOLV_1.0 {
 		repo_add_zyppdb_products;
 		repo_find_all_pubkeys;
 		repo_find_pubkey;
+		repo_mark_retracted_packages;
 		repo_verify_sigdata;
 		rpm_byfp;
 		rpm_byrpmdbid;

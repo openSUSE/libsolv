@@ -827,6 +827,7 @@ main(int argc, char **argv)
 #ifdef SUSE
   if (add_auto)
     repo_add_autopattern(repo, 0);
+  repo_mark_retracted_packages(repo, pool_str2id(pool, "retracted-patch-package()", 1));
 #endif
   tool_write(repo, 0, 0);
   if (fflush(stdout))

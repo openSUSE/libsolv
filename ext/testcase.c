@@ -49,6 +49,7 @@ static struct job2str {
   { SOLVER_ALLOWUNINSTALL, "allowuninstall" },
   { SOLVER_FAVOR,          "favor" },
   { SOLVER_DISFAVOR,       "disfavor" },
+  { SOLVER_BLACKLIST,      "blacklist" },
   { 0, 0 }
 };
 
@@ -1801,6 +1802,7 @@ static struct rclass2str {
   { SOLVER_RULE_LEARNT, "learnt" },
   { SOLVER_RULE_BEST, "best" },
   { SOLVER_RULE_YUMOBS, "yumobs" },
+  { SOLVER_RULE_BLACK, "black" },
   { 0, 0 }
 };
 

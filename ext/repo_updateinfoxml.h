@@ -6,3 +6,6 @@
  */
 
 extern int repo_add_updateinfoxml(Repo *repo, FILE *fp, int flags);
+
+extern void repo_mark_retracted_packages(Repo *repo, Id retractedmarker);
+
