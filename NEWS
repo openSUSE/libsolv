@@ -2,6 +2,21 @@
 This file contains the major changes between
 libsolv versions:
 
+Version 0.6.37:
+- bug fixes:
+  * fix heap-buffer-overflow in repodata_schema2id [CVE-2019-20387]
+  * testcase_read: error out if repos are added or the system is
+    changed too late [CVE-2021-3200]
+  * fix ruleinfo of complex dependencies returning the wrong origin
+  * fix SOLVER_FLAG_FOCUS_BEST updateing packages without reason
+  * fix add_complex_recommends() selecting conflicted packages in
+    rare cases
+  * fix potential segfault in resolve_jobrules
+  * fix solv_zchunk decoding error if large chunks are used 
+- new features:
+  * backport support for blacklisted packages to support ptf
+    packages and retracted patches
+
 Version 0.6.36
 - bug fixes:
   * do not autouninstall packages because of forcebest updates

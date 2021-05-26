@@ -1,4 +1,21 @@
 -------------------------------------------------------------------
+Wed May 26 14:25:00 CEST 2021 - mls@suse.de
+
+- fix heap-buffer-overflow in repodata_schema2id [CVE-2019-20387]
+  [bnc#1161510]
+- backport support for blacklisted packages to support ptf
+  packages and retracted patches [jsc#SLE-17973]
+- fix ruleinfo of complex dependencies returning the wrong origin
+- fix SOLVER_FLAG_FOCUS_BEST updateing packages without reason
+- fix add_complex_recommends() selecting conflicted packages in rare
+  cases
+- testcase_read: error out if repos are added or the system is changed
+  too late [CVE-2021-3200] [bnc#1186229]
+- fix potential segfault in resolve_jobrules
+- fix solv_zchunk decoding error if large chunks are used
+- bump version to 0.6.37
+
+-------------------------------------------------------------------
 Thu Jun 27 16:36:00 CEST 2019 - mls@suse.de
 
 - make cleandeps jobs on patterns work [bnc#1137977]
