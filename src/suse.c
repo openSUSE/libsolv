@@ -237,11 +237,40 @@ repo_fix_conflicts(Repo *repo, Offset conflicts)
 }
 
 void
+repo_fix_ptfdeps(Solvable *s)
+{
+  Repo *repo = s->repo;
+  Pool *pool = repo->pool;
+  unsigned int i;
+  Id id, name, evr;
+  char *namestr;
+  Reldep *rd;
+  
+  for (i = s->provides; (id = repo->idarraydata[i]) != 0; i++)
+    {
+      if (!ISRELDEP(id))
+	continue;
+      rd = GETRELDEP(pool, id);
+      if (rd->flags != REL_EQ || strncmp(pool_id2str(pool, rd->name), "ptfdep-", 7) != 0)
+	continue;
+      namestr = solv_strdup(pool_id2str(pool, rd->name) + 7);
+      name = pool_str2id(pool, namestr, 1);
+      solv_free(namestr);
+      evr = rd->evr;
+      id = pool_rel2id(pool, name, evr, REL_EQ, 1);
+      id = pool_rel2id(pool, id, name, REL_COND, 1);
+      s->requires = repo_addid_dep(repo, s->requires, id, -SOLVABLE_PREREQMARKER);
+    }
+}
+
+void
 repo_rewrite_suse_deps(Solvable *s, Offset freshens)
 {
   s->supplements = repo_fix_supplements(s->repo, s->provides, s->supplements, freshens);
   if (s->conflicts)
     s->conflicts = repo_fix_conflicts(s->repo, s->conflicts);
+  if (s->name && !strncmp(pool_id2str(s->repo->pool, s->name), "ptf-", 4))
+    repo_fix_ptfdeps(s);
 }
 
 /**********************************************************************************/
