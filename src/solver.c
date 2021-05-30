@@ -3360,6 +3360,30 @@ setup_favormap(Solver *solv)
     }
 }
 
+static void
+setup_trackfeatures_favor(Solver *solv)
+{
+  Pool *pool = solv->pool;
+  int idx, cnt;
+  Id p;
+
+  solv_free(solv->favormap);
+  solv->favormap = solv_calloc(pool->nsolvables, sizeof(Id));
+
+  idx = 0;
+  FOR_POOL_SOLVABLES(p)
+    {
+      Solvable *s = pool->solvables + p;
+      cnt = solvable_lookup_count(s, SOLVABLE_TRACK_FEATURES);
+      if (cnt != 0)
+        {
+	  idx++;
+	  solv->favormap[p] = -idx;
+	  solv->havedisfavored = 1;
+        }
+    }
+}
+
 /*
  *
  * solve job queue
@@ -4022,7 +4046,10 @@ solver_solve(Solver *solv, Queue *job)
   /* create favormap if we have favor jobs */
   if (hasfavorjob)
     setup_favormap(solv);
-
+#ifdef ENABLE_CONDA
+  else
+   setup_trackfeatures_favor(solv);
+#endif
   /* now create infarch and dup rules */
   if (!solv->noinfarchcheck)
     solver_addinfarchrules(solv, &addedmap);

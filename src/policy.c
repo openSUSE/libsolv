@@ -874,6 +874,11 @@ pool_buildflavorcmp(Pool *pool, Solvable *s1, Solvable *s2)
 void
 prune_to_best_version(Pool *pool, Queue *plist)
 {
+#ifdef ENABLE_CONDA
+  if (pool->disttype == DISTTYPE_CONDA)
+     return prune_to_best_version_conda(pool, plist);
+#endif
+
   int i, j, r;
   Solvable *s, *best;
 
@@ -909,30 +914,16 @@ prune_to_best_version(Pool *pool, Queue *plist)
         }
      
       r = 0; 
-#ifdef ENABLE_CONDA
-      if (pool->disttype == DISTTYPE_CONDA)
-        r = pool_featurecountcmp(pool, best, s);
-#endif
       if (r == 0)
         r = best->evr != s->evr ? pool_evrcmp(pool, best->evr, s->evr, EVRCMP_COMPARE) : 0;
 #ifdef ENABLE_LINKED_PKGS
       if (r == 0 && has_package_link(pool, s))
         r = pool_link_evrcmp(pool, best, s);
 #endif
-#ifdef ENABLE_CONDA
-      if (pool->disttype == DISTTYPE_CONDA)
-	{
-	  if (r == 0)
-	    r = (best->repo ? best->repo->subpriority : 0) - (s->repo ? s->repo->subpriority : 0);
-	  if (r == 0)
-	    r = pool_buildversioncmp(pool, best, s);
-	  if (r == 0)
-	    r = pool_buildflavorcmp(pool, best, s);
-	}
-#endif
       if (r < 0)
 	best = s;
     }
+
   plist->elements[j++] = best - pool->solvables;	/* finish last group */
   plist->count = j;
 
@@ -947,6 +938,89 @@ prune_to_best_version(Pool *pool, Queue *plist)
     }
 }
 
+#ifdef ENABLE_CONDA
+/*
+ * prune_to_best_version_conda
+ *
+ * sort list of packages (given through plist) by name and evr
+ * return result through plist
+ */
+void
+prune_to_best_version_conda(Pool *pool, Queue *plist)
+{
+  int i, j, r;
+  Solvable *s, *best;
+
+  if (plist->count < 2)         /* no need to prune for a single entry */
+    return;
+  POOL_DEBUG(SOLV_DEBUG_POLICY, "prune_to_best_version_conda %d\n", plist->count);
+
+  /* sort by name first, prefer installed */
+  solv_sort(plist->elements, plist->count, sizeof(Id), prune_to_best_version_sortcmp, pool);
+
+  /* now find best 'per name' */
+  best = 0;
+  for (i = j = 0; i < plist->count; i++)
+    {
+      s = pool->solvables + plist->elements[i];
+
+      POOL_DEBUG(SOLV_DEBUG_POLICY, "- %s [%d]%s\n",
+                 pool_solvable2str(pool, s), plist->elements[i], 
+                 (pool->installed && s->repo == pool->installed) ? "I" : "");
+
+      if (!best)                /* if no best yet, the current is best */
+        {
+          best = s;
+          continue;
+        }
+
+      /* name switch: finish group, re-init */
+      if (best->name != s->name)   /* new name */
+        {
+          plist->elements[j++] = best - pool->solvables; /* move old best to front */
+          best = s;             /* take current as new best */
+          continue;
+        }
+     
+      r = 0; 
+      r = pool_featurecountcmp(pool, best, s);
+      if (r == 0)
+        r = best->evr != s->evr ? pool_evrcmp(pool, best->evr, s->evr, EVRCMP_COMPARE) : 0;
+      if (r == 0)
+        r = (best->repo ? best->repo->subpriority : 0) - (s->repo ? s->repo->subpriority : 0);
+      if (r == 0)
+        r = pool_buildversioncmp(pool, best, s);
+      if (r == 0)
+        r = pool_buildflavorcmp(pool, best, s);
+      if (r < 0)
+        best = s;
+    }
+
+  Queue q;
+  queue_init(&q);
+  for (i = j = 0; i < plist->count; i++)
+    {
+      s = pool->solvables + plist->elements[i];
+      r = pool_featurecountcmp(pool, best, s);
+      if (r == 0)
+        r = best->evr != s->evr ? pool_evrcmp(pool, best->evr, s->evr, EVRCMP_COMPARE) : 0;
+      if (r == 0)
+        r = (best->repo ? best->repo->subpriority : 0) - (s->repo ? s->repo->subpriority : 0);
+      if (r == 0)
+        r = pool_buildversioncmp(pool, best, s);
+      if (r == 0)
+        queue_push(&q, s - pool->solvables);
+    }
+
+  for (i = 0; i < q.count; ++i)
+    {
+      plist->elements[i] = q.elements[i];
+    }
+
+  plist->count = q.count;
+  queue_free(&q);
+}
+#endif  // ENABLE_CONDA
 
 static int
 sort_by_name_evr_sortcmp(const void *ap, const void *bp, void *dp)
