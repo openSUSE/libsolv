@@ -149,6 +149,10 @@ parse_package(struct parsedata *pd, struct solv_jsonparser *jp, char *kfn)
 
   handle = repo_add_solvable(pd->repo);
   s = pool_id2solvable(pool, handle);
+
+  Id extra_keys = pool_str2id(pool, "solvable:extra_keys", 1);
+  Id extra_values = pool_str2id(pool, "solvable:extra_values", 1);
+
   while (type > 0 && (type = jsonparser_parse(jp)) > 0 && type != JP_OBJECT_END)
     {
       if (type == JP_STRING && !strcmp(jp->key, "build"))
@@ -180,15 +184,36 @@ parse_package(struct parsedata *pd, struct solv_jsonparser *jp, char *kfn)
       else if (type == JP_NUMBER && !strcmp(jp->key, "timestamp"))
 	{
 	  unsigned long long ts = strtoull(jp->value, 0, 10);
-	  if (ts > 253402300799ULL)
-	    ts /= 1000;
 	  repodata_set_num(data, handle, SOLVABLE_BUILDTIME, ts);
 	}
       else if (type == JP_STRING && !strcmp(jp->key, "track_features"))
 	parse_trackfeatures_string(pd, jp->value, handle);
       else if (type == JP_ARRAY && !strcmp(jp->key, "track_features"))
 	type = parse_trackfeatures_array(pd, jp, handle);
-      else
+    else if (type == JP_STRING)
+    {
+	repodata_add_poolstr_array(data, handle, extra_keys, jp->key);
+
+	char *val = malloc(jp->valuelen + 3);
+	val[0] = '"';
+	memcpy(val + 1, jp->value, jp->valuelen);
+	val[jp->valuelen+1] = '"';
+	val[jp->valuelen+2] = 0;
+	repodata_add_poolstr_array(data, handle, extra_values, val);	
+	free(val);
+	  }
+    else if (type == JP_NUMBER || type == JP_BOOL || type == JP_NULL)
+    {
+	repodata_add_poolstr_array(data, handle, extra_keys, jp->key);
+	repodata_add_poolstr_array(data, handle, extra_values, jp->value);
+	  }
+    else if (type == JP_ARRAY || type == JP_OBJECT)
+    {
+	type = jsonparser_as_str(jp, type, 1);
+	repodata_add_poolstr_array(data, handle, extra_keys, jp->key);
+	repodata_add_poolstr_array(data, handle, extra_values, jp->value);
+	  }
+	  else
 	type = jsonparser_skip(jp, type);
     }
   if (fn || kfn)
@@ -234,7 +259,7 @@ parse_packages(struct parsedata *pd, struct solv_jsonparser *jp)
       if (type == JP_OBJECT)
 	{
 	  char *fn = solv_strdup(jp->key);
-	  type = parse_package(pd, jp, fn);
+    type = parse_package(pd, jp, fn);
 	  solv_free(fn);
 	}
       else
@@ -258,6 +283,32 @@ parse_packages2(struct parsedata *pd, struct solv_jsonparser *jp)
 }
 
 static int
+parse_signatures_block(struct parsedata *pd, struct solv_jsonparser *jp)
+{
+  int type = JP_OBJECT;
+  Repodata *data = pd->data;
+  Id *fndata = 0, fntype = 0;
+  Id handle;
+
+  while (type > 0 && (type = jsonparser_parse(jp)) > 0 && type != JP_OBJECT_END)
+    {
+      if (type == JP_OBJECT)
+        {
+	    fndata = fn2data(pd, jp->key, &fntype, 0);
+	    handle = fndata[1];
+      type = jsonparser_as_str(jp, type, 1);
+      repodata_set_str(data, handle, SIGNATURE_DATA, jp->value);
+        }
+      else
+        {
+	    type = jsonparser_skip(jp, type);
+        }
+    }
+
+  return type;
+}
+
+static int
 parse_main(struct parsedata *pd, struct solv_jsonparser *jp, int flags)
 {
   int type = JP_OBJECT;
@@ -271,9 +322,12 @@ parse_main(struct parsedata *pd, struct solv_jsonparser *jp, int flags)
 	type = parse_packages(pd, jp);
       else if (type == JP_ARRAY && !strcmp("packages.conda", jp->key) && !(flags & CONDA_ADD_USE_ONLY_TAR_BZ2))
 	type = parse_packages2(pd, jp);
+      else if (type == JP_OBJECT && !strcmp("signatures", jp->key))
+	type = parse_signatures_block(pd, jp);
       else
 	type = jsonparser_skip(jp, type);
     }
+
   return type;
 }
 

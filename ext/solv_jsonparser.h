@@ -45,5 +45,6 @@ void jsonparser_init(struct solv_jsonparser *jp, FILE *fp);
 void jsonparser_free(struct solv_jsonparser *jp);
 int jsonparser_parse(struct solv_jsonparser *jp);
 int jsonparser_skip(struct solv_jsonparser *jp, int type);
+int jsonparser_as_str(struct solv_jsonparser *jp, int type, int dequeue);
 
 #endif /* SOLV_JSONPARSER_H */

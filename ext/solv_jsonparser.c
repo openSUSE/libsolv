@@ -287,3 +287,40 @@ jsonparser_skip(struct solv_jsonparser *jp, int type)
   return type;
 }
 
+int
+jsonparser_as_str(struct solv_jsonparser *jp, int type, int dequeue)
+{
+  int c;
+  jp->nspace = 0;
+
+  if (type == JP_ARRAY || type == JP_OBJECT)
+    {
+      if (type == JP_OBJECT)
+        savec(jp, '{');
+      else
+        savec(jp, '[');
+
+      int depth = jp->depth + 1, endtype = type + 1;
+      while (type > 0 && (jp->depth != depth))
+      {
+          c = skipspace(jp);          
+          if ((c == '[' && type == JP_ARRAY) || (c == '{' && type == JP_OBJECT))
+            ++depth;
+          else if ((c == ']' && endtype == JP_ARRAY_END) || (c == '}' && endtype == JP_OBJECT_END))
+            --depth;
+ 
+          if (c != EOF)
+            savec(jp, c);
+          else
+            return JP_ERROR;
+      }
+      savec(jp, 0);
+      jp->value = jp->space;
+      jp->valuelen = jp->nspace;
+      if (dequeue)
+        jp->state = queue_pop(&jp->stateq);
+      return endtype;
+    }
+
+  return JP_ERROR;
+}
