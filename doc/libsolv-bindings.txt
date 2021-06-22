@@ -2076,6 +2076,10 @@ Avoid the specified packages if the solver encounters an alternative. This
 can also be used to block recommended or supplemented packages from being
 installed.
 
+*SOLVER_EXCLUDEFROMWEAK*::
+Avoid the specified packages to satisfy recommended or supplemented dependencies.
+Unlike SOLVER_DISFAVOR, it does not interfere with other rules.
+
 *SOLVER_JOBMASK*::
 A mask containing all the above action bits.
 

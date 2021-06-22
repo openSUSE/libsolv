@@ -208,6 +208,8 @@ struct s_Solver {
   Map allowuninstallmap;		/* ok to uninstall those */
   int allowuninstall_all;
 
+  Map excludefromweakmap;		/* remove them from candidates for supplements and recommends */
+
   Id *favormap;				/* favor job index, > 0: favored, < 0: disfavored */
   int havedisfavored;			/* do we have disfavored packages? */
 
@@ -248,6 +250,7 @@ typedef struct s_Solver Solver;
 #define SOLVER_FAVOR			0x0c00
 #define SOLVER_DISFAVOR			0x0d00
 #define SOLVER_BLACKLIST		0x0e00
+#define SOLVER_EXCLUDEFROMWEAK		0x1000
 
 #define SOLVER_JOBMASK			0xff00
 
