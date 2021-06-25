@@ -17,6 +17,7 @@ int pool_evrcmp_conda(const Pool *pool, const char *evr1, const char *evr2, int 
 int solvable_conda_matchversion(Solvable *s, const char *version);
 Id pool_addrelproviders_conda(Pool *pool, Id name, Id evr, Queue *plist);
 Id pool_conda_matchspec(Pool *pool, const char *name);
+int conda_compare_bounds(const char* b1, const char* b2);
 
 #endif /* LIBSOLV_CONDA_H */
 

@@ -134,7 +134,7 @@ solv_vercmp_conda(const char *s1, const char *q1, const char *s2, const char *q2
 		return -1;
 	      if (s1p - s1 > s2p - s2)
 		return 1;
-	      r = s1p - s1 ? strncmp(s1, s2, s1p - s1) : 0;
+	      r = (s1p - s1) ? strncmp(s1, s2, s1p - s1) : 0;
 	      if (r)
 		return r;
 	    }
@@ -678,3 +678,166 @@ pool_conda_matchspec(Pool *pool, const char *name)
   return pool_rel2id(pool, nameid, evrid, REL_CONDA, 1);
 }
 
+int find_lower_upper_bound(const char* c, 
+    char* lower, int* lowerflag, char* upper, int* upperflag)
+{
+  lower[0] = '\0';
+  upper[0] = '\0';
+  *lowerflag = 0;
+  *upperflag = 0;
+
+  if (!c)
+    {
+      // Infinity bound => lower[0] == '\0' && flag == REL_GT | REL_EQ
+      // return infinity lower & upper
+      *lowerflag = REL_GT | REL_EQ;
+      *upperflag = REL_GT | REL_EQ;
+      return 1;
+    }
+
+  int len = strlen(c);
+  const char* lowerbegin = NULL;
+  const char* lowerend;
+  const char* upperbegin = NULL;
+  const char* upperend;
+  const char* p;
+  const char** toend = NULL;
+  int has_star = 0;
+
+  for (int i = 0; i < len; ++i)
+    {
+      if (c[i] == ' ') break;
+      if (c[i] == '>')
+       {
+          *lowerflag = REL_GT;
+          ++i;
+          if (len > i && c[i] == '=')
+            {
+              *lowerflag |= REL_EQ;
+              ++i;
+            }
+          p = lowerbegin = &c[i];
+          toend = &lowerend;
+        }
+      else if (c[i] == '<')
+        {
+          *upperflag = REL_LT;
+          ++i;
+          if (len > i && c[i] == '=')
+            {
+              *upperflag |= REL_EQ;
+              ++i;
+            }
+          p = upperbegin = &c[i];
+          toend = &upperend;
+        }
+      else if (c[i] == '=')
+        {
+          ++i;
+          if (c[i] == '=')
+            {
+              ++i;
+              *lowerflag = REL_EQ;
+              *upperflag = REL_EQ;
+            }
+          else
+            {
+              *lowerflag = REL_EQ | REL_LT | REL_GT;
+              *upperflag = REL_EQ | REL_LT | REL_GT;
+              has_star = 1;
+            }
+          p = lowerbegin = &c[i];
+          toend = &lowerend;
+        }
+      else if (c[i] == ',' || c[i] == '|')
+        {
+          // ignore
+        }
+      else
+        {
+	  *lowerflag = REL_EQ;
+          *upperflag = REL_EQ;
+          p = lowerbegin = &c[i];
+          toend = &lowerend;
+        }
+      if (toend)
+        {
+          while (*p && *p != ',' && *p != '|' && *p != ' ')
+            ++p, ++i;
+          *toend = p;
+          toend = NULL;
+          if (*p == ' ') break;
+        }
+  }
+
+  if (!upperbegin)
+    {
+      if (*(lowerend - 1) == '*' || has_star)
+        {
+          *upperflag = REL_GT | REL_LT | REL_EQ;
+          *lowerflag = REL_GT | REL_LT | REL_EQ;
+          const char* p = lowerend - 1;
+          while (p > lowerbegin && (*p == '*' || *p == '.')) p--;
+          lowerend = p + 1;
+        }
+      upperbegin = lowerbegin;
+      upperend   = lowerend;
+    }
+
+  if (lowerbegin != NULL)
+    strncat(lower, lowerbegin, lowerend - lowerbegin);
+
+  if (upperbegin != NULL && upperbegin != upper)
+    strncat(upper, upperbegin, upperend - upperbegin);
+
+  printf("\nLower: %s\nUpper: %s\nFlags: %d\n", lower, upper, *upperflag);
+  return 1;
+}
+
+int conda_compare_bounds(const char* b1, const char* b2)
+{
+  if (!b1 || !b2)
+  {
+    if (!b1 && !b2) return  0;
+    if (b1 && !b2)  return  1;
+    if (!b1 && b2)  return -1;
+  }
+
+  // TODO handle infty bounds
+  int lf1, uf1, lf2, uf2;
+  char l1[100] = "", u1[100] = "";
+  char l2[100] = "", u2[100] = "";
+  find_lower_upper_bound(b1, l1, &lf1, u1, &uf1);
+  find_lower_upper_bound(b2, l2, &lf2, u2, &uf2);
+
+  // if lower bound different, prefer package with higher lower bound
+  // if upper bound different, prefer package with higher upper bound
+
+  // edge cases `=3.7, >=3.7 --> lower bound equal, upper bound different
+  // edge cases `==3.7, =3.7 --> lower bound equal, upper bound different
+
+  // both lower pin with * at end
+  if (lf1 == lf2)
+  {
+    int l_evr_cmp = pool_evrcmp_conda(NULL, l1, l2, 0);
+    if (l_evr_cmp != 0)
+    {
+      return -l_evr_cmp;
+    }
+  }
+  else
+  {
+    int l_evr_cmp = pool_evrcmp_conda(NULL, l1, l2, 0);
+    // TODO
+    // need some logic here to normalize the bounds 
+    // depending on the comparison function
+    return -l_evr_cmp;
+  }
+
+  int u_evr_cmp = pool_evrcmp_conda(NULL, u1, u2, 0);
+  if (u_evr_cmp != 0)
+  {
+      return u_evr_cmp;
+  }
+  return u_evr_cmp;
+}
