@@ -45,6 +45,9 @@ extern void pool_best_solvables(Pool *pool, Queue *plist, int flags);
 extern void prune_to_best_version(Pool *pool, Queue *plist);
 extern void policy_prefer_favored(Solver *solv, Queue *plist);
 
+#ifdef ENABLE_CONDA
+extern void prune_to_best_version_conda(Pool *pool, Queue *plist);
+#endif
 
 #ifdef __cplusplus
 }

@@ -134,7 +134,7 @@ solv_vercmp_conda(const char *s1, const char *q1, const char *s2, const char *q2
 		return -1;
 	      if (s1p - s1 > s2p - s2)
 		return 1;
-	      r = s1p - s1 ? strncmp(s1, s2, s1p - s1) : 0;
+	      r = (s1p - s1) ? strncmp(s1, s2, s1p - s1) : 0;
 	      if (r)
 		return r;
 	    }
