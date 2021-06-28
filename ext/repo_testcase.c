@@ -480,6 +480,12 @@ testcase_write_testtags(Repo *repo, FILE *fp)
       tmp = solvable_lookup_str(s, SOLVABLE_BUILDVERSION);
       if (tmp)
         fprintf(fp, "=Bvr: %s\n", tmp);
+      if (solvable_lookup_idarray(s, SOLVABLE_TRACK_FEATURES, &q))
+	{
+	  int i;
+	  for (i = 0; i < q.count; i++)
+	    fprintf(fp, "=Trf: %s\n", pool_id2str(pool, q.elements[i]));
+	}
       ti = solvable_lookup_num(s, SOLVABLE_BUILDTIME, 0);
       if (ti)
 	fprintf(fp, "=Tim: %u\n", ti);
@@ -706,6 +712,9 @@ testcase_add_testtags(Repo *repo, FILE *fp, int flags)
 	  break;
 	case 'B' << 16 | 'v' << 8 | 'r':
 	  repodata_set_str(data, s - pool->solvables, SOLVABLE_BUILDVERSION, line + 6);
+	  break;
+	case 'T' << 16 | 'r' << 8 | 'f':
+	  repodata_add_poolstr_array(data, s - pool->solvables, SOLVABLE_TRACK_FEATURES, line + 6);
 	  break;
         default:
 	  break;
