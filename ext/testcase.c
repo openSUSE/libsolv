@@ -1193,6 +1193,7 @@ static struct rclass2str {
   { SOLVER_RULE_YUMOBS, "yumobs" },
   { SOLVER_RULE_BLACK, "black" },
   { SOLVER_RULE_RECOMMENDS, "recommends" },
+  { SOLVER_RULE_TRACKFEATURE, "trackfeature" },
   { 0, 0 }
 };
 

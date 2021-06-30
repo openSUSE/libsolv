@@ -79,6 +79,9 @@ struct s_Solver {
   Id blackrules;			/* rules from blacklisted packages */
   Id blackrules_end;
 
+  Id trackfeaturerules;			/* rules from packages containing track features */
+  Id trackfeaturerules_end;
+
   Id choicerules;			/* choice rules (always weak) */
   Id choicerules_end;
   Id *choicerules_info;			/* the rule we used to generate the choice rule */
@@ -215,6 +218,8 @@ struct s_Solver {
   int do_extra_reordering;		/* reorder for future installed packages */
 
   Queue *recommendsruleq;		/* pkg rules comming from recommends */
+
+  Queue *allowedtrackfeatureq;		/* which track features may be installed */
 #endif	/* LIBSOLV_INTERNAL */
 };
 

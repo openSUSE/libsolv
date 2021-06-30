@@ -132,6 +132,8 @@ solver_printruleclass(Solver *solv, int type, Rule *r)
     POOL_DEBUG(type, "BLACK ");
   else if (p >= solv->recommendsrules && p < solv->recommendsrules_end)
     POOL_DEBUG(type, "RECOMMENDS ");
+  else if (p >= solv->trackfeaturerules && p < solv->trackfeaturerules_end)
+    POOL_DEBUG(type, "TRACKFEATURE ");
   solver_printrule(solv, type, r);
 }
 

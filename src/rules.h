@@ -74,7 +74,8 @@ typedef enum {
   SOLVER_RULE_BEST = 0x900,
   SOLVER_RULE_YUMOBS = 0xa00,
   SOLVER_RULE_RECOMMENDS = 0xb00,
-  SOLVER_RULE_BLACK = 0xc00
+  SOLVER_RULE_BLACK = 0xc00,
+  SOLVER_RULE_TRACKFEATURE = 0xd00
 } SolverRuleinfo;
 
 #define SOLVER_RULE_TYPEMASK    0xff00
@@ -141,6 +142,10 @@ extern void solver_addblackrules(struct s_Solver *solv);
 
 /* recommends rules */
 extern void solver_addrecommendsrules(struct s_Solver *solv);
+
+/* trackfeature rules */
+void solver_allow_trackfeature(struct s_Solver *solv, Id id);
+void solver_addtrackfeaturerules(struct s_Solver *solv, Map *addedmap);
 
 /* policy rule disabling/reenabling */
 extern void solver_disablepolicyrules(struct s_Solver *solv);

@@ -32,6 +32,7 @@ struct s_Solver;
 void solver_recordproblem(struct s_Solver *solv, Id rid);
 void solver_fixproblem(struct s_Solver *solv, Id rid);
 Id solver_autouninstall(struct s_Solver *solv, int start);
+Id solver_autoallowtrackfeature(struct s_Solver *solv, int start);
 void solver_disableproblemset(struct s_Solver *solv, int start);
 
 int solver_prepare_solutions(struct s_Solver *solv);

@@ -253,6 +253,13 @@ makeruledecisions(Solver *solv, int disablerules)
 	    }
 	  queue_push(&solv->problems, 0);			/* finish problem */
 
+	  if (solv->allowedtrackfeatureq && solver_autoallowtrackfeature(solv, oldproblemcount) != 0)
+	    {
+	      solv->problems.count = oldproblemcount;
+	      havedisabled = 1;
+	      break;	/* start over */
+	    }
+
 	  /* try autouninstall if requested */
 	  if (doautouninstall)
 	    {
@@ -1028,6 +1035,14 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
     }
   queue_free(&weakq);
 
+  if (solv->allowedtrackfeatureq && solver_autoallowtrackfeature(solv, oldproblemcount) != 0)
+    {
+      solv->problems.count = oldproblemcount;
+      solv->learnt_pool.count = oldlearntpoolcount;
+      solver_reset(solv);
+      return 0;
+    }
+
   if (solv->allowuninstall || solv->allowuninstall_all || solv->allowuninstallmap.size)
     if (solver_autouninstall(solv, oldproblemcount) != 0)
       {
@@ -1383,6 +1398,7 @@ solver_free(Solver *solv)
   queuep_free(&solv->suggestscplxq);
   queuep_free(&solv->brokenorphanrules);
   queuep_free(&solv->recommendsruleq);
+  queuep_free(&solv->allowedtrackfeatureq);
 
   map_free(&solv->recommendsmap);
   map_free(&solv->suggestsmap);
@@ -3415,6 +3431,7 @@ solver_solve(Solver *solv, Queue *job)
   /* free old stuff in case we re-run a solver */
   queuep_free(&solv->update_targets);
   queuep_free(&solv->cleandeps_updatepkgs);
+  queuep_free(&solv->allowedtrackfeatureq);
   queue_empty(&solv->ruleassertions);
   solv->bestrules_info = solv_free(solv->bestrules_info);
   solv->yumobsrules_info = solv_free(solv->yumobsrules_info);
@@ -4057,6 +4074,11 @@ solver_solve(Solver *solv, Queue *job)
   else
     solv->blackrules = solv->blackrules_end = solv->nrules;
 
+  if (pool->disttype == DISTTYPE_CONDA)
+    solver_addtrackfeaturerules(solv, &addedmap);
+  else
+    solv->trackfeaturerules = solv->trackfeaturerules_end = solv->nrules;
+
   if (solv->havedisfavored && solv->strongrecommends && solv->recommendsruleq)
     solver_addrecommendsrules(solv);
   else
@@ -4077,7 +4099,7 @@ solver_solve(Solver *solv, Queue *job)
   map_free(&installcandidatemap);
   queue_free(&q);
 
-  POOL_DEBUG(SOLV_DEBUG_STATS, "%d pkg rules, 2 * %d update rules, %d job rules, %d infarch rules, %d dup rules, %d choice rules, %d best rules, %d yumobs rules\n", solv->pkgrules_end - 1, solv->updaterules_end - solv->updaterules, solv->jobrules_end - solv->jobrules, solv->infarchrules_end - solv->infarchrules, solv->duprules_end - solv->duprules, solv->choicerules_end - solv->choicerules, solv->bestrules_end - solv->bestrules, solv->yumobsrules_end - solv->yumobsrules);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "%d pkg rules, 2 * %d update rules, %d job rules, %d infarch rules, %d dup rules, %d choice rules, %d best rules, %d yumobs rules, %d trackfeature rules\n", solv->pkgrules_end - 1, solv->updaterules_end - solv->updaterules, solv->jobrules_end - solv->jobrules, solv->infarchrules_end - solv->infarchrules, solv->duprules_end - solv->duprules, solv->choicerules_end - solv->choicerules, solv->bestrules_end - solv->bestrules, solv->yumobsrules_end - solv->yumobsrules, solv->trackfeaturerules_end - solv->trackfeaturerules);
   POOL_DEBUG(SOLV_DEBUG_STATS, "overall rule memory used: %d K\n", solv->nrules * (int)sizeof(Rule) / 1024);
 
   /* create weak map */

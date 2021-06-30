@@ -2992,6 +2992,12 @@ solver_ruleinfo(Solver *solv, Id rid, Id *fromp, Id *top, Id *depp)
 	*fromp = -r->p;
       return SOLVER_RULE_BLACK;
     }
+  if (rid >= solv->trackfeaturerules && rid < solv->trackfeaturerules_end)
+    {
+      if (fromp)
+	*fromp = -r->p;
+      return SOLVER_RULE_TRACKFEATURE;
+    }
   if (rid >= solv->choicerules && rid < solv->choicerules_end)
     return SOLVER_RULE_CHOICE;
   if (rid >= solv->recommendsrules && rid < solv->recommendsrules_end)
@@ -3030,6 +3036,8 @@ solver_ruleclass(Solver *solv, Id rid)
     return SOLVER_RULE_RECOMMENDS;
   if (rid >= solv->blackrules && rid < solv->blackrules_end)
     return SOLVER_RULE_BLACK;
+  if (rid >= solv->trackfeaturerules && rid < solv->trackfeaturerules_end)
+    return SOLVER_RULE_TRACKFEATURE;
   if (rid >= solv->learntrules && rid < solv->nrules)
     return SOLVER_RULE_LEARNT;
   return SOLVER_RULE_UNKNOWN;
@@ -4227,3 +4235,94 @@ solver_check_brokenorphanrules(Solver *solv, Queue *dq)
     }
 }
 
+static int
+queue_contains_sorted(Queue *q, Id id, int insert)
+{
+  int i;
+  for (i = 0; i < q->count; i++)
+    {
+      if (q->elements[i] == id)
+	return 1;
+      if (q->elements[i] > id)
+	break;
+    }
+  if (insert)
+    queue_insert(q, i, id);
+  return 0;
+}
+
+void
+solver_allow_trackfeature(Solver *solv, Id id)
+{
+  Pool *pool = solv->pool;
+  int i, j;
+  Rule *r;
+  Queue q;
+  Id p;
+  if (queue_contains_sorted(solv->allowedtrackfeatureq, id, 1))
+    return;		/* already allowed? */
+  queue_init(&q);
+  for (i = solv->trackfeaturerules, r = solv->rules + i; i < solv->trackfeaturerules_end; i++, r++)
+    {
+      if (r->d < 0)
+	continue;	/* already disabled */
+      p = -r->p;
+      solvable_lookup_idarray(pool->solvables + p, SOLVABLE_TRACK_FEATURES, &q);
+      if (!queue_contains_sorted(&q, id, 0))
+	continue;
+      for (j = 0; j < q.count; j++)
+	if (q.elements[j] != id && !queue_contains_sorted(solv->allowedtrackfeatureq, q.elements[j], 0))
+	  break;
+      if (j == q.count)
+	solver_disablerule(solv, r);
+    }
+  queue_free(&q);
+}
+
+void
+solver_addtrackfeaturerules(Solver *solv, Map *addedmap)
+{
+  Pool *pool = solv->pool;
+  Repo *installed = solv->installed;
+  Id p;
+  Solvable *s;
+  Queue q;
+  int i;
+
+  solv->trackfeaturerules = solv->nrules;
+  queue_init(&q);
+  solv->allowedtrackfeatureq = solv_calloc(1, sizeof(Queue));
+  queue_init(solv->allowedtrackfeatureq);
+  FOR_REPO_SOLVABLES(installed, p, s)
+    {
+      solvable_lookup_idarray(s, SOLVABLE_TRACK_FEATURES, &q);
+      if (!q.elements)
+	continue;
+      for (i = 0; i < q.count; i++)
+	queue_contains_sorted(solv->allowedtrackfeatureq, q.elements[i], 1);
+    }
+  FOR_POOL_SOLVABLES(p)
+    {
+      Solvable *s = pool->solvables + p;
+      if (s->repo == installed)
+	continue;
+      if (!MAPTST(addedmap, p))
+	continue;		/* not possible to install */
+      solvable_lookup_idarray(s, SOLVABLE_TRACK_FEATURES, &q);
+      if (!q.count)
+	continue;
+      for (i = 0; i < q.count; i++)
+	if (!queue_contains_sorted(solv->allowedtrackfeatureq, q.elements[i], 0))
+	  break;
+      if (i < q.count) {
+        solver_addrule(solv, -p, 0, 0);
+}
+    }
+  solv->trackfeaturerules_end = solv->nrules;
+  if (solv->trackfeaturerules == solv->trackfeaturerules_end)
+    {
+      queue_free(solv->allowedtrackfeatureq);
+      solv->allowedtrackfeatureq = solv_free(solv->allowedtrackfeatureq);
+    }
+  queue_free(&q);
+}

@@ -316,6 +316,74 @@ solver_autouninstall(Solver *solv, int start)
   return v;
 }
 
+static inline int
+queue_contains(Queue *q, Id id)
+{
+  int i;
+  for (i = 0; i < q->count; i++) 
+    if (q->elements[i] == id)
+      return 1;
+  return 0;
+}
+
+static int
+autoallowtrackfeature_sortcmp(const void *ap, const void *bp, void *dp)
+{
+  Pool *pool = dp;
+  Id *a = (Id *)ap, *b = (Id *)bp;
+  if (a[1] != b[1])
+    return a[1] - b[1];
+  if (a[0] != b[0])
+    return strcmp(pool_id2str(pool, b[0]), pool_id2str(pool, a[0]));
+  return 0;
+}
+
+/*-------------------------------------------------------------------
+ * try to fix a problem by autodisabling trackfeature rules
+ */
+Id
+solver_autoallowtrackfeature(Solver *solv, int start)
+{
+  Pool *pool = solv->pool;
+  int i, j, cnt, oldcount;
+  Id v, p, id;
+  Queue q, dq;
+
+  if (!solv->allowedtrackfeatureq)
+    return 0;
+  queue_init(&q);
+  queue_init(&dq);
+  for (i = start + 1; i < solv->problems.count - 1; i++)
+    {
+      v = solv->problems.elements[i];
+      if (v < solv->trackfeaturerules || v >= solv->trackfeaturerules_end)
+	continue;
+      p = -solv->rules[v].p;
+      solvable_lookup_idarray(pool->solvables + p, SOLVABLE_TRACK_FEATURES, &q);
+      cnt = 0;
+      oldcount = dq.count;
+      for (j = 0; j < q.count; j++)
+	{
+	  if (queue_contains(solv->allowedtrackfeatureq, q.elements[j]))
+	    continue;
+	  queue_push2(&dq, q.elements[j], 0);
+	  cnt++;
+	}
+      for (j = oldcount; j < dq.count; j += 2)
+	dq.elements[j + 1] = cnt;
+    }
+  if (dq.count > 2)
+    solv_sort(dq.elements, dq.count / 2, sizeof(Id) * 2, autoallowtrackfeature_sortcmp, pool);
+  id = dq.count ? dq.elements[0] : 0;
+  queue_free(&dq);
+  queue_free(&q);
+  if (id)
+    {
+      POOL_DEBUG(SOLV_DEBUG_UNSOLVABLE, "autoallowing track feature %s\n", pool_id2str(pool, id));
+      solver_allow_trackfeature(solv, id);
+    }
+  return id;
+}
 
 /*-------------------------------------------------------------------
  * enable weak rules
