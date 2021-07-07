@@ -968,16 +968,29 @@ void intersect_selection(Pool* pool, Id dep, Queue* prev)
 
 int check_deps_unequal(Pool* pool, Queue* q1, Queue* q2, Id name)
 {
-  Id h1 = 0, h2 = 0;
-  int i;
-
+  Id dep;
+  int i, j;
+  int found = 0;
   for (i = 0; i < q1->count; ++i)
-    h1 ^= q1->elements[i];
+  {
+    dep = q1->elements[i];
+    if (ISRELDEP(dep) && GETRELDEP(pool, dep)->name == name)
+    {
+      for (j = 0; j < q2->count; ++j)
+      {
+        if (q2->elements[j] == dep)
+        {
+          found = 1;
+          break;
+        }
+      }
+      if (!found)
+        return 1;
 
-  for (i = 0; i < q2->count; ++i)
-    h2 ^= q2->elements[i];
-
-  return h1 != h2;
+      found = 0;
+    }
+  }
+  return 0;
 }
 
 Id best_matching(Pool* pool, Queue* q, Id name, int* all_have_trackfeatures)
@@ -1061,7 +1074,6 @@ int conda_compare_dependencies(Pool *pool, Solvable *s1, Solvable *s2)
 
     // first make sure that deps are different between a & b
     int deps_unequal = check_deps_unequal(pool, &q1, &q2, rd1->name);
-
     if (!deps_unequal)
       {
         queue_push(&seen, rd1->name);
@@ -1076,7 +1088,6 @@ int conda_compare_dependencies(Pool *pool, Solvable *s1, Solvable *s2)
     // ignoring this case for now
     if (b1 == 0 || b2 == 0)
       continue;
-      // comparison_result += (b1 - b2);
 
     // if one has deps with track features, and the other does not, 
     // downweight the one with track features
@@ -1114,7 +1125,9 @@ sort_by_best_dependencies(const void *ap, const void *bp, void *dp)
 
     unsigned long long bta = repodata_lookup_num(ra, a, SOLVABLE_BUILDTIME, 0ull);
     unsigned long long btb = repodata_lookup_num(rb, b, SOLVABLE_BUILDTIME, 0ull);
-    res = btb - bta;
+
+    res = (btb > bta) ? 1 : -1;
+    POOL_DEBUG(SOLV_DEBUG_POLICY, "Fallback to timestamp comparison: %llu vs %llu: [%d]\n", bta, btb, res);
   }
 
   POOL_DEBUG(SOLV_DEBUG_POLICY, "Selecting variant [%c] of (a) %s vs (b) %s (score: %d)\n",
