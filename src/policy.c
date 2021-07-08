@@ -1196,7 +1196,7 @@ prune_to_best_version_conda(Pool *pool, Queue *plist)
 
   Queue q;
   queue_init(&q);
-  for (i = j = 0; i < plist->count; i++)
+  for (i = 0; i < plist->count; i++)
     {
       s = pool->solvables + plist->elements[i];
       r = pool_featurecountcmp(pool, best, s);
@@ -1212,8 +1212,6 @@ prune_to_best_version_conda(Pool *pool, Queue *plist)
 
   if (q.count > 1)
     {
-      Queue sq;
-      queue_init(&sq);
       // order by first-level deps
       solv_sort(q.elements, q.count, sizeof(Id), sort_by_best_dependencies, pool);
     }
