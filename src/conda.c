@@ -670,7 +670,7 @@ pool_conda_matchspec(Pool *pool, const char *name)
   if (build)
     {
       *p++ = ' ';
-      memcpy(p, build, buildend - build);
+      memmove(p, build, buildend - build);
       p += buildend - build;
     }
   evrid = pool_strn2id(pool, version, p - version, 1);
