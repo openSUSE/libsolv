@@ -1066,7 +1066,7 @@ int conda_compare_dependencies(Pool *pool, Solvable *s1, Solvable *s2)
 
     Reldep* rd1 = GETRELDEP(pool, x1);
     for (j = 0; j < seen.count && has_seen == 0; ++j)
-      if (seen.elements[i] == rd1->name)
+      if (seen.elements[j] == rd1->name)
         has_seen = 1;
 
     if (has_seen)
