@@ -4143,25 +4143,50 @@ solver_addrecommendsrules(Solver *solv)
 
 /* add rules to exclude solvables provided by lower
  * precedence repositories */
-void solver_addstrictrepopriorules(struct s_Solver *solv)
+void solver_addstrictrepopriorules(struct s_Solver *solv, Map *addedmap)
 {
   Pool *pool = solv->pool;
-  Solvable *s;
-  Id sid, p, pp;
+	Solvable *s;
+	Id p, p2, pp2;
+	Map priomap;
+	int max_prio;
 
-  solv->strictrepopriorules = solv->nrules;
-  FOR_POOL_SOLVABLES(sid)
-  {
-	s = pool->solvables + sid;
-	int max_prio = 0;
-	FOR_PROVIDES(p, pp, s->name)
-	  if ((pool->solvables + p)->repo->priority > max_prio)
-	    max_prio = (pool->solvables + p)->repo->priority;
+	map_init_clone(&priomap, addedmap);
+	solv->strictrepopriorules = solv->nrules;
 
-	if (s->repo->priority < max_prio)
-	  solver_addrule(solv, -sid, 0, 0);
-  }
-  solv->strictrepopriorules_end = solv->nrules;
+	FOR_POOL_SOLVABLES(p)
+	{
+		if (!MAPTST(&priomap, p))
+		  	continue;
+
+		s = pool->solvables + p;
+		max_prio = s->repo->priority;
+		FOR_PROVIDES(p2, pp2, s->name)
+		{
+		Solvable *s2 = pool->solvables + p2;
+		if (s->name != s2->name)
+		{
+		MAPCLR(&priomap, p2);
+			continue;
+		}
+		if (s2->repo->priority > max_prio)
+			max_prio = s2->repo->priority;
+		}
+		
+    FOR_PROVIDES(p2, pp2, s->name)
+		{
+		Solvable *s2 = pool->solvables + p2;
+		if (!MAPTST(&priomap, p2))
+	    continue;
+		MAPCLR(&priomap, p2);
+		if (pool->installed && s2->repo == pool->installed)
+			continue;
+		if (s2->repo->priority < max_prio)
+			solver_addrule(solv, -p2, 0, 0);
+		}
+	}
+	solv->strictrepopriorules_end = solv->nrules;
+	map_free(&priomap);
 }
 
 void

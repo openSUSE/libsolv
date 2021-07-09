@@ -4068,7 +4068,7 @@ solver_solve(Solver *solv, Queue *job)
     solv->recommendsrules = solv->recommendsrules_end = solv->nrules;
 
   if (solv->strict_repo_priority)
-    solver_addstrictrepopriorules(solv);
+    solver_addstrictrepopriorules(solv, &addedmap);
   else
     solv->strictrepopriorules = solv->strictrepopriorules_end = solv->nrules;
 
