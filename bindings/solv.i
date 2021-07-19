@@ -10,6 +10,12 @@
 %markfunc Pool "mark_Pool";
 #endif
 
+#ifdef SWIGPYTHON
+%begin %{
+#define PY_SSIZE_T_CLEAN
+%}
+#endif
+
 /**
  ** binaryblob handling
  **/
@@ -69,7 +75,7 @@ typedef struct {
 
 %typemap(out,noblock=1,fragment="SWIG_FromCharPtrAndSize") BinaryBlob {
 #if defined(SWIGPYTHON) && defined(PYTHON3)
-  $result = $1.data ? Py_BuildValue("y#", $1.data, $1.len) : SWIG_Py_Void();
+  $result = $1.data ? Py_BuildValue("y#", $1.data, (Py_ssize_t)$1.len) : SWIG_Py_Void();
 #elif defined(SWIGTCL)
   Tcl_SetObjResult(interp, $1.data ? Tcl_NewByteArrayObj($1.data, $1.len) : NULL);
 #else
