@@ -29,7 +29,7 @@
 %else
 %bcond_with zstd
 %endif
-%if 0%{?fedora} || 0%{?rhel} >= 7 || 0%{?mageia} >= 6 || 0%{?suse_version} >= 1330
+%if 0%{?fedora} || 0%{?rhel} >= 7 || 0%{?mageia} >= 6 || 0%{?suse_version} >= 1315
 %bcond_without richdeps
 %else
 %bcond_with richdeps

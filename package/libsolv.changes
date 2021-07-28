@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Wed Jul 28 10:19:08 CEST 2021 - mls@suse.de
+
+- Turn on rich dependency handling needed for ptf support
+  [jsc#SLE-17973] 
+
+-------------------------------------------------------------------
 Wed May 26 14:25:00 CEST 2021 - mls@suse.de
 
 - fix heap-buffer-overflow in repodata_schema2id [CVE-2019-20387]
