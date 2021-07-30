@@ -1,7 +1,7 @@
 #
 # spec file for package libsolv
 #
-# Copyright (c) 2018 SUSE LINUX GmbH, Nuernberg, Germany.
+# Copyright (c) 2021 SUSE LLC
 #
 # All modifications and additions to the file contributed by third parties
 # remain the property of their copyright owners, unless otherwise agreed
@@ -12,8 +12,9 @@
 # license that conforms to the Open Source Definition (Version 1.9)
 # published by the Open Source Initiative.
 
-# Please submit bugfixes or comments via http://bugs.opensuse.org/
+# Please submit bugfixes or comments via https://bugs.opensuse.org/
 #
+
 
 %define libname libsolv@LIBSOLV_SOVERSION@
 
@@ -37,7 +38,11 @@
 # we need at least swig 1.3.40 for the bindings ($typemap support)
 %if 0%{?suse_version} != 1110
 %bcond_without python3
+%if 0%{?suse_version} < 1550
 %bcond_without python
+%else
+%bcond_with python
+%endif
 %bcond_without ruby
 %bcond_without perl
 %else
@@ -56,7 +61,7 @@ Release:        0
 Summary:        Package dependency solver using a satisfiability algorithm
 License:        BSD-3-Clause
 Group:          Development/Libraries/C and C++
-Url:            https://github.com/openSUSE/libsolv
+URL:            https://github.com/openSUSE/libsolv
 Source:         libsolv-%{version}.tar.bz2
 BuildRequires:  cmake
 BuildRequires:  gcc-c++
@@ -111,7 +116,6 @@ BuildRequires:  xz-devel
 %if %{with zstd}
 BuildRequires:  libzstd-devel
 %endif
-
 
 %description
 libsolv is a library for solving packages and reading repositories.

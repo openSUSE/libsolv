@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Fri Jul 30 11:43:29 UTC 2021 - Dominique Leuenberger <dimstar@opensuse.org>
+
+- Disable python2 usage on suse_version >= 1550 by default (still
+  possible to use osc build --with=python).
+
+-------------------------------------------------------------------
 Wed Apr  7 14:56:16 CEST 2021 - mls@suse.de
 
 - fix rare segfault in resolve_jobrules() that could happen
