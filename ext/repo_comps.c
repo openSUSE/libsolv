@@ -54,6 +54,8 @@ enum state {
   STATE_CDISPLAY_ORDER,
   STATE_GROUPLIST,
   STATE_GROUPID,
+  STATE_ENVIRONMENT,
+  STATE_OPTIONLIST,
   NUMSTATES
 };
 
@@ -61,6 +63,7 @@ static struct solv_xmlparser_element stateswitches[] = {
   { STATE_START,       "comps",         STATE_COMPS,         0 },
   { STATE_COMPS,       "group",         STATE_GROUP,         0 },
   { STATE_COMPS,       "category",      STATE_CATEGORY,      0 },
+  { STATE_COMPS,       "environment",   STATE_ENVIRONMENT,   0 },
   { STATE_GROUP,       "id",            STATE_ID,            1 },
   { STATE_GROUP,       "name",          STATE_NAME,          1 },
   { STATE_GROUP,       "description",   STATE_DESCRIPTION,   1 },
@@ -77,6 +80,13 @@ static struct solv_xmlparser_element stateswitches[] = {
   { STATE_CATEGORY ,   "grouplist",     STATE_GROUPLIST,     0 },
   { STATE_CATEGORY ,   "display_order", STATE_DISPLAY_ORDER, 1 },
   { STATE_GROUPLIST,   "groupid",       STATE_GROUPID,       1 },
+  { STATE_ENVIRONMENT, "id",            STATE_ID,            1 },
+  { STATE_ENVIRONMENT, "name",          STATE_NAME,          1 },
+  { STATE_ENVIRONMENT, "description",   STATE_DESCRIPTION,   1 },
+  { STATE_ENVIRONMENT, "grouplist",     STATE_GROUPLIST,     0 },
+  { STATE_ENVIRONMENT, "optionlist",    STATE_OPTIONLIST,    0 },
+  { STATE_ENVIRONMENT, "display_order", STATE_DISPLAY_ORDER, 1 },
+  { STATE_OPTIONLIST,  "groupid",       STATE_GROUPID,       1 },
   { NUMSTATES }
 };
 
@@ -128,9 +138,15 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
     {
     case STATE_GROUP:
     case STATE_CATEGORY:
+    case STATE_ENVIRONMENT:
       s = pd->solvable = pool_id2solvable(pool, repo_add_solvable(pd->repo));
       pd->handle = s - pool->solvables;
-      pd->kind = state == STATE_GROUP ? "group" : "category";
+      if (state == STATE_GROUP)
+        pd->kind = "group";
+      else if (state == STATE_CATEGORY)
+        pd->kind = "category";
+      else
+        pd->kind = "environment";
       pd->isvisible = COMPS_DEFAULT_ISVISIBLE;
       pd->isdefault = COMPS_DEFAULT_ISDEFAULT;
       break;
@@ -160,6 +176,18 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
 	break;
       }
 
+    case STATE_GROUPLIST:
+      {
+	pd->reqtype = SOLVABLE_REQUIRES;
+	break;
+      }
+
+    case STATE_OPTIONLIST:
+      {
+	pd->reqtype = SOLVABLE_SUGGESTS;
+	break;
+      }
+
     default:
       break;
     }
@@ -177,6 +205,7 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
     {
     case STATE_GROUP:
     case STATE_CATEGORY:
+    case STATE_ENVIRONMENT:
       if (!s->arch)
 	s->arch = ARCH_NOARCH;
       if (!s->evr)
@@ -211,7 +240,7 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
 
     case STATE_GROUPID:
       id = pool_str2id(pd->pool, join2(&pd->jd, "group", ":", content), 1);
-      s->requires = repo_addid_dep(pd->repo, s->requires, id, 0);
+      repo_add_idarray(pd->repo, pd->handle, pd->reqtype, id);
       break;
 
     case STATE_USERVISIBLE:
