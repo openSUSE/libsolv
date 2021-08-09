@@ -28,7 +28,7 @@ The libsolv documentation is split into multiple parts:
 Pointer Validity
 ----------------
 Note that all pointers to objects that have an Id have only a limited
-validity period, with the exception of Repo pointers. There are only
+validity period, with the exception of Repo pointers. They are only
 guaranteed to be valid until a new object of that type is added or an
 object of that type is removed. Thus pointers to Solvable objects are only 
 valid until another solvable is created, because adding a Solvable may
