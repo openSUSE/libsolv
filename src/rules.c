@@ -4165,24 +4165,21 @@ void solver_addstrictrepopriorules(struct s_Solver *solv, Map *addedmap)
 		{
 		Solvable *s2 = pool->solvables + p2;
 		if (s->name != s2->name)
-		{
-		MAPCLR(&priomap, p2);
 			continue;
-		}
 		if (s2->repo->priority > max_prio)
 			max_prio = s2->repo->priority;
 		}
 		
-    FOR_PROVIDES(p2, pp2, s->name)
+    	FOR_PROVIDES(p2, pp2, s->name)
 		{
 		Solvable *s2 = pool->solvables + p2;
-		if (!MAPTST(&priomap, p2))
-	    continue;
-		MAPCLR(&priomap, p2);
+        if (s->name != s2->name || !MAPTST(&priomap, p2))
+          continue;
+        MAPCLR(&priomap, p2);
 		if (pool->installed && s2->repo == pool->installed)
 			continue;
-		if (s2->repo->priority < max_prio)
-			solver_addrule(solv, -p2, 0, 0);
+        if (s2->repo->priority < max_prio)
+          solver_addrule(solv, -p2, 0, 0);
 		}
 	}
 	solv->strictrepopriorules_end = solv->nrules;
