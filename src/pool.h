@@ -13,6 +13,7 @@
 #ifndef LIBSOLV_POOL_H
 #define LIBSOLV_POOL_H
 
+#include <pthread.h>
 #include <stdio.h>
 
 #include "solvversion.h"
@@ -53,12 +54,13 @@ typedef struct s_Datapos {
 #ifdef LIBSOLV_INTERNAL
 
 /* how many strings to maintain (round robin) */
-#define POOL_TMPSPACEBUF 16
+#define POOL_TMPSPACEBUF 500
 
 struct s_Pool_tmpspace {
   char *buf[POOL_TMPSPACEBUF];
   int   len[POOL_TMPSPACEBUF];
   int   n;
+  pthread_mutex_t lock;
 };
 
 #endif
