@@ -2,7 +2,7 @@
 Wed Jul 28 10:19:08 CEST 2021 - mls@suse.de
 
 - Turn on rich dependency handling needed for ptf support
-  [jsc#SLE-17973] 
+  [jsc#SLE-17973] [jsc#SLE-17974]
 
 -------------------------------------------------------------------
 Wed May 26 14:25:00 CEST 2021 - mls@suse.de
