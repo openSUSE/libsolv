@@ -1398,6 +1398,8 @@ solver_free(Solver *solv)
   map_free(&solv->droporphanedmap);
   map_free(&solv->cleandepsmap);
   map_free(&solv->allowuninstallmap);
+  map_free(&solv->excludefromweakmap);
+
 
   solv_free(solv->favormap);
   solv_free(solv->decisionmap);
@@ -2202,6 +2204,20 @@ prune_disfavored(Solver *solv, Queue *plist)
     queue_truncate(plist, j);
 }
 
+static void
+prune_exclude_from_weak(Solver *solv, Queue *plist)
+{
+  int i, j;
+  for (i = j = 0; i < plist->count; i++)
+    {
+      Id p = plist->elements[i];
+      if (!MAPTST(&solv->excludefromweakmap, p))
+        plist->elements[j++] = p;
+    }
+  if (i != j)
+    queue_truncate(plist, j);
+}
+
 static int
 resolve_weak(Solver *solv, int level, int disablerules, Queue *dq, Queue *dqs, int *rerunp)
 {
@@ -2275,6 +2291,8 @@ resolve_weak(Solver *solv, int level, int disablerules, Queue *dq, Queue *dqs, i
 	    continue;
 	  if (solv->havedisfavored && solv->favormap[i] < 0)
 	    continue;	/* disfavored supplements, do not install */
+	  if (solv->excludefromweakmap.size && MAPTST(&solv->excludefromweakmap, i))
+	    continue;   /* excluded for weak deps, do not install */
 	  queue_push(dqs, i);
 	}
     }
@@ -2282,6 +2300,10 @@ resolve_weak(Solver *solv, int level, int disablerules, Queue *dq, Queue *dqs, i
   /* filter out disfavored recommended packages */
   if (dq->count && solv->havedisfavored)
     prune_disfavored(solv, dq);
+
+  /* filter out weak_excluded recommended packages */
+  if (solv->excludefromweakmap.size)
+    prune_exclude_from_weak(solv, dq);
 
   /* filter out all packages obsoleted by installed packages */
   /* this is no longer needed if we have (and trust) reverse obsoletes */
@@ -3320,6 +3342,37 @@ add_complex_jobrules(Solver *solv, Id dep, int flags, int jobidx, int weak)
 #endif
 
 static void
+solver_add_exclude_from_weak(Solver *solv)
+{
+  Queue *job = &solv->job;
+  Pool *pool = solv->pool;
+  int i;
+  Id p, pp, how, what, select;
+for (i = 0; i < job->count; i += 2)
+  {
+    how = job->elements[i];
+    if ((how & SOLVER_JOBMASK) != SOLVER_EXCLUDEFROMWEAK)
+	continue;
+    if (!solv->excludefromweakmap.size)
+	map_grow(&solv->excludefromweakmap, pool->nsolvables);
+    what = job->elements[i + 1];
+    select = how & SOLVER_SELECTMASK;
+    if (select == SOLVER_SOLVABLE_REPO)
+      {
+	Repo *repo = pool_id2repo(pool, what);
+	  if (repo)
+	    {
+	      Solvable *s;
+	      FOR_REPO_SOLVABLES(repo, p, s)
+		MAPSET(&solv->excludefromweakmap, p);
+	    }
+	}
+      FOR_JOB_SELECT(p, pp, select, what)
+	MAPSET(&solv->excludefromweakmap, p);
+    }
+}
+
+static void
 setup_favormap(Solver *solv)
 {
   Queue *job = &solv->job;
@@ -3385,6 +3438,7 @@ solver_solve(Solver *solv, Queue *job)
   int hasfavorjob = 0;
   int haslockjob = 0;
   int hasblacklistjob = 0;
+  int hasexcludefromweakjob = 0;
 
   solve_start = solv_timems(0);
 
@@ -3436,6 +3490,7 @@ solver_solve(Solver *solv, Queue *job)
   map_zerosize(&solv->droporphanedmap);
   solv->allowuninstall_all = 0;
   map_zerosize(&solv->allowuninstallmap);
+  map_zerosize(&solv->excludefromweakmap);
   map_zerosize(&solv->cleandepsmap);
   map_zerosize(&solv->weakrulemap);
   solv->favormap = solv_free(solv->favormap);
@@ -3999,6 +4054,10 @@ solver_solve(Solver *solv, Queue *job)
 	  POOL_DEBUG(SOLV_DEBUG_JOB, "job: blacklist %s\n", solver_select2str(pool, select, what));
 	  hasblacklistjob = 1;
 	  break;
+        case SOLVER_EXCLUDEFROMWEAK:
+	  POOL_DEBUG(SOLV_DEBUG_JOB, "job: excludefromweak %s\n", solver_select2str(pool, select, what));
+	  hasexcludefromweakjob = 1;
+	  break;
 	default:
 	  POOL_DEBUG(SOLV_DEBUG_JOB, "job: unknown job\n");
 	  break;
@@ -4056,6 +4115,9 @@ solver_solve(Solver *solv, Queue *job)
     solver_addblackrules(solv);
   else
     solv->blackrules = solv->blackrules_end = solv->nrules;
+
+  if (hasexcludefromweakjob)
+    solver_add_exclude_from_weak(solv);
 
   if (solv->havedisfavored && solv->strongrecommends && solv->recommendsruleq)
     solver_addrecommendsrules(solv);

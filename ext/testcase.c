@@ -60,6 +60,7 @@ static struct job2str {
   { SOLVER_FAVOR,          "favor" },
   { SOLVER_DISFAVOR,       "disfavor" },
   { SOLVER_BLACKLIST,      "blacklist" },
+  { SOLVER_EXCLUDEFROMWEAK,   "excludefromweak" },
   { 0, 0 }
 };
 
