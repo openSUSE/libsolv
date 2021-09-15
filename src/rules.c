@@ -3203,7 +3203,7 @@ solver_choicerulecheck2(Solver *solv, Id pi, Id pt, Queue *q)
       if (!ur->p)
         ur = solv->rules + solv->featurerules + (pi - pool->installed->start);
       if (!ur->p)
-	return 0;
+	return 1;		/* orphaned, thus newest */
       queue_push2(q, pi, 0);
       FOR_RULELITERALS(p, pp, ur)
 	if (p > 0 && p != pi)
