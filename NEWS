@@ -2,6 +2,11 @@
 This file contains the major changes between
 libsolv versions:
 
+Version 0.6.38:
+- bug fixes:
+  * Turn on rich dependency handling needed for ptf support
+    [jsc#SLE-17973] [jsc#SLE-17974] [bnc#1190530]
+
 Version 0.6.37:
 - bug fixes:
   * fix heap-buffer-overflow in repodata_schema2id [CVE-2019-20387]
