@@ -12,10 +12,10 @@ libsolv-bindings - access libsolv from perl/python/ruby
 Description
 -----------
 Libsolv's language bindings offer an abstract, object orientated interface
-to the library. The supported languages are currently perl, python, and ruby.
-All example code (except in the specifics sections, of course) lists first
-the ``C-ish'' interface, then the syntax for perl, python, and ruby (in that
-order).
+to the library. The supported languages are currently perl, python, ruby and
+tcl. All example code (except in the specifics sections, of course) lists
+first the ``C-ish'' interface, then the syntax for perl, python, and ruby
+(in that order).
 
 
 Perl Specifics

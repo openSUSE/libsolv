@@ -15,9 +15,9 @@ Constant Ids are Ids of strings that are often needed. They are defined
 to ease programming and reduce the number of pool_str2id calls. The
 constant Ids are part of the binary ABI of libsolv, a minor version 
 update will only add new constants and not change existing Ids to
-maintain compatible. The on-disk solv format works does not use the
-fixed Ids, but instead references the strings, so solv files can still
-be read when the ABI is broken.
+maintain compatibility. The on-disk solv format does not use the fixed
+Ids, but instead references the strings, so solv files can still be
+read when the ABI is broken.
 
 
 Special Strings
@@ -31,7 +31,7 @@ Special Strings
 
 Solvable Attributes
 -------------------
-These are Ids for keyname of attributes. They can be used in the
+These are Ids for keynames of attributes. They can be used in the
 lookup and storage functions to select the correct attribute in the
 solvable. The descriptions below describe the intended semantics
 of the values stored in the attribute with the keyname.

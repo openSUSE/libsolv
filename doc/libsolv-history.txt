@@ -53,12 +53,12 @@ solving on Debian. Looking at the SAT entry in Wikipedia, it was easy
 to see that this indeed was the missing piece: SAT algorithms are well
 researched and there are quite some open source implementations.
 I decided to look at the minisat code, as it is one of the fastest
-solvers while consisting of too many lines of code.
+solvers while consisting of not too many lines of code.
 
 Of course, directly using minisat would not work, as a package solver
 does not need to find just one correct solution, but it also has to
 optimize some metrics, i.e. keep as many packages installed as possible.
-Thus, I needed to write my own solver incorporation the ideas and
+Thus, I needed to write my own solver, incorporating the ideas and
 algorithms used in minisat. This wasn't very hard, and at the end of
 the hack week the solver calculated the first right solutions.
 
