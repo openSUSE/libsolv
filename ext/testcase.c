@@ -2096,7 +2096,7 @@ testcase_read(Pool *pool, FILE *fp, const char *testcase, Queue *job, char **res
 	    }
           repo->priority = prio;
           repo->subpriority = subprio;
-	  if (strcmp(pieces[3], "empty") != 0)
+	  if (strcmp(pieces[3], "empty") != 0 && npieces > 4)
 	    {
 	      const char *repotype = pool_tmpjoin(pool, pieces[3], 0, 0);	/* gets overwritten in <inline> case */
 	      if (!strcmp(pieces[4], "<inline>"))
