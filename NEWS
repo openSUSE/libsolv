@@ -2,6 +2,15 @@
 This file contains the major changes between
 libsolv versions:
 
+Version 0.7.20
+- selected bug fixes:
+  * fix misparsing of '&' in attributes with libxml2
+  * choice rules: treat orphaned packages as newest
+  * fix compatibility with Python 3.10
+- new features:
+  * new SOLVER_EXCLUDEFROMWEAK job to ignore pkgs for weak dependencies
+  * support for environments in comps parser
+
 Version 0.7.19
 - selected bug fixes:
   * fix rare segfault in resolve_jobrules() that could happen
