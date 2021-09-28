@@ -38,7 +38,7 @@
 # we need at least swig 1.3.40 for the bindings ($typemap support)
 %if 0%{?suse_version} != 1110
 %bcond_without python3
-%if 0%{?suse_version} && 0%{?suse_version} < 1540
+%if 0%{?sle_version} && 0%{?sle_version} < 150400
 %bcond_without python
 %else
 %bcond_with python
