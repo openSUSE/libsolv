@@ -6,6 +6,7 @@ Sat Sep 25 22:45:07 CEST 2021 - mls@suse.de
 - fix compatibility with Python 3.10
 - new SOLVER_EXCLUDEFROMWEAK job type
 - support for environments in comps parser
+- bump version to 0.7.20
 
 -------------------------------------------------------------------
 Fri Jul 30 11:43:29 UTC 2021 - Dominique Leuenberger <dimstar@opensuse.org>
