@@ -2257,6 +2257,89 @@ solver_addblackrules(Solver *solv)
 
 /***********************************************************************
  ***
+ ***  Strict repo prio rule part
+ ***/
+
+/* add rules to exclude solvables provided by lower
+ * precedence repositories */
+void solver_addstrictrepopriorules(struct s_Solver *solv, Map *addedmap)
+{
+  Pool *pool = solv->pool;
+  Solvable *s;
+  Id p, p2, pp2;
+  Map priomap;
+  int max_prio;
+
+  map_init_clone(&priomap, addedmap);
+  solv->strictrepopriorules = solv->nrules;
+
+  FOR_POOL_SOLVABLES(p)
+  {
+    if (!MAPTST(&priomap, p))
+      continue;
+
+    s = pool->solvables + p;
+    max_prio = s->repo->priority;
+    FOR_PROVIDES(p2, pp2, s->name)
+      {
+	Solvable *s2 = pool->solvables + p2;
+	if (s->name != s2->name)
+	  continue;
+	if (s2->repo->priority > max_prio)
+	  max_prio = s2->repo->priority;
+      }
+	  
+    FOR_PROVIDES(p2, pp2, s->name)
+      {
+	Solvable *s2 = pool->solvables + p2;
+	if (s->name != s2->name || !MAPTST(&priomap, p2))
+	  continue;
+	MAPCLR(&priomap, p2);
+	if (pool->installed && s2->repo == pool->installed)
+	  continue;
+	if (s2->repo->priority < max_prio)
+	  solver_addrule(solv, -p2, 0, 0);
+      }
+  }
+  solv->strictrepopriorules_end = solv->nrules;
+  map_free(&priomap);
+}
+
+static inline void
+disablerepopriorule(Solver *solv, Id name)
+{
+  Pool *pool = solv->pool;
+  Rule *r;
+  int i;
+  for (i = solv->strictrepopriorules, r = solv->rules + i; i < solv->strictrepopriorules_end; i++, r++)
+    {
+      if (r->p < 0 && r->d >= 0 && pool->solvables[-r->p].name == name)
+	solver_disablerule(solv, r);
+    }
+}
+
+static inline void
+reenablerepopriorule(Solver *solv, Id name)
+{
+  Pool *pool = solv->pool;
+  Rule *r;
+  int i;
+  for (i = solv->strictrepopriorules, r = solv->rules + i; i < solv->strictrepopriorules_end; i++, r++)
+    {
+      if (r->p < 0 && r->d < 0 && pool->solvables[-r->p].name == name)
+	{
+	  solver_enablerule(solv, r);
+	  IF_POOLDEBUG (SOLV_DEBUG_SOLUTIONS)
+	    {
+	      POOL_DEBUG(SOLV_DEBUG_SOLUTIONS, "@@@ re-enabling ");
+	      solver_printruleclass(solv, SOLV_DEBUG_SOLUTIONS, r);
+	    }
+	}
+    }
+}
+
+/***********************************************************************
+ ***
  ***  Policy rule disabling/reenabling
  ***
  ***  Disable all policy rules that conflict with our jobs. If a job
@@ -2264,10 +2347,11 @@ solver_addblackrules(Solver *solv)
  ***
  ***/
 
-#define DISABLE_UPDATE	1
-#define DISABLE_INFARCH	2
-#define DISABLE_DUP	3
-#define DISABLE_BLACK	4
+#define DISABLE_UPDATE	 1
+#define DISABLE_INFARCH	 2
+#define DISABLE_DUP	 3
+#define DISABLE_BLACK	 4
+#define DISABLE_REPOPRIO 5
 
 static void
 jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
@@ -2364,6 +2448,26 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
 		  if (i < q->count)
 		    continue;
 		  queue_push2(q, DISABLE_DUP, s->name);
+		}
+	    }
+	}
+      if ((set & SOLVER_SETREPO) != 0 && solv->strictrepopriorules != solv->strictrepopriorules_end)
+	{
+	  if (select == SOLVER_SOLVABLE)
+	    queue_push2(q, DISABLE_REPOPRIO, pool->solvables[what].name);
+	  else
+	    {
+	      int qcnt = q->count;
+	      FOR_JOB_SELECT(p, pp, select, what)
+		{
+		  s = pool->solvables + p;
+		  /* unify names */
+		  for (i = qcnt; i < q->count; i += 2)
+		    if (q->elements[i + 1] == s->name)
+		      break;
+		  if (i < q->count)
+		    continue;
+		  queue_push2(q, DISABLE_REPOPRIO, s->name);
 		}
 	    }
 	}
@@ -2553,6 +2657,9 @@ solver_disablepolicyrules(Solver *solv)
 	case DISABLE_BLACK:
 	  disableblackrule(solv, arg);
 	  break;
+	case DISABLE_REPOPRIO:
+	  disablerepopriorule(solv, arg);
+	  break;
 	default:
 	  break;
 	}
@@ -2658,6 +2765,9 @@ solver_reenablepolicyrules(Solver *solv, int jobidx)
 	  break;
 	case DISABLE_BLACK:
 	  reenableblackrule(solv, arg);
+	  break;
+	case DISABLE_REPOPRIO:
+	  reenablerepopriorule(solv, arg);
 	  break;
 	}
     }
@@ -4139,51 +4249,6 @@ solver_addrecommendsrules(Solver *solv)
   queue_free(&infoq);
   queue_free(&q);
   solv->recommendsrules_end = solv->nrules;
-}
-
-/* add rules to exclude solvables provided by lower
- * precedence repositories */
-void solver_addstrictrepopriorules(struct s_Solver *solv, Map *addedmap)
-{
-  Pool *pool = solv->pool;
-	Solvable *s;
-	Id p, p2, pp2;
-	Map priomap;
-	int max_prio;
-
-	map_init_clone(&priomap, addedmap);
-	solv->strictrepopriorules = solv->nrules;
-
-	FOR_POOL_SOLVABLES(p)
-	{
-		if (!MAPTST(&priomap, p))
-		  	continue;
-
-		s = pool->solvables + p;
-		max_prio = s->repo->priority;
-		FOR_PROVIDES(p2, pp2, s->name)
-		{
-		Solvable *s2 = pool->solvables + p2;
-		if (s->name != s2->name)
-			continue;
-		if (s2->repo->priority > max_prio)
-			max_prio = s2->repo->priority;
-		}
-		
-    	FOR_PROVIDES(p2, pp2, s->name)
-		{
-		Solvable *s2 = pool->solvables + p2;
-        if (s->name != s2->name || !MAPTST(&priomap, p2))
-          continue;
-        MAPCLR(&priomap, p2);
-		if (pool->installed && s2->repo == pool->installed)
-			continue;
-        if (s2->repo->priority < max_prio)
-          solver_addrule(solv, -p2, 0, 0);
-		}
-	}
-	solv->strictrepopriorules_end = solv->nrules;
-	map_free(&priomap);
 }
 
 void

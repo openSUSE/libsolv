@@ -28,6 +28,7 @@ struct s_Solver;
 #define SOLVER_SOLUTION_BEST		(-3)
 #define SOLVER_SOLUTION_POOLJOB		(-4)
 #define SOLVER_SOLUTION_BLACK		(-5)
+#define SOLVER_SOLUTION_STRICTREPOPRIORITY	(-6)
 
 void solver_recordproblem(struct s_Solver *solv, Id rid);
 void solver_fixproblem(struct s_Solver *solv, Id rid);

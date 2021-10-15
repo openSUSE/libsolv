@@ -131,7 +131,7 @@ solver_printruleclass(Solver *solv, int type, Rule *r)
   else if (p >= solv->blackrules && p < solv->blackrules_end)
     POOL_DEBUG(type, "BLACK ");
   else if (p >= solv->strictrepopriorules && p < solv->strictrepopriorules_end)
-    POOL_DEBUG(type, "PRIOS ");
+    POOL_DEBUG(type, "REPOPRIO ");
   else if (p >= solv->recommendsrules && p < solv->recommendsrules_end)
     POOL_DEBUG(type, "RECOMMENDS ");
   solver_printrule(solv, type, r);
