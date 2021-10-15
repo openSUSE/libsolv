@@ -1475,6 +1475,8 @@ solver_get_flag(Solver *solv, int flag)
     return solv->install_also_updates;
   case SOLVER_FLAG_ONLY_NAMESPACE_RECOMMENDED:
     return solv->only_namespace_recommended;
+  case SOLVER_FLAG_STRICT_REPO_PRIORITY:
+    return solv->strict_repo_priority;
   default:
     break;
   }
@@ -1567,6 +1569,9 @@ solver_set_flag(Solver *solv, int flag, int value)
     break;
   case SOLVER_FLAG_ONLY_NAMESPACE_RECOMMENDED:
     solv->only_namespace_recommended = value;
+    break;
+  case SOLVER_FLAG_STRICT_REPO_PRIORITY:
+    solv->strict_repo_priority = value;
     break;
   default:
     break;
@@ -4124,6 +4129,11 @@ solver_solve(Solver *solv, Queue *job)
   else
     solv->recommendsrules = solv->recommendsrules_end = solv->nrules;
 
+  if (solv->strict_repo_priority)
+    solver_addstrictrepopriorules(solv, &addedmap);
+  else
+    solv->strictrepopriorules = solv->strictrepopriorules_end = solv->nrules;
+
   if (1)
     solver_addchoicerules(solv);
   else
@@ -4139,7 +4149,19 @@ solver_solve(Solver *solv, Queue *job)
   map_free(&installcandidatemap);
   queue_free(&q);
 
-  POOL_DEBUG(SOLV_DEBUG_STATS, "%d pkg rules, 2 * %d update rules, %d job rules, %d infarch rules, %d dup rules, %d choice rules, %d best rules, %d yumobs rules\n", solv->pkgrules_end - 1, solv->updaterules_end - solv->updaterules, solv->jobrules_end - solv->jobrules, solv->infarchrules_end - solv->infarchrules, solv->duprules_end - solv->duprules, solv->choicerules_end - solv->choicerules, solv->bestrules_end - solv->bestrules, solv->yumobsrules_end - solv->yumobsrules);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "%d pkg rules, 2 * %d update rules, %d job rules, %d infarch rules, %d dup rules, %d choice rules, %d best rules, %d yumobs rules\n"
+  "%d black rules, %d recommends rules, %d repo priority rules\n",
+   solv->pkgrules_end - 1, 
+   solv->updaterules_end - solv->updaterules, 
+   solv->jobrules_end - solv->jobrules, 
+   solv->infarchrules_end - solv->infarchrules, 
+   solv->duprules_end - solv->duprules, 
+   solv->choicerules_end - solv->choicerules, 
+   solv->bestrules_end - solv->bestrules, 
+   solv->yumobsrules_end - solv->yumobsrules,
+   solv->blackrules_end - solv->blackrules,
+   solv->recommendsrules_end - solv->recommendsrules,
+   solv->strictrepopriorules_end - solv->strictrepopriorules);
   POOL_DEBUG(SOLV_DEBUG_STATS, "overall rule memory used: %d K\n", solv->nrules * (int)sizeof(Rule) / 1024);
 
   /* create weak map */

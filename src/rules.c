@@ -2992,6 +2992,12 @@ solver_ruleinfo(Solver *solv, Id rid, Id *fromp, Id *top, Id *depp)
 	*fromp = -r->p;
       return SOLVER_RULE_BLACK;
     }
+  if (rid >= solv->strictrepopriorules && rid < solv->strictrepopriorules_end)
+    {
+      if (fromp)
+	*fromp = -r->p;
+      return SOLVER_RULE_STRICT_REPO_PRIORITY;
+    }
   if (rid >= solv->choicerules && rid < solv->choicerules_end)
     return SOLVER_RULE_CHOICE;
   if (rid >= solv->recommendsrules && rid < solv->recommendsrules_end)
@@ -3028,8 +3034,8 @@ solver_ruleclass(Solver *solv, Id rid)
     return SOLVER_RULE_CHOICE;
   if (rid >= solv->recommendsrules && rid < solv->recommendsrules_end)
     return SOLVER_RULE_RECOMMENDS;
-  if (rid >= solv->blackrules && rid < solv->blackrules_end)
-    return SOLVER_RULE_BLACK;
+  if (rid >= solv->strictrepopriorules && rid < solv->strictrepopriorules_end)
+    return SOLVER_RULE_STRICT_REPO_PRIORITY;
   if (rid >= solv->learntrules && rid < solv->nrules)
     return SOLVER_RULE_LEARNT;
   return SOLVER_RULE_UNKNOWN;
@@ -4133,6 +4139,51 @@ solver_addrecommendsrules(Solver *solv)
   queue_free(&infoq);
   queue_free(&q);
   solv->recommendsrules_end = solv->nrules;
+}
+
+/* add rules to exclude solvables provided by lower
+ * precedence repositories */
+void solver_addstrictrepopriorules(struct s_Solver *solv, Map *addedmap)
+{
+  Pool *pool = solv->pool;
+	Solvable *s;
+	Id p, p2, pp2;
+	Map priomap;
+	int max_prio;
+
+	map_init_clone(&priomap, addedmap);
+	solv->strictrepopriorules = solv->nrules;
+
+	FOR_POOL_SOLVABLES(p)
+	{
+		if (!MAPTST(&priomap, p))
+		  	continue;
+
+		s = pool->solvables + p;
+		max_prio = s->repo->priority;
+		FOR_PROVIDES(p2, pp2, s->name)
+		{
+		Solvable *s2 = pool->solvables + p2;
+		if (s->name != s2->name)
+			continue;
+		if (s2->repo->priority > max_prio)
+			max_prio = s2->repo->priority;
+		}
+		
+    	FOR_PROVIDES(p2, pp2, s->name)
+		{
+		Solvable *s2 = pool->solvables + p2;
+        if (s->name != s2->name || !MAPTST(&priomap, p2))
+          continue;
+        MAPCLR(&priomap, p2);
+		if (pool->installed && s2->repo == pool->installed)
+			continue;
+        if (s2->repo->priority < max_prio)
+          solver_addrule(solv, -p2, 0, 0);
+		}
+	}
+	solv->strictrepopriorules_end = solv->nrules;
+	map_free(&priomap);
 }
 
 void

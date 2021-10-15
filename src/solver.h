@@ -79,6 +79,9 @@ struct s_Solver {
   Id blackrules;			/* rules from blacklisted packages */
   Id blackrules_end;
 
+  Id strictrepopriorules;			/* rules from strict priority repositories */
+  Id strictrepopriorules_end;
+
   Id choicerules;			/* choice rules (always weak) */
   Id choicerules_end;
   Id *choicerules_info;			/* the rule we used to generate the choice rule */
@@ -175,6 +178,7 @@ struct s_Solver {
   int strongrecommends;			/* true: create weak rules for recommends */
   int install_also_updates;		/* true: do not prune install job rules to installed packages */
   int only_namespace_recommended;	/* true: only install packages recommended by namespace */
+  int strict_repo_priority;			/* true: only use packages from highest precedence/priority */
 
   int process_orphans;			/* true: do special orphan processing */
   Map dupmap;				/* dup to those packages */
@@ -329,6 +333,7 @@ typedef struct s_Solver Solver;
 #define SOLVER_FLAG_STRONG_RECOMMENDS		25
 #define SOLVER_FLAG_INSTALL_ALSO_UPDATES	26
 #define SOLVER_FLAG_ONLY_NAMESPACE_RECOMMENDED	27
+#define SOLVER_FLAG_STRICT_REPO_PRIORITY	28
 
 #define GET_USERINSTALLED_NAMES			(1 << 0)	/* package names instead of ids */
 #define GET_USERINSTALLED_INVERTED		(1 << 1)	/* autoinstalled */
