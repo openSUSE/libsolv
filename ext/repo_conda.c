@@ -136,7 +136,7 @@ fn2data(struct parsedata *pd, const char *fn, Id *fntypep, int create)
 }
 
 static int
-parse_package(struct parsedata *pd, struct solv_jsonparser *jp, char *kfn)
+parse_package(struct parsedata *pd, struct solv_jsonparser *jp, char *kfn, char *repodata_subdir)
 {
   int type = JP_OBJECT;
   Pool *pool= pd->pool;
@@ -191,6 +191,9 @@ parse_package(struct parsedata *pd, struct solv_jsonparser *jp, char *kfn)
       else
 	type = jsonparser_skip(jp, type);
     }
+  /* some channels don't populate the individual packages' subdir property, so we add it from repodata info */
+  if (*subdir == 0)
+    subdir = repodata_subdir;
   if (fn || kfn)
     {
       repodata_set_location(data, handle, 0, subdir, fn ? fn : kfn);
@@ -226,7 +229,7 @@ parse_package(struct parsedata *pd, struct solv_jsonparser *jp, char *kfn)
 }
 
 static int
-parse_packages(struct parsedata *pd, struct solv_jsonparser *jp)
+parse_packages(struct parsedata *pd, struct solv_jsonparser *jp, char *subdir)
 {
   int type = JP_OBJECT;
   while (type > 0 && (type = jsonparser_parse(jp)) > 0 && type != JP_OBJECT_END)
@@ -234,8 +237,8 @@ parse_packages(struct parsedata *pd, struct solv_jsonparser *jp)
       if (type == JP_OBJECT)
 	{
 	  char *fn = solv_strdup(jp->key);
-	  type = parse_package(pd, jp, fn);
-	  solv_free(fn);
+    type = parse_package(pd, jp, fn, subdir);
+    solv_free(fn);
 	}
       else
 	type = jsonparser_skip(jp, type);
@@ -244,15 +247,29 @@ parse_packages(struct parsedata *pd, struct solv_jsonparser *jp)
 }
 
 static int
-parse_packages2(struct parsedata *pd, struct solv_jsonparser *jp)
+parse_packages2(struct parsedata *pd, struct solv_jsonparser *jp, char *subdir)
 {
   int type = JP_ARRAY;
   while (type > 0 && (type = jsonparser_parse(jp)) > 0 && type != JP_ARRAY_END)
     {
       if (type == JP_OBJECT)
-	type = parse_package(pd, jp, 0);
+	type = parse_package(pd, jp, 0, subdir);
       else
 	type = jsonparser_skip(jp, type);
+    }
+  return type;
+}
+
+static int
+parse_info_for_subdir(struct parsedata *pd, struct solv_jsonparser *jp, char *subdir)
+{
+  int type = JP_OBJECT;
+  while (type > 0 && (type = jsonparser_parse(jp)) > 0 && type != JP_OBJECT_END) 
+    {
+      if (type == JP_STRING && !strcmp("subdir", jp ->key))
+  subdir = jp->value;
+      else
+  type = jsonparser_skip(jp, type);
     }
   return type;
 }
@@ -261,16 +278,19 @@ static int
 parse_main(struct parsedata *pd, struct solv_jsonparser *jp, int flags)
 {
   int type = JP_OBJECT;
+  char *subdir = 0;
   while (type > 0 && (type = jsonparser_parse(jp)) > 0 && type != JP_OBJECT_END)
     {
       if (type == JP_OBJECT && !strcmp("packages", jp->key))
-	type = parse_packages(pd, jp);
+  type = parse_packages(pd, jp, subdir);
       else if (type == JP_ARRAY && !strcmp("packages", jp->key))
-	type = parse_packages2(pd, jp);
+	type = parse_packages2(pd, jp, subdir);
       else if (type == JP_OBJECT && !strcmp("packages.conda", jp->key) && !(flags & CONDA_ADD_USE_ONLY_TAR_BZ2))
-	type = parse_packages(pd, jp);
+	type = parse_packages(pd, jp, subdir);
       else if (type == JP_ARRAY && !strcmp("packages.conda", jp->key) && !(flags & CONDA_ADD_USE_ONLY_TAR_BZ2))
-	type = parse_packages2(pd, jp);
+	type = parse_packages2(pd, jp, subdir);
+      else if (type == JP_OBJECT && !strcmp("info", jp->key))
+  type = parse_info_for_subdir(pd, jp, subdir);
       else
 	type = jsonparser_skip(jp, type);
     }
