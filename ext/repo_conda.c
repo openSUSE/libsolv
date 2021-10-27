@@ -264,13 +264,19 @@ static int
 parse_info_for_subdir(struct parsedata *pd, struct solv_jsonparser *jp, char *subdir)
 {
   int type = JP_OBJECT;
-  while (type > 0 && (type = jsonparser_parse(jp)) > 0 && type != JP_OBJECT_END) 
-    {
-      if (type == JP_STRING && !strcmp("subdir", jp ->key))
-  subdir = jp->value;
-      else
-  type = jsonparser_skip(jp, type);
-    }
+  while (type > 0 && (type = jsonparser_parse(jp)) > 0 && type != JP_OBJECT_END)
+  {
+    if (type == JP_OBJECT && !strcmp("info", jp->key)) {
+      while (type > 0 && (type = jsonparser_parse(jp)) > 0 && type != JP_OBJECT_END)
+      {
+        if (type == JP_STRING && !strcmp("subdir", jp->key))
+          subdir = jp->value;
+        else
+          type = jsonparser_skip(jp, type);
+      }
+    } else
+      type = jsonparser_skip(jp, type);
+  }
   return type;
 }
 
@@ -279,20 +285,22 @@ parse_main(struct parsedata *pd, struct solv_jsonparser *jp, int flags)
 {
   int type = JP_OBJECT;
   char *subdir = 0;
+
+  parse_info_for_subdir(pd, jp, subdir);
+  jsonparser_init(&jp, jp->fp);
+
   while (type > 0 && (type = jsonparser_parse(jp)) > 0 && type != JP_OBJECT_END)
-    {
+  {
       if (type == JP_OBJECT && !strcmp("packages", jp->key))
-  type = parse_packages(pd, jp, subdir);
+        type = parse_packages(pd, jp, subdir);
       else if (type == JP_ARRAY && !strcmp("packages", jp->key))
-	type = parse_packages2(pd, jp, subdir);
+        type = parse_packages2(pd, jp, subdir);
       else if (type == JP_OBJECT && !strcmp("packages.conda", jp->key) && !(flags & CONDA_ADD_USE_ONLY_TAR_BZ2))
-	type = parse_packages(pd, jp, subdir);
+        type = parse_packages(pd, jp, subdir);
       else if (type == JP_ARRAY && !strcmp("packages.conda", jp->key) && !(flags & CONDA_ADD_USE_ONLY_TAR_BZ2))
-	type = parse_packages2(pd, jp, subdir);
-      else if (type == JP_OBJECT && !strcmp("info", jp->key))
-  type = parse_info_for_subdir(pd, jp, subdir);
+        type = parse_packages2(pd, jp, subdir);
       else
-	type = jsonparser_skip(jp, type);
+        type = jsonparser_skip(jp, type);
     }
   return type;
 }
