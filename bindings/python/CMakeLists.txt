@@ -5,13 +5,13 @@ IF (ENABLE_PYTHON3 AND NOT DEFINED PythonLibs_FIND_VERSION)
     SET (PythonLibs_FIND_VERSION_MAJOR 2)
 ENDIF (ENABLE_PYTHON3 AND NOT DEFINED PythonLibs_FIND_VERSION)
 
-FIND_PACKAGE (PythonLibs REQUIRED)
-IF(PYTHONLIBS_VERSION_STRING MATCHES "^([0-9.]+)")
+FIND_PACKAGE (PythonInterp ${python_version} REQUIRED)
+IF(PYTHON_VERSION_STRING MATCHES "^([0-9.]+)")
     SET(python_version "${CMAKE_MATCH_1}")
 ELSE()
-    MESSAGE(FATAL_ERROR "PythonLibs version format unknown '${PYTHONLIBS_VERSION_STRING}'")
+    MESSAGE(FATAL_ERROR "PythonInterp version format unknown '${PYTHON_VERSION_STRING}'")
 ENDIF()
-FIND_PACKAGE (PythonInterp ${python_version} REQUIRED)
+FIND_PACKAGE (PythonLibs ${python_version} REQUIRED)
 
 EXECUTE_PROCESS(COMMAND ${PYTHON_EXECUTABLE} -c "from sys import stdout; from distutils import sysconfig; stdout.write(sysconfig.get_python_lib(True))" OUTPUT_VARIABLE PYTHON_INSTALL_DIR)
 
