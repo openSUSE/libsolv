@@ -770,6 +770,21 @@ addcycleedges(struct orderdata *od, Id *cycle, Queue *todo)
     }
 }
 
+static int
+share_cycle(struct orderdata *od, Id p1, Id p2)
+{
+  int i, seen = 0;
+  for (i = 0; i < od->cyclesdata.count; i++)
+    {
+      Id p = od->cyclesdata.elements[i];
+      if (p == 0)
+	seen = 0;
+      else if ((p == p1 || p == p2) && ++seen == 2)
+        return 1;
+    }
+  return 0;
+}
+
 void
 transaction_order(Transaction *trans, int flags)
 {
@@ -787,8 +802,9 @@ transaction_order(Transaction *trans, int flags)
   int oldcount;
   int start, now;
   Repo *lastrepo;
-  int lastmedia;
+  int lastmedia, lastte;
   Id *temedianr;
+  unsigned char *incycle;
 
   start = now = solv_timems(0);
   POOL_DEBUG(SOLV_DEBUG_STATS, "ordering transaction\n");
@@ -933,20 +949,30 @@ transaction_order(Transaction *trans, int flags)
   POOL_DEBUG(SOLV_DEBUG_STATS, "cycles broken: %d\n", od.ncycles);
   POOL_DEBUG(SOLV_DEBUG_STATS, "cycle breaking took %d ms\n", solv_timems(now));
 
-  now = solv_timems(0);
-  /* now go through all broken cycles and create cycle edges to help
-     the ordering */
-   for (i = od.cycles.count - 4; i >= 0; i -= 4)
-     {
-       if (od.cycles.elements[i + 2] >= TYPE_REQ)
-         addcycleedges(&od, od.cyclesdata.elements + od.cycles.elements[i], &todo);
-     }
-   for (i = od.cycles.count - 4; i >= 0; i -= 4)
-     {
-       if (od.cycles.elements[i + 2] < TYPE_REQ)
-         addcycleedges(&od, od.cyclesdata.elements + od.cycles.elements[i], &todo);
-     }
-  POOL_DEBUG(SOLV_DEBUG_STATS, "cycle edge creation took %d ms\n", solv_timems(now));
+  incycle = 0;
+  if (od.cycles.count)
+    {
+      now = solv_timems(0);
+      incycle = solv_calloc(numte, 1);
+      /* now go through all broken cycles and create cycle edges to help
+	 the ordering */
+      for (i = od.cycles.count - 4; i >= 0; i -= 4)
+	{
+	  if (od.cycles.elements[i + 2] >= TYPE_REQ)
+	    addcycleedges(&od, od.cyclesdata.elements + od.cycles.elements[i], &todo);
+	}
+      for (i = od.cycles.count - 4; i >= 0; i -= 4)
+	{
+	  if (od.cycles.elements[i + 2] < TYPE_REQ)
+	    addcycleedges(&od, od.cyclesdata.elements + od.cycles.elements[i], &todo);
+	}
+      for (i = od.cycles.count - 4; i >= 0; i -= 4)
+	{
+	  for (j = od.cycles.elements[i]; od.cyclesdata.elements[j]; j++)
+	    incycle[od.cyclesdata.elements[j]] = 1;
+	}
+      POOL_DEBUG(SOLV_DEBUG_STATS, "cycle edge creation took %d ms\n", solv_timems(now));
+    }
 
 #if 0
   dump_tes(&od);
@@ -1014,6 +1040,7 @@ transaction_order(Transaction *trans, int flags)
 
   lastrepo = 0;
   lastmedia = 0;
+  lastte = 0;
   temedianr = solv_calloc(numte, sizeof(Id));
   for (i = 1; i < numte; i++)
     {
@@ -1030,7 +1057,22 @@ transaction_order(Transaction *trans, int flags)
       if (uninstq.count)
 	i = queue_shift(&uninstq);
       else if (samerepoq.count)
-	i = queue_shift(&samerepoq);
+	{
+	  if (lastte && incycle && incycle[lastte])
+	    {
+	      /* last installed package was in a cycle, prefer packages from the same cycle */
+	      for (j = 0; j < samerepoq.count; j++)
+		if (incycle[samerepoq.elements[j]] && share_cycle(&od, lastte, samerepoq.elements[j]))
+		  {
+		    /* yes, bring to front! */
+		    i = samerepoq.elements[j];
+		    queue_delete(&samerepoq, j);
+		    queue_unshift(&samerepoq, i);
+		    break;
+		  }
+	    }
+	  i = queue_shift(&samerepoq);
+	}
       else if (todo.count)
 	{
 	  /* find next repo/media */
@@ -1063,6 +1105,9 @@ transaction_order(Transaction *trans, int flags)
 
       te = od.tes + i;
       queue_push(tr, te->p);
+      if (pool->solvables[te->p].repo != installed)
+	lastte = i;
+	
 #if 0
 printf("do %s [%d]\n", pool_solvid2str(pool, te->p), temedianr[i]);
 #endif
@@ -1087,6 +1132,7 @@ printf("free %s [%d]\n", pool_solvid2str(pool, te2->p), temedianr[od.invedgedata
 	}
     }
   solv_free(temedianr);
+  solv_free(incycle);
   queue_free(&todo);
   queue_free(&samerepoq);
   queue_free(&uninstq);
