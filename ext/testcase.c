@@ -100,6 +100,7 @@ static struct resultflags2str {
   { TESTCASE_RESULT_CLEANDEPS,		"cleandeps" },
   { TESTCASE_RESULT_JOBS,		"jobs" },
   { TESTCASE_RESULT_USERINSTALLED,	"userinstalled" },
+  { TESTCASE_RESULT_ORDER,		"order" },
   { 0, 0 }
 };
 
@@ -1393,6 +1394,25 @@ testcase_solverresult(Solver *solv, int resultflags)
 	  strqueue_push(&sq, s);
 	}
       queue_free(&q);
+    }
+  if ((resultflags & TESTCASE_RESULT_ORDER) != 0)
+    {
+      int i;
+      char buf[256];
+      Id p;
+      Transaction *trans = solver_create_transaction(solv);
+      transaction_order(trans, 0);
+      for (i = 0; i < trans->steps.count; i++)
+	{
+	  p = trans->steps.elements[i];
+	  if (pool->installed && pool->solvables[p].repo == pool->installed)
+	    sprintf(buf, "%4d erase ", i + 1);
+	  else
+	    sprintf(buf, "%4d install ", i + 1);
+	  s = pool_tmpjoin(pool, "order ", buf, testcase_solvid2str(pool, p));
+	  strqueue_push(&sq, s);
+	}
+      transaction_free(trans);
     }
   if ((resultflags & TESTCASE_RESULT_ALTERNATIVES) != 0)
     {
