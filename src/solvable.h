@@ -34,6 +34,19 @@ typedef struct s_Solvable {
   struct s_Repo *repo;		/* repo we belong to */
 
   /* dependencies are offsets into repo->idarraydata */
+  /* the ifdef resolves "requires" conflicting with a C++20 keyword */
+#ifdef LIBSOLV_SOLVABLE_PREPEND_DEP
+  Offset dep_provides;		/* terminated with Id 0 */
+  Offset dep_obsoletes;
+  Offset dep_conflicts;
+
+  Offset dep_requires;
+  Offset dep_recommends;
+  Offset dep_suggests;
+
+  Offset dep_supplements;
+  Offset dep_enhances;
+#else
   Offset provides;		/* terminated with Id 0 */
   Offset obsoletes;
   Offset conflicts;
@@ -44,7 +57,7 @@ typedef struct s_Solvable {
 
   Offset supplements;
   Offset enhances;
-
+#endif
 } Solvable;
 
 /* lookup functions */
