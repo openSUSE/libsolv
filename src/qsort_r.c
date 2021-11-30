@@ -37,9 +37,6 @@
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)qsort.c	8.1 (Berkeley) 6/4/93";
 #endif /* LIBC_SCCS and not lint */
-#ifndef _WIN32
-#include <sys/cdefs.h>
-#endif
 
 /* $FreeBSD: src/lib/libc/stdlib/qsort.c,v 1.13.2.1.8.1 2010/12/21 17:10:29 kensmith Exp $ */
 
