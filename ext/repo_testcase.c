@@ -491,7 +491,7 @@ testcase_write_testtags(Repo *repo, FILE *fp)
 	fprintf(fp, "=Tim: %u\n", ti);
       ti = solvable_lookup_num(s, SOLVABLE_INSTALLTIME, 0);
       if (ti)
-	fprintf(fp, "=Iti: %u\n", ti);
+	fprintf(fp, "=Itm: %u\n", ti);
       writefilelist(repo, fp, "Fls:", s);
     }
   queue_free(&q);
@@ -638,7 +638,7 @@ testcase_add_testtags(Repo *repo, FILE *fp, int flags)
 	  if (t)
 	    repodata_set_num(data, s - pool->solvables, SOLVABLE_BUILDTIME, t);
 	  break;
-	case 'I' << 16 | 't' << 8 | 'i':
+	case 'I' << 16 | 't' << 8 | 'm':
 	  t = atoi(line + 6);
 	  if (t)
 	    repodata_set_num(data, s - pool->solvables, SOLVABLE_INSTALLTIME, t);
