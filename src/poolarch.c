@@ -61,6 +61,7 @@ static const char *archpolicies[] = {
   "ppc64iseries", "ppc64iseries:ppc64:ppc",
   "ppc64pseries", "ppc64pseries:ppc64:ppc",
 #endif
+  "loongarch64", "loongarch64",
   0
 };
 
