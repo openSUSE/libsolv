@@ -304,6 +304,7 @@ SOLV_1.0 {
 		solv_version_major;
 		solv_version_minor;
 		solv_version_patch;
+		solv_toolversion;
 		solvable_add_deparray;
 		solvable_add_idarray;
 		solvable_add_poolstr_array;

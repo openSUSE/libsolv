@@ -19,6 +19,7 @@
 /* toolversion history
  * 1.0: initial tool version
  * 1.1: changed PRODUCT_ENDOFLIFE parsing
+ * 1.2: added UPDATE_COLLECTIONLIST to updateinfo
 */
 
 static int
