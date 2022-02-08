@@ -22,6 +22,7 @@
 #include "pool.h"
 #include "poolarch.h"
 #include "util.h"
+#include "evr.h"
 
 
 /*-------------------------------------------------------------------
@@ -36,10 +37,18 @@ solver_is_updating(Solver *solv, Id p)
   Id l, pp;
   if (solv->decisionmap[p] >= 0)
     return 0;	/* old package stayed */
-  r = solv->rules + solv->updaterules + (p - solv->installed->start);
+  r = solv->rules + solv->featurerules + (p - solv->installed->start);
+  if (!r->p)
+    r = solv->rules + solv->updaterules + (p - solv->installed->start);
   FOR_RULELITERALS(l, pp, r)
     if (l > 0 && l != p && solv->decisionmap[l] > 0)
-      return 1;
+      {
+	/* check that this is really an upgrade */
+	Solvable *si = pool->solvables + p;
+	Solvable *s = pool->solvables + l;
+	if (s->name != si->name || pool_evrcmp(pool, s->evr, si->evr, EVRCMP_COMPARE) > 0)
+          return 1;
+      }
   return 0;
 }
 
