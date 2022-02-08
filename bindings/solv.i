@@ -3242,7 +3242,7 @@ rb_eval_string(
     e = solv_calloc(1, sizeof(*e));
     e->solv = solv;
     e->problemid = problemid;
-    e->solutionid = id;
+    e->solutionid = solutionid;
     e->id = id;
     e->type = type;
     e->p = p;
