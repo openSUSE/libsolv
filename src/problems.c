@@ -1148,7 +1148,6 @@ findproblemrule_internal(Solver *solv, Id idx, Id *reqrp, Id *conrp, Id *sysrp, 
 		      Pool *pool = solv->pool;
 		      Id op = -solv->rules[*reqrp].p;
 		      if (op > 1 && pool->solvables[op].arch != pool->solvables[-r->p].arch &&
-			  pool->solvables[op].arch != pool->noarchid &&
 			  pool->solvables[-r->p].arch != pool->noarchid)
 			continue;	/* different arch, skip */
 		    }
