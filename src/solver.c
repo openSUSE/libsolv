@@ -4158,7 +4158,7 @@ solver_solve(Solver *solv, Queue *job)
    solv->choicerules_end - solv->choicerules, 
    solv->bestrules_end - solv->bestrules, 
    solv->yumobsrules_end - solv->yumobsrules);
-  POOL_DEBUG(SOLV_DEBUG_STATS, "%d black rules, %d recommends rules, %d repo priority rules\n"
+  POOL_DEBUG(SOLV_DEBUG_STATS, "%d black rules, %d recommends rules, %d repo priority rules\n",
    solv->blackrules_end - solv->blackrules,
    solv->recommendsrules_end - solv->recommendsrules,
    solv->strictrepopriorules_end - solv->strictrepopriorules);
