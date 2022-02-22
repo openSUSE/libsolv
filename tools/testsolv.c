@@ -298,7 +298,13 @@ main(int argc, char **argv)
 	    {
 	      int pcnt = solver_solve(solv, &job);
 	      if (writetestcase)
-		testcase_write(solv, writetestcase, resultflags, 0, 0);
+		{
+		  if (!testcase_write(solv, writetestcase, resultflags, 0, 0))
+		    {
+		      fprintf(stderr, "Could not write testcase: %s\n", pool_errstr(pool));
+		      exit(1);
+		    }
+		}
 	      if (pcnt && solq.count)
 		{
 		  int i, taken = 0;
