@@ -441,6 +441,45 @@ testcase_str2repo(Pool *pool, const char *str)
   return repo;
 }
 
+static const char *
+testcase_escape(Pool *pool, const char *str)
+{
+  size_t nbad = 0;
+  const char *p;
+  char *new, *np;
+  for (p = str; *p; p++)
+    if (*p == '\\' || *p == ' ' || *p == '\t')
+      nbad++;
+  if (!nbad)
+    return str;
+  new = pool_alloctmpspace(pool, strlen(str) + 1 + nbad * 2);
+  for (np = new, p = str; *p; p++)
+    {
+      *np++ = *p;
+      if (*p == '\\' || *p == ' ' || *p == '\t')
+	{
+	  np[-1] = '\\';
+	  solv_bin2hex((unsigned char *)p, 1, np);
+	  np += 2;
+	}
+    }
+  *np = 0;
+  return new;
+}
+
+static void
+testcase_unescape_inplace(char *str)
+{
+  char *p, *q;
+  for (p = q = str; *p;)
+    {
+      *q++ = *p++;
+      if (p[-1] == '\\')
+	solv_hex2bin((const char **)&p, (unsigned char *)q - 1, 1);
+    }
+  *q = 0;
+}
+
 /* check evr and buildflavors */
 static int
 str2solvid_check(Pool *pool, Solvable *s, const char *start, const char *end, Id evrid)
@@ -1604,6 +1643,43 @@ testcase_solverresult(Solver *solv, int resultflags)
   return result;
 }
 
+static void
+dump_custom_vendorcheck(Pool *pool, Strqueue *sq, int (*vendorcheck)(Pool *, Solvable *, Solvable *))
+{
+  Id p, lastvendor = 0;
+  Queue vq;
+  int i, j;
+  char *cmd;
+
+  queue_init(&vq);
+  FOR_POOL_SOLVABLES(p)
+    {
+      Id vendor = pool->solvables[p].vendor;
+      if (!vendor || vendor == lastvendor)
+	continue;
+      lastvendor = vendor;
+      for (i = 0; i < vq.count; i += 2)
+	if (vq.elements[i] == vendor)
+	  break;
+      if (i == vq.count)
+        queue_push2(&vq, vendor, p);
+    }
+  for (i = 0; i < vq.count; i += 2)
+    {
+      Solvable *s1 = pool->solvables + vq.elements[i + 1];
+      for (j = i + 2; j < vq.count; j += 2)
+	{
+	  Solvable *s2 = pool->solvables + vq.elements[j + 1];
+	  if (vendorcheck(pool, s1, s2) || vendorcheck(pool, s2, s1))
+	    continue;
+	  cmd = pool_tmpjoin(pool, "vendorclass", 0, 0);
+	  cmd = pool_tmpappend(pool, cmd, " ", testcase_escape(pool, pool_id2str(pool, vq.elements[i])));
+	  cmd = pool_tmpappend(pool, cmd, " ", testcase_escape(pool, pool_id2str(pool, vq.elements[j])));
+	  strqueue_push(sq, cmd);
+	}
+    }
+  queue_free(&vq);
+}
 
 static int
 testcase_write_mangled(Solver *solv, const char *dir, int resultflags, const char *testcasename, const char *resultname)
@@ -1617,6 +1693,7 @@ testcase_write_mangled(Solver *solv, const char *dir, int resultflags, const cha
   Strqueue sq;
   char *cmd, *out, *result;
   const char *s;
+  int (*vendorcheck)(Pool *, Solvable *, Solvable *);
 
   if (!testcasename)
     testcasename = "testcase.t";
@@ -1693,12 +1770,15 @@ testcase_write_mangled(Solver *solv, const char *dir, int resultflags, const cha
       strqueue_push(&sq, cmd);
     }
 
-  if (pool->vendorclasses)
+  vendorcheck = pool_get_custom_vendorcheck(pool);
+  if (vendorcheck)
+    dump_custom_vendorcheck(pool, &sq, vendorcheck);
+  else if (pool->vendorclasses)
     {
       cmd = 0;
       for (i = 0; pool->vendorclasses[i]; i++)
 	{
-	  cmd = pool_tmpappend(pool, cmd ? cmd : "vendorclass", " ", pool->vendorclasses[i]);
+	  cmd = pool_tmpappend(pool, cmd ? cmd : "vendorclass", " ", testcase_escape(pool, pool->vendorclasses[i]));
 	  if (!pool->vendorclasses[i + 1])
 	    {
 	      strqueue_push(&sq, cmd);
@@ -2259,6 +2339,9 @@ testcase_read(Pool *pool, FILE *fp, const char *testcase, Queue *job, char **res
 	}
       else if (!strcmp(pieces[0], "vendorclass") && npieces > 1)
 	{
+	  int i;
+	  for (i = 1; i < npieces; i++)
+	    testcase_unescape_inplace(pieces[i]);
 	  pool_addvendorclass(pool, (const char **)(pieces + 1));
 	}
       else if (!strcmp(pieces[0], "namespace") && npieces > 1)
