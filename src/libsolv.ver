@@ -70,6 +70,7 @@ SOLV_1.0 {
 		pool_freewhatprovides;
 		pool_get_flag;
 		pool_get_rootdir;
+		pool_get_custom_vendorcheck;
 		pool_id2evr;
 		pool_id2langid;
 		pool_id2rel;

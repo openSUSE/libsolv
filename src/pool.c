@@ -2079,4 +2079,9 @@ pool_set_custom_vendorcheck(Pool *pool, int (*vendorcheck)(Pool *, Solvable *, S
   pool->custom_vendorcheck = vendorcheck;
 }
 
+int (*pool_get_custom_vendorcheck(Pool *pool))(Pool *, Solvable *, Solvable *)
+{
+  return pool->custom_vendorcheck;
+}
+
 /* EOF */
