@@ -64,6 +64,7 @@ Id pool_vendor2mask(Pool *pool, Id vendor)
 	  if (m == (1 << 31))
 	    break;	/* sorry, out of bits */
 	  m <<= 1;	/* next vendor equivalence class */
+	  continue;
 	}
       if (fnmatch(*vs == '!' ? vs + 1 : vs, vstr, FNM_CASEFOLD) == 0)
 	{
