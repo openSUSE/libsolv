@@ -1071,6 +1071,7 @@ repowriter_create(Repo *repo)
 Repowriter *
 repowriter_free(Repowriter *writer)
 {
+  solv_free(writer->userdata);
   return solv_free(writer);
 }
 
@@ -1105,6 +1106,17 @@ repowriter_set_solvablerange(Repowriter *writer, int solvablestart, int solvable
 {
   writer->solvablestart = solvablestart;
   writer->solvableend = solvableend;
+}
+
+void
+repowriter_set_userdata(Repowriter *writer, const void *data, int len)
+{
+  writer->userdata = solv_free(writer->userdata);
+  writer->userdatalen = 0;
+  if (len < 0 || len >= 65536)
+    return;
+  writer->userdata = len ? solv_memdup(data, len) : 0;
+  writer->userdatalen = len;
 }
 
 /*
@@ -1898,7 +1910,10 @@ for (i = 1; i < target.nkeys; i++)
 
   /* write file header */
   write_u32(&target, 'S' << 24 | 'O' << 16 | 'L' << 8 | 'V');
-  write_u32(&target, SOLV_VERSION_8);
+  if (writer->userdatalen)
+    write_u32(&target, SOLV_VERSION_9);
+  else
+    write_u32(&target, SOLV_VERSION_8);
 
 
   /* write counts */
@@ -1911,7 +1926,14 @@ for (i = 1; i < target.nkeys; i++)
   solv_flags = 0;
   solv_flags |= SOLV_FLAG_PREFIX_POOL;
   solv_flags |= SOLV_FLAG_SIZE_BYTES;
+  if (writer->userdatalen)
+    solv_flags |= SOLV_FLAG_USERDATA;
   write_u32(&target, solv_flags);
+  if (writer->userdatalen)
+    {
+      write_u32(&target, writer->userdatalen);
+      write_blob(&target, writer->userdata, writer->userdatalen);
+    }
 
   if (nstrings)
     {

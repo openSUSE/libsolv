@@ -23,9 +23,11 @@
 #define SOLV_VERSION_6 6
 #define SOLV_VERSION_7 7
 #define SOLV_VERSION_8 8
+#define SOLV_VERSION_9 9
 
-#define SOLV_FLAG_PREFIX_POOL 4
-#define SOLV_FLAG_SIZE_BYTES  8
+#define SOLV_FLAG_PREFIX_POOL	4
+#define SOLV_FLAG_SIZE_BYTES	8
+#define SOLV_FLAG_USERDATA	16
 
 struct s_Stringpool;
 typedef struct s_Stringpool Stringpool;

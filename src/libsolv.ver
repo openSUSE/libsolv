@@ -256,6 +256,7 @@ SOLV_1.0 {
 		repowriter_set_keyqueue;
 		repowriter_set_repodatarange;
 		repowriter_set_solvablerange;
+		repowriter_set_userdata;
 		repowriter_write;
 		selection_add;
 		selection_filter;
@@ -289,6 +290,7 @@ SOLV_1.0 {
 		solv_malloc;
 		solv_malloc2;
 		solv_oom;
+		solv_read_userdata;
 		solv_realloc;
 		solv_realloc2;
 		solv_replacebadutf8;

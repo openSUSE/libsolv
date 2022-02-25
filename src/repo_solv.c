@@ -514,6 +514,7 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
   switch (solvversion)
     {
       case SOLV_VERSION_8:
+      case SOLV_VERSION_9:
 	break;
       default:
         return pool_error(pool, SOLV_ERROR_UNSUPPORTED, "unsupported SOLV version");
@@ -550,6 +551,18 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
       for (i = 0; i < numsolv; i++)
 	if (pool->solvables[extendstart + i].repo != repo)
 	  return pool_error(pool, SOLV_ERROR_CORRUPT, "main repository contains holes, cannot extend");
+    }
+
+  /*******  Part 0: skip optional userdata ******************************/
+
+  if (solvflags & SOLV_FLAG_USERDATA)
+    {
+      unsigned int userdatalen = read_u32(&data);
+      if (userdatalen >= 65536)
+        return pool_error(pool, SOLV_ERROR_CORRUPT, "illegal userdata length");
+      while (userdatalen--)
+	if (getc(data.fp) == EOF)
+	  return pool_error(pool, SOLV_ERROR_EOF, "unexpected EOF");
     }
 
   /*******  Part 1: string IDs  *****************************************/
@@ -1353,3 +1366,44 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
   return 0;
 }
 
+int
+solv_read_userdata(FILE *fp, unsigned char **datap, int *lenp)
+{
+  unsigned char d[4 * 10], *ud = 0;
+  unsigned int n;
+  if (fread(d, sizeof(d), 1, fp) != 1)
+    return SOLV_ERROR_EOF;
+  n = d[0] << 24 | d[1] << 16 | d[2] << 8 | d[3];
+  if (n != ('S' << 24 | 'O' << 16 | 'L' << 8 | 'V'))
+    return SOLV_ERROR_NOT_SOLV;
+  n = d[4] << 24 | d[5] << 16 | d[6] << 8 | d[7];
+  switch(n)
+    {
+    case SOLV_VERSION_8:
+    case SOLV_VERSION_9:
+      break;
+    default:
+      return SOLV_ERROR_UNSUPPORTED;
+    }
+  n = d[32] << 24 | d[33] << 16 | d[34] << 8 | d[35];
+  if (!(n & SOLV_FLAG_USERDATA))
+    n = 0;
+  else
+    n = d[36] << 24 | d[37] << 16 | d[38] << 8 | d[39];
+  if (n >= 65536)
+    return SOLV_ERROR_CORRUPT;
+  if (n)
+    {
+      ud = solv_malloc(n + 1);
+      if (fread(ud, n, 1, fp) != 1)
+	{
+	  solv_free(ud);
+	  return SOLV_ERROR_EOF;
+	}
+      ud[n] = 0;
+    }
+  *datap = ud;
+  if (lenp)
+    *lenp = (int)n;
+  return 0;
+}

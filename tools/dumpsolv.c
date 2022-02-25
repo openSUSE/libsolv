@@ -13,6 +13,7 @@
 
 static int with_attr;
 static int dump_json;
+static int dump_userdata;
 
 #include "pool.h"
 #include "chksum.h"
@@ -394,10 +395,7 @@ int main(int argc, char **argv)
   int c, i, j, n;
   Solvable *s;
   
-  pool = pool_create();
-  pool_setloadcallback(pool, loadcallback, 0);
-
-  while ((c = getopt(argc, argv, "haj")) >= 0)
+  while ((c = getopt(argc, argv, "uhaj")) >= 0)
     {
       switch(c)
 	{
@@ -410,11 +408,55 @@ int main(int argc, char **argv)
 	case 'j':
 	  dump_json = 1;
 	  break;
+	case 'u':
+	  dump_userdata++;
+	  break;
 	default:
           usage(1);
           break;
 	}
     }
+  if (dump_userdata)
+    {
+      if (optind == argc)
+	argc++;
+      for (; optind < argc; optind++)
+	{
+	  unsigned char *userdata = 0;
+	  int r, userdatalen = 0;
+	  if (argv[optind] && freopen(argv[optind], "r", stdin) == 0)
+	    {
+	      perror(argv[optind]);
+	      exit(1);
+	    }
+	  r = solv_read_userdata(stdin, &userdata, &userdatalen);
+	  if (r)
+	    {
+	      fprintf(stderr, "could not read userdata: error %d\n", r);
+	      exit(1);
+	    }
+	  if (dump_userdata > 1)
+	    {
+	      /* dump raw */
+	      if (userdatalen && fwrite(userdata, userdatalen, 1, stdout) != 1)
+		{
+		  perror("fwrite");
+		  exit(1);
+		}
+	    }
+	  else
+	    {
+	      for (r = 0; r < userdatalen; r++)
+		printf("%02x", userdata[r]);
+	      printf("\n");
+	    }
+	  solv_free(userdata);
+	}
+      exit(0);
+    }
+
+  pool = pool_create();
+  pool_setloadcallback(pool, loadcallback, 0);
   if (!dump_json)
     pool_setdebuglevel(pool, 1);
   if (dump_json)
