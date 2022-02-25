@@ -92,7 +92,7 @@ static inline void *solv_calloc_block(size_t len, size_t size, size_t block)
   return buf;
 }
 
-static inline void *solv_memdup(void *buf, size_t len)
+static inline void *solv_memdup(const void *buf, size_t len)
 {
   void *newbuf;
   if (!buf)
@@ -103,7 +103,7 @@ static inline void *solv_memdup(void *buf, size_t len)
   return newbuf;
 }
 
-static inline void *solv_memdup2(void *buf, size_t num, size_t len)
+static inline void *solv_memdup2(const void *buf, size_t num, size_t len)
 {
   void *newbuf;
   if (!buf)
