@@ -48,6 +48,7 @@ typedef struct s_Repokey {
 #define KEY_STORAGE_SOLVABLE            1
 #define KEY_STORAGE_INCORE              2
 #define KEY_STORAGE_VERTICAL_OFFSET     3
+#define KEY_STORAGE_IDARRAYBLOCK	4
 
 #ifdef LIBSOLV_INTERNAL
 struct dircache;

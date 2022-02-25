@@ -105,6 +105,8 @@ compress_buf(const unsigned char *in, unsigned int in_len,
   unsigned int litofs = 0;
   memset(htab, -1, sizeof (htab));
   memset(hnext, -1, sizeof (hnext));
+  if (in_len > BLOCK_SIZE)
+    return 0;			/* Hey! */
   while (io + 2 < in_len)
     {
       /* Search for a match of the string starting at IN, we have at
@@ -119,84 +121,53 @@ compress_buf(const unsigned char *in, unsigned int in_len,
       mlen = 0;
       mofs = 0;
 
-      for (tries = 0; try != -1 && tries < 12; tries++)
+      for (tries = 0; try != (Ref)-1 && tries < 12; tries++, try = hnext[try])
         {
-	  if (try < io
-	      && in[try] == in[io] && in[try + 1] == in[io + 1])
+	  if (in[try] == in[io] && in[try + 1] == in[io + 1])
 	    {
 	      mlen = 2;
 	      mofs = (io - try) - 1;
 	      break;
 	    }
-	  try = hnext[try];
 	}
-      for (; try != -1 && tries < 12; tries++)
+      for (; try != (Ref)-1 && tries < 12; tries++, try = hnext[try])
 	{
-	  /* assert(mlen >= 2); */
 	  /* assert(io + mlen < in_len); */
 	  /* Try a match starting from [io] with the strings at [try].
-	     That's only sensible if TRY actually is before IO (can happen
-	     with uninit hash table).  If we have a previous match already
-	     we're only going to take the new one if it's longer, hence
-	     check the potentially last character.  */
-	  if (try < io && in[try + mlen] == in[io + mlen])
+	     If we have a previous match already we're only going to take
+             the new one if it's longer, hence check the potentially last
+             character first.  */
+	  if (in[try + mlen] == in[io + mlen] && !memcmp(in + try, in + io, mlen))
 	    {
-	      unsigned int this_len, this_ofs;
-	      if (memcmp(in + try, in + io, mlen))
-		goto no_match;
-	      this_len = mlen + 1;
+	      /* Found a longer match */
+	      mlen++;
 	      /* Now try extending the match by more characters.  */
-	      for (;
-		   io + this_len < in_len
-		   && in[try + this_len] == in[io + this_len]; this_len++)
-		;
-#if 0
-	      unsigned int testi;
-	      for (testi = 0; testi < this_len; testi++)
-		assert(in[try + testi] == in[io + testi]);
-#endif
-	      this_ofs = (io - try) - 1;
-	      /*if (this_ofs > 65535)
-		 goto no_match; */
-#if 0
-	      assert(this_len >= 2);
-	      assert(this_len >= mlen);
-	      assert(this_len > mlen || (this_len == mlen && this_ofs > mofs));
-#endif
-	      mlen = this_len, mofs = this_ofs;
+	      while (io + mlen < in_len && in[try + mlen] == in[io + mlen])
+		mlen++;
+	      mofs = (io - try) - 1;
 	      /* If our match extends up to the end of input, no next
 		 match can become better.  This is not just an
-		 optimization, it establishes a loop invariant
+		 optimization, it establishes the loop invariant
 		 (io + mlen < in_len).  */
 	      if (io + mlen >= in_len)
-		goto match_done;
+		break;
 	    }
-	no_match:
-	  try = hnext[try];
-	  /*if (io - try - 1 >= 65536)
-	    break;*/
 	}
-
-match_done:
+      if (mlen < 3)
+	mlen = 0;
       if (mlen)
 	{
 	  /*fprintf(stderr, "%d %d\n", mlen, mofs);*/
-	  if (mlen == 2 && (litofs || mofs >= 1024))
-	    mlen = 0;
-	  /*else if (mofs >= 65536)
-	    mlen = 0;*/
-	  else if (mofs >= 65536)
+#if BLOCK_SIZE > 65536
+	  if (mofs >= 65536)
 	    {
 	      if (mlen >= 2048 + 5)
 	        mlen = 2047 + 5;
 	      else if (mlen < 5)
 	        mlen = 0;
 	    }
-	  else if (mlen < 3)
-	    mlen = 0;
-	  /*else if (mlen >= 4096 + 19)
-	    mlen = 4095 + 19;*/
-	  else if (mlen >= 2048 + 19)
+#endif
+	  if (mlen >= 2048 + 19)
 	    mlen = 2047 + 19;
 	  /* Skip this match if the next character would deliver a better one,
 	     but only do this if we have the chance to really extend the
@@ -210,16 +181,11 @@ match_done:
 	      hval = (hval ^ (hval << 5) ^ (hval >> 5)) - hval * 5;
 	      hval = hval & (HS - 1);
 	      try = htab[hval];
-	      if (try < io + 1
-		  && in[try] == in[io + 1] && in[try + 1] == in[io + 2])
+	      if (try != (Ref)-1 && in[try] == in[io + 1] && in[try + 1] == in[io + 2])
 		{
-		  unsigned int this_len;
-		  this_len = 2;
-		  for (;
-		       io + 1 + this_len < in_len
-		       && in[try + this_len] == in[io + 1 + this_len];
-		       this_len++)
-		    ;
+		  unsigned int this_len = 2;
+		  while (io + 1 + this_len < in_len && in[try + this_len] == in[io + 1 + this_len])
+		    this_len++;
 		  if (this_len >= mlen)
 		    mlen = 0;
 		}
@@ -227,12 +193,14 @@ match_done:
 	}
       if (!mlen)
 	{
+	  /* Found no match, start/extend literal */
 	  if (!litofs)
 	    litofs = io + 1;
 	  io++;
 	}
       else
 	{
+	  /* Found a match. First dump literals */
 	  if (litofs)
 	    {
 	      unsigned litlen;
@@ -303,6 +271,9 @@ match_done:
 	    }
 	  else if (mofs >= 65536)
 	    {
+#if BLOCK_SIZE <= 65536
+	      return 0;
+#else
 	      assert(mlen >= 5 && mlen < 2048 + 5);
 	      if (oo + 5 >= out_len)
 	        return 0;
@@ -311,6 +282,7 @@ match_done:
 	      out[oo++] = mofs & 0xff;
 	      out[oo++] = (mofs >> 8) & 0xff;
 	      out[oo++] = mofs >> 16;
+#endif
 	    }
 	  else if (mlen >= 3 && mlen <= 18)
 	    {
@@ -350,7 +322,7 @@ match_done:
 		  htab[hval] = io;
 		}
 	      io++;
-	    };
+	    }
 	}
     }
   /* We might have some characters left.  */
@@ -466,14 +438,12 @@ unchecked_decompress_buf(const unsigned char *in, unsigned int in_len,
 	  {
 	    o = in[0] | (in[1] << 8);
 	    in += 2;
-	    first = first & 31;
-	    first += 3;
+	    first = (first & 15) + 3;
 	    break;
 	  }
 	case 15:
-	  /* f1 1111llll <8o> <8o> <8l> */
-	  /* f2 11110lll <8o> <8o> <8l> */
-	  /* g 11111lll <8o> <8o> <8o> <8l> */
+	  /* f2 11110lll <8l> <8o> <8o> */
+	  /* g  11111lll <8l> <8o> <8o> <8o> */
 	  {
 	    first = first & 15;
 	    if (first >= 8)
@@ -555,6 +525,77 @@ unchecked_decompress_buf(const unsigned char *in, unsigned int in_len,
 #endif
     }
   return out - orig_out;
+}
+
+static unsigned int
+check_decompress_buf(const unsigned char *in, unsigned int in_len)
+{
+  unsigned int out_len = 0;
+  const unsigned char *in_end = in + in_len;
+  while (in < in_end)
+    {
+      unsigned int first = *in++;
+      int o;
+      switch (first >> 4)
+	{
+	default:
+	  /* This default case can't happen, but GCCs VRP is not strong
+	     enough to see this, so make this explicitely not fall to
+	     the end of the switch, so that we don't have to initialize
+	     o above.  */
+	  continue;
+	case 0: case 1:
+	case 2: case 3:
+	case 4: case 5:
+	case 6: case 7:
+	  out_len++;
+	  continue;
+	case 8: case 9:
+	  /* b 100lllll <l+1 bytes> */
+	  first = (first & 31) + 1;
+	  in += first;
+	  out_len += first;
+	  continue;
+	case 10: case 11:
+	  /* c 101oolll <8o> */
+	  o = (first & (3 << 3)) << 5 | *in++;
+	  first = (first & 7) + 2;
+	  break;
+	case 12: case 13:
+	  /* d 110lllll <8o> */
+	  o = *in++;
+	  first = (first & 31) + 10;
+	  break;
+	case 14:
+	  /* e 1110llll <8o> <8o> */
+	  o = in[0] | (in[1] << 8);
+	  in += 2;
+	  first = (first & 15) + 3;
+	  break;
+	case 15:
+	  /* f1 1111llll <8l> <8o> <8o> */
+	  /* g  11111lll <8l> <8o> <8o> <8o> */
+	  first = first & 15;
+	  if (first >= 8)
+	    {
+	      first = (((first - 8) << 8) | in[0]) + 5;
+	      o = in[1] | (in[2] << 8) | (in[3] << 16);
+	      in += 4;
+	    }
+	  else
+	    {
+	      first = ((first << 8) | in[0]) + 19;
+	      o = in[1] | (in[2] << 8);
+	      in += 3;
+	    }
+	  break;
+	}
+      /* fprintf(stderr, "ref: %d @ %d\n", first, o); */
+      if (o >= out_len)
+	return 0;
+      out_len += first;
+    }
+  return out_len;
 }
 
 /**********************************************************************/
@@ -756,6 +797,16 @@ repopagestore_compress_page(unsigned char *page, unsigned int len, unsigned char
 {
   return compress_buf(page, len, cpage, max);
 }
+
+unsigned int
+repopagestore_decompress_page(const unsigned char *cpage, unsigned int len, unsigned char *page, unsigned int max)
+{
+  unsigned int l = check_decompress_buf(cpage, len);
+  if (l == 0 || l > max)
+    return 0;
+  return unchecked_decompress_buf(cpage, len, page, max);
+}
+
 
 #define SOLV_ERROR_EOF		3
 #define SOLV_ERROR_CORRUPT	6

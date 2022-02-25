@@ -28,6 +28,7 @@
 #define SOLV_FLAG_PREFIX_POOL	4
 #define SOLV_FLAG_SIZE_BYTES	8
 #define SOLV_FLAG_USERDATA	16
+#define SOLV_FLAG_IDARRAYBLOCK	32
 
 struct s_Stringpool;
 typedef struct s_Stringpool Stringpool;
