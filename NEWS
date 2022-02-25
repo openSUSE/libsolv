@@ -1,6 +1,23 @@
 
-This file contains the major changes between
-libsolv versions:
+This file contains the major changes between libsolv versions:
+
+Version 0.7.21
+- selected bug fixes:
+  * fix segfault on conflict resolution when using bindings
+  * fix split provides not working if the update includes a forbidden
+    vendor change
+- new features:
+  * support strict repository priorities
+    new solver flag: SOLVER_FLAG_STRICT_REPO_PRIORITY
+  * support zstd compressed control files in debian packages
+  * add an ifdef allowing to rename Solvable dependency members
+    ("requires" is a keyword in C++20)
+  * support setting/reading userdata in solv files
+    new functions: repowriter_set_userdata, solv_read_userdata
+  * support queying of the custom vendor check function
+    new function: pool_get_custom_vendorcheck
+  * support solv files with an idarray block
+  * allow accessing the toolversion at runtime
 
 Version 0.7.20
 - selected bug fixes:
