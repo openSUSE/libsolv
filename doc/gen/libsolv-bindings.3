@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 11/18/2020
+.\"      Date: 03/02/2022
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "11/18/2020" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "03/02/2022" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -31,7 +31,7 @@
 libsolv-bindings \- access libsolv from perl/python/ruby
 .SH "DESCRIPTION"
 .sp
-Libsolv\(cqs language bindings offer an abstract, object orientated interface to the library\&. The supported languages are currently perl, python, and ruby\&. All example code (except in the specifics sections, of course) lists first the \(lqC\-ish\(rq interface, then the syntax for perl, python, and ruby (in that order)\&.
+Libsolv\(cqs language bindings offer an abstract, object orientated interface to the library\&. The supported languages are currently perl, python, ruby and tcl\&. All example code (except in the specifics sections, of course) lists first the \(lqC\-ish\(rq interface, then the syntax for perl, python, and ruby (in that order)\&.
 .SH "PERL SPECIFICS"
 .sp
 Libsolv\(cqs perl bindings can be loaded with the following statement:
@@ -3617,6 +3617,11 @@ Prefer the specified packages if the solver encounters an alternative\&. If a jo
 Avoid the specified packages if the solver encounters an alternative\&. This can also be used to block recommended or supplemented packages from being installed\&.
 .RE
 .PP
+\fBSOLVER_EXCLUDEFROMWEAK\fR
+.RS 4
+Avoid the specified packages to satisfy recommended or supplemented dependencies\&. Unlike SOLVER_DISFAVOR, it does not interfere with other rules\&.
+.RE
+.PP
 \fBSOLVER_JOBMASK\fR
 .RS 4
 A mask containing all the above action bits\&.
@@ -3959,7 +3964,7 @@ A rule of an unknown class\&. You should never encounter those\&.
 .PP
 \fBSOLVER_RULE_PKG\fR
 .RS 4
-A package dependency rule\&.
+A rule generated because of a package dependency\&.
 .RE
 .PP
 \fBSOLVER_RULE_UPDATE\fR
@@ -4011,7 +4016,7 @@ The package contains a required dependency which was not provided by any package
 .PP
 \fBSOLVER_RULE_PKG_REQUIRES\fR
 .RS 4
-Similar to SOLVER_RULE_PKG_NOTHING_PROVIDES_DEP, but in this case some packages provided the dependency but none of them could be installed due to other dependency issues\&.
+The package contains a required dependency which was provided by at least one package\&.
 .RE
 .PP
 \fBSOLVER_RULE_PKG_SELF_CONFLICT\fR
@@ -4021,12 +4026,12 @@ The package conflicts with itself\&. This is not allowed by older rpm versions\&
 .PP
 \fBSOLVER_RULE_PKG_CONFLICTS\fR
 .RS 4
-To fulfill the dependencies two packages need to be installed, but one of the packages contains a conflict with the other one\&.
+The package conflices with some other package\&.
 .RE
 .PP
 \fBSOLVER_RULE_PKG_SAME_NAME\fR
 .RS 4
-The dependencies can only be fulfilled by multiple versions of a package, but installing multiple versions of the same package is not allowed\&.
+This rules make sure that only one version of a package is installed in the system\&.
 .RE
 .PP
 \fBSOLVER_RULE_PKG_OBSOLETES\fR

@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-History
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 09/14/2018
+.\"      Date: 03/02/2022
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-HISTORY" "3" "09/14/2018" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-HISTORY" "3" "03/02/2022" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -65,9 +65,9 @@ Having a new repository format was one big step, but the other area where libzyp
 As I was not very pleased with the way the solver worked, I looked at other solver algorithms\&. I checked smart, yum and apt, but could not find a convincing algorithm\&. My own experiments also were not very convincing, they worked fine for some problems but failed miserably for other corner cases\&.
 .SS "Using SAT for solving"
 .sp
-SUSE\(cqs hack week at the end of June 2007 turned out to be a turning point for the solver\&. Googling for solver algorithms, I stumbled over some note saying that some people are trying to use SAT algorithms to improve solving on Debian\&. Looking at the SAT entry in Wikipedia, it was easy to see that this indeed was the missing piece: SAT algorithms are well researched and there are quite some open source implementations\&. I decided to look at the minisat code, as it is one of the fastest solvers while consisting of too many lines of code\&.
+SUSE\(cqs hack week at the end of June 2007 turned out to be a turning point for the solver\&. Googling for solver algorithms, I stumbled over some note saying that some people are trying to use SAT algorithms to improve solving on Debian\&. Looking at the SAT entry in Wikipedia, it was easy to see that this indeed was the missing piece: SAT algorithms are well researched and there are quite some open source implementations\&. I decided to look at the minisat code, as it is one of the fastest solvers while consisting of not too many lines of code\&.
 .sp
-Of course, directly using minisat would not work, as a package solver does not need to find just one correct solution, but it also has to optimize some metrics, i\&.e\&. keep as many packages installed as possible\&. Thus, I needed to write my own solver incorporation the ideas and algorithms used in minisat\&. This wasn\(cqt very hard, and at the end of the hack week the solver calculated the first right solutions\&.
+Of course, directly using minisat would not work, as a package solver does not need to find just one correct solution, but it also has to optimize some metrics, i\&.e\&. keep as many packages installed as possible\&. Thus, I needed to write my own solver, incorporating the ideas and algorithms used in minisat\&. This wasn\(cqt very hard, and at the end of the hack week the solver calculated the first right solutions\&.
 .SS "Selling it to libzypp"
 .sp
 With those encouraging results, I went to Klaus Kaempf, the system management architect at SUSE\&. We spoke about how to convince the team to make libzypp switch to the new solver\&. Fortunately, libzypp comes with a plethora of solver test cases, so we decided to make the solver pass most of the test cases first\&. Klaus wrote a "deptestomatic" implementation to check the test cases\&. Together with Stephan Kulow, who is responsible for the openSUSE distribution, we tweaked and extended the solver until most of the test cases looked good\&.
