@@ -18,6 +18,5 @@ system i686 rpm system
 
 job update name B
 result transaction,problems <inline>
-result transaction,problems <inline>
 #>upgrade A-1-1.noarch@system A-2-2.noarch@available
 #>upgrade B-1-1.noarch@system B-2-1.noarch@available
