@@ -40,14 +40,17 @@ struct s_TransactionOrderdata {
 #define TYPE_BROKEN	(1<<0)
 #define TYPE_CON    	(1<<1)
 
-#define TYPE_REQ_P    	(1<<2)
-#define TYPE_PREREQ_P 	(1<<3)
+/* uninstall edges */
+#define TYPE_REQ_UI    	(1<<4)
+#define TYPE_PREREQ_UI 	(1<<5)
+#define TYPE_REQ_UU    	(1<<6)
+#define TYPE_PREREQ_UU 	(1<<7)
 
-#define TYPE_SUG	(1<<4)
-#define TYPE_REC	(1<<5)
-
-#define TYPE_REQ    	(1<<6)
-#define TYPE_PREREQ 	(1<<7)
+/* install edges */
+#define TYPE_SUG	(1<<8)
+#define TYPE_REC	(1<<9)
+#define TYPE_REQ    	(1<<10)
+#define TYPE_PREREQ 	(1<<11)
 
 #define TYPE_CYCLETAIL  (1<<16)
 #define TYPE_CYCLEHEAD  (1<<17)
@@ -212,27 +215,34 @@ addedge(struct orderdata *od, Id from, Id to, int type)
 }
 
 static inline int
-havescripts(Pool *pool, Id solvid)
+havescripts(Pool *pool, Id solvid, Queue *ignoreinst)
 {
   Solvable *s = pool->solvables + solvid;
-  const char *dep;
   if (s->requires)
     {
       Id req, *reqp;
-      int inpre = 0;
       reqp = s->repo->idarraydata + s->requires;
       while ((req = *reqp++) != 0)
+        if (req == SOLVABLE_PREREQMARKER)
+	  break;
+      if (!req)
+	return 0;
+      while ((req = *reqp++) != 0)
 	{
-          if (req == SOLVABLE_PREREQMARKER)
-	    {
-	      inpre = 1;
-	      continue;
-	    }
-	  if (!inpre)
-	    continue;
-	  dep = pool_id2str(pool, req);
+	  const char *dep = pool_id2str(pool, req);
 	  if (*dep == '/' && strcmp(dep, "/sbin/ldconfig") != 0)
-	    return 1;
+	    {
+	      if (ignoreinst && ignoreinst->count)
+		{
+		  int i;
+		  for (i = 0; i < ignoreinst->count; i++)
+		    if (req == ignoreinst->elements[i])
+		      break;
+		  if (i < ignoreinst->count)
+		    continue;
+		}
+	      return 1;
+	    }
 	}
     }
   return 0;
@@ -247,7 +257,7 @@ addsolvableedges(struct orderdata *od, Solvable *s)
   int i, j, pre, numins;
   Repo *installed = pool->installed;
   Solvable *s2;
-  Queue depq;
+  Queue depq, ignoreinst;
   int provbyinst;
 
 #if 0
@@ -255,9 +265,20 @@ addsolvableedges(struct orderdata *od, Solvable *s)
 #endif
   p = s - pool->solvables;
   queue_init(&depq);
+  queue_init(&ignoreinst);
   if (s->requires)
     {
       Id req, *reqp;
+      if (installed && s->repo == installed)
+	{
+	  reqp = s->repo->idarraydata + s->requires;
+	  while ((req = *reqp++) != 0)
+	    if (req == SOLVABLE_PREREQMARKER)
+	      {
+	        solvable_lookup_idarray(s, SOLVABLE_PREREQ_IGNOREINST, &ignoreinst);
+		break;
+	      }
+	}
       reqp = s->repo->idarraydata + s->requires;
       pre = TYPE_REQ;
       while ((req = *reqp++) != 0)
@@ -266,6 +287,16 @@ addsolvableedges(struct orderdata *od, Solvable *s)
 	    {
 	      pre = TYPE_PREREQ;
 	      continue;
+	    }
+	  if (pre == TYPE_PREREQ && ignoreinst.count)
+	    {
+	      /* check if this req is filtered. assumes that ignoreinst.count is small */
+	      int i;
+	      for (i = 0; i < ignoreinst.count; i++)
+		if (req == ignoreinst.elements[i])
+		  break;
+	      if (i < ignoreinst.count)
+		continue;
 	    }
 	  queue_empty(&depq);
 	  numins = 0;	/* number of packages to be installed providing it */
@@ -326,7 +357,7 @@ addsolvableedges(struct orderdata *od, Solvable *s)
 #if 0
 				  printf("add interrreq uninst->inst edge (%s -> %s -> %s)\n", pool_solvid2str(pool, depq.elements[i]), pool_dep2str(pool, req), pool_solvid2str(pool, depq.elements[j]));
 #endif
-				  addedge(od, depq.elements[i], depq.elements[j], pre == TYPE_PREREQ ? TYPE_PREREQ_P : TYPE_REQ_P);
+				  addedge(od, depq.elements[i], depq.elements[j], pre == TYPE_PREREQ ? TYPE_PREREQ_UI : TYPE_REQ_UI);
 				}
 			    }
 			}
@@ -356,7 +387,7 @@ addsolvableedges(struct orderdata *od, Solvable *s)
 #if 0
 		      printf("add uninst->inst edge (%s -> %s -> %s)\n", pool_solvid2str(pool, p), pool_dep2str(pool, req), pool_solvid2str(pool, p2));
 #endif
-		      addedge(od, p, p2, pre == TYPE_PREREQ ? TYPE_PREREQ_P : TYPE_REQ_P);
+		      addedge(od, p, p2, pre == TYPE_PREREQ ? TYPE_PREREQ_UI : TYPE_REQ_UI);
 		    }
 		}
 	      else
@@ -365,16 +396,16 @@ addsolvableedges(struct orderdata *od, Solvable *s)
 		    continue;	/* no inst->uninst edges, please! */
 
 		  /* uninst -> uninst edge. Those make trouble. Only add if we must */
-		  if (trans->transaction_installed[p - installed->start] && !havescripts(pool, p))
+		  if (trans->transaction_installed[p - installed->start] && !havescripts(pool, p, &ignoreinst))
 		    {
 		      /* p is obsoleted by another package and has no scripts */
-		      /* we assume that the obsoletor is good enough to replace p */
+		      /* we assume that the obsoleter is good enough to replace p */
 		      continue;
 		    }
 #if 0
 		  printf("add uninst->uninst edge (%s -> %s -> %s)\n", pool_solvid2str(pool, p), pool_dep2str(pool, req), pool_solvid2str(pool, p2));
 #endif
-	          addedge(od, p2, p, pre == TYPE_PREREQ ? TYPE_PREREQ_P : TYPE_REQ_P);
+	          addedge(od, p2, p, pre == TYPE_PREREQ ? TYPE_PREREQ_UU : TYPE_REQ_UU);
 		}
 	    }
 	}
@@ -515,9 +546,25 @@ addsolvableedges(struct orderdata *od, Solvable *s)
 	    }
 	}
     }
+  queue_free(&ignoreinst);
   queue_free(&depq);
 }
 
+static inline int
+scriptletedge(Pool *pool, struct orderdata *od, Id *cycle, int k)
+{
+  int deg = od->edgedata[cycle[k + 1] + 1];
+  if ((deg & TYPE_REQ_UU) || (deg & TYPE_PREREQ_UU))
+    {
+      /* the UU edges are reverse edges, so we have to check the next element for scripts */
+      if (havescripts(pool, od->tes[cycle[k + 2]].p, 0))
+	return 1;
+      deg &= ~(TYPE_REQ_UU | TYPE_PREREQ_UU);
+    }
+  if (deg && havescripts(pool, od->tes[cycle[k]].p, 0))
+    return 1;
+  return 0;
+}
 
 /* break an edge in a cycle */
 static void
@@ -533,23 +580,31 @@ breakcycle(struct orderdata *od, Id *cycle)
   for (k = 0; cycle[k + 1]; k += 2)
     {
       ddeg = od->edgedata[cycle[k + 1] + 1];
+      /* map UU to UI for the comparison */
+      if (ddeg & TYPE_REQ_UU)
+	{
+	  ddeg ^= TYPE_REQ_UU;
+	  ddeg |= TYPE_REQ_UI;
+	}
+      if (ddeg & TYPE_PREREQ_UU)
+	{
+	  ddeg ^= TYPE_PREREQ_UU;
+	  ddeg |= TYPE_PREREQ_UI;
+	}
       if (ddeg > ddegmax)
 	ddegmax = ddeg;
       if (!k || ddeg < ddegmin)
 	{
 	  l = k;
 	  ddegmin = ddeg;
-	  continue;
 	}
-      if (ddeg == ddegmin)
+      else if (ddeg == ddegmin)
 	{
-	  if (havescripts(pool, od->tes[cycle[l]].p) && !havescripts(pool, od->tes[cycle[k]].p))
+          if (scriptletedge(pool, od, cycle, l) && !scriptletedge(pool, od, cycle, k))
 	    {
 	      /* prefer k, as l comes from a package with contains scriptlets */
 	      l = k;
-	      continue;
 	    }
-	  /* same edge value, check for prereq */
 	}
     }
 
@@ -573,10 +628,11 @@ breakcycle(struct orderdata *od, Id *cycle)
   /* break that edge */
   od->edgedata[cycle[l + 1] + 1] |= TYPE_BROKEN;
 
-#if 1
-  if (ddegmin < TYPE_REQ)
+    
+  IF_POOLDEBUG (SOLV_DEBUG_SOLUTIONS)
+    ;
+  else if (ddegmin < TYPE_REQ)
     return;
-#endif
 
   /* cycle recorded, print it */
   if (ddegmin >= TYPE_REQ && (ddegmax & TYPE_PREREQ) != 0)
@@ -1375,7 +1431,7 @@ transaction_check_order(Transaction *trans)
 	lastins = p;
       if (s->repo != pool->installed)
 	MAPSET(&ins, p);
-      if (havescripts(pool, p))
+      if (havescripts(pool, p, 0))
 	{
 	  MAPZERO(&seen);
 	  transaction_check_pkg(trans, p, p, &ins, &seen, 1, lastins, 0);
