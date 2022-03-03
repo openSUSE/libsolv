@@ -86,6 +86,7 @@ typedef struct s_Transaction {
 /* order flags */
 #define SOLVER_TRANSACTION_KEEP_ORDERDATA	(1 << 0)
 #define SOLVER_TRANSACTION_KEEP_ORDERCYCLES	(1 << 1)
+#define SOLVER_TRANSACTION_KEEP_ORDEREDGES	(1 << 2)
 
 /* cycle severities */
 #define SOLVER_ORDERCYCLE_HARMLESS		0
@@ -137,6 +138,7 @@ extern void transaction_check_order(Transaction *trans);
 /* order cycle introspection */
 extern void transaction_order_get_cycleids(Transaction *trans, Queue *q, int minseverity);
 extern int transaction_order_get_cycle(Transaction *trans, Id cid, Queue *q);
+extern void transaction_order_get_edges(Transaction *trans, Id p, Queue *q, int unbroken);
 
 extern void transaction_free_orderdata(Transaction *trans);
 extern void transaction_clone_orderdata(Transaction *trans, Transaction *srctrans);

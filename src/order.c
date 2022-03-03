@@ -35,6 +35,7 @@ struct s_TransactionOrderdata {
   Id *invedgedata;
   int ninvedgedata;
   Queue *cycles;
+  Queue *edgedataq;		/* from SOLVER_TRANSACTION_KEEP_ORDEREDGES */
 };
 
 #define TYPE_BROKEN	(1<<0)
@@ -73,6 +74,11 @@ transaction_clone_orderdata(Transaction *trans, Transaction *srctrans)
       trans->orderdata->cycles = solv_calloc(1, sizeof(Queue));
       queue_init_clone(trans->orderdata->cycles, od->cycles);
     }
+  if (od->edgedataq)
+    {
+      trans->orderdata->edgedataq = solv_calloc(1, sizeof(Queue));
+      queue_init_clone(trans->orderdata->edgedataq, od->edgedataq);
+    }
 }
 
 void
@@ -87,6 +93,11 @@ transaction_free_orderdata(Transaction *trans)
 	{
 	  queue_free(od->cycles);
 	  od->cycles = solv_free(od->cycles);
+	}
+      if (od->edgedataq)
+	{
+	  queue_init(od->edgedataq);
+	  od->edgedataq = solv_free(od->edgedataq);
 	}
       trans->orderdata = solv_free(trans->orderdata);
     }
@@ -103,6 +114,7 @@ struct orderdata {
   Queue cycles;
   Queue cyclesdata;
   int ncycles;
+  Queue edgedataq;
 };
 
 static void
@@ -331,9 +343,9 @@ addsolvableedges(struct orderdata *od, Solvable *s)
 		  queue_pushunique(&depq, p2);
 		}
 	    }
-	  if (provbyinst)
+	  if (provbyinst && s->repo == installed)
 	    {
-	      /* prune to harmless ->inst edges */
+	      /* prune to harmless uninst->inst edges */
 	      for (i = j = 0; i < depq.count; i++)
 		if (pool->solvables[depq.elements[i]].repo != installed)
 		  depq.elements[j++] = depq.elements[i];
@@ -375,7 +387,7 @@ addsolvableedges(struct orderdata *od, Solvable *s)
 	      if (pool->solvables[p2].repo != installed)
 		{
 		  /* all elements of depq are installs, thus have different TEs */
-		  if (pool->solvables[p].repo != installed)
+		  if (s->repo != installed)
 		    {
 #if 0
 		      printf("add inst->inst edge (%s -> %s -> %s)\n", pool_solvid2str(pool, p), pool_dep2str(pool, req), pool_solvid2str(pool, p2));
@@ -863,12 +875,7 @@ transaction_order(Transaction *trans, int flags)
   POOL_DEBUG(SOLV_DEBUG_STATS, "ordering transaction\n");
   /* free old data if present */
   if (trans->orderdata)
-    {
-      struct s_TransactionOrderdata *od = trans->orderdata;
-      od->tes = solv_free(od->tes);
-      od->invedgedata = solv_free(od->invedgedata);
-      trans->orderdata = solv_free(trans->orderdata);
-    }
+    transaction_free_orderdata(trans);
 
   /* create a transaction element for every active component */
   numte = 0;
@@ -893,6 +900,8 @@ transaction_order(Transaction *trans, int flags)
   od.edgedata[0] = 0;
   od.nedgedata = 1;
   queue_init(&od.cycles);
+  queue_init(&od.cyclesdata);
+  queue_init(&od.edgedataq);
 
   /* initialize TEs */
   for (i = 0, te = od.tes + 1; i < tr->count; i++)
@@ -1030,6 +1039,14 @@ transaction_order(Transaction *trans, int flags)
 #if 0
   dump_tes(&od);
 #endif
+  if ((flags & SOLVER_TRANSACTION_KEEP_ORDEREDGES) != 0)
+    {
+      queue_insertn(&od.edgedataq, 0, od.nedgedata, od.edgedata);
+      queue_insertn(&od.edgedataq, 0, numte, 0);
+      for (i = 1, te = od.tes + i; i < numte; i++, te++)
+	od.edgedataq.elements[i] = te->edges + numte;
+    }
+
   /* all edges are finally set up and there are no cycles, now the easy part.
    * Create an ordered transaction */
   now = solv_timems(0);
@@ -1199,7 +1216,7 @@ printf("free %s [%d]\n", pool_solvid2str(pool, te2->p), temedianr[od.invedgedata
   POOL_DEBUG(SOLV_DEBUG_STATS, "creating new transaction took %d ms\n", solv_timems(now));
   POOL_DEBUG(SOLV_DEBUG_STATS, "transaction ordering took %d ms\n", solv_timems(start));
 
-  if ((flags & (SOLVER_TRANSACTION_KEEP_ORDERDATA | SOLVER_TRANSACTION_KEEP_ORDERCYCLES)) != 0)
+  if ((flags & (SOLVER_TRANSACTION_KEEP_ORDERDATA | SOLVER_TRANSACTION_KEEP_ORDERCYCLES | SOLVER_TRANSACTION_KEEP_ORDEREDGES)) != 0)
     {
       struct s_TransactionOrderdata *tod;
       trans->orderdata = tod = solv_calloc(1, sizeof(*trans->orderdata));
@@ -1214,7 +1231,7 @@ printf("free %s [%d]\n", pool_solvid2str(pool, te2->p), temedianr[od.invedgedata
 	  queue_insertn(cycles, cycles->count, od.cycles.count, od.cycles.elements);
 	  queue_push(cycles, od.cycles.count / 4);
 	}
-      if ((flags & SOLVER_TRANSACTION_KEEP_ORDERDATA) != 0)
+      if ((flags & (SOLVER_TRANSACTION_KEEP_ORDERDATA | SOLVER_TRANSACTION_KEEP_ORDEREDGES)) != 0)
 	{
 	  tod->tes = od.tes;
 	  tod->ntes = numte;
@@ -1223,10 +1240,16 @@ printf("free %s [%d]\n", pool_solvid2str(pool, te2->p), temedianr[od.invedgedata
 	  od.tes = 0;
 	  od.invedgedata = 0;
 	}
+      if ((flags & SOLVER_TRANSACTION_KEEP_ORDEREDGES) != 0)
+	{
+	  Queue *edgedataq = tod->edgedataq = solv_calloc(1, sizeof(Queue));
+	  queue_init_clone(edgedataq, &od.edgedataq);
+	}
     }
   solv_free(od.tes);
   solv_free(od.invedgedata);
   queue_free(&od.cycles);
+  queue_free(&od.edgedataq);
   queue_free(&od.cyclesdata);
 }
 
@@ -1501,3 +1524,32 @@ transaction_order_get_cycle(Transaction *trans, Id cid, Queue *q)
   return severity;
 }
 
+void
+transaction_order_get_edges(Transaction *trans, Id p, Queue *q, int unbroken)
+{
+  struct s_TransactionOrderdata *od = trans->orderdata;
+  struct s_TransactionElement *te;
+  int i;
+  Queue *eq;
+
+  queue_empty(q);
+  if (!od || !od->edgedataq)
+    return;
+  for (i = 1, te = od->tes + i; i < od->ntes; i++, te++)
+    if (te->p == p)
+      break;
+  if (i == od->ntes)
+    return;
+  eq = od->edgedataq;
+  for (i = eq->elements[i]; eq->elements[i]; i += 2)
+    {
+      int type = eq->elements[i + 1];
+      if (unbroken)
+	{
+	  type &= ~(TYPE_BROKEN | TYPE_CYCLETAIL | TYPE_CYCLEHEAD);
+	  if (type == 0)
+	    continue;
+	}
+      queue_push2(q, od->tes[eq->elements[i]].p, type);
+    }
+}

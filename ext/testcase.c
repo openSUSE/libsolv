@@ -101,6 +101,7 @@ static struct resultflags2str {
   { TESTCASE_RESULT_JOBS,		"jobs" },
   { TESTCASE_RESULT_USERINSTALLED,	"userinstalled" },
   { TESTCASE_RESULT_ORDER,		"order" },
+  { TESTCASE_RESULT_ORDEREDGES,		"orderedges" },
   { 0, 0 }
 };
 
@@ -1451,6 +1452,31 @@ testcase_solverresult(Solver *solv, int resultflags)
 	  s = pool_tmpjoin(pool, "order ", buf, testcase_solvid2str(pool, p));
 	  strqueue_push(&sq, s);
 	}
+      transaction_free(trans);
+    }
+  if ((resultflags & TESTCASE_RESULT_ORDEREDGES) != 0)
+    {
+      Queue q;
+      int i, j;
+      Id p, p2;
+      Transaction *trans = solver_create_transaction(solv);
+      transaction_order(trans, SOLVER_TRANSACTION_KEEP_ORDEREDGES);
+      queue_init(&q);
+      for (i = 0; i < trans->steps.count; i++)
+	{
+	  p = trans->steps.elements[i];
+	  transaction_order_get_edges(trans, p, &q, 1);
+	  for (j = 0; j < q.count; j += 2)
+	    {
+	      char typebuf[32], *s;
+	      p2 = q.elements[j];
+	      sprintf(typebuf, " -%x-> ", q.elements[j + 1]);
+	      s = pool_tmpjoin(pool, "orderedge ", testcase_solvid2str(pool, p), typebuf);
+	      s = pool_tmpappend(pool, s, testcase_solvid2str(pool, p2), 0);
+	      strqueue_push(&sq, s);
+	    }
+	}
+      queue_free(&q);
       transaction_free(trans);
     }
   if ((resultflags & TESTCASE_RESULT_ALTERNATIVES) != 0)

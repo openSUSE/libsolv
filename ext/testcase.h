@@ -22,6 +22,7 @@
 #define TESTCASE_RESULT_JOBS		(1 << 10)
 #define TESTCASE_RESULT_USERINSTALLED	(1 << 11)
 #define TESTCASE_RESULT_ORDER		(1 << 12)
+#define TESTCASE_RESULT_ORDEREDGES	(1 << 13)
 
 /* reuse solver hack, testsolv use only */
 #define TESTCASE_RESULT_REUSE_SOLVER	(1 << 31)
