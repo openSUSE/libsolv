@@ -1179,9 +1179,9 @@ repowriter_set_userdata(Repowriter *writer, const void *data, int len)
 {
   writer->userdata = solv_free(writer->userdata);
   writer->userdatalen = 0;
-  if (len < 0 || len >= 65536)
+  if (len <= 0)
     return;
-  writer->userdata = len ? solv_memdup(data, len) : 0;
+  writer->userdata = solv_memdup(data, len);
   writer->userdatalen = len;
 }
 
@@ -1249,6 +1249,9 @@ repowriter_write(Repowriter *writer, FILE *fp)
 
   Id type_constantid = 0;
 
+  /* sanity checks */
+  if (writer->userdatalen < 0 || writer->userdatalen >= 65536)
+    return pool_error(pool, -1, "illegal userdata length: %d", writer->userdatalen);
 
   memset(&cbdata, 0, sizeof(cbdata));
   cbdata.pool = pool;
