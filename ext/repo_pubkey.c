@@ -271,18 +271,32 @@ static void
 pgpsig_makesigdata(struct pgpsig *sig, unsigned char *p, int l, unsigned char *pubkey, int pubkeyl, unsigned char *userid, int useridl, Chksum *h)
 {
   int type = sig->type;
-  unsigned char b[6];
+  unsigned char b[10];
   const unsigned char *cs;
   int csl;
 
   if (!h || sig->mpioff < 2 || l <= sig->mpioff)
     return;
+  if (p[0] != 3 && p[0] != 4 && p[0] != 5)
+    return;	/* unsupported signature version */
   if ((type >= 0x10 && type <= 0x13) || type == 0x1f || type == 0x18 || type == 0x20 || type == 0x28)
     {
-      b[0] = 0x99;
-      b[1] = pubkeyl >> 8;
-      b[2] = pubkeyl;
-      solv_chksum_add(h, b, 3);
+      if (p[0] == 4)
+	{
+	  b[0] = 0x99;
+	  b[1] = pubkeyl >> 8;
+	  b[2] = pubkeyl;
+	  solv_chksum_add(h, b, 3);
+	}
+      else if (p[0] == 5)
+	{
+	  b[0] = 0x9a;
+	  b[1] = pubkeyl >> 24;
+	  b[2] = pubkeyl >> 16;
+	  b[3] = pubkeyl >> 8;
+	  b[4] = pubkeyl;
+	  solv_chksum_add(h, b, 5);
+	}
       solv_chksum_add(h, pubkey, pubkeyl);
     }
   if ((type >= 0x10 && type <= 0x13))
@@ -301,7 +315,7 @@ pgpsig_makesigdata(struct pgpsig *sig, unsigned char *p, int l, unsigned char *p
   /* add trailer */
   if (p[0] == 3)
     solv_chksum_add(h, p + 2, 5);
-  else
+  else if (p[0] == 4)
     {
       int hl = 6 + (p[4] << 8 | p[5]);
       solv_chksum_add(h, p, hl);
@@ -313,6 +327,27 @@ pgpsig_makesigdata(struct pgpsig *sig, unsigned char *p, int l, unsigned char *p
       b[5] = hl;
       solv_chksum_add(h, b, 6);
     }
+  else if (p[0] == 5)
+    {
+      int hl = 6 + (p[4] << 8 | p[5]);
+      solv_chksum_add(h, p, hl);
+      if (type == 0 || type == 1)
+	{
+	  memset(b, 0, 6);
+          solv_chksum_add(h, b, 6);
+	}
+      hl += 6;
+      b[0] = 5;
+      b[1] = 0xff;
+      b[2] = b[3] = b[4] = b[5] = 0;
+      b[6] = hl >> 24;
+      b[7] = hl >> 16;
+      b[8] = hl >> 8;
+      b[9] = hl;
+      solv_chksum_add(h, b, 10);
+    }
+  else
+    return;
   cs = solv_chksum_get(h, &csl);
   if (cs[0] == p[sig->mpioff - 2] && cs[1] == p[sig->mpioff - 1])
     {
@@ -629,7 +664,7 @@ parsepubkey(Solvable *s, Repodata *data, unsigned char *p, int pl, int flags)
 	      Chksum *h;
 	      unsigned char hdr[3];
 	      unsigned char fp[20];
-	      char fpx[40 + 1];
+	      char fpx[20 * 2 + 1];
 
 	      maxsigcr = kcr = p[1] << 24 | p[2] << 16 | p[3] << 8 | p[4];
 	      hdr[0] = 0x99;
@@ -642,7 +677,31 @@ parsepubkey(Solvable *s, Repodata *data, unsigned char *p, int pl, int flags)
 	      solv_chksum_free(h, fp);
 	      solv_bin2hex(fp, 20, fpx);
 	      repodata_set_str(data, s - pool->solvables, PUBKEY_FINGERPRINT, fpx);
-	      memcpy(keyid, fp + 12, 8);	/* keyid is last 64 bits of fingerprint */
+	      memcpy(keyid, fp + (20 - 8), 8);	/* keyid is last 64 bits of fingerprint */
+	      pubdata = p + 5;
+	      pubdatal = l - 5;
+	    }
+	  else if (p[0] == 5 && l >= 6)
+	    {
+	      Chksum *h;
+	      unsigned char hdr[5];
+	      unsigned char fp[32];
+	      char fpx[32 * 2 + 1];
+
+	      maxsigcr = kcr = p[1] << 24 | p[2] << 16 | p[3] << 8 | p[4];
+	      hdr[0] = 0x9a;
+	      hdr[1] = l >> 24;
+	      hdr[2] = l >> 16;
+	      hdr[3] = l >> 8;
+	      hdr[4] = l;
+	      /* fingerprint is the sha256 over the packet */
+	      h = solv_chksum_create(REPOKEY_TYPE_SHA256);
+	      solv_chksum_add(h, hdr, 5);
+	      solv_chksum_add(h, p, l);
+	      solv_chksum_free(h, fp);
+	      solv_bin2hex(fp, 32, fpx);
+	      repodata_set_str(data, s - pool->solvables, PUBKEY_FINGERPRINT, fpx);
+	      memcpy(keyid, fp + (32 - 8), 8);	/* keyid is last 64 bits of fingerprint */
 	      pubdata = p + 5;
 	      pubdatal = l - 5;
 	    }
@@ -1086,18 +1145,21 @@ repo_find_all_pubkeys(Repo *repo, const char *keyid, Queue *q)
 {
   Id p;
   Solvable *s;
+  size_t keyidlen;
 
   queue_empty(q);
   if (!keyid)
     return;
-  queue_init(q);
+  keyidlen = strlen(keyid);
+  if (keyidlen < 8 || keyidlen > 64)
+    return;
   FOR_REPO_SOLVABLES(repo, p, s)
     {
       const char *kidstr, *evr = pool_id2str(s->repo->pool, s->evr);
 
-      if (!evr || strncmp(evr, keyid + 8, 8) != 0)
-       continue;
-      kidstr = solvable_lookup_str(s, PUBKEY_KEYID);
+      if (!evr || strncmp(evr, keyid + keyidlen - 8, 8) != 0)
+	continue;
+      kidstr = solvable_lookup_str(s, keyidlen >= 32 ? PUBKEY_FINGERPRINT : PUBKEY_KEYID);
       if (kidstr && !strcmp(kidstr, keyid))
         queue_push(q, p);
     }
