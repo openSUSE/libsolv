@@ -28,6 +28,7 @@ struct solv_xmlparser {
 
   Id *elementhelper;
   void *parser;
+  void *attsdata;
 };
 
 static inline const char *
