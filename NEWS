@@ -2,6 +2,19 @@
 This file contains the major changes between
 libsolv versions:
 
+Version 0.6.39:
+- bug fixes:
+  * fix memory leaks in SWIG generated code
+  * fix misparsing of '&' in attributes with libxml2
+  * try to keep packages from a cycle close togther in the
+    transaction order [bsc#1189622]
+  * fix split provides not working if the update includes a
+    forbidden vendor change [bsc#1195485]
+  * fix segfault on conflict resolution when using bindings
+  * do not replace noarch problem rules with arch dependent ones
+    in problem reporting
+  * fix and simplify pool_vendor2mask implementation
+
 Version 0.6.38:
 - bug fixes:
   * Turn on rich dependency handling needed for ptf support

@@ -1,4 +1,19 @@
 -------------------------------------------------------------------
+Fri Mar  4 12:07:50 CET 2022 - mls@suse.de
+
+- fix memory leaks in SWIG generated code
+- fix misparsing of '&' in attributes with libxml2
+- try to keep packages from a cycle close togther in the
+  transaction order [bsc#1189622]
+- fix split provides not working if the update includes a
+  forbidden vendor change [bsc#1195485]
+- fix segfault on conflict resolution when using bindings
+- do not replace noarch problem rules with arch dependent ones
+  in problem reporting
+- fix and simplify pool_vendor2mask implementation
+- bump version to 0.6.39
+
+-------------------------------------------------------------------
 Wed Jul 28 10:19:08 CEST 2021 - mls@suse.de
 
 - Turn on rich dependency handling needed for ptf support
