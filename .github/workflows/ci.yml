@@ -26,4 +26,5 @@ jobs:
           make
       - name: Test
         run:  |
+          cd build
           make test
