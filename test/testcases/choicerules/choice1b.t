@@ -1,3 +1,4 @@
+feature complex_deps
 repo system 0 testtags <inline>
 #>=Pkg: B 1 1 noarch
 #>=Prv: P = 1
