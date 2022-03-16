@@ -20,8 +20,6 @@ repo system 0 testtags <inline>
 #>=Pkg: B 1 1 noarch
 #>=Req: libA
 repo available 0 testtags <inline>
-#>=Pkg: B 1 1 noarch
-#>=Req: libA
 #>=Pkg: A 2 1 noarch
 #>=Pkg: Anew 2 1 noarch
 #>=Prv: libA

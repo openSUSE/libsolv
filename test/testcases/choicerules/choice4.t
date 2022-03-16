@@ -1,3 +1,21 @@
+# This tests that A is updated instead of Anew being installed
+#
+#Rule #4:
+#    !B-2-2.noarch [11] (w1)
+#    A-2-2.noarch [9] (w2)
+#    Anew-2-2.noarch [10]
+#Rule #11:
+#    !B-2-1.noarch [8] (w1)
+#    A-2-1.noarch [6] (w2)
+#    Anew-2-1.noarch [7]
+#
+#Choice Rule for #4:
+#    !B-2-2.noarch [11] (w1)
+#    A-2-2.noarch [9] (w2)
+#Choice Rule for #11
+#    !B-2-1.noarch [8] (w1)
+#    A-2-1.noarch [6] (w2)
+#
 repo system 0 testtags <inline>
 #>=Pkg: A 1 1 noarch
 #>=Prv: libA = 1-1
