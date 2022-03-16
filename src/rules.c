@@ -3255,6 +3255,12 @@ solver_rule2rules(Solver *solv, Id rid, Queue *q, int recursive)
 
 
 /* check if the newest versions of pi still provides the dependency we're looking for */
+/* pi: installed package
+ * r: rule for the dependency
+ * m: map with all positive elements of r
+ * return 0: at least one provider
+ * return 1: the newest versions do not provide the dependency
+ */
 static int
 solver_choicerulecheck(Solver *solv, Id pi, Rule *r, Map *m, Queue *q)
 {
@@ -3301,94 +3307,6 @@ solver_choicerulecheck(Solver *solv, Id pi, Rule *r, Map *m, Queue *q)
     if (MAPTST(m, q->elements[i]))
       return 0;		/* at least one provides it */
   return 1;	/* none of the new packages provided it */
-}
-
-static int
-solver_choicerulecheck2(Solver *solv, Id pi, Id pt, Queue *q)
-{
-  Pool *pool = solv->pool;
-  Rule *ur;
-  Id p, pp;
-  int i;
-
-  if (!q->count || q->elements[0] != pi)
-    {
-      if (q->count)
-        queue_empty(q);
-      ur = solv->rules + solv->updaterules + (pi - pool->installed->start);
-      if (!ur->p)
-        ur = solv->rules + solv->featurerules + (pi - pool->installed->start);
-      if (!ur->p)
-	return 1;		/* orphaned, thus newest */
-      queue_push2(q, pi, 0);
-      FOR_RULELITERALS(p, pp, ur)
-	if (p > 0 && p != pi)
-	  queue_push(q, p);
-      queue_push(q, pi);
-    }
-  if (q->count <= 3)
-    return q->count == 3 && q->elements[2] == pt ? 1 : 0;
-  if (!q->elements[1])
-    {
-      queue_deleten(q, 0, 2);
-      policy_filter_unwanted(solv, q, POLICY_MODE_CHOOSE);
-      queue_unshift(q, 1);	/* filter mark */
-      queue_unshift(q, pi);
-    }
-  for (i = 2; i < q->count; i++)
-    if (q->elements[i] == pt)
-      return 1;
-  return 0;	/* not newest */
-}
-
-static int
-solver_choicerulecheck3(Solver *solv, Id pt, Queue *q)
-{
-  Pool *pool = solv->pool;
-  Id p, pp;
-  int i;
-
-  if (!q->count || q->elements[0] != pt)
-    {
-      Solvable *s = pool->solvables + pt;
-      if (q->count)
-        queue_empty(q);
-      /* no installed package, so check all with same name */
-      queue_push2(q, pt, 0);
-      FOR_PROVIDES(p, pp, s->name)
-        if (pool->solvables[p].name == s->name && p != pt)
-          queue_push(q, p);
-      queue_push(q, pt);
-    }
-  if (q->count <= 3)
-    return q->count == 3 && q->elements[2] == pt ? 1 : 0;
-  if (!q->elements[1])
-    {
-      queue_deleten(q, 0, 2);
-      policy_filter_unwanted(solv, q, POLICY_MODE_CHOOSE);
-      queue_unshift(q, 1);	/* filter mark */
-      queue_unshift(q, pt);
-    }
-  for (i = 2; i < q->count; i++)
-    if (q->elements[i] == pt)
-      return 1;
-  return 0;	/* not newest */
-}
-
-static inline void
-queue_removeelement(Queue *q, Id el)
-{
-  int i, j;
-  for (i = 0; i < q->count; i++)
-    if (q->elements[i] == el)
-      break;
-  if (i < q->count)
-    {
-      for (j = i++; i < q->count; i++)
-	if (q->elements[i] != el)
-	  q->elements[j++] = q->elements[i];
-      queue_truncate(q, j);
-    }
 }
 
 static Id
@@ -3439,14 +3357,14 @@ solver_addchoicerules(Solver *solv)
   Pool *pool = solv->pool;
   Map m, mneg;
   Rule *r;
-  Queue q, qi, qcheck, qcheck2, infoq;
+  Queue q, qi, qcheck, infoq;
   int i, j, rid, havechoice, negcnt;
   Id p, d, pp, p2;
   Solvable *s;
   Id lastaddedp, lastaddedd;
   int lastaddedcnt;
   unsigned int now;
-  int isnewest = 0;
+  int isinstalled;
 
   solv->choicerules = solv->nrules;
   if (!pool->installed)
@@ -3458,7 +3376,6 @@ solver_addchoicerules(Solver *solv)
   queue_init(&q);
   queue_init(&qi);
   queue_init(&qcheck);
-  queue_init(&qcheck2);
   queue_init(&infoq);
   map_init(&m, pool->nsolvables);
   map_init(&mneg, pool->nsolvables);
@@ -3478,20 +3395,28 @@ solver_addchoicerules(Solver *solv)
       if (r->p >= 0 || ((r->d == 0 || r->d == -1) && r->w2 <= 0))
 	continue;	/* only look at requires rules */
       /* solver_printrule(solv, SOLV_DEBUG_RESULT, r); */
-      queue_empty(&q);
       queue_empty(&qi);
       havechoice = 0;
+      isinstalled = 0;
       FOR_RULELITERALS(p, pp, r)
 	{
 	  if (p < 0)
-	    continue;
+	    {
+	      Solvable *s = pool->solvables - p;
+	      p2 = s->repo == pool->installed ? -p : 0;
+	      if (p2)
+		{
+		  if (!(solv->updatemap_all || (solv->updatemap.size && MAPTST(&solv->updatemap, p2 - solv->installed->start))))
+		    isinstalled = 1;
+		}
+	      continue;
+	    }
 	  s = pool->solvables + p;
 	  if (!s->repo)
 	    continue;
 	  if (s->repo == pool->installed)
 	    {
 	      queue_push2(&qi, p, p);
-	      queue_push(&q, p);
 	      continue;
 	    }
 	  /* find an installed package p2 that we can update/downgrade to p */
@@ -3503,7 +3428,6 @@ solver_addchoicerules(Solver *solv)
 	      if (policy_is_illegal(solv, pool->solvables + p2, s, 0))
 		continue;
 	      queue_push2(&qi, p2, p);
-	      queue_push(&q, p);
 	      continue;
 	    }
 	  /* package p is independent of the installed ones */
@@ -3512,53 +3436,46 @@ solver_addchoicerules(Solver *solv)
 #if 0
       printf("havechoice: %d qcount %d qicount %d\n", havechoice, q.count, qi.count);
 #endif
-      if (!havechoice || !q.count || !qi.count)
+      if (!havechoice || !qi.count)
 	continue;	/* no choice */
 
       FOR_RULELITERALS(p, pp, r)
         if (p > 0)
 	  MAPSET(&m, p);
 
-      isnewest = 1;
-      FOR_RULELITERALS(p, pp, r)
+      if (!isinstalled)
 	{
-	  if (p > 0)
-	    break;
-	  p2 = choicerule_find_installed(pool, -p);
-	  if (p2 && !solver_choicerulecheck2(solv, p2, -p, &qcheck2))
+	  /* do extra checking for packages related to installed packages */
+	  for (i = j = 0; i < qi.count; i += 2)
 	    {
-	      isnewest = 0;
-	      break;
+	      p2 = qi.elements[i];
+	      if (solv->updatemap_all || (solv->updatemap.size && MAPTST(&solv->updatemap, p2 - solv->installed->start)))
+		{
+		  if (solver_choicerulecheck(solv, p2, r, &m, &qcheck))
+		    continue;
+		}
+	      qi.elements[j++] = p2;
+	      qi.elements[j++] = qi.elements[i + 1];
 	    }
-	  if (!p2 && !solver_choicerulecheck3(solv, -p, &qcheck2))
-	    {
-	      isnewest = 0;
-	      break;
-	    }
+	  queue_truncate(&qi, j);
 	}
-      /* do extra checking */
-      for (i = j = 0; i < qi.count; i += 2)
-	{
-	  p2 = qi.elements[i];
-	  if (!p2)
-	    continue;
-	  if (isnewest && solver_choicerulecheck(solv, p2, r, &m, &qcheck))
-	    {
-	      /* oops, remove element p from q */
-	      queue_removeelement(&q, qi.elements[i + 1]);
-	      continue;
-	    }
-	  qi.elements[j++] = p2;
-	}
-      queue_truncate(&qi, j);
 
-      if (!q.count || !qi.count)
+      if (!qi.count)
 	{
 	  FOR_RULELITERALS(p, pp, r)
 	    if (p > 0)
 	      MAPCLR(&m, p);
 	  continue;
 	}
+
+      queue_empty(&q);
+      /* split q from qi */
+      for (i = j = 0; i < qi.count; i += 2)
+	{
+	  queue_push(&q, qi.elements[i + 1]);
+	  qi.elements[j++] = qi.elements[i];
+	}
+      queue_truncate(&qi, j);
 
 
       /* now check the update rules of the installed package.
@@ -3579,6 +3496,7 @@ solver_addchoicerules(Solver *solv)
 	      break;
 	  if (p)
 	    break;
+	  /* speed improvement: only check each package once */
 	  for (j = i + 1; j < qi.count; j++)
 	    if (qi.elements[i] == qi.elements[j])
 	      qi.elements[j] = 0;
@@ -3636,7 +3554,6 @@ solver_addchoicerules(Solver *solv)
   queue_free(&q);
   queue_free(&qi);
   queue_free(&qcheck);
-  queue_free(&qcheck2);
   queue_free(&infoq);
   map_free(&m);
   map_free(&mneg);

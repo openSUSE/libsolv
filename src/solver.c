@@ -2620,6 +2620,43 @@ resolve_orphaned(Solver *solv, int level, int disablerules, Queue *dq, int *reru
   return level;
 }
 
+int
+solver_check_unneeded_choicerules(Solver *solv)
+{
+  Pool *pool = solv->pool;
+  Rule *r, *or;
+  Id p, pp, p2, pp2;
+  int i;
+  int havedisabled = 0;
+
+  /* check if some choice rules could have been broken */
+  for (i = solv->choicerules, r = solv->rules + i; i < solv->choicerules_end; i++, r++)
+    {
+      if (r->d < 0)
+	continue;
+      or = solv->rules + solv->choicerules_info[i - solv->choicerules];
+      if (or->d < 0)
+	continue;
+      FOR_RULELITERALS(p, pp, or)
+	{
+	  if (p < 0 || solv->decisionmap[p] <= 0)
+	    continue;
+	  FOR_RULELITERALS(p2, pp2, r)
+	    if (p2 == p)
+	      break;
+	  if (!p2)
+	    {
+	      /* did not find p in choice rule, disable it */
+	      POOL_DEBUG(SOLV_DEBUG_SOLVER, "disabling unneeded choice rule #%d\n", i);
+	      solver_disablechoicerules(solv, r);
+	      havedisabled = 1;
+	      break;
+	    }
+	}
+    }
+  return havedisabled;
+}
+
 /*-------------------------------------------------------------------
  *
  * solver_run_sat
@@ -2800,6 +2837,14 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 
       if (solv->installed && solv->cleandepsmap.size && solver_check_cleandeps_mistakes(solv))
 	{
+	  solver_reset(solv);
+	  level = 0;	/* restart from scratch */
+	  continue;
+	}
+
+      if (solv->choicerules != solv->choicerules_end && solver_check_unneeded_choicerules(solv))
+	{
+	  POOL_DEBUG(SOLV_DEBUG_SOLVER, "did choice rule minimization, rerunning solver\n");
 	  solver_reset(solv);
 	  level = 0;	/* restart from scratch */
 	  continue;
