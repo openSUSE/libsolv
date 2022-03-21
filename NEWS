@@ -1,6 +1,13 @@
 
 This file contains the major changes between libsolv versions:
 
+Version 0.7.22
+- selected bug fixes:
+  * reworked choice rule generation to cover more usecases
+  * support SOLVABLE_PREREQ_IGNOREINST in the ordering code
+- new features:
+  * support parsing of Debian's Multi-Arch indicator
+
 Version 0.7.21
 - selected bug fixes:
   * fix segfault on conflict resolution when using bindings

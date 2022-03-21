@@ -1,4 +1,13 @@
 -------------------------------------------------------------------
+Mon Mar 21 10:05:32 CET 2022 - mls@suse.de
+
+- reworked choice rule generation to cover more usecases
+- support SOLVABLE_PREREQ_IGNOREINST in the ordering code
+  [bsc#1196514]
+- support parsing of Debian's Multi-Arch indicator
+- bump version to 0.7.22
+
+-------------------------------------------------------------------
 Fri Feb 25 17:32:20 CET 2022 - mls@suse.de
 
 - fix segfault on conflict resolution when using bindings
