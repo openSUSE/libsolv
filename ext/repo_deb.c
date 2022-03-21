@@ -462,6 +462,10 @@ control2solvable(Solvable *s, Repodata *data, char *control)
 	      checksumtype = REPOKEY_TYPE_MD5;
 	    }
 	  break;
+	case 'M' << 8 | 'U':
+	  if (!strcasecmp(tag, "multi-arch"))
+	    repodata_set_poolstr(data, s - pool->solvables, SOLVABLE_MULTIARCH, q);
+	  break;
 	case 'P' << 8 | 'A':
 	  if (!strcasecmp(tag, "package"))
 	    s->name = pool_str2id(pool, q, 1);
