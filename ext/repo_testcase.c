@@ -388,7 +388,13 @@ writedeps(Repo *repo, FILE *fp, const char *tag, Id key, Solvable *s, Offset off
 	  fprintf(fp, "+%s\n", tag);
 	  tagwritten = 1;
 	}
-      fprintf(fp, "%s\n", idstr);
+      if (*idstr == '/' && !ISRELDEP(id)) {
+        fprintf(fp, "%s\n", pool_id2str(pool, id));
+      } else if (*idstr == '/') {
+        fprintf(fp, "\\2f%s\n", idstr + 1);
+      } else {
+        fprintf(fp, "%s\n", idstr);
+      }
     }
   if (tagwritten)
     fprintf(fp, "-%s\n", tag);
