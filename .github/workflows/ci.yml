@@ -11,7 +11,7 @@ on:
       - master
 
 jobs:
-  build:
+  build_linux:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -28,3 +28,38 @@ jobs:
         run:  |
           cd build
           make test
+
+  build_win:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install environment from environment.yml
+        uses: mamba-org/provision-with-micromamba@main
+        with:
+          environment-file: .github/micromamba_ci_environment.yml
+
+      - name: Build
+        shell: cmd /C CALL {0}
+        run:  |
+          call micromamba activate ci_environment
+
+          mkdir build
+          cd build
+          cmake -GNinja .. ^
+            -D CMAKE_INSTALL_PREFIX=%CONDA_PREFIX%\Library ^
+            -D ENABLE_CONDA=ON ^
+            -D MULTI_SEMANTICS=ON ^
+            -D WITHOUT_COOKIEOPEN=ON
+
+          ninja
+
+          ninja install
+
+      - name: Test
+        shell: cmd /C call {0}
+        run: |
+          call micromamba activate ci_environment
+
+          set CTEST_OUTPUT_ON_FAILURE=1
+          cd build
+          ninja test
