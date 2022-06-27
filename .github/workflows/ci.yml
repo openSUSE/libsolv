@@ -28,3 +28,31 @@ jobs:
         run:  |
           cd build
           make test
+
+  win32:
+    runs-on: windows-latest
+    steps:
+      - run: git config --global core.autocrlf input
+      - uses: actions/checkout@v2
+      - uses: msys2/setup-msys2@v2
+        with:
+          pacboy: >-
+            toolchain:p
+            cmake:p
+      - name: Build
+        shell: msys2 {0}
+        run: |
+          mkdir build
+          cd build
+          export CFLAGS="-D__USE_MINGW_ANSI_STDIO=1"
+          # CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS doesn't work correctly in the
+          # presence of explicit dllexports for the gcc/binutils toolchain
+          export LDFLAGS="-Wl,--export-all-symbols"
+          cmake -DENABLE_STATIC=ON -DWITHOUT_COOKIEOPEN=ON ..
+          ninja
+      - name: Test
+        shell: msys2 {0}
+        run: |
+          cd build
+          export PATH="$(pwd)/src:$(pwd)/ext:${PATH}"
+          ninja test
