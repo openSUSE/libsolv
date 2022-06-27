@@ -2448,7 +2448,10 @@ testcase_read(Pool *pool, FILE *fp, const char *testcase, Queue *job, char **res
 		}
 	    }
 	  if (resultp)
+	  {
+	    solv_free(*resultp);
 	    *resultp = result;
+	  }
 	  else
 	    solv_free(result);
 	  if (resultflagsp)
