@@ -25,6 +25,10 @@ struct parsedata {
 
   Stringpool fnpool;
   Queue fndata;
+
+  char *subdir;
+  char **fnlist;
+  int nfnlist;
 };
 
 static int
@@ -135,6 +139,38 @@ fn2data(struct parsedata *pd, const char *fn, Id *fntypep, int create)
   return pd->fndata.elements + 2 * fnid;
 }
 
+static void
+set_fnlist(struct parsedata *pd, int handle, char *fn)
+{
+  handle -= pd->repo->start;
+  if (handle >= pd->nfnlist)
+    {
+      int n;
+      if (!fn)
+	return;
+      n = handle - pd->nfnlist + 16;
+      pd->fnlist = solv_realloc2(pd->fnlist, pd->nfnlist + n, sizeof(char *));
+      memset(pd->fnlist + pd->nfnlist, 0, n * sizeof(char *));
+      pd->nfnlist += n;
+    }
+  if (pd->fnlist[handle])
+    solv_free(pd->fnlist[handle]);
+  pd->fnlist[handle] = fn;
+}
+
+static void
+move_fnlist(struct parsedata *pd, int fromhandle, int tohandle)
+{
+  char *fn = 0;
+  fromhandle -= pd->repo->start;
+  if (fromhandle < pd->nfnlist)
+    {
+      fn = pd->fnlist[fromhandle];
+      pd->fnlist[fromhandle] = 0;
+    }
+  set_fnlist(pd, tohandle, fn);
+}
+
 static int
 parse_package(struct parsedata *pd, struct solv_jsonparser *jp, char *kfn)
 {
@@ -193,7 +229,10 @@ parse_package(struct parsedata *pd, struct solv_jsonparser *jp, char *kfn)
     }
   if (fn || kfn)
     {
-      repodata_set_location(data, handle, 0, subdir, fn ? fn : kfn);
+      if (subdir)
+	repodata_set_location(data, handle, 0, subdir, fn ? fn : kfn);
+      else
+	set_fnlist(pd, handle, solv_strdup(fn ? fn : kfn));	/* delay location setting */
       fndata = fn2data(pd, fn ? fn : kfn, &fntype, 1);
     }
   solv_free(fn);
@@ -210,12 +249,14 @@ parse_package(struct parsedata *pd, struct solv_jsonparser *jp, char *kfn)
 	{
 	  /* ignore this package */
 	  repo_free_solvable(pd->repo, handle, 1);
+	  set_fnlist(pd, handle, 0);
 	  return type;
 	}
       if (fndata[0] && fndata[0] < fntype)
 	{
 	  /* replace old package */
 	  swap_solvables(pool, data, handle, fndata[1]);
+	  move_fnlist(pd, handle, fndata[1]);
 	  repo_free_solvable(pd->repo, handle, 1);
 	  handle = fndata[1];
 	}
@@ -258,11 +299,25 @@ parse_packages2(struct parsedata *pd, struct solv_jsonparser *jp)
 }
 
 static int
+parse_info(struct parsedata *pd, struct solv_jsonparser *jp)
+{
+  int type = JP_OBJECT;
+  while (type > 0 && (type = jsonparser_parse(jp)) > 0 && type != JP_OBJECT_END)
+    {
+      if (type == JP_STRING && !strcmp(jp->key, "subdir") && !pd->subdir)
+	pd->subdir = strdup(jp->value);
+    }
+  return type;
+}
+
+static int
 parse_main(struct parsedata *pd, struct solv_jsonparser *jp, int flags)
 {
   int type = JP_OBJECT;
   while (type > 0 && (type = jsonparser_parse(jp)) > 0 && type != JP_OBJECT_END)
     {
+      if (type == JP_OBJECT && !strcmp("info", jp->key))
+	type = parse_info(pd, jp);
       if (type == JP_OBJECT && !strcmp("packages", jp->key))
 	type = parse_packages(pd, jp);
       else if (type == JP_ARRAY && !strcmp("packages", jp->key))
@@ -302,8 +357,23 @@ repo_add_conda(Repo *repo, FILE *fp, int flags)
     ret = pool_error(pool, -1, "parse error line %d", jp.line);
   jsonparser_free(&jp);
 
+  /* finalize delayed location setting */
+  if (pd.fnlist)
+    {
+      int i;
+      for (i = 0; i < pd.nfnlist; i++)
+	{
+	  if (!pd.fnlist[i])
+	    continue;
+	  repodata_set_location(data, repo->start + i, 0, pd.subdir, pd.fnlist[i]);
+	  solv_free(pd.fnlist[i]);
+	}
+      solv_free(pd.fnlist);
+    }
+
   queue_free(&pd.fndata);
   stringpool_free(&pd.fnpool);
+  solv_free(pd.subdir);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
 
