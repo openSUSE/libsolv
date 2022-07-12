@@ -22,7 +22,7 @@ jobs:
         run:  |
           mkdir build
           cd build
-          cmake -DDEBIAN=1 -DMULTI_SEMANTICS=1 ..
+          cmake -DDEBIAN=1 -DMULTI_SEMANTICS=1 -DCMAKE_VERBOSE_MAKEFILE=TRUE ..
           make
       - name: Test
         run:  |
