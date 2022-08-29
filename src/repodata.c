@@ -22,7 +22,14 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <assert.h>
+#ifdef ENABLE_PCRE2
+#include <pcre2posix.h>
+#define regcomp pcre2_regcomp
+#define regexec pcre2_regexec
+#define regfree pcre2_regfree
+#else
 #include <regex.h>
+#endif
 
 #include "repo.h"
 #include "pool.h"

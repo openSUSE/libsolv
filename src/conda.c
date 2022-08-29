@@ -17,7 +17,14 @@
 #include <unistd.h>
 #include <string.h>
 #include <sys/types.h>
+#ifdef ENABLE_PCRE2
+#include <pcre2posix.h>
+#define regcomp pcre2_regcomp
+#define regexec pcre2_regexec
+#define regfree pcre2_regfree
+#else
 #include <regex.h>
+#endif
 
 #include "pool.h"
 #include "repo.h"
@@ -574,7 +581,7 @@ pool_conda_matchspec(Pool *pool, const char *name)
   int haveglob = 0;
 
   /* ignore channel and namespace for now */
-  if ((p2 = strrchr(name, ':')))
+  if ((p2 = strrchr(name, ':')) && (p2 < strchr(name, ' ')))
     name = p2 + 1;
   name2 = solv_strdup(name);
   /* find end of name */
