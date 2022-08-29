@@ -619,10 +619,10 @@ pool_conda_matchspec(Pool *pool, const char *name)
       if (p <= version + 1 || (p[-1] != ' ' && p[-1] != '='))
 	break;		/* no build */
       /* check char before delimiter */
-      if (p[-2] == '=' || p[-2] == '!' || p[-2] == '|' || p[-2] == ',' || p[-2] == '<' || p[-2] == '>' || p[-2] == '~')
+      if (p[-2] == '=' || p[-2] == '!' || p[-2] == '|' || p[-2] == ',' || p[-2] == '<' || p[-2] == '>' || p[-2] == '~' || p[-2] == '?')
 	{
 	  /* illegal combination */
-	  if (p[-1] == ' ')
+	  if (p[-1] == ' '  || (p[-1] == '=' && p[-2] == '?'))
 	    {
 	      p--;
 	      continue;	/* special case space: it may be in the build */
