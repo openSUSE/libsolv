@@ -51,6 +51,8 @@ void solver_take_solution(struct s_Solver *solv, Id problem, Id solution, Queue 
 
 Id solver_findproblemrule(struct s_Solver *solv, Id problem);
 void solver_findallproblemrules(struct s_Solver *solv, Id problem, Queue *rules);
+void solver_get_proof(struct s_Solver *solv, Id id, int islearnt, Queue *q);
+void solver_get_learnt(struct s_Solver *solv, Id id, int islearnt, Queue *q);
 
 extern const char *solver_problemruleinfo2str(struct s_Solver *solv, SolverRuleinfo type, Id source, Id target, Id dep);
 extern const char *solver_problem2str(struct s_Solver *solv, Id problem);

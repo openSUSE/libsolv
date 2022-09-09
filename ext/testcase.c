@@ -102,6 +102,7 @@ static struct resultflags2str {
   { TESTCASE_RESULT_USERINSTALLED,	"userinstalled" },
   { TESTCASE_RESULT_ORDER,		"order" },
   { TESTCASE_RESULT_ORDEREDGES,		"orderedges" },
+  { TESTCASE_RESULT_PROOF,		"proof" },
   { 0, 0 }
 };
 
@@ -1357,6 +1358,73 @@ testcase_solverresult(Solver *solv, int resultflags)
 	    }
 	  solv_free(probprefix);
 	}
+    }
+
+  if ((resultflags & TESTCASE_RESULT_PROOF) != 0)
+    {
+      char *probprefix;
+      int pcnt, problem;
+      Queue q, lq;
+
+      queue_init(&q);
+      queue_init(&lq);
+      pcnt = solver_problem_count(solv);
+      for (problem = 1; problem <= pcnt + lq.count; problem++)
+	{
+	  if (problem <= pcnt)
+	    {
+	      s = testcase_problemid(solv, problem);
+	      solver_get_proof(solv, problem, 0, &q);
+	    }
+	  else
+	    {
+	      s = testcase_ruleid(solv, lq.elements[problem - pcnt - 1]);
+	      solver_get_proof(solv, lq.elements[problem - pcnt - 1], 1, &q);
+	    }
+	  probprefix = solv_dupjoin("proof ", s, 0);
+	  for (i = 0; i < q.count; i += 2)
+	    {
+	      SolverRuleinfo rclass;
+	      Queue rq;
+	      Id rid = q.elements[i];
+	      char *rprefix;
+	      Id truelit = i + 1 < q.count ? q.elements[i + 1] : 0;
+	      char nbuf[16];
+
+	      rclass = solver_ruleclass(solv, rid);
+	      if (rclass == SOLVER_RULE_LEARNT)
+		queue_pushunique(&lq, rid);
+	      queue_init(&rq);
+	      solver_ruleliterals(solv, rid, &rq);
+	      sprintf(nbuf, "%3d", i / 2);
+	      rprefix = solv_dupjoin(probprefix, " ", nbuf);
+	      rprefix = solv_dupappend(rprefix, " ", testcase_rclass2str(rclass));
+	      rprefix = solv_dupappend(rprefix, " ", testcase_ruleid(solv, rid));
+	      strqueue_push(&sq, rprefix);
+	      solv_free(rprefix);
+	      rprefix = solv_dupjoin(probprefix, " ", nbuf);
+	      rprefix = solv_dupappend(rprefix, ": ", 0);
+	      for (j = 0; j < rq.count; j++)
+		{
+		  const char *s;
+		  Id p = rq.elements[j];
+		  if (p == truelit)
+		    s = pool_tmpjoin(pool, rprefix, "-->", 0);
+		  else
+		    s = pool_tmpjoin(pool, rprefix, "   ", 0);
+		  if (p < 0)
+		    s = pool_tmpappend(pool, s, " -", testcase_solvid2str(pool, -p));
+		  else
+		    s = pool_tmpappend(pool, s, "  ", testcase_solvid2str(pool, p));
+		  strqueue_push(&sq, s);
+		}
+	      solv_free(rprefix);
+	      queue_free(&rq);
+	    }
+	  solv_free(probprefix);
+	}
+      queue_free(&q);
+      queue_free(&lq);
     }
 
   if ((resultflags & TESTCASE_RESULT_ORPHANED) != 0)

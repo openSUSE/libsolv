@@ -986,7 +986,7 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
   FOR_RULELITERALS(v, pp, r)
     {
       if (DECISIONMAP_TRUE(v))	/* the one true literal */
-	  continue;
+	  abort();
       vv = v > 0 ? v : -v;
       MAPSET(&involved, vv);
     }
@@ -1005,8 +1005,12 @@ analyze_unsolvable(Solver *solv, Rule *cr, int disablerules)
       analyze_unsolvable_rule(solv, r, &weakq, &rseen);
       FOR_RULELITERALS(v, pp, r)
 	{
-	  if (DECISIONMAP_TRUE(v))	/* the one true literal */
+	  if (DECISIONMAP_TRUE(v))	/* the one true literal, i.e. our decision */
+	    {
+	      if (v != solv->decisionq.elements[idx])
+		abort();
 	      continue;
+	    }
 	  vv = v > 0 ? v : -v;
 	  MAPSET(&involved, vv);
 	}

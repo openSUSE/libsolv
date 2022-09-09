@@ -1447,3 +1447,105 @@ solver_solutionelement2str(Solver *solv, Id p, Id rp)
     return "bad solution element";
 }
 
+void
+solver_get_proof(Solver *solv, Id id, int islearnt, Queue *q)
+{
+  Pool *pool = solv->pool;
+  Map seen, seent;	/* seent: was the literal true or false */
+  Id rid, truelit;
+  int first = 1;
+  int why, i, j;
+
+  queue_empty(q);
+  if (!islearnt)
+    why = solv->problems.elements[2 * id - 2];
+  else if (id >= solv->learntrules && id < solv->nrules)
+    why = solv->learnt_why.elements[id - solv->learntrules];
+  else
+    return;
+  map_init(&seen, pool->nsolvables);
+  map_init(&seent, pool->nsolvables);
+  while ((rid = solv->learnt_pool.elements[why++]) != 0)
+    {
+      Rule *r = solv->rules + rid;
+      Id p, pp;
+      truelit = 0;
+      FOR_RULELITERALS(p, pp, r)
+	{
+	  Id vv = p > 0 ? p : -p;
+	  if (MAPTST(&seen, vv))
+	    {
+	      if ((p > 0 ? 1 : 0) == (MAPTST(&seent, vv) ? 1 : 0))
+		{
+		  if (truelit)
+		    abort();
+		  truelit = p;		/* the one true literal! */
+		}
+	    }
+	  else
+	    {
+	      /* a new literal. it must be false as the rule is unit */
+	      MAPSET(&seen, vv);
+	      if (p < 0)
+		MAPSET(&seent, vv);
+	    }
+	}
+      if (truelit)
+        queue_push(q, truelit);
+      else if (!first)
+	abort();
+      queue_push(q, rid);
+      first = 0;
+    }
+  /* reverse proof queue */
+  for (i = 0, j = q->count - 1; i < j; i++, j--)
+    {
+      Id e = q->elements[i];
+      q->elements[i] = q->elements[j];
+      q->elements[j] = e;
+    }
+  map_free(&seen);
+  map_free(&seent);
+}
+
+void
+solver_get_learnt(Solver *solv, Id id, int islearnt, Queue *q)
+{
+  int why;
+  Queue todo;
+
+  queue_empty(q);
+  if (!islearnt)
+    why = solv->problems.elements[2 * id - 2];
+  else if (id >= solv->learntrules && id < solv->nrules)
+    why = solv->learnt_why.elements[id - solv->learntrules];
+  else
+    return;
+  queue_init(&todo);
+  queue_push(&todo, why);
+  while (todo.count)
+    {
+      int i, rid;
+      why = queue_pop(&todo);
+      while ((rid = solv->learnt_pool.elements[why++]) != 0)
+	{
+	  if (rid < solv->learntrules || rid >= solv->nrules)
+	    continue;
+	  /* insert sorted and unified */
+	  for (i = 0; i < q->count; i++)
+	    {
+	      if (q->elements[i] < rid)
+		continue;
+	      if (q->elements[i] == rid)
+		rid = 0;
+	      break;
+	    }
+	  if (!rid)
+	    continue;	/* already in list */
+	  queue_insert(q, i, rid);
+	  queue_push(&todo, solv->learnt_why.elements[rid - solv->learntrules]);
+	}
+    }
+  queue_free(&todo);
+}
+
