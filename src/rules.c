@@ -3008,7 +3008,7 @@ solver_ruleinfo(Solver *solv, Id rid, Id *fromp, Id *top, Id *depp)
 	  qp = rq.elements[i + 1];
 	  qo = rq.elements[i + 2];
 	  qd = rq.elements[i + 3];
-	  if (type == SOLVER_RULE_PKG || type > qt)
+	  if (type == SOLVER_RULE_PKG || SOLVER_RULE_PKG_SAME_NAME || type > qt)
 	    {
 	      type = qt;
 	      if (fromp)
@@ -3017,6 +3017,8 @@ solver_ruleinfo(Solver *solv, Id rid, Id *fromp, Id *top, Id *depp)
 		*top = qo;
 	      if (depp)
 		*depp = qd;
+	      if (qt == SOLVER_RULE_PKG_SAME_NAME)
+		break;			/* prefer SOLVER_RULE_PKG_SAME_NAME */
 	    }
 	}
       queue_free(&rq);
