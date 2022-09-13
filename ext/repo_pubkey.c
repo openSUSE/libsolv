@@ -458,11 +458,11 @@ pgpsig_init(struct pgpsig *sig, unsigned char *p, int l)
 		  sig->haveissuer = 1;
 		  memcpy(sig->issuer, q + 1, 8);
 		}
-	      if (x == 2 && j == 0)
+	      if (x == 2 && sl == 5 && j == 0)
 		sig->created = q[1] << 24 | q[2] << 16 | q[3] << 8 | q[4];
-	      if (x == 3 && j == 0)
+	      if (x == 3 && sl == 5 && j == 0)
 		sig->expires = q[1] << 24 | q[2] << 16 | q[3] << 8 | q[4];
-	      if (x == 9 && j == 0)
+	      if (x == 9 && sl == 5 && j == 0)
 		sig->keyexpires = q[1] << 24 | q[2] << 16 | q[3] << 8 | q[4];
 	      q += sl;
 	      ql -= sl;
