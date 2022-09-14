@@ -220,6 +220,16 @@ solver_disableproblemset(Solver *solv, int start)
     solver_disableproblem(solv, solv->problems.elements[i]);
 }
 
+#ifdef SUSE
+static inline int
+suse_isptf(Pool *pool, Solvable *s)
+{
+  if (!strncmp("ptf-", pool_id2str(pool, s->name), 4))
+    return 1;
+  return 0;
+}
+#endif
+
 /*-------------------------------------------------------------------
  * try to fix a problem by auto-uninstalling packages
  */
@@ -250,6 +260,10 @@ solver_autouninstall(Solver *solv, int start)
 	  Id p = solv->installed->start + (v - solv->updaterules);
 	  if (m && !MAPTST(m, v - solv->updaterules))
 	    continue;
+#ifdef SUSE
+	  if (suse_isptf(pool, pool->solvables + p))
+	    continue;	/* do not autouninstall ptf packages */
+#endif
 	  if (pool->considered && !MAPTST(pool->considered, p))
 	    continue;	/* do not uninstalled disabled packages */
 	  if (solv->bestrules_info && solv->bestrules_end > solv->bestrules)
