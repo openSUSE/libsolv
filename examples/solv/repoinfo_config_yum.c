@@ -21,6 +21,37 @@
 # define REPOINFO_PATH "/etc/zypp/repos.d"
 #endif
 
+static char *
+find_releaseevr(Pool *pool)
+{
+#ifdef SUSE
+  extern char *suse_find_baseproduct_evr(Pool *);
+#endif
+  void *rpmstate;
+  char *releaseevr = 0;
+  Queue q;
+
+#ifdef SUSE
+  if ((releaseevr = suse_find_baseproduct_evr(pool)) != 0)
+    return releaseevr;
+#endif
+  queue_init(&q);
+  rpmstate = rpm_state_create(pool, pool_get_rootdir(pool));
+  rpm_installedrpmdbids(rpmstate, "Providename", "system-release", &q);
+  if (q.count)
+    {
+      void *handle;
+      char *p;
+      handle = rpm_byrpmdbid(rpmstate, q.elements[0]);
+      releaseevr = handle ? rpm_query(handle, SOLVABLE_EVR) : 0;
+      if (releaseevr && (p = strchr(releaseevr, '-')) != 0)
+	*p = 0;
+    }
+  rpm_state_free(rpmstate);
+  queue_free(&q);
+  return releaseevr;
+}
+
 char *
 yum_substitute(Pool *pool, char *line)
 {
@@ -43,28 +74,15 @@ yum_substitute(Pool *pool, char *line)
 	{
 	  if (!releaseevr)
 	    {
-	      void *rpmstate;
-	      Queue q;
-	
-	      queue_init(&q);
-	      rpmstate = rpm_state_create(pool, pool_get_rootdir(pool));
-	      rpm_installedrpmdbids(rpmstate, "Providename", "system-release", &q);
-	      if (q.count)
-		{
-		  void *handle;
-		  char *p;
-		  handle = rpm_byrpmdbid(rpmstate, q.elements[0]);
-		  releaseevr = handle ? rpm_query(handle, SOLVABLE_EVR) : 0;
-		  if (releaseevr && (p = strchr(releaseevr, '-')) != 0)
-		    *p = 0;
-		}
-	      rpm_state_free(rpmstate);
-	      queue_free(&q);
+	      releaseevr = find_releaseevr(pool);
 	      if (!releaseevr)
 		{
-		  fprintf(stderr, "no installed package provides 'system-release', cannot determine $releasever\n");
+		  fprintf(stderr, "Cannot determine $releasever\n");
 		  exit(1);
 		}
+	      /* we only need the version */
+	      if ((p = strchr(releaseevr, '-')) != 0)
+		*p = 0;
 	    }
 	  *p2 = 0;
 	  p = pool_tmpjoin(pool, line, releaseevr, p2 + 11);
