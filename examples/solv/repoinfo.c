@@ -47,6 +47,7 @@
 #ifdef ENABLE_MDKREPO
 #include "repoinfo_type_mdk.h"
 #endif
+#include "repoinfo_type_plaindir.h"
 
 static int
 repoinfos_sort_cmp(const void *ap, const void *bp)
@@ -252,6 +253,11 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 
       switch (cinfo->type)
 	{
+#if defined(ENABLE_RPMDB) || defined(ENABLE_RPMPKG)
+        case TYPE_PLAINDIR:
+	  plaindir_load(cinfo, &sigpool);
+	  break;
+#endif
 #ifdef ENABLE_RPMMD
         case TYPE_RPMMD:
 	  repomd_load(cinfo, &sigpool);

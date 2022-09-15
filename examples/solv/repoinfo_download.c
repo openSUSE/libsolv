@@ -194,6 +194,10 @@ downloadpackage(Solvable *s, const char *loc)
       const char *datadir = repo_lookup_str(cinfo->repo, SOLVID_META, SUSETAGS_DATADIR);
       loc = pool_tmpjoin(s->repo->pool, datadir ? datadir : "suse", "/", loc);
     }
+  else if (cinfo->type == TYPE_PLAINDIR)
+    {
+     return fopen(loc, "r");
+    }
 #endif
   chksumtype = 0;
   chksum = solvable_lookup_bin_checksum(s, SOLVABLE_CHECKSUM, &chksumtype);
