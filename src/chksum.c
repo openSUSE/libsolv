@@ -15,9 +15,48 @@
 #include "util.h"
 #include "chksum.h"
 
+#ifdef WITH_OPENSSL
+
+#include <openssl/evp.h>
+
+typedef EVP_MD_CTX* MD5_CTX;
+typedef EVP_MD_CTX* SHA1_CTX;
+typedef EVP_MD_CTX* SHA224_CTX;
+typedef EVP_MD_CTX* SHA256_CTX;
+typedef EVP_MD_CTX* SHA384_CTX;
+typedef EVP_MD_CTX* SHA512_CTX;
+
+#define solv_MD5_Init(ctx) { *ctx = EVP_MD_CTX_new(); EVP_DigestInit_ex(*ctx, EVP_md5(), NULL); }
+#define solv_MD5_Update(ctx, data, len) EVP_DigestUpdate(*ctx, data, len)
+#define solv_MD5_Final(md, ctx) EVP_DigestFinal_ex(*ctx, md, NULL)
+
+#define solv_SHA1_Init(ctx) { *ctx = EVP_MD_CTX_new(); EVP_DigestInit_ex(*ctx, EVP_sha1(), NULL); }
+#define solv_SHA1_Update(ctx, data, len) EVP_DigestUpdate(*ctx, data, len)
+#define solv_SHA1_Final(ctx, md) EVP_DigestFinal_ex(*ctx, md, NULL)
+
+#define solv_SHA224_Init(ctx) { *ctx = EVP_MD_CTX_new(); EVP_DigestInit_ex(*ctx, EVP_sha224(), NULL); }
+#define solv_SHA224_Update(ctx, data, len) EVP_DigestUpdate(*ctx, data, len)
+#define solv_SHA224_Final(md, ctx) EVP_DigestFinal_ex(*ctx, md, NULL)
+
+#define solv_SHA256_Init(ctx) { *ctx = EVP_MD_CTX_new(); EVP_DigestInit_ex(*ctx, EVP_sha256(), NULL); }
+#define solv_SHA256_Update(ctx, data, len) EVP_DigestUpdate(*ctx, data, len)
+#define solv_SHA256_Final(md, ctx) EVP_DigestFinal_ex(*ctx, md, NULL)
+
+#define solv_SHA384_Init(ctx) { *ctx = EVP_MD_CTX_new(); EVP_DigestInit_ex(*ctx, EVP_sha384(), NULL); }
+#define solv_SHA384_Update(ctx, data, len) EVP_DigestUpdate(*ctx, data, len)
+#define solv_SHA384_Final(md, ctx) EVP_DigestFinal_ex(*ctx, md, NULL)
+
+#define solv_SHA512_Init(ctx) { *ctx = EVP_MD_CTX_new(); EVP_DigestInit_ex(*ctx, EVP_sha512(), NULL); }
+#define solv_SHA512_Update(ctx, data, len) EVP_DigestUpdate(*ctx, data, len)
+#define solv_SHA512_Final(md, ctx) EVP_DigestFinal_ex(*ctx, md, NULL)
+
+#else
+
 #include "md5.h"
 #include "sha1.h"
 #include "sha2.h"
+
+#endif
 
 #ifdef _WIN32
   #include "strfncs.h"
@@ -36,6 +75,72 @@ struct s_Chksum {
     SHA512_CTX sha512;
   } c;
 };
+
+#ifdef WITH_OPENSSL
+
+void
+openssl_ctx_copy(Chksum *chk_out, Chksum *chk_in)
+{
+  switch(chk_in->type)
+    {
+    case REPOKEY_TYPE_MD5:
+      chk_out->c.md5 = EVP_MD_CTX_new();
+      EVP_MD_CTX_copy_ex(chk_out->c.md5, chk_in->c.md5);
+      return;
+    case REPOKEY_TYPE_SHA1:
+      chk_out->c.sha1 = EVP_MD_CTX_new();
+      EVP_MD_CTX_copy_ex(chk_out->c.sha1, chk_in->c.sha1);
+      return;
+    case REPOKEY_TYPE_SHA224:
+      chk_out->c.sha224 = EVP_MD_CTX_new();
+      EVP_MD_CTX_copy_ex(chk_out->c.sha224, chk_in->c.sha224);
+      return;
+    case REPOKEY_TYPE_SHA256:
+      chk_out->c.sha256 = EVP_MD_CTX_new();
+      EVP_MD_CTX_copy_ex(chk_out->c.sha256, chk_in->c.sha256);
+      return;
+    case REPOKEY_TYPE_SHA384:
+      chk_out->c.sha384 = EVP_MD_CTX_new();
+      EVP_MD_CTX_copy_ex(chk_out->c.sha384, chk_in->c.sha384);
+      return;
+    case REPOKEY_TYPE_SHA512:
+      chk_out->c.sha512 = EVP_MD_CTX_new();
+      EVP_MD_CTX_copy_ex(chk_out->c.sha512, chk_in->c.sha512);
+      return;
+    default:
+      return;
+    }
+}
+
+void
+openssl_ctx_free(Chksum *chk)
+{
+  switch(chk->type)
+    {
+    case REPOKEY_TYPE_MD5:
+      EVP_MD_CTX_free(chk->c.md5);
+      return;
+    case REPOKEY_TYPE_SHA1:
+      EVP_MD_CTX_free(chk->c.sha1);
+      return;
+    case REPOKEY_TYPE_SHA224:
+      EVP_MD_CTX_free(chk->c.sha224);
+      return;
+    case REPOKEY_TYPE_SHA256:
+      EVP_MD_CTX_free(chk->c.sha256);
+      return;
+    case REPOKEY_TYPE_SHA384:
+      EVP_MD_CTX_free(chk->c.sha384);
+      return;
+    case REPOKEY_TYPE_SHA512:
+      EVP_MD_CTX_free(chk->c.sha512);
+      return;
+    default:
+      return;
+    }
+}
+
+#endif
 
 Chksum *
 solv_chksum_create(Id type)
@@ -73,7 +178,11 @@ solv_chksum_create(Id type)
 Chksum *
 solv_chksum_create_clone(Chksum *chk)
 {
-  return solv_memdup(chk, sizeof(*chk));
+  Chksum *chk_clone = solv_memdup(chk, sizeof(*chk));
+#ifdef WITH_OPENSSL
+  openssl_ctx_copy(chk_clone, chk);
+#endif
+  return chk_clone;
 }
 
 int
@@ -259,6 +368,9 @@ solv_chksum_free(Chksum *chk, unsigned char *cp)
       if (l && res)
         memcpy(cp, res, l);
     }
+#ifdef WITH_OPENSSL
+  openssl_ctx_free(chk);
+#endif
   solv_free(chk);
   return 0;
 }
