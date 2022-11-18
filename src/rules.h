@@ -161,6 +161,7 @@ extern Id   solver_rule2job(struct s_Solver *solv, Id rid, Id *whatp);
 extern Id   solver_rule2solvable(struct s_Solver *solv, Id rid);
 extern void solver_rule2rules(struct s_Solver *solv, Id rid, Queue *q, int recursive);
 extern Id   solver_rule2pkgrule(struct s_Solver *solv, Id rid);
+extern const char *solver_ruleinfo2str(struct s_Solver *solv, SolverRuleinfo type, Id source, Id target, Id dep);
 
 /* orphan handling */
 extern void solver_breakorphans(struct s_Solver *solv);

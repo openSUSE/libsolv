@@ -396,6 +396,7 @@ SOLV_1.0 {
 		solver_rule2solvable;
 		solver_ruleclass;
 		solver_ruleinfo;
+		solver_ruleinfo2str;
 		solver_ruleliterals;
 		solver_rulecmp;
 		solver_select2str;
