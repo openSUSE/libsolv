@@ -3078,8 +3078,12 @@ solver_ruleinfo(Solver *solv, Id rid, Id *fromp, Id *top, Id *depp)
     }
   if (rid >= solv->bestrules && rid < solv->bestrules_end)
     {
+      /* > 0: the package we are updating */
       if (fromp && solv->bestrules_info[rid - solv->bestrules] > 0)
 	*fromp = solv->bestrules_info[rid - solv->bestrules];
+      /* < 0: the job rule */
+      if (top && solv->bestrules_info[rid - solv->bestrules] < 0)
+	*top = -solv->bestrules_info[rid - solv->bestrules];
       return SOLVER_RULE_BEST;
     }
   if (rid >= solv->yumobsrules && rid < solv->yumobsrules_end)
@@ -3111,9 +3115,36 @@ solver_ruleinfo(Solver *solv, Id rid, Id *fromp, Id *top, Id *depp)
       return SOLVER_RULE_STRICT_REPO_PRIORITY;
     }
   if (rid >= solv->choicerules && rid < solv->choicerules_end)
-    return SOLVER_RULE_CHOICE;
+    {
+      if (solv->choicerules_info && fromp)
+	*fromp = solv->choicerules_info[rid - solv->choicerules];
+      return SOLVER_RULE_CHOICE;
+    }
   if (rid >= solv->recommendsrules && rid < solv->recommendsrules_end)
-    return SOLVER_RULE_RECOMMENDS;
+    {
+      Queue rq;
+      int i;
+      if (r->p >= 0)
+	return SOLVER_RULE_RECOMMENDS;
+      if (fromp)
+	*fromp = -r->p;
+      queue_init(&rq);
+      getpkgruleinfos(solv, r, &rq);
+      for (i = 0; i < rq.count; i += 4)
+	{
+	  if (rq.elements[i] != SOLVER_RULE_RECOMMENDS)
+	    continue;
+	  if (fromp)
+	    *fromp = rq.elements[i + 1];
+	  if (top)
+	    *top = rq.elements[i + 2];
+	  if (depp)
+	    *depp = rq.elements[i + 3];
+	  break;
+	}
+      queue_free(&rq);
+      return SOLVER_RULE_RECOMMENDS;
+    }
   if (rid >= solv->learntrules)
     return SOLVER_RULE_LEARNT;
   return SOLVER_RULE_UNKNOWN;
@@ -4276,6 +4307,8 @@ solver_ruleinfo2str(Solver *solv, SolverRuleinfo type, Id source, Id target, Id 
       return pool_tmpjoin(pool, pool_solvid2str(pool, source), " has inferior architecture", 0);
     case SOLVER_RULE_UPDATE:
       return pool_tmpjoin(pool, pool_solvid2str(pool, source), " needs to stay installed or be updated", 0);
+    case SOLVER_RULE_FEATURE:
+      return pool_tmpjoin(pool, pool_solvid2str(pool, source), " needs to stay installed or be updated/downgraded", 0);
     case SOLVER_RULE_JOB:
       return pool_tmpjoin(pool, "job ", pool_job2str(pool, target, dep, 0), 0);
     case SOLVER_RULE_JOB_UNSUPPORTED:
@@ -4286,12 +4319,17 @@ solver_ruleinfo2str(Solver *solv, SolverRuleinfo type, Id source, Id target, Id 
       return pool_tmpjoin(pool, "requested package ", pool_dep2str(pool, dep), " does not exist");
     case SOLVER_RULE_JOB_PROVIDED_BY_SYSTEM:
       return pool_tmpjoin(pool, "requested ", pool_dep2str(pool, dep), " is provided by the system");
-    case SOLVER_RULE_PKG:
-      return "bad pkg rule type";
     case SOLVER_RULE_BEST:
       if (source > 0)
-        return pool_tmpjoin(pool, "cannot install the best update candidate for package ", pool_solvid2str(pool, source), 0);
-     return "cannot install the best candidate for the job";
+        return pool_tmpjoin(pool, "install best update candidate for package ", pool_solvid2str(pool, source), 0);
+      if (target > 0)
+	{
+	  target = solver_rule2job(solv, target, &dep);
+	  return pool_tmpjoin(pool, "best package for job ", pool_job2str(pool, target, dep, 0), 0);
+	}
+     return "best rule";
+    case SOLVER_RULE_PKG:
+      return "bad pkg rule type";
     case SOLVER_RULE_PKG_NOT_INSTALLABLE:
       ss = pool->solvables + source;
       if (pool_disabled_solvable(pool, ss))
@@ -4310,6 +4348,9 @@ solver_ruleinfo2str(Solver *solv, SolverRuleinfo type, Id source, Id target, Id 
       s = pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), 0);
       s = pool_tmpappend(pool, s, " conflicts with ", pool_dep2str(pool, dep));
       return pool_tmpappend(pool, s, " provided by ", pool_solvid2str(pool, target));
+    case SOLVER_RULE_PKG_SELF_CONFLICT:
+      s = pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), " conflicts with ");
+      return pool_tmpappend(pool, s, pool_dep2str(pool, dep), " provided by itself");
     case SOLVER_RULE_PKG_OBSOLETES:
       s = pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), 0);
       s = pool_tmpappend(pool, s, " obsoletes ", pool_dep2str(pool, dep));
@@ -4325,9 +4366,13 @@ solver_ruleinfo2str(Solver *solv, SolverRuleinfo type, Id source, Id target, Id 
     case SOLVER_RULE_PKG_REQUIRES:
       s = pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), " requires ");
       return pool_tmpappend(pool, s, pool_dep2str(pool, dep), 0);
-    case SOLVER_RULE_PKG_SELF_CONFLICT:
-      s = pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), " conflicts with ");
-      return pool_tmpappend(pool, s, pool_dep2str(pool, dep), " provided by itself");
+    case SOLVER_RULE_PKG_RECOMMENDS:
+      s = pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), " recommends ");
+      return pool_tmpappend(pool, s, pool_dep2str(pool, dep), 0);
+    case SOLVER_RULE_PKG_CONSTRAINS:
+      s = pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), 0);
+      s = pool_tmpappend(pool, s, " has constraint ", pool_dep2str(pool, dep));
+      return pool_tmpappend(pool, s, " conflicting with ", pool_solvid2str(pool, target));
     case SOLVER_RULE_YUMOBS:
       s = pool_tmpjoin(pool, "both package ", pool_solvid2str(pool, source), " and ");
       s = pool_tmpjoin(pool, s, pool_solvid2str(pool, target), " obsolete ");
@@ -4336,12 +4381,17 @@ solver_ruleinfo2str(Solver *solv, SolverRuleinfo type, Id source, Id target, Id 
       return pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), " can only be installed by a direct request");
     case SOLVER_RULE_STRICT_REPO_PRIORITY:
       return pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), " is excluded by strict repo priority");
-    case SOLVER_RULE_PKG_CONSTRAINS:
-      s = pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), 0);
-      s = pool_tmpappend(pool, s, " has constraint ", pool_dep2str(pool, dep));
-      return pool_tmpappend(pool, s, " conflicting with ", pool_solvid2str(pool, target));
     case SOLVER_RULE_LEARNT:
       return "learnt rule";
+    case SOLVER_RULE_CHOICE:
+      if (source > 0)
+	{
+	  const char *s2;
+          type = solver_ruleinfo(solv, source, &source, &target, &dep);
+	  s2 = solver_ruleinfo2str(solv, type, source, target, dep);
+	  return pool_tmpjoin(pool, "limited version of ", s2, 0);
+	}
+      return "choice rule";
     default:
       return "bad problem rule type";
     }
