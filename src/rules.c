@@ -4321,7 +4321,7 @@ solver_ruleinfo2str(Solver *solv, SolverRuleinfo type, Id source, Id target, Id 
       return pool_tmpjoin(pool, "requested ", pool_dep2str(pool, dep), " is provided by the system");
     case SOLVER_RULE_BEST:
       if (source > 0)
-        return pool_tmpjoin(pool, "install best update candidate for package ", pool_solvid2str(pool, source), 0);
+        return pool_tmpjoin(pool, "install best update candidate for ", pool_solvid2str(pool, source), 0);
       if (target > 0)
 	{
 	  target = solver_rule2job(solv, target, &dep);
@@ -4333,11 +4333,11 @@ solver_ruleinfo2str(Solver *solv, SolverRuleinfo type, Id source, Id target, Id 
     case SOLVER_RULE_PKG_NOT_INSTALLABLE:
       ss = pool->solvables + source;
       if (pool_disabled_solvable(pool, ss))
-        return pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), " is disabled");
+        return pool_tmpjoin(pool, pool_solvid2str(pool, source), " is disabled", 0);
       if (ss->arch && ss->arch != ARCH_SRC && ss->arch != ARCH_NOSRC &&
           pool->id2arch && pool_arch2score(pool, ss->arch) == 0)
-        return pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), " does not have a compatible architecture");
-      return pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), " is not installable");
+        return pool_tmpjoin(pool, pool_solvid2str(pool, source), " does not have a compatible architecture", 0);
+      return pool_tmpjoin(pool, pool_solvid2str(pool, source), " is not installable", 0);
     case SOLVER_RULE_PKG_NOTHING_PROVIDES_DEP:
       s = pool_tmpjoin(pool, "nothing provides ", pool_dep2str(pool, dep), 0);
       return pool_tmpappend(pool, s, " needed by ", pool_solvid2str(pool, source));
@@ -4345,42 +4345,44 @@ solver_ruleinfo2str(Solver *solv, SolverRuleinfo type, Id source, Id target, Id 
       s = pool_tmpjoin(pool, "cannot install both ", pool_solvid2str(pool, source), 0);
       return pool_tmpappend(pool, s, " and ", pool_solvid2str(pool, target));
     case SOLVER_RULE_PKG_CONFLICTS:
-      s = pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), 0);
-      s = pool_tmpappend(pool, s, " conflicts with ", pool_dep2str(pool, dep));
-      return pool_tmpappend(pool, s, " provided by ", pool_solvid2str(pool, target));
+      s = pool_tmpappend(pool, pool_solvid2str(pool, source), " conflicts with ", pool_dep2str(pool, dep));
+      if (target)
+        s = pool_tmpappend(pool, s, " provided by ", pool_solvid2str(pool, target));
+      return s;
     case SOLVER_RULE_PKG_SELF_CONFLICT:
-      s = pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), " conflicts with ");
+      s = pool_tmpjoin(pool, pool_solvid2str(pool, source), " conflicts with ", 0);
       return pool_tmpappend(pool, s, pool_dep2str(pool, dep), " provided by itself");
     case SOLVER_RULE_PKG_OBSOLETES:
-      s = pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), 0);
-      s = pool_tmpappend(pool, s, " obsoletes ", pool_dep2str(pool, dep));
-      return pool_tmpappend(pool, s, " provided by ", pool_solvid2str(pool, target));
+      s = pool_tmpappend(pool, pool_solvid2str(pool, source), " obsoletes ", pool_dep2str(pool, dep));
+      if (target)
+	s = pool_tmpappend(pool, s, " provided by ", pool_solvid2str(pool, target));
+      return s;
     case SOLVER_RULE_PKG_INSTALLED_OBSOLETES:
-      s = pool_tmpjoin(pool, "installed package ", pool_solvid2str(pool, source), 0);
+      s = pool_tmpjoin(pool, "installed ", pool_solvid2str(pool, source), 0);
       s = pool_tmpappend(pool, s, " obsoletes ", pool_dep2str(pool, dep));
-      return pool_tmpappend(pool, s, " provided by ", pool_solvid2str(pool, target));
+      if (target)
+	s = pool_tmpappend(pool, s, " provided by ", pool_solvid2str(pool, target));
+      return s;
     case SOLVER_RULE_PKG_IMPLICIT_OBSOLETES:
-      s = pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), 0);
-      s = pool_tmpappend(pool, s, " implicitly obsoletes ", pool_dep2str(pool, dep));
-      return pool_tmpappend(pool, s, " provided by ", pool_solvid2str(pool, target));
+      s = pool_tmpappend(pool, pool_solvid2str(pool, source), " implicitly obsoletes ", pool_dep2str(pool, dep));
+      if (target)
+	s = pool_tmpappend(pool, s, " provided by ", pool_solvid2str(pool, target));
+      return s;
     case SOLVER_RULE_PKG_REQUIRES:
-      s = pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), " requires ");
-      return pool_tmpappend(pool, s, pool_dep2str(pool, dep), 0);
+      return pool_tmpjoin(pool, pool_solvid2str(pool, source), " requires ", pool_dep2str(pool, dep));
     case SOLVER_RULE_PKG_RECOMMENDS:
-      s = pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), " recommends ");
-      return pool_tmpappend(pool, s, pool_dep2str(pool, dep), 0);
+      return pool_tmpjoin(pool, pool_solvid2str(pool, source), " recommends ", pool_dep2str(pool, dep));
     case SOLVER_RULE_PKG_CONSTRAINS:
-      s = pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), 0);
-      s = pool_tmpappend(pool, s, " has constraint ", pool_dep2str(pool, dep));
+      s = pool_tmpappend(pool, pool_solvid2str(pool, source), " has constraint ", pool_dep2str(pool, dep));
       return pool_tmpappend(pool, s, " conflicting with ", pool_solvid2str(pool, target));
     case SOLVER_RULE_YUMOBS:
-      s = pool_tmpjoin(pool, "both package ", pool_solvid2str(pool, source), " and ");
+      s = pool_tmpjoin(pool, "both ", pool_solvid2str(pool, source), " and ");
       s = pool_tmpjoin(pool, s, pool_solvid2str(pool, target), " obsolete ");
       return pool_tmpappend(pool, s, pool_dep2str(pool, dep), 0);
     case SOLVER_RULE_BLACK:
-      return pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), " can only be installed by a direct request");
+      return pool_tmpjoin(pool, pool_solvid2str(pool, source), " can only be installed by a direct request", 0);
     case SOLVER_RULE_STRICT_REPO_PRIORITY:
-      return pool_tmpjoin(pool, "package ", pool_solvid2str(pool, source), " is excluded by strict repo priority");
+      return pool_tmpjoin(pool, pool_solvid2str(pool, source), " is excluded by strict repo priority", 0);
     case SOLVER_RULE_LEARNT:
       return "learnt rule";
     case SOLVER_RULE_CHOICE:
