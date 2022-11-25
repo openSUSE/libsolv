@@ -81,19 +81,15 @@ showwhy(Solver *solv, const char *showwhypkgstr)
 {
   Pool *pool = solv->pool;
   Queue dq, rq, iq;
-  int reason, info;
-  Map dm;
-  Id showwhypkg;
   int ii, i;
 
-  map_init(&dm, pool->nsolvables);
   queue_init(&dq);
   queue_init(&rq);
   queue_init(&iq);
 
-  showwhypkg = testcase_str2solvid(pool, showwhypkgstr);
-  if (showwhypkg)
-    MAPSET(&dm, showwhypkg);
+  i = testcase_str2solvid(pool, showwhypkgstr);
+  if (i)
+    solver_get_decisionlist(solv, i, &dq);
   else
     {
       int selflags = SELECTION_NAME | SELECTION_CANON;
@@ -101,65 +97,29 @@ showwhy(Solver *solv, const char *showwhypkgstr)
       selection_solvables(pool, &dq, &iq);
       if (!iq.count)
 	printf("No package matches %s\n", showwhypkgstr);
-      for (i = 0; i < iq.count; i++)
-	MAPSET(&dm, iq.elements[i]);
       queue_empty(&dq);
-      queue_empty(&iq);
+      solver_get_decisionlist_multiple(solv, &iq, &dq);
     }
-  solver_get_decisionqueue(solv, &dq);
-  for (ii = dq.count - 1; ii >= 0; ii--)
+  for (ii = 0; ii < dq.count; ii += 3)
     {
       Id v = dq.elements[ii];
+      int reason = dq.elements[ii + 1];
+      int info = dq.elements[ii + 2];
       const char *action = v > 0 ? "installed" : "conflicted";
       Id vv = (v > 0 ? v : -v);
-      int jobidx;
 
-      if (!MAPTST(&dm, vv))
-	continue;
-      reason = solver_describe_decision(solv, vv, &info);
-      if (reason == SOLVER_REASON_UNRELATED)
-	continue;
       printf("%s %s because\n", action, testcase_solvid2str(pool, vv));
       switch(reason)
 	{
 	case SOLVER_REASON_WEAKDEP:
-	  queue_empty(&iq);
-	  if (v > 0)
-	    solver_describe_weakdep_decision(solv, v, &iq);
+	  solver_allweakdepinfos(solv, vv, &iq);
 	  if (!iq.count)
 	    printf("  of some weak dependency\n");
-	  for (i = 0; i < iq.count; i += 3)
-	    {
-	      Id pp2, p2 = iq.elements[i + 1];
-	      Id id = iq.elements[i + 2];
-	      if (p2)
-	        MAPSET(&dm, p2);
-	      if (iq.elements[i] == SOLVER_REASON_RECOMMENDED)
-	        printf("  %s recommends %s\n", pool_solvid2str(pool, p2), pool_dep2str(pool, id));
-	      else if (iq.elements[i] == SOLVER_REASON_SUPPLEMENTED)
-		{
-		  if (p2)
-		    printf("  it supplements %s provided by %s\n", pool_dep2str(pool, id), testcase_solvid2str(pool, p2));
-		  else
-		    {
-		      printf("  it supplements %s\n", pool_dep2str(pool, id));
-		      FOR_PROVIDES(p2, pp2, id)
-			if (solver_get_decisionlevel(solv, p2) > 0)
-			  MAPSET(&dm, p2);
-		    }
-		}
-	      else
-	        printf("  of some weak dependency\n");
-	    }
+	  for (i = 0; i < iq.count; i += 4)
+	     printf("  %s\n", solver_ruleinfo2str(solv, iq.elements[i], iq.elements[i + 1], iq.elements[i + 2], iq.elements[i + 3]));
 	  break;
 	case SOLVER_REASON_UNIT_RULE:
 	case SOLVER_REASON_RESOLVE:
-	  solver_ruleliterals(solv, info, &rq);
-	  for (i = 0; i < rq.count; i++)
-	    {
-	      Id p2 = rq.elements[i] > 0 ? rq.elements[i] : -rq.elements[i];
-	      MAPSET(&dm, p2);
-	    }
 	  solver_allruleinfos(solv, info, &iq);
 	  if (!iq.count)
 	    printf("  of some rule\n");
@@ -167,6 +127,7 @@ showwhy(Solver *solv, const char *showwhypkgstr)
 	    {
 	      if (iq.elements[i] == SOLVER_RULE_LEARNT)
 		{
+		  solver_ruleliterals(solv, info, &rq);
 		  printf("  of a learnt rule:\n");
 		  for (i = 0; i < rq.count; i++)
 		    {
@@ -182,17 +143,8 @@ showwhy(Solver *solv, const char *showwhypkgstr)
 	  printf("  we want to keep it installed\n");
 	  break;
 	case SOLVER_REASON_RESOLVE_JOB:
-	  solver_ruleliterals(solv, info, &rq);
-	  for (i = 0; i < rq.count; i++)
-	    {
-	      Id p2 = rq.elements[i];
-	      if (p2 < 0)
-	        MAPSET(&dm, -p2);
-	      else if (solver_get_decisionlevel(solv, p2) < 0)
-	        MAPSET(&dm, p2);
-	    }
-	  jobidx = solver_rule2jobidx(solv, info);
-	  printf("  a job was to %s\n", pool_job2str(pool, solv->job.elements[jobidx], solv->job.elements[jobidx + 1], 0));
+	  i = solver_rule2jobidx(solv, info);
+	  printf("  a job was to %s\n", pool_job2str(pool, solv->job.elements[i], solv->job.elements[i + 1], 0));
 	  break;
 	case SOLVER_REASON_UPDATE_INSTALLED:
 	  printf("  we want to update/keep it\n");
@@ -203,6 +155,9 @@ showwhy(Solver *solv, const char *showwhypkgstr)
 	case SOLVER_REASON_RESOLVE_ORPHAN:
 	  printf("  it is orphaned\n");
 	  break;
+	case SOLVER_REASON_UNRELATED:
+	  printf("  it was unrelated\n");
+	  break;
 	default:
 	  printf("  of some reason\n");
 	  break;
@@ -211,7 +166,6 @@ showwhy(Solver *solv, const char *showwhypkgstr)
   queue_free(&iq);
   queue_free(&rq);
   queue_free(&dq);
-  map_free(&dm);
 }
 
 int
