@@ -4822,7 +4822,7 @@ getdecisionlist(Solver *solv, Map *dm, Queue *decisionlistq)
 
   queue_empty(decisionlistq);
   queue_init(&iq);
-  for (ii = solv->decisionq.count - 1; ii >= 0; ii--)
+  for (ii = solv->decisionq.count - 1; ii > 0; ii--)
     {
       Id v = solv->decisionq.elements[ii];
       Id vv = (v > 0 ? v : -v);

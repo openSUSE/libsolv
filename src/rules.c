@@ -3122,27 +3122,8 @@ solver_ruleinfo(Solver *solv, Id rid, Id *fromp, Id *top, Id *depp)
     }
   if (rid >= solv->recommendsrules && rid < solv->recommendsrules_end)
     {
-      Queue rq;
-      int i;
-      if (r->p >= 0)
-	return SOLVER_RULE_RECOMMENDS;
-      if (fromp)
-	*fromp = -r->p;
-      queue_init(&rq);
-      getpkgruleinfos(solv, r, &rq);
-      for (i = 0; i < rq.count; i += 4)
-	{
-	  if (rq.elements[i] != SOLVER_RULE_RECOMMENDS)
-	    continue;
-	  if (fromp)
-	    *fromp = rq.elements[i + 1];
-	  if (top)
-	    *top = rq.elements[i + 2];
-	  if (depp)
-	    *depp = rq.elements[i + 3];
-	  break;
-	}
-      queue_free(&rq);
+      if (solv->recommendsrules_info && fromp)
+	*fromp = solv->recommendsrules_info[rid - solv->recommendsrules];
       return SOLVER_RULE_RECOMMENDS;
     }
   if (rid >= solv->learntrules)
@@ -4396,10 +4377,19 @@ solver_ruleinfo2str(Solver *solv, SolverRuleinfo type, Id source, Id target, Id 
 	  const char *s2;
           type = solver_ruleinfo(solv, source, &source, &target, &dep);
 	  s2 = solver_ruleinfo2str(solv, type, source, target, dep);
-	  return pool_tmpjoin(pool, "limited version of ", s2, 0);
+	  return pool_tmpjoin(pool, s2, " (limited version)", 0);
 	}
       return "choice rule";
+    case SOLVER_RULE_RECOMMENDS:
+      if (source > 0)
+	{
+	  const char *s2;
+          type = solver_ruleinfo(solv, source, &source, &target, &dep);
+	  s2 = solver_ruleinfo2str(solv, type, source, target, dep);
+	  return pool_tmpjoin(pool, s2, " (limited version)", 0);
+	}
+      return "recommends rule";
     default:
-      return "bad problem rule type";
+      return "bad rule type";
     }
 }
