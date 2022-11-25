@@ -60,6 +60,7 @@ typedef enum {
   SOLVER_RULE_PKG_INSTALLED_OBSOLETES,
   SOLVER_RULE_PKG_RECOMMENDS,
   SOLVER_RULE_PKG_CONSTRAINS,
+  SOLVER_RULE_PKG_SUPPLEMENTS,
   SOLVER_RULE_UPDATE = 0x200,
   SOLVER_RULE_FEATURE = 0x300,
   SOLVER_RULE_JOB = 0x400,
@@ -162,6 +163,10 @@ extern Id   solver_rule2solvable(struct s_Solver *solv, Id rid);
 extern void solver_rule2rules(struct s_Solver *solv, Id rid, Queue *q, int recursive);
 extern Id   solver_rule2pkgrule(struct s_Solver *solv, Id rid);
 extern const char *solver_ruleinfo2str(struct s_Solver *solv, SolverRuleinfo type, Id source, Id target, Id dep);
+
+/* rule infos for weakdep decisions */
+extern int  solver_allweakdepinfos(struct s_Solver *solv, Id p, Queue *rq);
+extern SolverRuleinfo solver_weakdepinfo(struct s_Solver *solv, Id p, Id *fromp, Id *top, Id *depp);
 
 /* orphan handling */
 extern void solver_breakorphans(struct s_Solver *solv);

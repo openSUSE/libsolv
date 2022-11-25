@@ -342,6 +342,7 @@ SOLV_1.0 {
 		solvable_trivial_installable_repo;
 		solvable_unset;
 		solver_allruleinfos;
+		solver_allweakdepinfos;
 		solver_alternative2str;
 		solver_alternatives_count;
 		solver_calc_duchanges;
@@ -360,6 +361,8 @@ SOLV_1.0 {
 		solver_get_alternative;
 		solver_get_decisionblock;
 		solver_get_decisionlevel;
+		solver_get_decisionlist;
+		solver_get_decisionlist_multiple;
 		solver_get_decisionqueue;
 		solver_get_flag;
 		solver_get_lastdecisionblocklevel;
@@ -411,6 +414,7 @@ SOLV_1.0 {
 		solver_take_solutionelement;
 		solver_trivial_installable;
 		solver_unifyrules;
+		solver_weakdepinfo;
 		stringpool_clone;
 		stringpool_free;
 		stringpool_freehash;

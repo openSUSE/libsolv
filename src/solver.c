@@ -4662,7 +4662,7 @@ solver_describe_decision(Solver *solv, Id p, Id *infop)
     return SOLVER_REASON_UNRELATED;
   why = solv->decisionq_why.elements[i];
   if (infop)
-    *infop = why > 0 ? why : -why;
+    *infop = why >= 0 ? why : -why;
   if (why > 0)
     return SOLVER_REASON_UNIT_RULE;
   i = solv->decisionmap[p] >= 0 ? solv->decisionmap[p] : -solv->decisionmap[p];
@@ -4670,8 +4670,8 @@ solver_describe_decision(Solver *solv, Id p, Id *infop)
 }
 
 
-void
-solver_describe_weakdep_decision(Solver *solv, Id p, Queue *whyq)
+int
+solver_allweakdepinfos(Solver *solv, Id p, Queue *whyq)
 {
   Pool *pool = solv->pool;
   int i;
@@ -4681,15 +4681,15 @@ solver_describe_weakdep_decision(Solver *solv, Id p, Queue *whyq)
 
   queue_empty(whyq);
   if (level < 0)
-    return;	/* huh? */
+    return 0;	/* huh? */
   for (decisionno = 0; decisionno < solv->decisionq.count; decisionno++)
     if (solv->decisionq.elements[decisionno] == p)
       break;
   if (decisionno == solv->decisionq.count)
-    return;	/* huh? */
+    return 0;	/* huh? */
   i = solv->decisionmap[p] >= 0 ? solv->decisionmap[p] : -solv->decisionmap[p];
   if (solv->decisionq_reason.elements[i] != SOLVER_REASON_WEAKDEP)
-    return;	/* huh? */
+    return 0;	/* huh? */
 
   /* 1) list all packages that recommend us */
   for (i = 1; i < pool->nsolvables; i++)
@@ -4719,8 +4719,8 @@ solver_describe_weakdep_decision(Solver *solv, Id p, Queue *whyq)
 	    }
 	  if (!p2 && found)
 	    {
-	      queue_push(whyq, SOLVER_REASON_RECOMMENDED);
-	      queue_push2(whyq, i, rec);
+	      queue_push2(whyq, SOLVER_RULE_PKG_RECOMMENDS, i);
+	      queue_push2(whyq, 0, rec);
 	    }
 	}
     }
@@ -4752,7 +4752,7 @@ solver_describe_weakdep_decision(Solver *solv, Id p, Queue *whyq)
 		  }
 	        if (solv->decisionmap[p2] > 0 && solv->decisionmap[p2] < level)
 		  {
-		    queue_push(whyq, SOLVER_REASON_SUPPLEMENTED);
+		    queue_push2(whyq, SOLVER_RULE_PKG_SUPPLEMENTS, p);
 		    queue_push2(whyq, p2, sup);
 		    found = 1;
 		  }
@@ -4760,7 +4760,7 @@ solver_describe_weakdep_decision(Solver *solv, Id p, Queue *whyq)
 	    if (!found)
 	      {
 		/* hard case, just note dependency with no package */
-		queue_push(whyq, SOLVER_REASON_SUPPLEMENTED);
+		queue_push2(whyq, SOLVER_RULE_PKG_SUPPLEMENTS, p);
 	        queue_push2(whyq, 0, sup);
 	      }
 	  }
@@ -4771,6 +4771,155 @@ solver_describe_weakdep_decision(Solver *solv, Id p, Queue *whyq)
 	    solv->decisionmap[p2] = -solv->decisionmap[p2];
 	}
     }
+  return whyq->count / 4;
+}
+
+SolverRuleinfo
+solver_weakdepinfo(Solver *solv, Id p, Id *fromp, Id *top, Id *depp)
+{
+  Queue iq;
+  queue_init(&iq);
+  solver_allweakdepinfos(solv, p, &iq);
+  if (fromp)
+    *fromp = iq.count ? iq.elements[1] : 0;
+  if (top)
+    *top = iq.count ? iq.elements[2] : 0;
+  if (depp)
+    *depp = iq.count ? iq.elements[3] : 0;
+  return iq.count ? iq.elements[0] : SOLVER_RULE_UNKNOWN;
+}
+
+/* deprecated, use solver_allweakdepinfos instead */
+void
+solver_describe_weakdep_decision(Solver *solv, Id p, Queue *whyq)
+{
+  int i, j;
+  solver_allweakdepinfos(solv, p, whyq);
+  for (i = j = 0; i < whyq->count; i += 4)
+    {
+      if (whyq->elements[i] == SOLVER_RULE_PKG_RECOMMENDS)
+        {
+	  whyq->elements[j++] = SOLVER_REASON_RECOMMENDED;
+	  whyq->elements[j++] = whyq->elements[i + 1];
+	  whyq->elements[j++] = whyq->elements[i + 3];
+        }
+      else if (whyq->elements[i] == SOLVER_RULE_PKG_SUPPLEMENTS)
+	{
+	  whyq->elements[j++] = SOLVER_REASON_SUPPLEMENTED;
+	  whyq->elements[j++] = whyq->elements[i + 2];
+	  whyq->elements[j++] = whyq->elements[i + 3];
+	}
+    }
+  queue_truncate(whyq, j);
+}
+
+static void
+getdecisionlist(Solver *solv, Map *dm, Queue *decisionlistq)
+{
+  Pool *pool = solv->pool;
+  int i, ii, reason, info;
+  Queue iq;
+
+  queue_empty(decisionlistq);
+  queue_init(&iq);
+  for (ii = solv->decisionq.count - 1; ii >= 0; ii--)
+    {
+      Id v = solv->decisionq.elements[ii];
+      Id vv = (v > 0 ? v : -v);
+      if (!MAPTST(dm, vv))
+	continue;
+      info = solv->decisionq_why.elements[ii];
+      if (info > 0)
+	reason = SOLVER_REASON_UNIT_RULE;
+      else if (info <= 0)
+	{
+	  info = -info;
+	  reason = solv->decisionmap[vv];
+	  reason = solv->decisionq_reason.elements[reason >= 0 ? reason : -reason];
+	}
+      queue_unshift(decisionlistq, info);
+      queue_unshift(decisionlistq, reason);
+      queue_unshift(decisionlistq, v);
+      switch (reason)
+	{
+	case SOLVER_REASON_WEAKDEP:
+	  if (v <= 0)
+	    break;
+	  solver_allweakdepinfos(solv, v, &iq);
+	  for (i = 0; i < iq.count; i += 4)
+	    {
+	      if (iq.elements[i + 1])
+		MAPSET(dm, iq.elements[i + 1]);
+	      if (iq.elements[i + 2])
+		MAPSET(dm, iq.elements[i + 2]);
+	      else if (iq.elements[i] == SOLVER_RULE_PKG_SUPPLEMENTS)
+		{
+		  Id p2, pp2, id = iq.elements[i + 3];
+		  FOR_PROVIDES(p2, pp2, id)
+		    if (solv->decisionmap[p2] > 0)
+		      MAPSET(dm, p2);
+		}
+	    }
+	  break;
+	case SOLVER_REASON_RESOLVE_JOB:
+	case SOLVER_REASON_UNIT_RULE:
+	case SOLVER_REASON_RESOLVE:
+	  solver_ruleliterals(solv, info, &iq);
+	  for (i = 0; i < iq.count; i++)
+	    {
+	      Id p2 = iq.elements[i];
+	      if (p2 < 0)
+		MAPSET(dm, -p2);
+	      else if (solv->decisionmap[p2] > 0)
+		MAPSET(dm, p2);
+	    }
+	  break;
+	default:
+	  break;
+	}
+    }
+  queue_free(&iq);
+}
+
+void
+solver_get_decisionlist(Solver *solv, Id p, Queue *decisionlistq)
+{
+  Pool *pool = solv->pool;
+  Map dm;
+  map_init(&dm, pool->nsolvables);
+  MAPSET(&dm, p);
+  getdecisionlist(solv, &dm, decisionlistq);
+  if (!decisionlistq->count)
+    {
+      queue_push(decisionlistq, -p);
+      queue_push2(decisionlistq, SOLVER_REASON_UNRELATED, 0);
+    }
+  map_free(&dm);
+}
+
+void
+solver_get_decisionlist_multiple(Solver *solv, Queue *pq, Queue *decisionlistq)
+{
+  Pool *pool = solv->pool;
+  int i;
+  Map dm;
+  map_init(&dm, pool->nsolvables);
+  for (i = 0; i < pq->count; i++)
+    {
+      Id p = pq->elements[i];
+      if (solv->decisionmap[p] != 0)
+	MAPSET(&dm, p);
+    }
+  getdecisionlist(solv, &dm, decisionlistq);
+  for (i = 0; i < pq->count; i++)
+    {
+      Id p = pq->elements[i];
+      if (solv->decisionmap[p] != 0)
+	continue;
+      queue_push(decisionlistq, -p);
+      queue_push2(decisionlistq, SOLVER_REASON_UNRELATED, 0);
+    }
+  map_free(&dm);
 }
 
 void

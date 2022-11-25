@@ -4375,6 +4375,11 @@ solver_ruleinfo2str(Solver *solv, SolverRuleinfo type, Id source, Id target, Id 
     case SOLVER_RULE_PKG_CONSTRAINS:
       s = pool_tmpappend(pool, pool_solvid2str(pool, source), " has constraint ", pool_dep2str(pool, dep));
       return pool_tmpappend(pool, s, " conflicting with ", pool_solvid2str(pool, target));
+    case SOLVER_RULE_PKG_SUPPLEMENTS:
+      s = pool_tmpjoin(pool, pool_solvid2str(pool, source), " supplements ", pool_dep2str(pool, dep));
+      if (target)
+	s = pool_tmpappend(pool, s, " provided by ", pool_solvid2str(pool, target));
+      return s;
     case SOLVER_RULE_YUMOBS:
       s = pool_tmpjoin(pool, "both ", pool_solvid2str(pool, source), " and ");
       s = pool_tmpjoin(pool, s, pool_solvid2str(pool, target), " obsolete ");
