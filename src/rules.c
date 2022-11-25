@@ -3210,10 +3210,10 @@ solver_rule2job(Solver *solv, Id rid, Id *whatp)
 Id
 solver_rule2solvable(Solver *solv, Id rid)
 {
-  if (rid >= solv->updaterules && rid < solv->updaterules_end)
-    return rid - solv->updaterules;
-  if (rid >= solv->featurerules && rid < solv->featurerules_end)
-    return rid - solv->featurerules;
+  if (rid >= solv->updaterules && rid < solv->updaterules_end && solv->installed)
+    return solv->installed->start + (rid - solv->updaterules);
+  if (rid >= solv->featurerules && rid < solv->featurerules_end && solv->installed)
+    return solv->installed->start + (rid - solv->featurerules);
   return 0;
 }
 
