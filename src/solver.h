@@ -363,7 +363,8 @@ extern void pool_add_userinstalled_jobs(Pool *pool, Queue *q, Queue *job, int fl
 extern void solver_get_cleandeps(Solver *solv, Queue *cleandepsq);
 
 extern int  solver_describe_decision(Solver *solv, Id p, Id *infop);
-extern void solver_describe_weakdep_decision(Solver *solv, Id p, Queue *whyq);
+extern void solver_get_decisionlist(Solver *solv, Id p, Queue *decisionlistq);
+extern void solver_get_decisionlist_multiple(Solver *solv, Queue *pq, Queue *decisionlistq);
 
 extern int solver_alternatives_count(Solver *solv);
 extern int solver_get_alternative(Solver *solv, Id alternative, Id *idp, Id *fromp, Id *chosenp, Queue *choices, int *levelp);
@@ -382,6 +383,8 @@ extern const char *solver_select2str(Pool *pool, Id select, Id what);
 extern const char *pool_job2str(Pool *pool, Id how, Id what, Id flagmask);
 extern const char *solver_alternative2str(Solver *solv, int type, Id id, Id from);
 
+/* deprecated, use solver_allweakdepinfos/solver_weakdepinfo instead */
+extern void solver_describe_weakdep_decision(Solver *solv, Id p, Queue *whyq);
 
 /* iterate over all literals of a rule */
 #define FOR_RULELITERALS(l, pp, r)				\
