@@ -1461,6 +1461,40 @@ solver_solutionelement2str(Solver *solv, Id p, Id rp)
     return "bad solution element";
 }
 
+static int
+proofsort(const void *va, const void *vb, void *vd)
+{
+  Solver *solv = vd;
+  Pool *pool = solv->pool;
+  const Id *a = va, *b = vb;
+  Solvable *as, *bs;
+  if (a[2] != b[2])	/* rule type */
+    return a[2] - b[2];
+  if (a[5] != b[5])	/* dep id */
+    return a[5] - b[5];
+  as = pool->solvables + a[3];
+  bs = pool->solvables + b[3];
+  if (as->name != bs->name)
+    return strcmp(pool_id2str(pool, as->name), pool_id2str(pool, bs->name));
+  if (as->evr != bs->evr)
+    {
+      int r = pool_evrcmp(pool, as->evr, bs->evr, EVRCMP_COMPARE);
+      if (r)
+	return r;
+    }
+  as = pool->solvables + a[4];
+  bs = pool->solvables + b[4];
+  if (as->name != bs->name)
+    return strcmp(pool_id2str(pool, as->name), pool_id2str(pool, bs->name));
+  if (as->evr != bs->evr)
+    {
+      int r = pool_evrcmp(pool, as->evr, bs->evr, EVRCMP_COMPARE);
+      if (r)
+	return r;
+    }
+  return 0;
+}
+
 void
 solver_get_proof(Solver *solv, Id id, int islearnt, Queue *q)
 {
@@ -1468,7 +1502,8 @@ solver_get_proof(Solver *solv, Id id, int islearnt, Queue *q)
   Map seen, seent;	/* seent: was the literal true or false */
   Id rid, truelit;
   int first = 1;
-  int why, i, j;
+  int why, i, j, k;
+  int cnt, doing;
 
   queue_empty(q);
   if (!islearnt)
@@ -1476,6 +1511,8 @@ solver_get_proof(Solver *solv, Id id, int islearnt, Queue *q)
   else if (id >= solv->learntrules && id < solv->nrules)
     why = solv->learnt_why.elements[id - solv->learntrules];
   else
+    return;
+  if (!solv->learnt_pool.elements[why])
     return;
   map_init(&seen, pool->nsolvables);
   map_init(&seent, pool->nsolvables);
@@ -1511,12 +1548,65 @@ solver_get_proof(Solver *solv, Id id, int islearnt, Queue *q)
       queue_push(q, rid);
       first = 0;
     }
-  /* reverse proof queue */
-  for (i = 0, j = q->count - 1; i < j; i++, j--)
+
+  /* add ruleinfo data to all rules (and also reverse the queue) */
+  cnt = q->count;
+  for (i = q->count - 1; i >= 0; i-= 2)
     {
-      Id e = q->elements[i];
-      q->elements[i] = q->elements[j];
-      q->elements[j] = e;
+      SolverRuleinfo type;
+      Id from = 0, to = 0, dep = 0;
+      rid = q->elements[i];
+      type = solver_ruleinfo(solv, rid, &from, &to, &dep);
+      queue_push(q, i > 0 ? q->elements[i - 1] : 0);
+      queue_push(q, rid);
+      queue_push(q, type);
+      queue_push(q, from);
+      queue_push(q, to);
+      queue_push(q, dep);
+    }
+  queue_deleten(q, 0, cnt);
+
+  /* move rules:
+   *   if a package is installed, move conflicts right after
+   *   if a package is conflicted, move requires right after
+   */
+  MAPZERO(&seen);
+  doing = 0;
+  i = 0;
+  while (i < q->count - 6)
+    {
+      doing ^= 1;
+      for (j = k = i; j < q->count - 6; j += 6)
+	{
+	  Rule *or;
+	  Id p, pp;
+	  Id truelit = q->elements[j];
+	  if ((doing == 0 && truelit < 0) || (doing != 0 && truelit >= 0))
+	    continue;
+	  or = solv->rules + q->elements[j + 1];
+	  FOR_RULELITERALS(p, pp, or)
+	    if (p != truelit && !MAPTST(&seen, p >= 0 ? p : -p))
+	      break;
+	  if (p)
+	    continue;	/* not unit yet */
+	  if (k > j)
+	    {
+	      /* move from j to k */
+	      queue_insertn(q, k, 6, 0);
+	      memmove(q->elements + k, q->elements + j + 6, 6 * sizeof(Id));
+	      queue_deleten(q, j + 6, 6); 
+	    }
+	  k += 6;
+	}
+      if (k == i)
+	continue;
+      if (i + 6 < k)
+	solv_sort(q->elements + i, (k - i) / 6, 6 * sizeof(Id), proofsort, solv);
+      for (; i < k; i += 6)
+	{
+	  Id truelit = q->elements[i];
+	  MAPSET(&seen, truelit >= 0 ? truelit : -truelit);
+	}
     }
   map_free(&seen);
   map_free(&seent);

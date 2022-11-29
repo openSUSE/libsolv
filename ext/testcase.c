@@ -1382,13 +1382,13 @@ testcase_solverresult(Solver *solv, int resultflags)
 	      solver_get_proof(solv, lq.elements[problem - pcnt - 1], 1, &q);
 	    }
 	  probprefix = solv_dupjoin("proof ", s, 0);
-	  for (i = 0; i < q.count; i += 2)
+	  for (i = 0; i < q.count; i += 6)
 	    {
 	      SolverRuleinfo rclass;
 	      Queue rq;
-	      Id rid = q.elements[i];
+	      Id truelit = q.elements[i];
+	      Id rid = q.elements[i + 1];
 	      char *rprefix;
-	      Id truelit = i + 1 < q.count ? q.elements[i + 1] : 0;
 	      char nbuf[16];
 
 	      rclass = solver_ruleclass(solv, rid);
