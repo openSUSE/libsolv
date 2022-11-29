@@ -9,6 +9,7 @@
 #include "selection.h"
 #include "solverdebug.h"
 #include "testcase.h"
+#include "evr.h"
 
 static struct resultflags2str {
   Id flag;
@@ -105,10 +106,9 @@ showwhy(Solver *solv, const char *showwhypkgstr)
       Id v = dq.elements[ii];
       int reason = dq.elements[ii + 1];
       int info = dq.elements[ii + 2];
-      const char *action = v > 0 ? "installed" : "conflicted";
       Id vv = (v > 0 ? v : -v);
 
-      printf("%s %s because\n", action, testcase_solvid2str(pool, vv));
+      printf("%s %s because\n", v > 0 ? "installed" : "conflicted", testcase_solvid2str(pool, vv));
       switch(reason)
 	{
 	case SOLVER_REASON_WEAKDEP:
@@ -168,6 +168,221 @@ showwhy(Solver *solv, const char *showwhypkgstr)
   queue_free(&dq);
 }
 
+static int
+multipkg_evrcmp(Pool *pool, Id a, Id b)
+{
+  Solvable *as = pool->solvables + a, *bs = pool->solvables + b;
+  return as->evr != bs->evr ? pool_evrcmp(pool, as->evr, bs->evr, EVRCMP_COMPARE) : 0;
+}
+
+static int
+multipkg_sortcmp(const void *va, const void *vb, void *vd)
+{
+  Pool *pool = vd;
+  Solvable *as = pool->solvables + *(Id *)va, *bs = pool->solvables + *(Id *)vb;
+  if (as->name != bs->name)
+    {
+      int r = strcmp(pool_id2str(pool, as->name), pool_id2str(pool, bs->name));
+      if (r)
+	return r;
+      return as->name - bs->name;
+    }
+  if (as->evr != bs->evr)
+    {
+      int r = pool_evrcmp(pool, as->evr, bs->evr, EVRCMP_COMPARE);
+      if (r)
+        return r;
+    }
+  return *(Id *)va - *(Id *)vb;
+}
+
+const char *
+striprelease(Pool *pool, Id evr, Id otherevr)
+{
+  const char *evrstr = pool_id2str(pool, evr);
+  const char *r = strchr(evrstr, '-');
+  char *evrstr2;
+  int cmp;
+  if (!r)
+    return evrstr;
+  evrstr2 = pool_tmpjoin(pool, evrstr, 0, 0);
+  evrstr2[r - evrstr] = 0;
+  cmp = pool_evrcmp_str(pool, evrstr2, pool_id2str(pool, otherevr), pool->disttype != DISTTYPE_DEB ? EVRCMP_MATCH_RELEASE : EVRCMP_COMPARE);
+  return cmp == 1 ? evrstr2 : evrstr;
+}
+
+const char *
+multipkg(Pool *pool, Queue *q)
+{
+  Queue pq;
+  Queue pr;
+  char *s = 0;
+  int i, j, k, kstart;
+  Id name = 0;
+
+  if (!q->count)
+    return "no package";
+  if (q->count == 1)
+    return pool_solvid2str(pool, q->elements[0]);
+  queue_init_clone(&pq, q);
+  queue_init(&pr);
+  solv_sort(pq.elements, pq.count, sizeof(Id), multipkg_sortcmp, pool);
+
+  for (i = 0; i < pq.count; i++)
+    {
+      Id p = pq.elements[i];
+      if (s)
+	s = pool_tmpappend(pool, s, ", ", 0);
+
+      if (i == 0 || pool->solvables[p].name != name)
+	{
+	  Id p2, pp2;
+	  name = pool->solvables[p].name;
+	  queue_empty(&pr);
+	  FOR_PROVIDES(p2, pp2, name)
+	    if (pool->solvables[p].name == name)
+	      queue_push(&pr, p2);
+	  if (pr.count > 1)
+	    solv_sort(pr.elements, pr.count, sizeof(Id), multipkg_sortcmp, pool);
+	}
+
+      for (k = 0; k < pr.count; k++)
+	if (pr.elements[k] == p)
+	  break;
+      if (k == pr.count)
+	{
+	  /* not in provides, list as singularity */
+	  s = pool_tmpappend(pool, s, pool_solvid2str(pool, pq.elements[i]), 0);
+	  continue;
+	}
+      if (k && multipkg_evrcmp(pool, pr.elements[k], pr.elements[k - 1]) == 0)
+	{
+	  /* unclear start, list as single package */
+	  s = pool_tmpappend(pool, s, pool_solvid2str(pool, pq.elements[i]), 0);
+	  continue;
+	}
+      kstart = k;
+      for (j = i + 1, k = k + 1; j < pq.count; j++, k++)
+        if (k == pr.count || pq.elements[j] != pr.elements[k])
+	  break;
+      while (j > i + 1 && k && k < pr.count && multipkg_evrcmp(pool, pr.elements[k], pr.elements[k - 1]) == 0)
+	{
+	  j--;
+	  k--;
+	}
+      if (k == 0 || j == i + 1)
+	{
+	  s = pool_tmpappend(pool, s, pool_solvid2str(pool, pq.elements[i]), 0);
+	  continue;
+	}
+      /* create an interval */
+      s = pool_tmpappend(pool, s, pool_id2str(pool, name), 0);
+      if (kstart > 0)
+        s = pool_tmpappend(pool, s, " >= ", striprelease(pool, pool->solvables[pr.elements[kstart]].evr, pool->solvables[pr.elements[kstart - 1]].evr));
+      if (k < pr.count)
+        s = pool_tmpappend(pool, s, " < ", striprelease(pool, pool->solvables[pr.elements[k]].evr, pool->solvables[pr.elements[k - 1]].evr));
+      i = j - 1;
+    }
+  queue_free(&pq);
+  queue_free(&pr);
+  return s;
+}
+
+void
+doshowproof(Solver *solv, Id problem)
+{
+  Pool *pool = solv->pool;
+  Queue q, qp;
+  int i, j, k;
+  int comb;
+
+  queue_init(&q);
+  queue_init(&qp);
+  solver_get_proof(solv, problem, 0, &q);
+  for (i = 0; i < q.count; i += 6)
+    {
+      Id truelit = q.elements[i];
+      Id type = q.elements[i + 2];
+      Id from = q.elements[i + 3];
+      Id to = q.elements[i + 4];
+      Id dep = q.elements[i + 5];
+      Id name;
+      if (truelit && (type == SOLVER_RULE_PKG_NOTHING_PROVIDES_DEP || type == SOLVER_RULE_PKG_CONFLICTS || type == SOLVER_RULE_PKG_REQUIRES))
+	{
+	  comb = 0;
+	  name = 0;
+	  for (j = i + 6; j < q.count - 6; j += 6)
+	    {
+	      if (truelit > 0 && q.elements[j] <= 0)
+		break;
+	      if (truelit < 0 && q.elements[j] >= 0)
+		break;
+	      if (type != q.elements[j + 2])
+		break;
+	      if (dep != q.elements[j + 5])
+		break;
+	      if (!comb)
+		{
+		  if (from == q.elements[j + 3] && to == (truelit > 0 ? truelit : -truelit))
+		    {
+		      comb = 1;
+		      name = to ? pool->solvables[to].name : 0;
+		    }
+		  else if (to == q.elements[j + 4] && from == (truelit > 0 ? truelit : -truelit))
+		    {
+		      comb = 2;
+		      name = from ? pool->solvables[from].name : 0;
+		    }
+		  else
+		    break;
+		}
+	      if (comb == 1 && (from != q.elements[j + 3] || pool->solvables[q.elements[j + 4]].name != name))
+		break;
+	      if (comb == 2 && (to != q.elements[j + 4] || pool->solvables[q.elements[j + 3]].name != name))
+		break;
+	      if (comb == 1 && q.elements[j + 4] != (q.elements[j] > 0 ? q.elements[j] : -q.elements[j]))
+		break;
+	      if (comb == 2 && q.elements[j + 3] != (q.elements[j] > 0 ? q.elements[j] : -q.elements[j]))
+		break;
+	    }
+	  if (comb)
+	    {
+	      const char *action = truelit < 0 ? "conflicted" : "installed";
+	      queue_empty(&qp);
+	      for (k = i; k < j; k += 6)
+		queue_push(&qp, q.elements[k] > 0 ? q.elements[k] : -q.elements[k]);
+	      switch (type)
+		{
+		case SOLVER_RULE_PKG_NOTHING_PROVIDES_DEP:
+		  printf("%s %s as nothing provides %s\n", action, multipkg(pool, &qp), pool_dep2str(pool, dep));
+		  break;
+		case SOLVER_RULE_PKG_CONFLICTS:
+		  if (comb == 1)
+		    printf("%s %s as %s conflicts with %s\n", action, multipkg(pool, &qp), pool_solvid2str(pool, from), pool_dep2str(pool, dep));
+		  else
+		    printf("%s %s as the packages conflict with %s provided by %s\n", action, multipkg(pool, &qp), pool_dep2str(pool, dep), pool_solvid2str(pool, to));
+		  break;
+		case SOLVER_RULE_PKG_REQUIRES:
+		  printf("%s %s as the packages require %s\n", action, multipkg(pool, &qp), pool_dep2str(pool, dep));
+		  break;
+		}
+	      i = j - 6;
+	      continue;
+	    }
+	}
+      if (i + 6 < q.count && type == SOLVER_RULE_PKG_SAME_NAME)
+	continue;	/* obvious */
+      if (truelit > 0)
+        printf("installed %s as %s\n", pool_solvid2str(pool, truelit), solver_ruleinfo2str(solv, type, from, to, dep));
+      else if (truelit < 0)
+        printf("conflicted %s as %s\n", pool_solvid2str(pool, -truelit), solver_ruleinfo2str(solv, type, from, to, dep));
+      else
+        printf("unsolvable: %s\n", solver_ruleinfo2str(solv, type, from, to, dep));
+    }
+  queue_free(&qp);
+  queue_free(&q);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -183,6 +398,7 @@ main(int argc, char **argv)
   char *writetestcase = 0;
   int multijob = 0;
   int rescallback = 0;
+  int showproof = 0;
   int c;
   int ex = 0;
   const char *list = 0;
@@ -191,7 +407,7 @@ main(int argc, char **argv)
   const char *p;
 
   queue_init(&solq);
-  while ((c = getopt(argc, argv, "vmrhL:l:s:T:W:")) >= 0)
+  while ((c = getopt(argc, argv, "vmrhL:l:s:T:W:P")) >= 0)
     {
       switch (c)
       {
@@ -226,6 +442,9 @@ main(int argc, char **argv)
           break;
         case 'T':
 	  writetestcase = optarg;
+          break;
+        case 'P':
+	  showproof = 1;
           break;
         default:
 	  usage(1);
@@ -328,6 +547,18 @@ main(int argc, char **argv)
 	    {
 	      solver_solve(solv, &job);
 	      showwhy(solv, showwhypkgstr);
+	    }
+	  else if (showproof)
+	    {
+	      int pcnt = solver_solve(solv, &job);
+	      int problem;
+	      if (!pcnt)
+		printf("nothing to proof\n");
+	      for (problem = 1; problem <= pcnt; problem++)
+		{
+		  printf("Proof #%d:\n", problem);
+		  doshowproof(solv, problem);
+		}
 	    }
 	  else if (result || writeresult)
 	    {
