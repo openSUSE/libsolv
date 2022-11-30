@@ -3607,6 +3607,7 @@ solver_disablechoicerules(Solver *solv, Rule *r)
       if (p)
 	solver_disablerule(solv, r);
     }
+  map_free(&m);
 }
 
 static void
