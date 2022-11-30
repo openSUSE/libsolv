@@ -289,7 +289,7 @@ multipkg(Pool *pool, Queue *q)
 }
 
 void
-doshowproof(Solver *solv, Id problem)
+doshowproof(Solver *solv, Id problem, int islearnt, Queue *lq)
 {
   Pool *pool = solv->pool;
   Queue q, qp;
@@ -298,7 +298,7 @@ doshowproof(Solver *solv, Id problem)
 
   queue_init(&q);
   queue_init(&qp);
-  solver_get_proof(solv, problem, 0, &q);
+  solver_get_proof(solv, problem, islearnt, &q);
   for (i = 0; i < q.count; i += 6)
     {
       Id truelit = q.elements[i];
@@ -307,7 +307,8 @@ doshowproof(Solver *solv, Id problem)
       Id to = q.elements[i + 4];
       Id dep = q.elements[i + 5];
       Id name;
-      if (truelit && (type == SOLVER_RULE_PKG_NOTHING_PROVIDES_DEP || type == SOLVER_RULE_PKG_CONFLICTS || type == SOLVER_RULE_PKG_REQUIRES))
+      const char *action = truelit < 0 ? "conflicted" : "installed";
+      if (truelit && (type == SOLVER_RULE_PKG_NOTHING_PROVIDES_DEP || type == SOLVER_RULE_PKG_CONFLICTS || type == SOLVER_RULE_PKG_REQUIRES || type == SOLVER_RULE_DISTUPGRADE || type == SOLVER_RULE_INFARCH || type == SOLVER_RULE_PKG_OBSOLETES || type == SOLVER_RULE_PKG_INSTALLED_OBSOLETES || type == SOLVER_RULE_PKG_IMPLICIT_OBSOLETES))
 	{
 	  comb = 0;
 	  name = 0;
@@ -347,23 +348,46 @@ doshowproof(Solver *solv, Id problem)
 	    }
 	  if (comb)
 	    {
-	      const char *action = truelit < 0 ? "conflicted" : "installed";
 	      queue_empty(&qp);
 	      for (k = i; k < j; k += 6)
 		queue_push(&qp, q.elements[k] > 0 ? q.elements[k] : -q.elements[k]);
 	      switch (type)
 		{
+		case SOLVER_RULE_DISTUPGRADE:
+		  printf("%s %s: do not belong to a distupgrade repository\n", action, multipkg(pool, &qp));
+		  break;
+		case SOLVER_RULE_INFARCH:
+		  printf("%s %s: have inferior architecture\n", action, multipkg(pool, &qp));
+		  break;
 		case SOLVER_RULE_PKG_NOTHING_PROVIDES_DEP:
-		  printf("%s %s as nothing provides %s\n", action, multipkg(pool, &qp), pool_dep2str(pool, dep));
+		  printf("%s %s: nothing provides %s\n", action, multipkg(pool, &qp), pool_dep2str(pool, dep));
 		  break;
 		case SOLVER_RULE_PKG_CONFLICTS:
 		  if (comb == 1)
-		    printf("%s %s as %s conflicts with %s\n", action, multipkg(pool, &qp), pool_solvid2str(pool, from), pool_dep2str(pool, dep));
+		    printf("%s %s: %s conflicts with %s\n", action, multipkg(pool, &qp), pool_solvid2str(pool, from), pool_dep2str(pool, dep));
 		  else
-		    printf("%s %s as the packages conflict with %s provided by %s\n", action, multipkg(pool, &qp), pool_dep2str(pool, dep), pool_solvid2str(pool, to));
+		    printf("%s %s: the packages conflict with %s provided by %s\n", action, multipkg(pool, &qp), pool_dep2str(pool, dep), pool_solvid2str(pool, to));
+		  break;
+		case SOLVER_RULE_PKG_OBSOLETES:
+		  if (comb == 1)
+		    printf("%s %s: %s obsoletes %s\n", action, multipkg(pool, &qp), pool_solvid2str(pool, from), pool_dep2str(pool, dep));
+		  else
+		    printf("%s %s: the packages obsolete %s provided by %s\n", action, multipkg(pool, &qp), pool_dep2str(pool, dep), pool_solvid2str(pool, to));
+		  break;
+		case SOLVER_RULE_PKG_IMPLICIT_OBSOLETES:
+		  if (comb == 1)
+		    printf("%s %s: %s implicitly obsoletes %s\n", action, multipkg(pool, &qp), pool_solvid2str(pool, from), pool_dep2str(pool, dep));
+		  else
+		    printf("%s %s: the packages implicitly obsolete %s provided by %s\n", action, multipkg(pool, &qp), pool_dep2str(pool, dep), pool_solvid2str(pool, to));
+		  break;
+		case SOLVER_RULE_PKG_INSTALLED_OBSOLETES:
+		  if (comb == 1)
+		    printf("%s %s: installed %s obsoletes %s\n", action, multipkg(pool, &qp), pool_solvid2str(pool, from), pool_dep2str(pool, dep));
+		  else
+		    printf("%s %s: the installed packages obsolete %s provided by %s\n", action, multipkg(pool, &qp), pool_dep2str(pool, dep), pool_solvid2str(pool, to));
 		  break;
 		case SOLVER_RULE_PKG_REQUIRES:
-		  printf("%s %s as the packages require %s\n", action, multipkg(pool, &qp), pool_dep2str(pool, dep));
+		  printf("%s %s: the packages require %s\n", action, multipkg(pool, &qp), pool_dep2str(pool, dep));
 		  break;
 		}
 	      i = j - 6;
@@ -372,10 +396,26 @@ doshowproof(Solver *solv, Id problem)
 	}
       if (i + 6 < q.count && type == SOLVER_RULE_PKG_SAME_NAME)
 	continue;	/* obvious */
-      if (truelit > 0)
-        printf("installed %s as %s\n", pool_solvid2str(pool, truelit), solver_ruleinfo2str(solv, type, from, to, dep));
-      else if (truelit < 0)
-        printf("conflicted %s as %s\n", pool_solvid2str(pool, -truelit), solver_ruleinfo2str(solv, type, from, to, dep));
+      if (truelit != 0)
+	{
+	  if (lq && type == SOLVER_RULE_LEARNT)
+	    {
+	      for (j = 0; j < lq->count; j++)
+		if (lq->elements[j] == q.elements[i + 1])
+		  break;
+	      if (j < lq->count)
+		{
+		  printf("%s %s: learnt rule #%d\n", action, pool_solvid2str(pool, truelit >= 0 ? truelit : -truelit), j + 1);
+		  continue;
+		}
+	    }
+	  if (islearnt && type == 0)
+	    {
+	      printf("%s %s: learnt rule premise\n", action, pool_solvid2str(pool, truelit >= 0 ? truelit : -truelit));
+	      continue;
+	    }
+          printf("%s %s: %s\n", action, pool_solvid2str(pool, truelit >= 0 ? truelit : -truelit), solver_ruleinfo2str(solv, type, from, to, dep));
+	}
       else
         printf("unsolvable: %s\n", solver_ruleinfo2str(solv, type, from, to, dep));
     }
@@ -556,8 +596,21 @@ main(int argc, char **argv)
 		printf("nothing to proof\n");
 	      for (problem = 1; problem <= pcnt; problem++)
 		{
+		  Queue lq;
+		  int i;
+		  queue_init(&lq);
+		  solver_get_learnt(solv, problem, 0, &lq);
+		  for (i = 0; i < lq.count; i++)
+		    {
+		      printf("Learnt rule #%d:\n", i + 1);
+		      doshowproof(solv, lq.elements[i], 1, &lq);
+		      printf("\n");
+		    }
 		  printf("Proof #%d:\n", problem);
-		  doshowproof(solv, problem);
+		  doshowproof(solv, problem, 0, &lq);
+		  queue_free(&lq);
+		  if (problem < pcnt)
+		    printf("\n");
 		}
 	    }
 	  else if (result || writeresult)
