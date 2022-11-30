@@ -1557,6 +1557,13 @@ solver_get_proof(Solver *solv, Id id, int islearnt, Queue *q)
       Id from = 0, to = 0, dep = 0;
       rid = q->elements[i];
       type = solver_ruleinfo(solv, rid, &from, &to, &dep);
+      if (type == SOLVER_RULE_CHOICE || type == SOLVER_RULE_RECOMMENDS)
+	{
+	  /* use pkg ruleinfo for choice/recommends rules */
+	  Id rid2 = solver_rule2pkgrule(solv, rid);
+	  if (rid2)
+	    type = solver_ruleinfo(solv, rid2, &from, &to, &dep);
+	}
       queue_push(q, i > 0 ? q->elements[i - 1] : 0);
       queue_push(q, rid);
       queue_push(q, type);
@@ -1566,13 +1573,32 @@ solver_get_proof(Solver *solv, Id id, int islearnt, Queue *q)
     }
   queue_deleten(q, 0, cnt);
 
+  /* put learnt rule premises in front */
+  MAPZERO(&seen);
+  i = 0;
+  if (islearnt)
+    {
+      /* insert learnt prereqs at front */
+      Rule *r = solv->rules + id;
+      Id p, pp;
+      i = 0;
+      FOR_RULELITERALS(p, pp, r)
+	{
+	  queue_insertn(q, i, 6, 0);
+	  q->elements[i] = -p;
+	  q->elements[i + 3] = p >= 0 ? p : -p;
+	  MAPSET(&seen, p >= 0 ? p : -p);
+	  i += 6;
+	}
+      if (i > 6)
+	solv_sort(q->elements, i / 6, 6 * sizeof(Id), proofsort, solv);
+    }
+
   /* move rules:
    *   if a package is installed, move conflicts right after
    *   if a package is conflicted, move requires right after
    */
-  MAPZERO(&seen);
   doing = 0;
-  i = 0;
   while (i < q->count - 6)
     {
       doing ^= 1;
