@@ -1495,6 +1495,15 @@ proofsort(const void *va, const void *vb, void *vd)
   return 0;
 }
 
+/* move a decison from position "from" to a smaller position "to" */
+static inline void
+move_decision(Queue *q, int to, int from)
+{
+  queue_insertn(q, to, 6, 0);
+  memmove(q->elements + to, q->elements + from + 6, 6 * sizeof(Id));
+  queue_deleten(q, from + 6, 6); 
+}
+
 void
 solver_get_proof(Solver *solv, Id id, int islearnt, Queue *q)
 {
@@ -1573,6 +1582,21 @@ solver_get_proof(Solver *solv, Id id, int islearnt, Queue *q)
     }
   queue_deleten(q, 0, cnt);
 
+  /* switch last two decisions if the unsolvable rule is of type SOLVER_RULE_RPM_SAME_NAME */
+  if (q->count >= 12 && q->elements[q->count - 6 + 2] == SOLVER_RULE_RPM_SAME_NAME && q->elements[q->count - 12] > 0)
+    {
+      Rule *r = solv->rules + q->elements[q->count - 6 + 1];
+      /* make sure that the rule is a binary conflict and it matches the installed element */
+      if (r->p < 0 && (r->d == 0 || r->d == -1) && r->w2 < 0
+	 && (q->elements[q->count - 12] == -r->p || q->elements[q->count - 12] -r->w2))
+	{
+	  /* looks good! swap decisions and fixup truelit entries */
+	  move_decision(q, q->count - 12, q->count - 6);
+	  q->elements[q->count - 12] = -q->elements[q->count - 6];
+	  q->elements[q->count - 6] = 0;
+	}
+    }
+
   /* put learnt rule premises in front */
   MAPZERO(&seen);
   i = 0;
@@ -1598,7 +1622,7 @@ solver_get_proof(Solver *solv, Id id, int islearnt, Queue *q)
    *   if a package is installed, move conflicts right after
    *   if a package is conflicted, move requires right after
    */
-  doing = 0;
+  doing = 1;
   while (i < q->count - 6)
     {
       doing ^= 1;
@@ -1615,13 +1639,8 @@ solver_get_proof(Solver *solv, Id id, int islearnt, Queue *q)
 	      break;
 	  if (p)
 	    continue;	/* not unit yet */
-	  if (k > j)
-	    {
-	      /* move from j to k */
-	      queue_insertn(q, k, 6, 0);
-	      memmove(q->elements + k, q->elements + j + 6, 6 * sizeof(Id));
-	      queue_deleten(q, j + 6, 6); 
-	    }
+	  if (j > k)
+	    move_decision(q, k, j);
 	  k += 6;
 	}
       if (k == i)
