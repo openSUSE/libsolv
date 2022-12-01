@@ -366,19 +366,19 @@ doshowproof(Solver *solv, Id problem, int islearnt, Queue *lq)
 		  if (comb == 1)
 		    printf("%s %s: %s conflicts with %s\n", action, multipkg(pool, &qp), pool_solvid2str(pool, from), pool_dep2str(pool, dep));
 		  else
-		    printf("%s %s: the packages conflict with %s provided by %s\n", action, multipkg(pool, &qp), pool_dep2str(pool, dep), pool_solvid2str(pool, to));
+		    printf("%s %s: they conflict with %s provided by %s\n", action, multipkg(pool, &qp), pool_dep2str(pool, dep), pool_solvid2str(pool, to));
 		  break;
 		case SOLVER_RULE_PKG_OBSOLETES:
 		  if (comb == 1)
 		    printf("%s %s: %s obsoletes %s\n", action, multipkg(pool, &qp), pool_solvid2str(pool, from), pool_dep2str(pool, dep));
 		  else
-		    printf("%s %s: the packages obsolete %s provided by %s\n", action, multipkg(pool, &qp), pool_dep2str(pool, dep), pool_solvid2str(pool, to));
+		    printf("%s %s: they obsolete %s provided by %s\n", action, multipkg(pool, &qp), pool_dep2str(pool, dep), pool_solvid2str(pool, to));
 		  break;
 		case SOLVER_RULE_PKG_IMPLICIT_OBSOLETES:
 		  if (comb == 1)
 		    printf("%s %s: %s implicitly obsoletes %s\n", action, multipkg(pool, &qp), pool_solvid2str(pool, from), pool_dep2str(pool, dep));
 		  else
-		    printf("%s %s: the packages implicitly obsolete %s provided by %s\n", action, multipkg(pool, &qp), pool_dep2str(pool, dep), pool_solvid2str(pool, to));
+		    printf("%s %s: they implicitly obsolete %s provided by %s\n", action, multipkg(pool, &qp), pool_dep2str(pool, dep), pool_solvid2str(pool, to));
 		  break;
 		case SOLVER_RULE_PKG_INSTALLED_OBSOLETES:
 		  if (comb == 1)
@@ -387,7 +387,7 @@ doshowproof(Solver *solv, Id problem, int islearnt, Queue *lq)
 		    printf("%s %s: the installed packages obsolete %s provided by %s\n", action, multipkg(pool, &qp), pool_dep2str(pool, dep), pool_solvid2str(pool, to));
 		  break;
 		case SOLVER_RULE_PKG_REQUIRES:
-		  printf("%s %s: the packages require %s\n", action, multipkg(pool, &qp), pool_dep2str(pool, dep));
+		  printf("%s %s: they require %s\n", action, multipkg(pool, &qp), pool_dep2str(pool, dep));
 		  break;
 		}
 	      i = j - 6;
@@ -410,11 +410,15 @@ doshowproof(Solver *solv, Id problem, int islearnt, Queue *lq)
 		}
 	    }
 	  if (islearnt && type == 0)
-	    {
-	      printf("%s %s: learnt rule premise\n", action, pool_solvid2str(pool, truelit >= 0 ? truelit : -truelit));
-	      continue;
-	    }
-          printf("%s %s: %s\n", action, pool_solvid2str(pool, truelit >= 0 ? truelit : -truelit), solver_ruleinfo2str(solv, type, from, to, dep));
+	    printf("%s %s: learnt rule premise\n", action, pool_solvid2str(pool, truelit >= 0 ? truelit : -truelit));
+	  else if (truelit < 0 && type == SOLVER_RULE_PKG_REQUIRES && from == -truelit)
+	    printf("%s %s: it requires %s\n", action, pool_solvid2str(pool, -truelit), pool_dep2str(pool, dep));
+	  else if (truelit < 0 && SOLVER_RULE_PKG_CONFLICTS && from == -truelit && to)
+            printf("%s %s: it conflicts with %s provided by %s\n", action, pool_solvid2str(pool, from), pool_dep2str(pool, dep), pool_solvid2str(pool, to));
+	  else if (truelit < 0 && SOLVER_RULE_PKG_CONFLICTS && to == -truelit && from)
+            printf("%s %s: %s conflicts with %s provided by it\n", action, pool_solvid2str(pool, from), pool_dep2str(pool, dep), pool_solvid2str(pool, from));
+	  else
+            printf("%s %s: %s\n", action, pool_solvid2str(pool, truelit >= 0 ? truelit : -truelit), solver_ruleinfo2str(solv, type, from, to, dep));
 	}
       else
         printf("unsolvable: %s\n", solver_ruleinfo2str(solv, type, from, to, dep));
