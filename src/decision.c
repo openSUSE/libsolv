@@ -730,6 +730,8 @@ solver_reason2str(Solver *solv, int reason)
       return "unsolvable";
     case SOLVER_REASON_PREMISE:
       return "learnt rule premise";
+    case SOLVER_REASON_UNRELATED:
+      return "it is unrelated";
     default:
       break;
     }
