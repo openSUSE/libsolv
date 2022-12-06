@@ -90,7 +90,7 @@ showwhy(Solver *solv, const char *showwhypkgstr)
 
   i = testcase_str2solvid(pool, showwhypkgstr);
   if (i)
-    solver_get_decisionlist(solv, i, &dq);
+    solver_get_decisionlist(solv, i, SOLVER_DECISIONLIST_SOLVABLE, &dq);
   else
     {
       int selflags = SELECTION_NAME | SELECTION_CANON;
@@ -99,329 +99,113 @@ showwhy(Solver *solv, const char *showwhypkgstr)
       if (!iq.count)
 	printf("No package matches %s\n", showwhypkgstr);
       queue_empty(&dq);
-      solver_get_decisionlist_multiple(solv, &iq, &dq);
+      solver_get_decisionlist_multiple(solv, &iq, SOLVER_DECISIONLIST_SOLVABLE, &dq);
     }
   for (ii = 0; ii < dq.count; ii += 3)
     {
       Id v = dq.elements[ii];
       int reason = dq.elements[ii + 1];
       int info = dq.elements[ii + 2];
-      Id vv = (v > 0 ? v : -v);
 
-      printf("%s %s because\n", v > 0 ? "installed" : "conflicted", testcase_solvid2str(pool, vv));
-      switch(reason)
+      printf("%s %s:\n", v < 0 ? "conflicted" : "installed", testcase_solvid2str(pool, v >= 0 ? v : -v));
+      /* special case some reasons where we want to show multiple rule infos or extra info */
+      if (reason == SOLVER_REASON_UNIT_RULE || reason == SOLVER_REASON_RESOLVE || reason == SOLVER_REASON_WEAKDEP)
 	{
-	case SOLVER_REASON_WEAKDEP:
-	  solver_allweakdepinfos(solv, vv, &iq);
-	  if (!iq.count)
-	    printf("  of some weak dependency\n");
-	  for (i = 0; i < iq.count; i += 4)
-	     printf("  %s\n", solver_ruleinfo2str(solv, iq.elements[i], iq.elements[i + 1], iq.elements[i + 2], iq.elements[i + 3]));
-	  break;
-	case SOLVER_REASON_UNIT_RULE:
-	case SOLVER_REASON_RESOLVE:
-	  solver_allruleinfos(solv, info, &iq);
-	  if (!iq.count)
-	    printf("  of some rule\n");
-	  for (i = 0; i < iq.count; i += 4)
+	  if (reason == SOLVER_REASON_WEAKDEP)
+	    solver_allweakdepinfos(solv, v, &iq);
+	  else
+	    solver_allruleinfos(solv, info, &iq);
+	  if (iq.count)
 	    {
-	      if (iq.elements[i] == SOLVER_RULE_LEARNT)
+	      for (i = 0; i < iq.count; i += 4)
 		{
-		  solver_ruleliterals(solv, info, &rq);
-		  printf("  of a learnt rule:\n");
-		  for (i = 0; i < rq.count; i++)
+		  int state;
+		  if (iq.elements[i] == SOLVER_RULE_LEARNT)
 		    {
-		      Id p2 = rq.elements[i];
-		      printf("    %c %s\n", p2 > 0 ? '+' : '-', testcase_solvid2str(pool, p2 > 0 ? p2 : -p2));
+		      printf("  a learnt rule:\n");
+		      solver_ruleliterals(solv, info, &rq);
+		      for (i = 0; i < rq.count; i++)
+			{
+			  Id p2 = rq.elements[i];
+			  printf("    %c %s\n", p2 > 0 ? '+' : '-', testcase_solvid2str(pool, p2 > 0 ? p2 : -p2));
+			}
+		      continue;
 		    }
-		  continue;
+		  state = solver_init_decisioninfo(solv, v, iq.elements[i], iq.elements[i + 1], iq.elements[i + 2], iq.elements[i + 3]);
+		  printf("  %s\n", solver_decisioninfo2str(solv, state, iq.elements[i], iq.elements[i + 1], iq.elements[i + 2], iq.elements[i + 3]));
 		}
-	      printf("  %s\n", solver_ruleinfo2str(solv, iq.elements[i], iq.elements[i + 1], iq.elements[i + 2], iq.elements[i + 3]));
+	      continue;
 	    }
-	  break;
-	case SOLVER_REASON_KEEP_INSTALLED:
-	  printf("  we want to keep it installed\n");
-	  break;
-	case SOLVER_REASON_RESOLVE_JOB:
-	  i = solver_rule2jobidx(solv, info);
-	  printf("  a job was to %s\n", pool_job2str(pool, solv->job.elements[i], solv->job.elements[i + 1], 0));
-	  break;
-	case SOLVER_REASON_UPDATE_INSTALLED:
-	  printf("  we want to update/keep it\n");
-	  break;
-	case SOLVER_REASON_CLEANDEPS_ERASE:
-	  printf("  we want to cleandeps erase it\n");
-	  break;
-	case SOLVER_REASON_RESOLVE_ORPHAN:
-	  printf("  it is orphaned\n");
-	  break;
-	case SOLVER_REASON_UNRELATED:
-	  printf("  it was unrelated\n");
-	  break;
-	default:
-	  printf("  of some reason\n");
-	  break;
 	}
+      printf("  %s\n", solver_decisionreason2str(solv, v, reason, info));
     }
   queue_free(&iq);
   queue_free(&rq);
   queue_free(&dq);
 }
 
-static int
-multipkg_evrcmp(Pool *pool, Id a, Id b)
-{
-  Solvable *as = pool->solvables + a, *bs = pool->solvables + b;
-  return as->evr != bs->evr ? pool_evrcmp(pool, as->evr, bs->evr, EVRCMP_COMPARE) : 0;
-}
-
-static int
-multipkg_sortcmp(const void *va, const void *vb, void *vd)
-{
-  Pool *pool = vd;
-  Solvable *as = pool->solvables + *(Id *)va, *bs = pool->solvables + *(Id *)vb;
-  if (as->name != bs->name)
-    {
-      int r = strcmp(pool_id2str(pool, as->name), pool_id2str(pool, bs->name));
-      if (r)
-	return r;
-      return as->name - bs->name;
-    }
-  if (as->evr != bs->evr)
-    {
-      int r = pool_evrcmp(pool, as->evr, bs->evr, EVRCMP_COMPARE);
-      if (r)
-        return r;
-    }
-  return *(Id *)va - *(Id *)vb;
-}
-
-const char *
-striprelease(Pool *pool, Id evr, Id otherevr)
-{
-  const char *evrstr = pool_id2str(pool, evr);
-  const char *r = strchr(evrstr, '-');
-  char *evrstr2;
-  int cmp;
-  if (!r)
-    return evrstr;
-  evrstr2 = pool_tmpjoin(pool, evrstr, 0, 0);
-  evrstr2[r - evrstr] = 0;
-  cmp = pool_evrcmp_str(pool, evrstr2, pool_id2str(pool, otherevr), pool->disttype != DISTTYPE_DEB ? EVRCMP_MATCH_RELEASE : EVRCMP_COMPARE);
-  return cmp == 1 ? evrstr2 : evrstr;
-}
-
-const char *
-multipkg(Pool *pool, Queue *q)
-{
-  Queue pq;
-  Queue pr;
-  char *s = 0;
-  int i, j, k, kstart;
-  Id name = 0;
-
-  if (!q->count)
-    return "no package";
-  if (q->count == 1)
-    return pool_solvid2str(pool, q->elements[0]);
-  queue_init_clone(&pq, q);
-  queue_init(&pr);
-  solv_sort(pq.elements, pq.count, sizeof(Id), multipkg_sortcmp, pool);
-
-  for (i = 0; i < pq.count; i++)
-    {
-      Id p = pq.elements[i];
-      if (s)
-	s = pool_tmpappend(pool, s, ", ", 0);
-
-      if (i == 0 || pool->solvables[p].name != name)
-	{
-	  Id p2, pp2;
-	  name = pool->solvables[p].name;
-	  queue_empty(&pr);
-	  FOR_PROVIDES(p2, pp2, name)
-	    if (pool->solvables[p].name == name)
-	      queue_push(&pr, p2);
-	  if (pr.count > 1)
-	    solv_sort(pr.elements, pr.count, sizeof(Id), multipkg_sortcmp, pool);
-	}
-
-      for (k = 0; k < pr.count; k++)
-	if (pr.elements[k] == p)
-	  break;
-      if (k == pr.count)
-	{
-	  /* not in provides, list as singularity */
-	  s = pool_tmpappend(pool, s, pool_solvid2str(pool, pq.elements[i]), 0);
-	  continue;
-	}
-      if (k && multipkg_evrcmp(pool, pr.elements[k], pr.elements[k - 1]) == 0)
-	{
-	  /* unclear start, list as single package */
-	  s = pool_tmpappend(pool, s, pool_solvid2str(pool, pq.elements[i]), 0);
-	  continue;
-	}
-      kstart = k;
-      for (j = i + 1, k = k + 1; j < pq.count; j++, k++)
-        if (k == pr.count || pq.elements[j] != pr.elements[k])
-	  break;
-      while (j > i + 1 && k && k < pr.count && multipkg_evrcmp(pool, pr.elements[k], pr.elements[k - 1]) == 0)
-	{
-	  j--;
-	  k--;
-	}
-      if (k == 0 || j == i + 1)
-	{
-	  s = pool_tmpappend(pool, s, pool_solvid2str(pool, pq.elements[i]), 0);
-	  continue;
-	}
-      /* create an interval */
-      s = pool_tmpappend(pool, s, pool_id2str(pool, name), 0);
-      if (kstart > 0)
-        s = pool_tmpappend(pool, s, " >= ", striprelease(pool, pool->solvables[pr.elements[kstart]].evr, pool->solvables[pr.elements[kstart - 1]].evr));
-      if (k < pr.count)
-        s = pool_tmpappend(pool, s, " < ", striprelease(pool, pool->solvables[pr.elements[k]].evr, pool->solvables[pr.elements[k - 1]].evr));
-      i = j - 1;
-    }
-  queue_free(&pq);
-  queue_free(&pr);
-  return s;
-}
-
 void
-doshowproof(Solver *solv, Id problem, int islearnt, Queue *lq)
+doshowproof(Solver *solv, Id problem, int flags, Queue *lq)
 {
   Pool *pool = solv->pool;
   Queue q, qp;
-  int i, j, k;
-  int comb;
+  int i, j;
 
   queue_init(&q);
   queue_init(&qp);
-  solver_get_proof(solv, problem, islearnt, &q);
-  for (i = 0; i < q.count; i += 6)
+  solver_get_decisionlist(solv, problem, flags | SOLVER_DECISIONLIST_SORTED | SOLVER_DECISIONLIST_WITHINFO, &q);
+  for (i = 0; i < q.count; i += 7)
     {
-      Id truelit = q.elements[i];
-      Id type = q.elements[i + 2];
-      Id from = q.elements[i + 3];
-      Id to = q.elements[i + 4];
-      Id dep = q.elements[i + 5];
+      int state;
+      Id v = q.elements[i];
+      int reason = q.elements[i + 1];
+      int type = q.elements[i + 3];
+      Id from = q.elements[i + 4];
+      Id to = q.elements[i + 5];
+      Id dep = q.elements[i + 6];
       Id name;
-      const char *action = truelit < 0 ? "conflicted" : "installed";
-      if (truelit && (type == SOLVER_RULE_PKG_NOTHING_PROVIDES_DEP || type == SOLVER_RULE_PKG_CONFLICTS || type == SOLVER_RULE_PKG_REQUIRES || type == SOLVER_RULE_DISTUPGRADE || type == SOLVER_RULE_INFARCH || type == SOLVER_RULE_PKG_OBSOLETES || type == SOLVER_RULE_PKG_INSTALLED_OBSOLETES || type == SOLVER_RULE_PKG_IMPLICIT_OBSOLETES))
+
+      if (reason != SOLVER_REASON_UNSOLVABLE && type == SOLVER_RULE_PKG_SAME_NAME)
+	continue;	/* do not show "obvious" decisions */
+
+      state = solver_init_decisioninfo(solv, v, type, from, to, dep);
+      queue_empty(&qp);
+      queue_push(&qp, v >= 0 ? v : -v);
+      name = pool->solvables[v >= 0 ? v : -v].name;
+      /* merge with the following decisions if we can */
+      for (j = i + 7; j < q.count - 7; j += 7)
 	{
-	  comb = 0;
-	  name = 0;
-	  for (j = i + 6; j < q.count - 6; j += 6)
+	  Id newv = q.elements[j];
+	  if (reason != q.elements[j + 1])
+	    break;
+	  if (name != pool->solvables[newv >= 0 ? newv : -newv].name)
+	    break;
+	  if (!solver_merge_decisioninfo(solv, &state, type, from, to, dep, newv, q.elements[j + 3], q.elements[j + 4], q.elements[j + 5], q.elements[j + 6]))
+	    break;
+          queue_push(&qp, newv >= 0 ? newv : -newv);
+	}
+      i = j - 7;
+      if (reason == SOLVER_REASON_UNSOLVABLE)
+        printf("unsolvable: ");
+      else
+        printf("%s %s: ", v < 0 ? "conflicted" : "installed", pool_solvidset2str(pool, &qp));
+      if (reason == SOLVER_REASON_PREMISE)
+	{
+	  printf("%s\n", solver_reason2str(solv, reason));
+	  continue;
+	}
+      if (lq && type == SOLVER_RULE_LEARNT)
+	{
+	  for (j = 0; j < lq->count; j++)
+	    if (lq->elements[j] == q.elements[i + 2])
+	      break;
+	  if (j < lq->count)
 	    {
-	      if (truelit > 0 && q.elements[j] <= 0)
-		break;
-	      if (truelit < 0 && q.elements[j] >= 0)
-		break;
-	      if (type != q.elements[j + 2])
-		break;
-	      if (dep != q.elements[j + 5])
-		break;
-	      if (!comb)
-		{
-		  if (from == q.elements[j + 3] && to == (truelit > 0 ? truelit : -truelit))
-		    {
-		      comb = 1;
-		      name = to ? pool->solvables[to].name : 0;
-		    }
-		  else if (to == q.elements[j + 4] && from == (truelit > 0 ? truelit : -truelit))
-		    {
-		      comb = 2;
-		      name = from ? pool->solvables[from].name : 0;
-		    }
-		  else
-		    break;
-		}
-	      if (comb == 1 && (from != q.elements[j + 3] || pool->solvables[q.elements[j + 4]].name != name))
-		break;
-	      if (comb == 2 && (to != q.elements[j + 4] || pool->solvables[q.elements[j + 3]].name != name))
-		break;
-	      if (comb == 1 && q.elements[j + 4] != (q.elements[j] > 0 ? q.elements[j] : -q.elements[j]))
-		break;
-	      if (comb == 2 && q.elements[j + 3] != (q.elements[j] > 0 ? q.elements[j] : -q.elements[j]))
-		break;
-	    }
-	  if (comb)
-	    {
-	      queue_empty(&qp);
-	      for (k = i; k < j; k += 6)
-		queue_push(&qp, q.elements[k] > 0 ? q.elements[k] : -q.elements[k]);
-	      switch (type)
-		{
-		case SOLVER_RULE_DISTUPGRADE:
-		  printf("%s %s: do not belong to a distupgrade repository\n", action, multipkg(pool, &qp));
-		  break;
-		case SOLVER_RULE_INFARCH:
-		  printf("%s %s: have inferior architecture\n", action, multipkg(pool, &qp));
-		  break;
-		case SOLVER_RULE_PKG_NOTHING_PROVIDES_DEP:
-		  printf("%s %s: nothing provides %s\n", action, multipkg(pool, &qp), pool_dep2str(pool, dep));
-		  break;
-		case SOLVER_RULE_PKG_CONFLICTS:
-		  if (comb == 1)
-		    printf("%s %s: %s conflicts with %s\n", action, multipkg(pool, &qp), pool_solvid2str(pool, from), pool_dep2str(pool, dep));
-		  else
-		    printf("%s %s: they conflict with %s provided by %s\n", action, multipkg(pool, &qp), pool_dep2str(pool, dep), pool_solvid2str(pool, to));
-		  break;
-		case SOLVER_RULE_PKG_OBSOLETES:
-		  if (comb == 1)
-		    printf("%s %s: %s obsoletes %s\n", action, multipkg(pool, &qp), pool_solvid2str(pool, from), pool_dep2str(pool, dep));
-		  else
-		    printf("%s %s: they obsolete %s provided by %s\n", action, multipkg(pool, &qp), pool_dep2str(pool, dep), pool_solvid2str(pool, to));
-		  break;
-		case SOLVER_RULE_PKG_IMPLICIT_OBSOLETES:
-		  if (comb == 1)
-		    printf("%s %s: %s implicitly obsoletes %s\n", action, multipkg(pool, &qp), pool_solvid2str(pool, from), pool_dep2str(pool, dep));
-		  else
-		    printf("%s %s: they implicitly obsolete %s provided by %s\n", action, multipkg(pool, &qp), pool_dep2str(pool, dep), pool_solvid2str(pool, to));
-		  break;
-		case SOLVER_RULE_PKG_INSTALLED_OBSOLETES:
-		  if (comb == 1)
-		    printf("%s %s: installed %s obsoletes %s\n", action, multipkg(pool, &qp), pool_solvid2str(pool, from), pool_dep2str(pool, dep));
-		  else
-		    printf("%s %s: the installed packages obsolete %s provided by %s\n", action, multipkg(pool, &qp), pool_dep2str(pool, dep), pool_solvid2str(pool, to));
-		  break;
-		case SOLVER_RULE_PKG_REQUIRES:
-		  printf("%s %s: they require %s\n", action, multipkg(pool, &qp), pool_dep2str(pool, dep));
-		  break;
-		}
-	      i = j - 6;
+	      printf("learnt rule #%d\n", j + 1);
 	      continue;
 	    }
 	}
-      if (i + 6 < q.count && type == SOLVER_RULE_PKG_SAME_NAME)
-	continue;	/* obvious */
-      if (truelit != 0)
-	{
-	  if (lq && type == SOLVER_RULE_LEARNT)
-	    {
-	      for (j = 0; j < lq->count; j++)
-		if (lq->elements[j] == q.elements[i + 1])
-		  break;
-	      if (j < lq->count)
-		{
-		  printf("%s %s: learnt rule #%d\n", action, pool_solvid2str(pool, truelit >= 0 ? truelit : -truelit), j + 1);
-		  continue;
-		}
-	    }
-	  if (islearnt && type == 0)
-	    printf("%s %s: learnt rule premise\n", action, pool_solvid2str(pool, truelit >= 0 ? truelit : -truelit));
-	  else if (truelit < 0 && type == SOLVER_RULE_PKG_REQUIRES && from == -truelit)
-	    printf("%s %s: it requires %s\n", action, pool_solvid2str(pool, -truelit), pool_dep2str(pool, dep));
-	  else if (truelit < 0 && SOLVER_RULE_PKG_CONFLICTS && from == -truelit && to)
-            printf("%s %s: it conflicts with %s provided by %s\n", action, pool_solvid2str(pool, from), pool_dep2str(pool, dep), pool_solvid2str(pool, to));
-	  else if (truelit < 0 && SOLVER_RULE_PKG_CONFLICTS && to == -truelit && from)
-            printf("%s %s: %s conflicts with %s provided by it\n", action, pool_solvid2str(pool, from), pool_dep2str(pool, dep), pool_solvid2str(pool, from));
-	  else
-            printf("%s %s: %s\n", action, pool_solvid2str(pool, truelit >= 0 ? truelit : -truelit), solver_ruleinfo2str(solv, type, from, to, dep));
-	}
-      else
-        printf("unsolvable: %s\n", solver_ruleinfo2str(solv, type, from, to, dep));
+      printf("%s\n", solver_decisioninfo2str(solv, state, type, from, to, dep));
     }
   queue_free(&qp);
   queue_free(&q);
@@ -603,15 +387,15 @@ main(int argc, char **argv)
 		  Queue lq;
 		  int i;
 		  queue_init(&lq);
-		  solver_get_learnt(solv, problem, 0, &lq);
+		  solver_get_learnt(solv, problem, SOLVER_DECISIONLIST_PROBLEM, &lq);
 		  for (i = 0; i < lq.count; i++)
 		    {
 		      printf("Learnt rule #%d:\n", i + 1);
-		      doshowproof(solv, lq.elements[i], 1, &lq);
+		      doshowproof(solv, lq.elements[i], SOLVER_DECISIONLIST_LEARNTRULE, &lq);
 		      printf("\n");
 		    }
 		  printf("Proof #%d:\n", problem);
-		  doshowproof(solv, problem, 0, &lq);
+		  doshowproof(solv, problem, SOLVER_DECISIONLIST_PROBLEM, &lq);
 		  queue_free(&lq);
 		  if (problem < pcnt)
 		    printf("\n");
