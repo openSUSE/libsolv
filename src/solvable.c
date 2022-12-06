@@ -24,6 +24,7 @@
 #include "poolvendor.h"
 #include "chksum.h"
 #include "linkedpkg.h"
+#include "evr.h"
 
 const char *
 pool_solvable2str(Pool *pool, Solvable *s)
@@ -746,3 +747,124 @@ solvable_matchessolvable(Solvable *s, Id keyname, Id solvid, Queue *depq, int ma
   queue_free(&qq);
   return res;
 }
+
+static int
+solvidset2str_evrcmp(Pool *pool, Id a, Id b)
+{
+  Solvable *as = pool->solvables + a, *bs = pool->solvables + b;
+  return as->evr != bs->evr ? pool_evrcmp(pool, as->evr, bs->evr, EVRCMP_COMPARE) : 0;
+}
+
+static int
+solvidset2str_sortcmp(const void *va, const void *vb, void *vd)
+{
+  Pool *pool = vd;
+  Solvable *as = pool->solvables + *(Id *)va, *bs = pool->solvables + *(Id *)vb;
+  if (as->name != bs->name)
+    {
+      int r = strcmp(pool_id2str(pool, as->name), pool_id2str(pool, bs->name));
+      if (r)
+	return r;
+      return as->name - bs->name;
+    }
+  if (as->evr != bs->evr)
+    {
+      int r = pool_evrcmp(pool, as->evr, bs->evr, EVRCMP_COMPARE);
+      if (r)
+        return r;
+    }
+  return *(Id *)va - *(Id *)vb;
+}
+
+static const char *
+solvidset2str_striprelease(Pool *pool, Id evr, Id otherevr)
+{
+  const char *evrstr = pool_id2str(pool, evr);
+  const char *r = strchr(evrstr, '-');
+  char *evrstr2;
+  int cmp;
+  if (!r)
+    return evrstr;
+  evrstr2 = pool_tmpjoin(pool, evrstr, 0, 0);
+  evrstr2[r - evrstr] = 0;
+  cmp = pool_evrcmp_str(pool, evrstr2, pool_id2str(pool, otherevr), pool->disttype != DISTTYPE_DEB ? EVRCMP_MATCH_RELEASE : EVRCMP_COMPARE);
+  return cmp == 1 ? evrstr2 : evrstr;
+}
+
+const char *
+pool_solvidset2str(Pool *pool, Queue *q)
+{
+  Queue pq;
+  Queue pr;
+  char *s = 0;
+  int i, j, k, kstart;
+  Id name = 0;
+
+  if (!q->count)
+    return "";
+  if (q->count == 1)
+    return pool_solvid2str(pool, q->elements[0]);
+  queue_init_clone(&pq, q);
+  queue_init(&pr);
+  solv_sort(pq.elements, pq.count, sizeof(Id), solvidset2str_sortcmp, pool);
+
+  for (i = 0; i < pq.count; i++)
+    {
+      Id p = pq.elements[i];
+      if (s)
+	s = pool_tmpappend(pool, s, ", ", 0);
+
+      if (i == 0 || pool->solvables[p].name != name)
+	{
+	  Id p2, pp2;
+	  name = pool->solvables[p].name;
+	  queue_empty(&pr);
+	  FOR_PROVIDES(p2, pp2, name)
+	    if (pool->solvables[p].name == name)
+	      queue_push(&pr, p2);
+	  if (pr.count > 1)
+	    solv_sort(pr.elements, pr.count, sizeof(Id), solvidset2str_sortcmp, pool);
+	}
+
+      for (k = 0; k < pr.count; k++)
+	if (pr.elements[k] == p)
+	  break;
+      if (k == pr.count)
+	{
+	  /* not in provides, list as singularity */
+	  s = pool_tmpappend(pool, s, pool_solvid2str(pool, pq.elements[i]), 0);
+	  continue;
+	}
+      if (k && solvidset2str_evrcmp(pool, pr.elements[k], pr.elements[k - 1]) == 0)
+	{
+	  /* unclear start, list as single package */
+	  s = pool_tmpappend(pool, s, pool_solvid2str(pool, pq.elements[i]), 0);
+	  continue;
+	}
+      kstart = k;
+      for (j = i + 1, k = k + 1; j < pq.count; j++, k++)
+        if (k == pr.count || pq.elements[j] != pr.elements[k])
+	  break;
+      while (j > i + 1 && k && k < pr.count && solvidset2str_evrcmp(pool, pr.elements[k], pr.elements[k - 1]) == 0)
+	{
+	  j--;
+	  k--;
+	}
+      if (k == 0 || j == i + 1)
+	{
+	  s = pool_tmpappend(pool, s, pool_solvid2str(pool, pq.elements[i]), 0);
+	  continue;
+	}
+      /* create an interval */
+      s = pool_tmpappend(pool, s, pool_id2str(pool, name), 0);
+      if (kstart > 0)
+        s = pool_tmpappend(pool, s, " >= ", solvidset2str_striprelease(pool, pool->solvables[pr.elements[kstart]].evr, pool->solvables[pr.elements[kstart - 1]].evr));
+      if (k < pr.count)
+        s = pool_tmpappend(pool, s, " < ", solvidset2str_striprelease(pool, pool->solvables[pr.elements[k]].evr, pool->solvables[pr.elements[k - 1]].evr));
+      i = j - 1;
+    }
+  queue_free(&pq);
+  queue_free(&pr);
+  return s;
+}
+

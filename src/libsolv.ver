@@ -113,6 +113,7 @@ SOLV_1.0 {
 		pool_shrink_rels;
 		pool_shrink_strings;
 		pool_solvable2str;
+		pool_solvidset2str;
 		pool_str2id;
 		pool_strn2id;
 		pool_tmpappend;
