@@ -393,9 +393,17 @@ extern int solver_calc_installsizechange(Solver *solv);
 extern void pool_job2solvables(Pool *pool, Queue *pkgs, Id how, Id what);
 extern int  pool_isemptyupdatejob(Pool *pool, Id how, Id what);
 
+/* decisioninfo merging */
+extern int solver_init_decisioninfo(Solver *solv, Id decision, int type, Id from, Id to, Id dep);
+extern int solver_merge_decisioninfo(Solver *solv, int *statep, int oldtype, Id oldfrom, Id oldto, Id olddep, Id decision, int type, Id from, Id to, Id dep);
+
 extern const char *solver_select2str(Pool *pool, Id select, Id what);
 extern const char *pool_job2str(Pool *pool, Id how, Id what, Id flagmask);
 extern const char *solver_alternative2str(Solver *solv, int type, Id id, Id from);
+extern const char *solver_reason2str(Solver *solv, int reason);
+extern const char *solver_decisionreason2str(Solver *solv, Id decision, int reason, Id info);
+extern const char *solver_decisioninfo2str(Solver *solv, int state, int type, Id from, Id to, Id dep);
+
 
 /* deprecated, use solver_allweakdepinfos/solver_weakdepinfo instead */
 extern void solver_describe_weakdep_decision(Solver *solv, Id p, Queue *whyq);

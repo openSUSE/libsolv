@@ -704,3 +704,242 @@ solver_get_decisionlist_multiple(Solver *solv, Queue *idq, int flags, Queue *dec
   map_free(&dm);
 }
 
+
+const char *
+solver_reason2str(Solver *solv, int reason)
+{
+  switch(reason)
+    {
+    case SOLVER_REASON_WEAKDEP:
+      return "a weak dependency";
+    case SOLVER_REASON_RESOLVE_JOB:
+      return "a job rule";
+    case SOLVER_REASON_RESOLVE:
+      return "a rule";
+    case SOLVER_REASON_UNIT_RULE:
+      return "an unit rule";
+    case SOLVER_REASON_KEEP_INSTALLED:
+      return "update/keep installed";
+    case SOLVER_REASON_UPDATE_INSTALLED:
+      return "update installed";
+    case SOLVER_REASON_CLEANDEPS_ERASE:
+      return "cleandeps erase";
+    case SOLVER_REASON_RESOLVE_ORPHAN:
+      return "orphaned package";
+    case SOLVER_REASON_UNSOLVABLE:
+      return "unsolvable";
+    case SOLVER_REASON_PREMISE:
+      return "learnt rule premise";
+    default:
+      break;
+    }
+  return "an unknown reason";
+}
+
+const char *
+solver_decisionreason2str(Solver *solv, Id decision, int reason, Id info)
+{
+  if (reason == SOLVER_REASON_WEAKDEP && decision > 0)
+    {
+      Id from, to, dep;
+      int type = solver_weakdepinfo(solv, decision, &from, &to, &dep);
+      if (type)
+	{
+	  int state = solver_init_decisioninfo(solv, decision, type, from, to, dep);
+	  return solver_decisioninfo2str(solv, state, type, from, to, dep);
+	}
+    }
+  if ((reason == SOLVER_REASON_RESOLVE_JOB || reason == SOLVER_REASON_UNIT_RULE || reason == SOLVER_REASON_RESOLVE || reason == SOLVER_REASON_UNSOLVABLE) && info > 0)
+    {
+      Id from, to, dep;
+      int type = solver_ruleinfo(solv, info, &from, &to, &dep);
+      if (type == SOLVER_RULE_CHOICE || type == SOLVER_RULE_RECOMMENDS)
+	{
+	  Id rid2 = solver_rule2pkgrule(solv, info);
+	  if (rid2)
+	    {
+              type = solver_ruleinfo(solv, rid2, &from, &to, &dep);
+	      if (type)
+		{
+		  int state = solver_init_decisioninfo(solv, decision, type, from, to, dep);
+		  return pool_tmpappend(solv->pool, solver_decisioninfo2str(solv, state, type, from, to, dep), " (limited)", 0);
+		}
+            }
+	}
+      if (type)
+	{
+	  int state = solver_init_decisioninfo(solv, decision, type, from, to, dep);
+	  return solver_decisioninfo2str(solv, state, type, from, to, dep);
+	}
+    }
+  return solver_reason2str(solv, reason);
+}
+
+/* decision merge state bits */
+#define DMS_INITED		(1 << 0)
+#define DMS_IDENTICAL_FROM	(1 << 1)
+#define DMS_IDENTICAL_TO	(1 << 2)
+#define DMS_MULTIPLE		(1 << 3)
+#define DMS_NEGATIVE		(1 << 4)
+#define DMS_NOMERGE		(1 << 5)
+
+/* add some bits about the decision to the ruleinfo type so we can joint decisions */
+int
+solver_init_decisioninfo(Solver *solv, Id decision, int type, Id from, Id to, Id dep)
+{
+  Id decisionpkg = decision >= 0 ? decision : -decision;
+  int state = DMS_INITED | (decision < 0 ? DMS_NEGATIVE : 0);
+  switch (type)
+    {
+    case SOLVER_RULE_DISTUPGRADE:
+    case SOLVER_RULE_INFARCH:
+    case SOLVER_RULE_UPDATE:
+    case SOLVER_RULE_FEATURE:
+    case SOLVER_RULE_BLACK:
+    case SOLVER_RULE_STRICT_REPO_PRIORITY:
+    case SOLVER_RULE_PKG_NOTHING_PROVIDES_DEP:
+    case SOLVER_RULE_PKG_REQUIRES:
+    case SOLVER_RULE_PKG_RECOMMENDS:
+    case SOLVER_RULE_PKG_SUPPLEMENTS:
+      if (decisionpkg == from)
+	state |= DMS_IDENTICAL_FROM;
+      break;
+    case SOLVER_RULE_PKG_SAME_NAME:
+    case SOLVER_RULE_PKG_CONFLICTS:
+    case SOLVER_RULE_PKG_OBSOLETES:
+    case SOLVER_RULE_PKG_INSTALLED_OBSOLETES:
+    case SOLVER_RULE_PKG_IMPLICIT_OBSOLETES:
+    case SOLVER_RULE_PKG_CONSTRAINS:
+      if (decisionpkg == from)
+	state |= DMS_IDENTICAL_FROM;
+      else if (decisionpkg == to)
+	state |= DMS_IDENTICAL_TO;
+      break;
+    default:
+      break;
+    }
+  if (!decision)
+    state |= DMS_NOMERGE;
+  return state;
+}
+
+/* try to merge the ruleinfos of two decisions */
+int
+solver_merge_decisioninfo(Solver *solv, int *statep, int oldtype, Id oldfrom, Id oldto, Id olddep, Id decision, int type, Id from, Id to, Id dep)
+{
+  int state = *statep, newstate;
+  Id decisionpkg = decision >= 0 ? decision : -decision;
+  if (!state || (state & DMS_NOMERGE) != 0 || !type || type != oldtype)
+    return 0;
+  if (!decision || (decision > 0 && (state & DMS_NEGATIVE) != 0) || (decision < 0 && (state & DMS_NEGATIVE) == 0))
+    return 0;
+  newstate = (state & ~(DMS_IDENTICAL_FROM | DMS_IDENTICAL_TO)) | DMS_MULTIPLE;
+  if (decisionpkg == from && (state & DMS_IDENTICAL_FROM) != 0)
+    newstate |= DMS_IDENTICAL_FROM;
+  else if (oldfrom != from)
+    return 0;
+  if (decisionpkg == to && (state & DMS_IDENTICAL_TO) != 0)
+    newstate |= DMS_IDENTICAL_TO;
+  else if (oldto != to)
+    return 0;
+  /* if MULTIPLE is set we need to keep the identical from/to bits */
+  if ((state & DMS_MULTIPLE) != 0 && ((state ^ newstate) & (DMS_IDENTICAL_FROM|DMS_IDENTICAL_TO)) != 0)
+    return 0;
+  *statep = newstate;
+  return 1;
+}
+
+/* special version of solver_ruleinfo2str which supports merged decisions */
+const char *
+solver_decisioninfo2str(Solver *solv, int state, int type, Id from, Id to, Id dep)
+{
+  Pool *pool = solv->pool;
+  const char *s;
+  int multiple = state & DMS_MULTIPLE;
+
+  /* use it/they variants if DMS_IDENTICAL_FROM is set */
+  if ((state & DMS_IDENTICAL_FROM) != 0)
+    {
+      switch (type)
+	{
+	case SOLVER_RULE_DISTUPGRADE:
+	  return multiple ? "they do not belong to a distupgrade repository" : "it does not belong to a distupgrade repository";
+	case SOLVER_RULE_INFARCH:
+	  return multiple ? "they have inferior architecture": "it has inferior architecture";
+	case SOLVER_RULE_UPDATE:
+	  return multiple ? "they need to stay installed or be updated" : "it needs to stay installed or be updated";
+	case SOLVER_RULE_FEATURE:
+	  return multiple ? "they need to stay installed or be updated/downgraded" : "it needs to stay installed or be updated/downgraded";
+	case SOLVER_RULE_BLACK:
+	  return multiple ? "they can only be installed by a direct request" : "it can only be installed by a direct request";
+	case SOLVER_RULE_STRICT_REPO_PRIORITY:
+	  return multiple ? "they are excluded by strict repo priority" : "it is excluded by strict repo priority";
+
+	case SOLVER_RULE_PKG_NOTHING_PROVIDES_DEP:
+	  return pool_tmpjoin(pool, "nothing provides ", pool_dep2str(pool, dep), 0);
+	case SOLVER_RULE_PKG_REQUIRES:
+	  return pool_tmpjoin(pool, multiple ? "they require " : "it requires ", pool_dep2str(pool, dep), 0);
+	case SOLVER_RULE_PKG_RECOMMENDS:
+	  return pool_tmpjoin(pool,  multiple ? "they recommend " : "it recommends ", pool_dep2str(pool, dep), 0);
+	case SOLVER_RULE_PKG_SUPPLEMENTS:
+	  s = pool_tmpjoin(pool, multiple ? "they  supplement " : "it supplements ", pool_dep2str(pool, dep), 0);
+	  if (to)
+	    s = pool_tmpappend(pool, s, " provided by ", pool_solvid2str(pool, to));
+	  return s;
+	case SOLVER_RULE_PKG_SAME_NAME:
+	  return pool_tmpappend(pool, multiple ? "they have the same name as " : "it has the same name as ", pool_solvid2str(pool, to), 0);
+	case SOLVER_RULE_PKG_CONFLICTS:
+	  s = pool_tmpappend(pool, multiple ? "they conflict with " : "it conflicts with ", pool_dep2str(pool, dep), 0);
+	  if (to)
+	    s = pool_tmpappend(pool, s, " provided by ", pool_solvid2str(pool, to));
+	  return s;
+	case SOLVER_RULE_PKG_OBSOLETES:
+	  s = pool_tmpappend(pool, multiple ? "they obsolete " : "it obsoletes ", pool_dep2str(pool, dep), 0);
+	  if (to)
+	    s = pool_tmpappend(pool, s, " provided by ", pool_solvid2str(pool, to));
+	  return s;
+	case SOLVER_RULE_PKG_INSTALLED_OBSOLETES:
+	  s = pool_tmpjoin(pool, multiple ? "they are installed and obsolete " : "it is installed and obsoletes ", pool_dep2str(pool, dep), 0);
+	  if (to)
+	    s = pool_tmpappend(pool, s, " provided by ", pool_solvid2str(pool, to));
+	  return s;
+	case SOLVER_RULE_PKG_IMPLICIT_OBSOLETES:
+	  s = pool_tmpjoin(pool, multiple ? "they implicitly obsolete " : "it implicitly obsoletes ", pool_dep2str(pool, dep), 0);
+	  if (to)
+	    s = pool_tmpappend(pool, s, " provided by ", pool_solvid2str(pool, to));
+	  return s;
+	case SOLVER_RULE_PKG_CONSTRAINS:
+	  s = pool_tmpappend(pool, multiple ? "they have constraint " : "it has constraint ", pool_dep2str(pool, dep), 0);
+	  if (to)
+	    s = pool_tmpappend(pool, s, " conflicting with ", pool_solvid2str(pool, to));
+	  return s;
+	default:
+	  break;
+	}
+    }
+
+  /* in some cases we can drop the "to" part if DMS_IDENTICAL_TO is set */
+  if ((state & DMS_IDENTICAL_TO) != 0)
+    {
+      switch (type)
+	{
+	case SOLVER_RULE_PKG_SAME_NAME:
+	  return pool_tmpappend(pool, multiple ? "they have the same name as " : "it has the same name as ", pool_solvid2str(pool, from), 0);
+	case SOLVER_RULE_PKG_CONFLICTS:
+	case SOLVER_RULE_PKG_OBSOLETES:
+	case SOLVER_RULE_PKG_IMPLICIT_OBSOLETES:
+	case SOLVER_RULE_PKG_INSTALLED_OBSOLETES:
+	case SOLVER_RULE_PKG_CONSTRAINS:
+	  state &= ~DMS_IDENTICAL_TO;
+	  to = 0;
+	  break;
+	default:
+	  break;
+	}
+    }
+
+  /* fallback to solver_ruleinfo2str if we can */
+  if (multiple && (state & (DMS_IDENTICAL_FROM|DMS_IDENTICAL_TO)) != 0)
+      return "unsupported decision merge?";
+  return solver_ruleinfo2str(solv, type, from, to, dep);
+}

@@ -353,6 +353,8 @@ SOLV_1.0 {
 		solver_create;
 		solver_create_state_maps;
 		solver_create_transaction;
+		solver_decisioninfo2str;
+		solver_decisionreason2str;
 		solver_describe_decision;
 		solver_describe_weakdep_decision;
 		solver_findallproblemrules;
@@ -372,6 +374,8 @@ SOLV_1.0 {
 		solver_get_recommendations;
 		solver_get_unneeded;
 		solver_get_userinstalled;
+		solver_init_decisioninfo;
+		solver_merge_decisioninfo;
 		solver_next_problem;
 		solver_next_solution;
 		solver_next_solutionelement;
@@ -392,6 +396,7 @@ SOLV_1.0 {
 		solver_problem2str;
 		solver_problem_count;
 		solver_problemruleinfo2str;
+		solver_reason2str;
 		solver_rule2job;
 		solver_rule2jobidx;
 		solver_rule2pkgrule;
