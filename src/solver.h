@@ -302,8 +302,11 @@ typedef struct s_Solver Solver;
 #define SOLVER_REASON_WEAKDEP		7
 #define SOLVER_REASON_RESOLVE_ORPHAN	8
 
-#define SOLVER_REASON_RECOMMENDED	16
-#define SOLVER_REASON_SUPPLEMENTED	17
+#define SOLVER_REASON_RECOMMENDED	16		/* deprecated */
+#define SOLVER_REASON_SUPPLEMENTED	17		/* deprecated */
+
+#define SOLVER_REASON_UNSOLVABLE	18
+#define SOLVER_REASON_PREMISE		19
 
 
 #define SOLVER_FLAG_ALLOW_DOWNGRADE		1
@@ -343,6 +346,15 @@ typedef struct s_Solver Solver;
 #define SOLVER_ALTERNATIVE_TYPE_RECOMMENDS	2
 #define SOLVER_ALTERNATIVE_TYPE_SUGGESTS	3
 
+/* solver_get_decisionlist / solver_get_learnt flags */
+#define SOLVER_DECISIONLIST_SOLVABLE		(1 << 1)
+#define SOLVER_DECISIONLIST_PROBLEM		(1 << 2)
+#define SOLVER_DECISIONLIST_LEARNTRULE		(1 << 3)
+#define SOLVER_DECISIONLIST_WITHINFO		(1 << 8)
+#define SOLVER_DECISIONLIST_SORTED		(1 << 9)
+
+#define SOLVER_DECISIONLIST_TYPEMASK		(0xff)
+
 extern Solver *solver_create(Pool *pool);
 extern void solver_free(Solver *solv);
 extern int  solver_solve(Solver *solv, Queue *job);
@@ -363,8 +375,10 @@ extern void pool_add_userinstalled_jobs(Pool *pool, Queue *q, Queue *job, int fl
 extern void solver_get_cleandeps(Solver *solv, Queue *cleandepsq);
 
 extern int  solver_describe_decision(Solver *solv, Id p, Id *infop);
-extern void solver_get_decisionlist(Solver *solv, Id p, Queue *decisionlistq);
-extern void solver_get_decisionlist_multiple(Solver *solv, Queue *pq, Queue *decisionlistq);
+
+extern void solver_get_decisionlist(Solver *solv, Id p, int flags, Queue *decisionlistq);
+extern void solver_get_decisionlist_multiple(Solver *solv, Queue *pq, int flags, Queue *decisionlistq);
+extern void solver_get_learnt(Solver *solv, Id id, int flags, Queue *q);
 
 extern int solver_alternatives_count(Solver *solv);
 extern int solver_get_alternative(Solver *solv, Id alternative, Id *idp, Id *fromp, Id *chosenp, Queue *choices, int *levelp);

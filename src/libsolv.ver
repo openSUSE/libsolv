@@ -369,7 +369,6 @@ SOLV_1.0 {
 		solver_get_lastdecisionblocklevel;
 		solver_get_learnt;
 		solver_get_orphaned;
-		solver_get_proof;
 		solver_get_recommendations;
 		solver_get_unneeded;
 		solver_get_userinstalled;

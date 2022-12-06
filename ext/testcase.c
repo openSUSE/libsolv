@@ -1374,20 +1374,20 @@ testcase_solverresult(Solver *solv, int resultflags)
 	  if (problem <= pcnt)
 	    {
 	      s = testcase_problemid(solv, problem);
-	      solver_get_proof(solv, problem, 0, &q);
+	      solver_get_decisionlist(solv, problem, SOLVER_DECISIONLIST_PROBLEM, &q);
 	    }
 	  else
 	    {
 	      s = testcase_ruleid(solv, lq.elements[problem - pcnt - 1]);
-	      solver_get_proof(solv, lq.elements[problem - pcnt - 1], 1, &q);
+	      solver_get_decisionlist(solv, lq.elements[problem - pcnt - 1], SOLVER_DECISIONLIST_LEARNTRULE, &q);
 	    }
 	  probprefix = solv_dupjoin("proof ", s, 0);
-	  for (i = 0; i < q.count; i += 6)
+	  for (i = 0; i < q.count; i += 3)
 	    {
 	      SolverRuleinfo rclass;
 	      Queue rq;
 	      Id truelit = q.elements[i];
-	      Id rid = q.elements[i + 1];
+	      Id rid = q.elements[i + 2];
 	      char *rprefix;
 	      char nbuf[16];
 
@@ -1396,10 +1396,19 @@ testcase_solverresult(Solver *solv, int resultflags)
 		queue_pushunique(&lq, rid);
 	      queue_init(&rq);
 	      solver_ruleliterals(solv, rid, &rq);
-	      sprintf(nbuf, "%3d", i / 2);
+	      sprintf(nbuf, "%3d", i / 3);
 	      rprefix = solv_dupjoin(probprefix, " ", nbuf);
-	      rprefix = solv_dupappend(rprefix, " ", testcase_rclass2str(rclass));
-	      rprefix = solv_dupappend(rprefix, " ", testcase_ruleid(solv, rid));
+	      if (q.elements[i + 1] == SOLVER_REASON_PREMISE)
+		{
+		  rprefix = solv_dupappend(rprefix, " premise", 0);
+		  queue_empty(&rq);
+		  queue_push(&rq, truelit);
+		}
+	      else
+		{
+		  rprefix = solv_dupappend(rprefix, " ", testcase_rclass2str(rclass));
+		  rprefix = solv_dupappend(rprefix, " ", testcase_ruleid(solv, rid));
+		}
 	      strqueue_push(&sq, rprefix);
 	      solv_free(rprefix);
 	      rprefix = solv_dupjoin(probprefix, " ", nbuf);
