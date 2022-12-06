@@ -189,16 +189,11 @@ solvable_lookup_str_base(Solvable *s, Id keyname, Id basekeyname, int usebase)
 	}
 #ifdef ENABLE_LINKED_PKGS
       /* autopattern/product translation magic */
-      if (pass)
+      if (pass == 1 && name == s->name)
 	{
-	  const char *n = pool_id2str(pool, name);
-	  if (*n == 'p')
-	    {
-	      if (!strncmp("pattern:", n, 8) && (name = find_autopattern_name(pool, s)) != 0)
-		pass = -1;
-	      if (!strncmp("product:", n, 8) && (name = find_autoproduct_name(pool, s)) != 0)
-		pass = -1;
-	    }
+	  name = find_autopackage_name(pool, s);
+	  if (name && name != s->name)
+	    pass = -1;	/* start over with new name */
 	}
 #endif
     }
