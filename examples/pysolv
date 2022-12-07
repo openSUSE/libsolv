@@ -787,6 +787,10 @@ while True:
             sys.stdout.write("Please choose a solution: ")
             sys.stdout.flush()
             sol = sys.stdin.readline().strip()
+            if sol == 'p':
+                for decision in problem.get_decisionlist():
+                    print("%s: %s" % (decision, decision.reasonstr()))
+                print('')
         if sol == 's':
             continue        # skip problem
         if sol == 'q':
