@@ -119,7 +119,7 @@ showwhy(Solver *solv, const char *showwhypkgstr)
 	    {
 	      for (i = 0; i < iq.count; i += 4)
 		{
-		  int state;
+		  int bits;
 		  if (iq.elements[i] == SOLVER_RULE_LEARNT)
 		    {
 		      printf("  a learnt rule:\n");
@@ -131,8 +131,8 @@ showwhy(Solver *solv, const char *showwhypkgstr)
 			}
 		      continue;
 		    }
-		  state = solver_init_decisioninfo(solv, v, iq.elements[i], iq.elements[i + 1], iq.elements[i + 2], iq.elements[i + 3]);
-		  printf("  %s\n", solver_decisioninfo2str(solv, state, iq.elements[i], iq.elements[i + 1], iq.elements[i + 2], iq.elements[i + 3]));
+		  bits = solver_calc_decisioninfo_bits(solv, v, iq.elements[i], iq.elements[i + 1], iq.elements[i + 2], iq.elements[i + 3]);
+		  printf("  %s\n", solver_decisioninfo2str(solv, bits, iq.elements[i], iq.elements[i + 1], iq.elements[i + 2], iq.elements[i + 3]));
 		}
 	      continue;
 	    }
@@ -153,38 +153,19 @@ doshowproof(Solver *solv, Id problem, int flags, Queue *lq)
 
   queue_init(&q);
   queue_init(&qp);
-  solver_get_decisionlist(solv, problem, flags | SOLVER_DECISIONLIST_SORTED | SOLVER_DECISIONLIST_WITHINFO, &q);
-  for (i = 0; i < q.count; i += 7)
+  solver_get_decisionlist(solv, problem, flags | SOLVER_DECISIONLIST_SORTED | SOLVER_DECISIONLIST_WITHINFO | SOLVER_DECISIONLIST_MERGEDINFO, &q);
+  for (i = 0; i < q.count; i += 8)
     {
-      int state;
       Id v = q.elements[i];
-      int reason = q.elements[i + 1];
-      int type = q.elements[i + 3];
-      Id from = q.elements[i + 4];
-      Id to = q.elements[i + 5];
-      Id dep = q.elements[i + 6];
-      Id name;
+      int reason = q.elements[i + 1], bits = q.elements[i + 3], type = q.elements[i + 4];
+      Id from = q.elements[i + 5], to = q.elements[i + 6], dep = q.elements[i + 7];
 
       if (reason != SOLVER_REASON_UNSOLVABLE && type == SOLVER_RULE_PKG_SAME_NAME)
 	continue;	/* do not show "obvious" decisions */
 
-      state = solver_init_decisioninfo(solv, v, type, from, to, dep);
-      queue_empty(&qp);
-      queue_push(&qp, v >= 0 ? v : -v);
-      name = pool->solvables[v >= 0 ? v : -v].name;
-      /* merge with the following decisions if we can */
-      for (j = i + 7; j < q.count - 7; j += 7)
-	{
-	  Id newv = q.elements[j];
-	  if (reason != q.elements[j + 1])
-	    break;
-	  if (name != pool->solvables[newv >= 0 ? newv : -newv].name)
-	    break;
-	  if (!solver_merge_decisioninfo(solv, &state, type, from, to, dep, newv, q.elements[j + 3], q.elements[j + 4], q.elements[j + 5], q.elements[j + 6]))
-	    break;
-          queue_push(&qp, newv >= 0 ? newv : -newv);
-	}
-      i = j - 7;
+      solver_decisionlist_solvables(solv, &q, i, &qp);
+      if (qp.count)
+        i += qp.count * 8 - 8;
       if (reason == SOLVER_REASON_UNSOLVABLE)
         printf("unsolvable: ");
       else
@@ -205,7 +186,7 @@ doshowproof(Solver *solv, Id problem, int flags, Queue *lq)
 	      continue;
 	    }
 	}
-      printf("%s\n", solver_decisioninfo2str(solv, state, type, from, to, dep));
+      printf("%s\n", solver_decisioninfo2str(solv, bits, type, from, to, dep));
     }
   queue_free(&qp);
   queue_free(&q);
