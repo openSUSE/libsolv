@@ -352,6 +352,7 @@ typedef struct s_Solver Solver;
 #define SOLVER_DECISIONLIST_LEARNTRULE		(1 << 3)
 #define SOLVER_DECISIONLIST_WITHINFO		(1 << 8)
 #define SOLVER_DECISIONLIST_SORTED		(1 << 9)
+#define SOLVER_DECISIONLIST_MERGEDINFO		(1 << 10)
 
 #define SOLVER_DECISIONLIST_TYPEMASK		(0xff)
 
@@ -379,6 +380,7 @@ extern int  solver_describe_decision(Solver *solv, Id p, Id *infop);
 extern void solver_get_decisionlist(Solver *solv, Id p, int flags, Queue *decisionlistq);
 extern void solver_get_decisionlist_multiple(Solver *solv, Queue *pq, int flags, Queue *decisionlistq);
 extern void solver_get_learnt(Solver *solv, Id id, int flags, Queue *q);
+extern void solver_decisionlist_solvables(Solver *solv, Queue *decisionlistq, int pos, Queue *q);
 
 extern int solver_alternatives_count(Solver *solv);
 extern int solver_get_alternative(Solver *solv, Id alternative, Id *idp, Id *fromp, Id *chosenp, Queue *choices, int *levelp);
@@ -394,15 +396,15 @@ extern void pool_job2solvables(Pool *pool, Queue *pkgs, Id how, Id what);
 extern int  pool_isemptyupdatejob(Pool *pool, Id how, Id what);
 
 /* decisioninfo merging */
-extern int solver_init_decisioninfo(Solver *solv, Id decision, int type, Id from, Id to, Id dep);
-extern int solver_merge_decisioninfo(Solver *solv, int *statep, int oldtype, Id oldfrom, Id oldto, Id olddep, Id decision, int type, Id from, Id to, Id dep);
+extern int solver_calc_decisioninfo_bits(Solver *solv, Id decision, int type, Id from, Id to, Id dep);
+extern int solver_merge_decisioninfo_bits(Solver *solv, int state1, int type1, Id from1, Id to1, Id dep1, int state2, int type2, Id from2, Id to2, Id dep2);
 
 extern const char *solver_select2str(Pool *pool, Id select, Id what);
 extern const char *pool_job2str(Pool *pool, Id how, Id what, Id flagmask);
 extern const char *solver_alternative2str(Solver *solv, int type, Id id, Id from);
 extern const char *solver_reason2str(Solver *solv, int reason);
 extern const char *solver_decisionreason2str(Solver *solv, Id decision, int reason, Id info);
-extern const char *solver_decisioninfo2str(Solver *solv, int state, int type, Id from, Id to, Id dep);
+extern const char *solver_decisioninfo2str(Solver *solv, int bits, int type, Id from, Id to, Id dep);
 
 
 /* deprecated, use solver_allweakdepinfos/solver_weakdepinfo instead */

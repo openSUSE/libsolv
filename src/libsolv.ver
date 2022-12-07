@@ -346,6 +346,7 @@ SOLV_1.0 {
 		solver_allweakdepinfos;
 		solver_alternative2str;
 		solver_alternatives_count;
+		solver_calc_decisioninfo_bits;
 		solver_calc_duchanges;
 		solver_calc_installsizechange;
 		solver_calculate_multiversionmap;
@@ -354,6 +355,7 @@ SOLV_1.0 {
 		solver_create_state_maps;
 		solver_create_transaction;
 		solver_decisioninfo2str;
+		solver_decisionlist_solvables;
 		solver_decisionreason2str;
 		solver_describe_decision;
 		solver_describe_weakdep_decision;
@@ -374,8 +376,7 @@ SOLV_1.0 {
 		solver_get_recommendations;
 		solver_get_unneeded;
 		solver_get_userinstalled;
-		solver_init_decisioninfo;
-		solver_merge_decisioninfo;
+		solver_merge_decisioninfo_bits;
 		solver_next_problem;
 		solver_next_solution;
 		solver_next_solutionelement;

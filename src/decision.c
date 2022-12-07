@@ -255,14 +255,14 @@ decisionsort(const void *va, const void *vb, void *vd)
 {
   Solver *solv = vd;
   Pool *pool = solv->pool;
-  const Id *a = va, *b = vb;	/* (decision, reason, rid, type, from, to, dep) */
+  const Id *a = va, *b = vb;	/* (decision, reason, rid, bits, type, from, to, dep) */
   Solvable *as, *bs;
-  if (a[3] != b[3])	/* rule type */
-    return a[3] - b[3];
-  if (a[6] != b[6])	/* dep id */
-    return a[6] - b[6];
-  as = pool->solvables + a[4];
-  bs = pool->solvables + b[4];
+  if (a[4] != b[4])	/* type */
+    return a[4] - b[4];
+  if (a[7] != b[7])	/* dep id */
+    return a[7] - b[7];
+  as = pool->solvables + a[5];
+  bs = pool->solvables + b[5];
   if (as->name != bs->name)
     return strcmp(pool_id2str(pool, as->name), pool_id2str(pool, bs->name));
   if (as->evr != bs->evr)
@@ -271,8 +271,8 @@ decisionsort(const void *va, const void *vb, void *vd)
       if (r)
 	return r;
     }
-  as = pool->solvables + a[5];
-  bs = pool->solvables + b[5];
+  as = pool->solvables + a[6];
+  bs = pool->solvables + b[6];
   if (as->name != bs->name)
     return strcmp(pool_id2str(pool, as->name), pool_id2str(pool, bs->name));
   if (as->evr != bs->evr)
@@ -284,13 +284,44 @@ decisionsort(const void *va, const void *vb, void *vd)
   return 0;
 }
 
+static void
+decisionmerge(Solver *solv, Queue *q)
+{
+  Pool *pool = solv->pool;
+  int i, j;
+
+  for (i = 0; i < q->count; i += 8)
+    {
+      Id p = q->elements[i] >= 0 ? q->elements[i] : -q->elements[i];
+      int reason = q->elements[i + 1];
+      int bits = q->elements[i + 3];
+      Id name =  pool->solvables[p].name;
+      for (j = i + 8; j < q->count; j += 8)
+	{
+	  int merged;
+	  p = q->elements[j] >= 0 ? q->elements[j] : -q->elements[j];
+	  if (reason != q->elements[j + 1] || name != pool->solvables[p].name)
+	    break;
+	  merged = solver_merge_decisioninfo_bits(solv, bits, q->elements[i + 4], q->elements[i + 5], q->elements[i + 6], q->elements[i + 7], q->elements[j + 3], q->elements[j + 4], q->elements[j + 5], q->elements[j + 6], q->elements[j + 7]);
+	  if (!merged)
+	    break;
+	  bits = merged;
+	}
+      j -= 8;
+      if (j == i)
+	continue;
+      for (; i < j; i += 8)
+	q->elements[i + 3] = bits;
+    }
+}
+
 /* move a decison from position "from" to a smaller position "to" */
 static inline void
 move_decision(Queue *q, int to, int from)
 {
-  queue_insertn(q, to, 7, 0);
-  memmove(q->elements + to, q->elements + from + 7, 7 * sizeof(Id));
-  queue_deleten(q, from + 7, 7); 
+  queue_insertn(q, to, 8, 0);
+  memmove(q->elements + to, q->elements + from + 8, 8 * sizeof(Id));
+  queue_deleten(q, from + 8, 8); 
 }
 
 static void
@@ -366,6 +397,7 @@ solver_get_proof(Solver *solv, Id id, int flags, Queue *q)
       queue_push(q, i > 0 ? q->elements[i - 1] : 0);
       queue_push(q, i > 0 ? SOLVER_REASON_UNIT_RULE : SOLVER_REASON_UNSOLVABLE);
       queue_push(q, rid);
+      queue_push(q, 0);		/* bits */
       queue_push(q, type);
       queue_push(q, from);
       queue_push(q, to);
@@ -374,17 +406,17 @@ solver_get_proof(Solver *solv, Id id, int flags, Queue *q)
   queue_deleten(q, 0, cnt);
 
   /* switch last two decisions if the unsolvable rule is of type SOLVER_RULE_RPM_SAME_NAME */
-  if (q->count >= 14 && q->elements[q->count - 7 + 2] == SOLVER_RULE_RPM_SAME_NAME && q->elements[q->count - 14] > 0)
+  if (q->count >= 16 && q->elements[q->count - 8 + 3] == SOLVER_RULE_RPM_SAME_NAME && q->elements[q->count - 16] > 0)
     {
-      Rule *r = solv->rules + q->elements[q->count - 7 + 1];
+      Rule *r = solv->rules + q->elements[q->count - 8 + 1];
       /* make sure that the rule is a binary conflict and it matches the installed element */
       if (r->p < 0 && (r->d == 0 || r->d == -1) && r->w2 < 0
-	 && (q->elements[q->count - 14] == -r->p || q->elements[q->count - 14] -r->w2))
+	 && (q->elements[q->count - 16] == -r->p || q->elements[q->count - 16] -r->w2))
 	{
 	  /* looks good! swap decisions and fixup truelit entries */
-	  move_decision(q, q->count - 14, q->count - 7);
-	  q->elements[q->count - 14] = -q->elements[q->count - 7];
-	  q->elements[q->count - 7] = 0;
+	  move_decision(q, q->count - 16, q->count - 8);
+	  q->elements[q->count - 16] = -q->elements[q->count - 8];
+	  q->elements[q->count - 8] = 0;
 	}
     }
 
@@ -399,15 +431,15 @@ solver_get_proof(Solver *solv, Id id, int flags, Queue *q)
       i = 0;
       FOR_RULELITERALS(p, pp, r)
 	{
-	  queue_insertn(q, i, 7, 0);
+	  queue_insertn(q, i, 8, 0);
 	  q->elements[i] = -p;
 	  q->elements[i + 1] = SOLVER_REASON_PREMISE;
-	  q->elements[i + 4] = p >= 0 ? p : -p;
+	  q->elements[i + 5] = p >= 0 ? p : -p;
 	  MAPSET(&seen, p >= 0 ? p : -p);
-	  i += 7;
+	  i += 8;
 	}
-      if (i > 7)
-	solv_sort(q->elements, i / 7, 7 * sizeof(Id), decisionsort, solv);
+      if (i > 8)
+	solv_sort(q->elements, i / 8, 8 * sizeof(Id), decisionsort, solv);
     }
 
   if (flags & SOLVER_DECISIONLIST_SORTED)
@@ -417,10 +449,10 @@ solver_get_proof(Solver *solv, Id id, int flags, Queue *q)
        *   if a package is conflicted, move requires right after
        */
       doing = 1;
-      while (i < q->count - 7)
+      while (i < q->count - 8)
 	{
 	  doing ^= 1;
-	  for (j = k = i; j < q->count - 7; j += 7)
+	  for (j = k = i; j < q->count - 8; j += 8)
 	    {
 	      Rule *or;
 	      Id p, pp;
@@ -435,13 +467,13 @@ solver_get_proof(Solver *solv, Id id, int flags, Queue *q)
 		continue;	/* not unit yet */
 	      if (j > k)
 		move_decision(q, k, j);
-	      k += 7;
+	      k += 8;
 	    }
 	  if (k == i)
 	    continue;
-	  if (i + 7 < k)
-	    solv_sort(q->elements + i, (k - i) / 7, 7 * sizeof(Id), decisionsort, solv);
-	  for (; i < k; i += 7)
+	  if (i + 8 < k)
+	    solv_sort(q->elements + i, (k - i) / 8, 8 * sizeof(Id), decisionsort, solv);
+	  for (; i < k; i += 8)
 	    {
 	      Id truelit = q->elements[i];
 	      MAPSET(&seen, truelit >= 0 ? truelit : -truelit);
@@ -455,13 +487,21 @@ solver_get_proof(Solver *solv, Id id, int flags, Queue *q)
   if (!(flags & SOLVER_DECISIONLIST_WITHINFO))
     {
       int j;
-      for (i = j = 0; i < q->count; i += 7)
+      for (i = j = 0; i < q->count; i += 8)
 	{
 	  q->elements[j++] = q->elements[i];
 	  q->elements[j++] = q->elements[i + 1];
 	  q->elements[j++] = q->elements[i + 2];
 	}
       queue_truncate(q, j);
+    }
+  else
+    {
+      /* set bits */
+      for (i = 0; i < q->count; i += 8)
+	q->elements[i + 3] = solver_calc_decisioninfo_bits(solv, q->elements[i], q->elements[i + 4], q->elements[i + 5], q->elements[i + 6], q->elements[i + 7]);
+      if (flags & SOLVER_DECISIONLIST_MERGEDINFO)
+	decisionmerge(solv, q);
     }
 }
 
@@ -564,16 +604,16 @@ getdecisionlist(Solver *solv, Map *dm, int flags, Queue *decisionlistq)
 	}
       if (flags & (SOLVER_DECISIONLIST_SORTED | SOLVER_DECISIONLIST_WITHINFO))
 	{
-	  queue_insertn(decisionlistq, 0, 4, 0);
+	  queue_insertn(decisionlistq, 0, 5, 0);
 	  if (reason == SOLVER_REASON_WEAKDEP)
 	    {
 	      solver_allweakdepinfos(solv, v, &iq);
 	      if (iq.count)
 		{
-		  decisionlistq->elements[0] = iq.elements[0];
-		  decisionlistq->elements[1] = iq.elements[1];
-		  decisionlistq->elements[2] = iq.elements[2];
-		  decisionlistq->elements[3] = iq.elements[3];
+		  decisionlistq->elements[1] = iq.elements[0];
+		  decisionlistq->elements[2] = iq.elements[1];
+		  decisionlistq->elements[3] = iq.elements[2];
+		  decisionlistq->elements[4] = iq.elements[3];
 		}
 	    }
 	  else if (info > 0)
@@ -587,10 +627,10 @@ getdecisionlist(Solver *solv, Map *dm, int flags, Queue *decisionlistq)
 		  if (rid2)
 		    type = solver_ruleinfo(solv, rid2, &from, &to, &dep);
 		}
-	      decisionlistq->elements[0] = type;
-	      decisionlistq->elements[1] = from;
-	      decisionlistq->elements[2] = to;
-	      decisionlistq->elements[3] = dep;
+	      decisionlistq->elements[1] = type;
+	      decisionlistq->elements[2] = from;
+	      decisionlistq->elements[3] = to;
+	      decisionlistq->elements[4] = dep;
 	    }
 	}
       queue_unshift(decisionlistq, info);
@@ -638,13 +678,21 @@ getdecisionlist(Solver *solv, Map *dm, int flags, Queue *decisionlistq)
   if ((flags & (SOLVER_DECISIONLIST_SORTED | SOLVER_DECISIONLIST_WITHINFO)) == SOLVER_DECISIONLIST_SORTED)
     {
       int j;
-      for (i = j = 0; i < decisionlistq->count; i += 7)
+      for (i = j = 0; i < decisionlistq->count; i += 8)
 	{
 	  decisionlistq->elements[j++] = decisionlistq->elements[i];
 	  decisionlistq->elements[j++] = decisionlistq->elements[i + 1];
 	  decisionlistq->elements[j++] = decisionlistq->elements[i + 2];
 	}
       queue_truncate(decisionlistq, j);
+    }
+  else
+    {
+      /* set bits */
+      for (i = 0; i < decisionlistq->count; i += 8)
+	decisionlistq->elements[i + 3] = solver_calc_decisioninfo_bits(solv, decisionlistq->elements[i], decisionlistq->elements[i + 4], decisionlistq->elements[i + 5], decisionlistq->elements[i + 6], decisionlistq->elements[i + 7]);
+      if (flags & SOLVER_DECISIONLIST_MERGEDINFO)
+	decisionmerge(solv, decisionlistq);
     }
 }
 
@@ -664,6 +712,7 @@ solver_get_decisionlist(Solver *solv, Id id, int flags, Queue *decisionlistq)
       queue_push2(decisionlistq, SOLVER_REASON_UNRELATED, 0);
       if ((flags & SOLVER_DECISIONLIST_WITHINFO) != 0)
 	{
+	  queue_push(decisionlistq, solver_calc_decisioninfo_bits(solv, -id, 0, 0, 0, 0));
 	  queue_push2(decisionlistq, 0, 0);
 	  queue_push2(decisionlistq, 0, 0);
 	}
@@ -697,6 +746,7 @@ solver_get_decisionlist_multiple(Solver *solv, Queue *idq, int flags, Queue *dec
       queue_push2(decisionlistq, SOLVER_REASON_UNRELATED, 0);
       if ((flags & SOLVER_DECISIONLIST_WITHINFO) != 0)
 	{
+	  queue_push(decisionlistq, solver_calc_decisioninfo_bits(solv, -p, 0, 0, 0, 0));
 	  queue_push2(decisionlistq, 0, 0);
 	  queue_push2(decisionlistq, 0, 0);
 	}
@@ -747,8 +797,8 @@ solver_decisionreason2str(Solver *solv, Id decision, int reason, Id info)
       int type = solver_weakdepinfo(solv, decision, &from, &to, &dep);
       if (type)
 	{
-	  int state = solver_init_decisioninfo(solv, decision, type, from, to, dep);
-	  return solver_decisioninfo2str(solv, state, type, from, to, dep);
+	  int bits = solver_calc_decisioninfo_bits(solv, decision, type, from, to, dep);
+	  return solver_decisioninfo2str(solv, bits, type, from, to, dep);
 	}
     }
   if ((reason == SOLVER_REASON_RESOLVE_JOB || reason == SOLVER_REASON_UNIT_RULE || reason == SOLVER_REASON_RESOLVE || reason == SOLVER_REASON_UNSOLVABLE) && info > 0)
@@ -763,15 +813,15 @@ solver_decisionreason2str(Solver *solv, Id decision, int reason, Id info)
               type = solver_ruleinfo(solv, rid2, &from, &to, &dep);
 	      if (type)
 		{
-		  int state = solver_init_decisioninfo(solv, decision, type, from, to, dep);
-		  return pool_tmpappend(solv->pool, solver_decisioninfo2str(solv, state, type, from, to, dep), " (limited)", 0);
+		  int bits = solver_calc_decisioninfo_bits(solv, decision, type, from, to, dep);
+		  return pool_tmpappend(solv->pool, solver_decisioninfo2str(solv, bits, type, from, to, dep), " (limited)", 0);
 		}
             }
 	}
       if (type)
 	{
-	  int state = solver_init_decisioninfo(solv, decision, type, from, to, dep);
-	  return solver_decisioninfo2str(solv, state, type, from, to, dep);
+	  int bits = solver_calc_decisioninfo_bits(solv, decision, type, from, to, dep);
+	  return solver_decisioninfo2str(solv, bits, type, from, to, dep);
 	}
     }
   return solver_reason2str(solv, reason);
@@ -781,16 +831,18 @@ solver_decisionreason2str(Solver *solv, Id decision, int reason, Id info)
 #define DMS_INITED		(1 << 0)
 #define DMS_IDENTICAL_FROM	(1 << 1)
 #define DMS_IDENTICAL_TO	(1 << 2)
-#define DMS_MULTIPLE		(1 << 3)
+#define DMS_MERGED		(1 << 3)
 #define DMS_NEGATIVE		(1 << 4)
 #define DMS_NOMERGE		(1 << 5)
 
-/* add some bits about the decision to the ruleinfo type so we can joint decisions */
+/* add some bits about the decision and the ruleinfo so we can join decisions */
 int
-solver_init_decisioninfo(Solver *solv, Id decision, int type, Id from, Id to, Id dep)
+solver_calc_decisioninfo_bits(Solver *solv, Id decision, int type, Id from, Id to, Id dep)
 {
   Id decisionpkg = decision >= 0 ? decision : -decision;
-  int state = DMS_INITED | (decision < 0 ? DMS_NEGATIVE : 0);
+  int bits = DMS_INITED | (decision < 0 ? DMS_NEGATIVE : 0);
+  if (!decision)
+    return bits | DMS_NOMERGE;
   switch (type)
     {
     case SOLVER_RULE_DISTUPGRADE:
@@ -804,7 +856,7 @@ solver_init_decisioninfo(Solver *solv, Id decision, int type, Id from, Id to, Id
     case SOLVER_RULE_PKG_RECOMMENDS:
     case SOLVER_RULE_PKG_SUPPLEMENTS:
       if (decisionpkg == from)
-	state |= DMS_IDENTICAL_FROM;
+	bits |= DMS_IDENTICAL_FROM;
       break;
     case SOLVER_RULE_PKG_SAME_NAME:
     case SOLVER_RULE_PKG_CONFLICTS:
@@ -813,54 +865,56 @@ solver_init_decisioninfo(Solver *solv, Id decision, int type, Id from, Id to, Id
     case SOLVER_RULE_PKG_IMPLICIT_OBSOLETES:
     case SOLVER_RULE_PKG_CONSTRAINS:
       if (decisionpkg == from)
-	state |= DMS_IDENTICAL_FROM;
+	bits |= DMS_IDENTICAL_FROM;
       else if (decisionpkg == to)
-	state |= DMS_IDENTICAL_TO;
+	bits |= DMS_IDENTICAL_TO;
       break;
     default:
       break;
     }
-  if (!decision)
-    state |= DMS_NOMERGE;
-  return state;
+  return bits;
 }
 
 /* try to merge the ruleinfos of two decisions */
 int
-solver_merge_decisioninfo(Solver *solv, int *statep, int oldtype, Id oldfrom, Id oldto, Id olddep, Id decision, int type, Id from, Id to, Id dep)
+solver_merge_decisioninfo_bits(Solver *solv, int bits1, int type1, Id from1, Id to1, Id dep1, int bits2, int type2, Id from2, Id to2, Id dep2)
 {
-  int state = *statep, newstate;
-  Id decisionpkg = decision >= 0 ? decision : -decision;
-  if (!state || (state & DMS_NOMERGE) != 0 || !type || type != oldtype)
+  int merged = 0;
+  if (type1 != type2 || dep1 != dep2)
     return 0;
-  if (!decision || (decision > 0 && (state & DMS_NEGATIVE) != 0) || (decision < 0 && (state & DMS_NEGATIVE) == 0))
+  if (!bits1 || !bits2 || ((bits1 | bits2) & DMS_NOMERGE) != 0 || ((bits1 ^ bits2) & DMS_NEGATIVE) != 0)
     return 0;
-  newstate = (state & ~(DMS_IDENTICAL_FROM | DMS_IDENTICAL_TO)) | DMS_MULTIPLE;
-  if (decisionpkg == from && (state & DMS_IDENTICAL_FROM) != 0)
-    newstate |= DMS_IDENTICAL_FROM;
-  else if (oldfrom != from)
+  merged = (((bits1 ^ (DMS_IDENTICAL_FROM | DMS_IDENTICAL_TO)) | (bits2 ^ (DMS_IDENTICAL_FROM | DMS_IDENTICAL_TO))) ^ (DMS_IDENTICAL_FROM | DMS_IDENTICAL_TO)) | DMS_MERGED;
+  if (((bits1 & DMS_MERGED) != 0 && bits1 != merged) || ((bits2 & DMS_MERGED) != 0 && bits2 != merged))
     return 0;
-  if (decisionpkg == to && (state & DMS_IDENTICAL_TO) != 0)
-    newstate |= DMS_IDENTICAL_TO;
-  else if (oldto != to)
+  if (((merged & DMS_IDENTICAL_FROM) == 0 && from1 != from2) || ((merged & DMS_IDENTICAL_TO) == 0 && to1 != to2))
     return 0;
-  /* if MULTIPLE is set we need to keep the identical from/to bits */
-  if ((state & DMS_MULTIPLE) != 0 && ((state ^ newstate) & (DMS_IDENTICAL_FROM|DMS_IDENTICAL_TO)) != 0)
-    return 0;
-  *statep = newstate;
-  return 1;
+  return merged;
+}
+
+void
+solver_decisionlist_solvables(Solver *solv, Queue *decisionlistq, int pos, Queue *q)
+{
+  queue_empty(q);
+  for (; pos < decisionlistq->count; pos += 8)
+    {
+      Id p = decisionlistq->elements[pos];
+      queue_push(q, p > 0 ? p : -p);
+      if ((decisionlistq->elements[pos + 3] & DMS_MERGED) == 0)
+	break;
+    }
 }
 
 /* special version of solver_ruleinfo2str which supports merged decisions */
 const char *
-solver_decisioninfo2str(Solver *solv, int state, int type, Id from, Id to, Id dep)
+solver_decisioninfo2str(Solver *solv, int bits, int type, Id from, Id to, Id dep)
 {
   Pool *pool = solv->pool;
   const char *s;
-  int multiple = state & DMS_MULTIPLE;
+  int multiple = bits & DMS_MERGED;
 
   /* use it/they variants if DMS_IDENTICAL_FROM is set */
-  if ((state & DMS_IDENTICAL_FROM) != 0)
+  if ((bits & DMS_IDENTICAL_FROM) != 0)
     {
       switch (type)
 	{
@@ -921,7 +975,7 @@ solver_decisioninfo2str(Solver *solv, int state, int type, Id from, Id to, Id de
     }
 
   /* in some cases we can drop the "to" part if DMS_IDENTICAL_TO is set */
-  if ((state & DMS_IDENTICAL_TO) != 0)
+  if ((bits & DMS_IDENTICAL_TO) != 0)
     {
       switch (type)
 	{
@@ -932,7 +986,7 @@ solver_decisioninfo2str(Solver *solv, int state, int type, Id from, Id to, Id de
 	case SOLVER_RULE_PKG_IMPLICIT_OBSOLETES:
 	case SOLVER_RULE_PKG_INSTALLED_OBSOLETES:
 	case SOLVER_RULE_PKG_CONSTRAINS:
-	  state &= ~DMS_IDENTICAL_TO;
+	  bits &= ~DMS_IDENTICAL_TO;
 	  to = 0;
 	  break;
 	default:
@@ -941,7 +995,7 @@ solver_decisioninfo2str(Solver *solv, int state, int type, Id from, Id to, Id de
     }
 
   /* fallback to solver_ruleinfo2str if we can */
-  if (multiple && (state & (DMS_IDENTICAL_FROM|DMS_IDENTICAL_TO)) != 0)
+  if (multiple && (bits & (DMS_IDENTICAL_FROM|DMS_IDENTICAL_TO)) != 0)
       return "unsupported decision merge?";
   return solver_ruleinfo2str(solv, type, from, to, dep);
 }
