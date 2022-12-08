@@ -788,8 +788,9 @@ while True:
             sys.stdout.flush()
             sol = sys.stdin.readline().strip()
             if sol == 'p':
-                for decision in problem.get_decisionlist():
-                    print("%s: %s" % (decision, decision.reasonstr()))
+                print('')
+                for decisionset in problem.get_decisionsetlist():
+                    print("%s: %s" % (decisionset, decisionset.reasonstr()))
                 print('')
         if sol == 's':
             continue        # skip problem
