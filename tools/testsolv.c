@@ -111,6 +111,7 @@ showwhy(Solver *solv, const char *showwhypkgstr)
       /* special case some reasons where we want to show multiple rule infos or extra info */
       if (reason == SOLVER_REASON_WEAKDEP || reason == SOLVER_REASON_UNIT_RULE || reason == SOLVER_REASON_RESOLVE)
 	{
+	  queue_empty(&iq);
 	  if (reason == SOLVER_REASON_WEAKDEP)
 	    solver_allweakdepinfos(solv, v, &iq);
 	  else if (info > 0)

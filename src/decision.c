@@ -379,7 +379,7 @@ solver_get_proof(Solver *solv, Id id, int flags, Queue *q)
 
   /* add ruleinfo data to all rules (and also reverse the queue) */
   cnt = q->count;
-  for (i = q->count - 1; i >= 0; i-= 2)
+  for (i = q->count - 1; i >= 0; i -= 2)
     {
       SolverRuleinfo type;
       Id from = 0, to = 0, dep = 0;
@@ -392,14 +392,14 @@ solver_get_proof(Solver *solv, Id id, int flags, Queue *q)
 	  if (rid2)
 	    type = solver_ruleinfo(solv, rid2, &from, &to, &dep);
 	}
-      queue_push(q, i > 0 ? q->elements[i - 1] : 0);
-      queue_push(q, i > 0 ? SOLVER_REASON_UNIT_RULE : SOLVER_REASON_UNSOLVABLE);
-      queue_push(q, rid);
-      queue_push(q, 0);		/* bits */
-      queue_push(q, type);
-      queue_push(q, from);
-      queue_push(q, to);
-      queue_push(q, dep);
+      queue_insertn(q, q->count, 8, 0);
+      q->elements[q->count - 8] = i > 0 ? q->elements[i - 1] : 0;
+      q->elements[q->count - 8 + 1] = i > 0 ? SOLVER_REASON_UNIT_RULE : SOLVER_REASON_UNSOLVABLE;
+      q->elements[q->count - 8 + 2] = rid;
+      q->elements[q->count - 8 + 4] = type;
+      q->elements[q->count - 8 + 5] = from;
+      q->elements[q->count - 8 + 6] = to;
+      q->elements[q->count - 8 + 7] = dep;
     }
   queue_deleten(q, 0, cnt);
 
@@ -498,7 +498,7 @@ solver_get_proof(Solver *solv, Id id, int flags, Queue *q)
     }
   else
     {
-      /* set bits */
+      /* set decisioninfo bits */
       for (i = 0; i < q->count; i += 8)
 	q->elements[i + 3] = solver_calc_decisioninfo_bits(solv, q->elements[i], q->elements[i + 4], q->elements[i + 5], q->elements[i + 6], q->elements[i + 7]);
       if (flags & SOLVER_DECISIONLIST_MERGEDINFO)
@@ -689,7 +689,7 @@ getdecisionlist(Solver *solv, Map *dm, int flags, Queue *decisionlistq)
     }
   else
     {
-      /* set bits */
+      /* set decisioninfo bits */
       for (i = 0; i < decisionlistq->count; i += 8)
 	decisionlistq->elements[i + 3] = solver_calc_decisioninfo_bits(solv, decisionlistq->elements[i], decisionlistq->elements[i + 4], decisionlistq->elements[i + 5], decisionlistq->elements[i + 6], decisionlistq->elements[i + 7]);
       if (flags & SOLVER_DECISIONLIST_MERGEDINFO)
@@ -789,6 +789,13 @@ solver_reason2str(Solver *solv, int reason)
   return "an unknown reason";
 }
 
+static const char *
+decisionruleinfo2str(Solver *solv, Id decision, int type, Id from, Id to, Id dep)
+{
+  int bits = solver_calc_decisioninfo_bits(solv, decision, type, from, to, dep);
+  return solver_decisioninfo2str(solv, bits, type, from, to, dep);
+}
+
 const char *
 solver_decisionreason2str(Solver *solv, Id decision, int reason, Id info)
 {
@@ -797,10 +804,7 @@ solver_decisionreason2str(Solver *solv, Id decision, int reason, Id info)
       Id from, to, dep;
       int type = solver_weakdepinfo(solv, decision, &from, &to, &dep);
       if (type)
-	{
-	  int bits = solver_calc_decisioninfo_bits(solv, decision, type, from, to, dep);
-	  return solver_decisioninfo2str(solv, bits, type, from, to, dep);
-	}
+	return decisionruleinfo2str(solv, decision, type, from, to, dep);
     }
   if ((reason == SOLVER_REASON_RESOLVE_JOB || reason == SOLVER_REASON_UNIT_RULE || reason == SOLVER_REASON_RESOLVE || reason == SOLVER_REASON_UNSOLVABLE) && info > 0)
     {
@@ -813,17 +817,11 @@ solver_decisionreason2str(Solver *solv, Id decision, int reason, Id info)
 	    {
               type = solver_ruleinfo(solv, rid2, &from, &to, &dep);
 	      if (type)
-		{
-		  int bits = solver_calc_decisioninfo_bits(solv, decision, type, from, to, dep);
-		  return pool_tmpappend(solv->pool, solver_decisioninfo2str(solv, bits, type, from, to, dep), " (limited)", 0);
-		}
+		return decisionruleinfo2str(solv, decision, type, from, to, dep);
             }
 	}
       if (type)
-	{
-	  int bits = solver_calc_decisioninfo_bits(solv, decision, type, from, to, dep);
-	  return solver_decisioninfo2str(solv, bits, type, from, to, dep);
-	}
+	return decisionruleinfo2str(solv, decision, type, from, to, dep);
     }
   return solver_reason2str(solv, reason);
 }
