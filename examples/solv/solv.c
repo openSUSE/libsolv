@@ -134,6 +134,72 @@ showdiskusagechanges(Transaction *trans)
 }
 #endif
 
+static void
+doshowproof(Solver *solv, Id id, int flags, Queue *lq)
+{
+  Pool *pool = solv->pool;
+  Queue q, qp;
+  int i, j;
+
+  queue_init(&q);
+  queue_init(&qp);
+  solver_get_decisionlist(solv, id, flags | SOLVER_DECISIONLIST_SORTED | SOLVER_DECISIONLIST_WITHINFO | SOLVER_DECISIONLIST_MERGEDINFO, &q);
+  for (i = 0; i < q.count; i += 8)
+    {
+      Id v = q.elements[i];
+      int reason = q.elements[i + 1], bits = q.elements[i + 3], type = q.elements[i + 4];
+      Id from = q.elements[i + 5], to = q.elements[i + 6], dep = q.elements[i + 7];
+      if (reason != SOLVER_REASON_UNSOLVABLE && type == SOLVER_RULE_PKG_SAME_NAME)
+        continue;       /* do not show "obvious" decisions */
+      solver_decisionlist_solvables(solv, &q, i, &qp);
+      if (qp.count)
+        i += qp.count * 8 - 8;
+      if (reason == SOLVER_REASON_UNSOLVABLE)
+        printf("unsolvable: ");
+      else
+        printf("%s %s: ", v < 0 ? "conflicted" : "installed", pool_solvidset2str(pool, &qp));
+      if (type == 0)
+        {
+          printf("%s\n", solver_reason2str(solv, reason));
+          continue;
+        }
+      if (type == SOLVER_RULE_LEARNT && lq)
+        {
+          for (j = 0; j < lq->count; j++)
+            if (lq->elements[j] == q.elements[i + 2])
+              break;
+          if (j < lq->count)
+            {
+              printf("learnt rule #%d\n", j + 1);
+              continue;
+            }
+        }
+      printf("%s\n", solver_decisioninfo2str(solv, bits, type, from, to, dep));
+    }
+  queue_free(&qp);
+  queue_free(&q);
+  printf("\n");
+}
+
+static void
+showproof(Solver *solv, int problem)
+{
+  Queue lq;
+  int i;
+
+  printf("\n");
+  queue_init(&lq);
+  solver_get_learnt(solv, problem, SOLVER_DECISIONLIST_PROBLEM, &lq);
+  for (i = 0; i < lq.count; i++)
+    {
+      printf("Learnt rule #%d:\n", i + 1);
+      doshowproof(solv, lq.elements[i], SOLVER_DECISIONLIST_LEARNTRULE, &lq);
+    }
+  printf("Proof:\n");
+  doshowproof(solv, problem, SOLVER_DECISIONLIST_PROBLEM, &lq);
+  queue_free(&lq);
+}
+
 static Id
 find_repo(const char *name, Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
 {
@@ -755,6 +821,8 @@ rerunsolver:
 		  take = 0;
 		  break;
 		}
+	      if (*ip == 'p')
+		showproof(solv, problem);
 	      if (*ip == 'q')
 		{
 		  printf("Abort.\n");
