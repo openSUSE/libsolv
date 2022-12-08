@@ -251,7 +251,7 @@ solver_describe_weakdep_decision(Solver *solv, Id p, Queue *whyq)
 }
 
 static int
-decisionsort(const void *va, const void *vb, void *vd)
+decisionsort_cmp(const void *va, const void *vb, void *vd)
 {
   Solver *solv = vd;
   Pool *pool = solv->pool;
@@ -308,8 +308,6 @@ decisionmerge(Solver *solv, Queue *q)
 	  bits = merged;
 	}
       j -= 8;
-      if (j == i)
-	continue;
       for (; i < j; i += 8)
 	q->elements[i + 3] = bits;
     }
@@ -422,6 +420,7 @@ solver_get_proof(Solver *solv, Id id, int flags, Queue *q)
 
   /* put learnt rule premises in front */
   MAPZERO(&seen);
+  MAPSET(&seen, 1);
   i = 0;
   if ((flags & SOLVER_DECISIONLIST_TYPEMASK) == SOLVER_DECISIONLIST_LEARNTRULE)
     {
@@ -438,12 +437,14 @@ solver_get_proof(Solver *solv, Id id, int flags, Queue *q)
 	  MAPSET(&seen, p >= 0 ? p : -p);
 	  i += 8;
 	}
-      if (i > 8)
-	solv_sort(q->elements, i / 8, 8 * sizeof(Id), decisionsort, solv);
     }
 
   if (flags & SOLVER_DECISIONLIST_SORTED)
     {
+      /* sort premise block */
+      if (i > 8)
+	solv_sort(q->elements, i / 8, 8 * sizeof(Id), decisionsort_cmp, solv);
+
       /* move rules:
        *   if a package is installed, move conflicts right after
        *   if a package is conflicted, move requires right after
@@ -472,7 +473,7 @@ solver_get_proof(Solver *solv, Id id, int flags, Queue *q)
 	  if (k == i)
 	    continue;
 	  if (i + 8 < k)
-	    solv_sort(q->elements + i, (k - i) / 8, 8 * sizeof(Id), decisionsort, solv);
+	    solv_sort(q->elements + i, (k - i) / 8, 8 * sizeof(Id), decisionsort_cmp, solv);
 	  for (; i < k; i += 8)
 	    {
 	      Id truelit = q->elements[i];

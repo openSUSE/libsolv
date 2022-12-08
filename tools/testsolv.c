@@ -109,11 +109,11 @@ showwhy(Solver *solv, const char *showwhypkgstr)
 
       printf("%s %s:\n", v < 0 ? "conflicted" : "installed", testcase_solvid2str(pool, v >= 0 ? v : -v));
       /* special case some reasons where we want to show multiple rule infos or extra info */
-      if (reason == SOLVER_REASON_UNIT_RULE || reason == SOLVER_REASON_RESOLVE || reason == SOLVER_REASON_WEAKDEP)
+      if (reason == SOLVER_REASON_WEAKDEP || reason == SOLVER_REASON_UNIT_RULE || reason == SOLVER_REASON_RESOLVE)
 	{
 	  if (reason == SOLVER_REASON_WEAKDEP)
 	    solver_allweakdepinfos(solv, v, &iq);
-	  else
+	  else if (info > 0)
 	    solver_allruleinfos(solv, info, &iq);
 	  if (iq.count)
 	    {
@@ -145,7 +145,7 @@ showwhy(Solver *solv, const char *showwhypkgstr)
 }
 
 void
-doshowproof(Solver *solv, Id problem, int flags, Queue *lq)
+doshowproof(Solver *solv, Id id, int flags, Queue *lq)
 {
   Pool *pool = solv->pool;
   Queue q, qp;
@@ -153,7 +153,7 @@ doshowproof(Solver *solv, Id problem, int flags, Queue *lq)
 
   queue_init(&q);
   queue_init(&qp);
-  solver_get_decisionlist(solv, problem, flags | SOLVER_DECISIONLIST_SORTED | SOLVER_DECISIONLIST_WITHINFO | SOLVER_DECISIONLIST_MERGEDINFO, &q);
+  solver_get_decisionlist(solv, id, flags | SOLVER_DECISIONLIST_SORTED | SOLVER_DECISIONLIST_WITHINFO | SOLVER_DECISIONLIST_MERGEDINFO, &q);
   for (i = 0; i < q.count; i += 8)
     {
       Id v = q.elements[i];
@@ -170,12 +170,12 @@ doshowproof(Solver *solv, Id problem, int flags, Queue *lq)
         printf("unsolvable: ");
       else
         printf("%s %s: ", v < 0 ? "conflicted" : "installed", pool_solvidset2str(pool, &qp));
-      if (reason == SOLVER_REASON_PREMISE)
+      if (type == 0)
 	{
 	  printf("%s\n", solver_reason2str(solv, reason));
 	  continue;
 	}
-      if (lq && type == SOLVER_RULE_LEARNT)
+      if (type == SOLVER_RULE_LEARNT && lq)
 	{
 	  for (j = 0; j < lq->count; j++)
 	    if (lq->elements[j] == q.elements[i + 2])
