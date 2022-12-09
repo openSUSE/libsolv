@@ -890,7 +890,7 @@ typedef struct {
 
 typedef struct {
   Solver *solv;
-  Queue pq;
+  Queue decisionlistq;
   Id p;
   int reason;
   Id infoid;
@@ -919,7 +919,7 @@ static Decisionset *decisionset_fromids(Solver *solv, Id *ids)
 {
   Decisionset *d = solv_calloc(1, sizeof(*d));
   d->solv = solv;
-  queue_init(&d->pq);
+  queue_init(&d->decisionlistq);
   d->p = ids[0];
   d->reason = ids[1];
   d->infoid = ids[2];
@@ -928,9 +928,8 @@ static Decisionset *decisionset_fromids(Solver *solv, Id *ids)
   d->source = ids[5];
   d->target = ids[6];
   d->dep_id = ids[7];
-  if (ids[8] && ids[9])
-    queue_insertn(&d->pq, 0, ids[8], ids + 9);
-  if (ids[8] > 1)
+  queue_insertn(&d->decisionlistq, 0, ids[8], ids + 9);
+  if (ids[8] > 3)
     d->infoid = 0;
   return d;
 }
@@ -942,17 +941,17 @@ static void prepare_decisionset_queue(Solver *solv, Queue *q) {
   int i, cnt = 0;
   for (i = 0; i < q->count; i += 8)
     {
+      int j, dc;
       solver_decisionlist_solvables(solv, q, i, &pq);
-      queue_insertn(q, cnt, 8 + 2 + pq.count, 0);
-      i += 8 + 2 + pq.count;
+      dc = pq.count ? pq.count : 1;
+      queue_insertn(q, cnt, 8 + 2 + dc * 3, 0);
+      i += 8 + 2 + dc * 3;
       q->elements[cnt] = cnt + 1 - q->count;
       memcpy(q->elements + cnt + 1, q->elements + i, 8 * sizeof(Id));
-      q->elements[cnt + 9] = pq.count;
-      if (pq.count)
-        {
-          memcpy(q->elements + cnt + 10, pq.elements, pq.count * sizeof(Id));
-          i += pq.count * 8 - 8;
-        }
+      q->elements[cnt + 9] = 3 * dc;
+      for (j = 0; j < dc; j++, i += 8)
+        memcpy(q->elements + cnt + 10 + j * 3, q->elements + i, 3 * sizeof(Id));
+      i -= 8;
       cnt++;
     }
   queue_free(&pq);
@@ -4472,11 +4471,11 @@ rb_eval_string(
   Decisionset(Solver *solv) {
     Decisionset *d = solv_calloc(1, sizeof(*d));
     d->solv = solv;
-    queue_init(&d->pq);
+    queue_init(&d->decisionlistq);
     return d;
   }
   ~Decisionset() {
-    queue_free(&$self->pq);
+    queue_free(&$self->decisionlistq);
     solv_free($self);
   }
   %newobject info;
@@ -4495,19 +4494,36 @@ rb_eval_string(
   %newobject packages;
   Queue packages() {
     Queue q;
-    queue_init_clone(&q, &$self->pq);
+    int i;
+    queue_init(&q);
+    for (i = 0; i < $self->decisionlistq.count; i += 3)
+      if ($self->decisionlistq.elements[i] != 0)
+        queue_push(&q, $self->decisionlistq.elements[i] > 0 ? $self->decisionlistq.elements[i] : -$self->decisionlistq.elements[i]);
+    return q;
+  }
+  %typemap(out) Queue decisions Queue2Array(Decision *, 3, new_Decision(arg1->solv, id, idp[1], idp[2]));
+  %newobject decisions;
+  Queue decisions() {
+    Queue q;
+    queue_init_clone(&q, &$self->decisionlistq);
     return q;
   }
   const char *__str__() {
     Pool *pool = $self->solv->pool;
-    if ($self->pq.count == 0 && $self->reason == 0)
+    Queue q;
+    int i;
+    const char *s;
+    if (!$self->decisionlistq.elements)
       return "";
     if ($self->p == 0 && $self->reason == SOLVER_REASON_UNSOLVABLE)
       return "unsolvable";
-    if ($self->p >= 0)
-      return pool_tmpjoin(pool, "install ", pool_solvidset2str(pool, &$self->pq), 0);
-    else
-      return pool_tmpjoin(pool, "conflict ", pool_solvidset2str(pool, &$self->pq), 0);
+    queue_init(&q);
+    for (i = 0; i < $self->decisionlistq.count; i += 3)
+      if ($self->decisionlistq.elements[i] != 0)
+        queue_push(&q, $self->decisionlistq.elements[i] > 0 ? $self->decisionlistq.elements[i] : -$self->decisionlistq.elements[i]);
+    s = pool_solvidset2str(pool, &q);
+    queue_free(&q);
+    return pool_tmpjoin(pool, $self->p >= 0 ? "install " : "conflict ", s, 0);
   }
 }
 
