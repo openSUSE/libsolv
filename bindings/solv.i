@@ -1281,8 +1281,6 @@ typedef struct {
 typedef struct {
   Solver *const solv;
   Id const type;
-  Id const rid;
-  Id const from_id;
   Id const dep_id;
   Id const chosen_id;
   int level;
@@ -3625,6 +3623,9 @@ returnself(matchsolvable)
   static const int SOLVER_RULE_PKG_OBSOLETES = SOLVER_RULE_PKG_OBSOLETES;
   static const int SOLVER_RULE_PKG_IMPLICIT_OBSOLETES = SOLVER_RULE_PKG_IMPLICIT_OBSOLETES;
   static const int SOLVER_RULE_PKG_INSTALLED_OBSOLETES = SOLVER_RULE_PKG_INSTALLED_OBSOLETES;
+  static const int SOLVER_RULE_PKG_RECOMMENDS = SOLVER_RULE_PKG_RECOMMENDS;
+  static const int SOLVER_RULE_PKG_CONSTRAINS = SOLVER_RULE_PKG_CONSTRAINS;
+  static const int SOLVER_RULE_PKG_SUPPLEMENTS = SOLVER_RULE_PKG_SUPPLEMENTS;
   static const int SOLVER_RULE_UPDATE = SOLVER_RULE_UPDATE;
   static const int SOLVER_RULE_FEATURE = SOLVER_RULE_FEATURE;
   static const int SOLVER_RULE_JOB = SOLVER_RULE_JOB;
@@ -3636,6 +3637,11 @@ returnself(matchsolvable)
   static const int SOLVER_RULE_INFARCH = SOLVER_RULE_INFARCH;
   static const int SOLVER_RULE_CHOICE = SOLVER_RULE_CHOICE;
   static const int SOLVER_RULE_LEARNT = SOLVER_RULE_LEARNT;
+  static const int SOLVER_RULE_BEST  = SOLVER_RULE_BEST;
+  static const int SOLVER_RULE_YUMOBS = SOLVER_RULE_YUMOBS;
+  static const int SOLVER_RULE_RECOMMENDS = SOLVER_RULE_RECOMMENDS;
+  static const int SOLVER_RULE_BLACK = SOLVER_RULE_BLACK;
+  static const int SOLVER_RULE_STRICT_REPO_PRIORITY = SOLVER_RULE_STRICT_REPO_PRIORITY;
 
   static const int SOLVER_SOLUTION_JOB = SOLVER_SOLUTION_JOB;
   static const int SOLVER_SOLUTION_POOLJOB = SOLVER_SOLUTION_POOLJOB;
@@ -4370,13 +4376,11 @@ rb_eval_string(
       return new_Dep(a->solv->pool, a->dep_id);
     }
   %}
-
   Queue choices_raw() {
     Queue r;
     queue_init_clone(&r, &$self->choices);
     return r;
   }
-
   %typemap(out) Queue choices Queue2Array(XSolvable *, 1, new_XSolvable(arg1->solv->pool, id));
   Queue choices() {
     int i;
@@ -4387,7 +4391,6 @@ rb_eval_string(
         r.elements[i] = -r.elements[i];
     return r;
   }
-
 #if defined(SWIGPERL) || defined(SWIGTCL)
   %rename("str") __str__;
 #endif
@@ -4406,15 +4409,17 @@ rb_eval_string(
     return d;
   }
   %newobject rule;
-  XRule *rule() {
-    if ($self->reason == SOLVER_REASON_WEAKDEP)
-      return 0;
-    return new_XRule($self->solv, $self->infoid);
-  }
+  XRule * const rule;
   %newobject solvable;
-  XSolvable *solvable() {
-    return new_XSolvable($self->solv->pool, $self->p >= 0 ? $self->p : -$self->p);
-  }
+  XSolvable * const solvable;
+  %{
+    SWIGINTERN XRule *Decision_rule_get(Decision *d) {
+      return d->reason == SOLVER_REASON_WEAKDEP || d->infoid <= 0 ? 0 : new_XRule(d->solv, d->infoid);
+    }
+    SWIGINTERN XSolvable *Decision_solvable_get(Decision *d) {
+      return new_XSolvable(d->solv->pool, d->p >= 0 ? d->p : -d->p);
+    }
+  %}
   %newobject info;
   Ruleinfo *info() {
     Id type, source, target, dep;
@@ -4439,14 +4444,14 @@ rb_eval_string(
     }
     return q;
   }
-#if defined(SWIGPERL) || defined(SWIGTCL)
-  %rename("str") __str__;
-#endif
   const char *reasonstr(bool noinfo=0) {
     if (noinfo)
       return solver_reason2str($self->solv, $self->reason);
     return solver_decisionreason2str($self->solv, $self->p, $self->reason, $self->infoid);
   }
+#if defined(SWIGPERL) || defined(SWIGTCL)
+  %rename("str") __str__;
+#endif
   const char *__str__() {
     Pool *pool = $self->solv->pool;
     if ($self->p == 0 && $self->reason == SOLVER_REASON_UNSOLVABLE)
@@ -4473,17 +4478,16 @@ rb_eval_string(
   Ruleinfo *info() {
     return new_Ruleinfo($self->solv, $self->infoid, $self->type, $self->source, $self->target, $self->dep_id);
   }
-#if defined(SWIGPERL) || defined(SWIGTCL)
-  %rename("str") __str__;
-#endif
-  const char *reasonstr(bool noinfo=0) {
-    if (noinfo || !$self->type)
-      return solver_reason2str($self->solv, $self->reason);
-    return solver_decisioninfo2str($self->solv, $self->bits, $self->type, $self->source, $self->target, $self->dep_id);
-  }
-  %typemap(out) Queue packages Queue2Array(XSolvable *, 1, new_XSolvable(arg1->solv->pool, id));
-  %newobject packages;
-  Queue packages() {
+  %newobject dep;
+  Dep * const dep;
+  %{
+    SWIGINTERN Dep *Decisionset_dep_get(Decisionset *d) {
+      return new_Dep(d->solv->pool, d->dep_id);
+    }
+  %}
+  %typemap(out) Queue solvables Queue2Array(XSolvable *, 1, new_XSolvable(arg1->solv->pool, id));
+  %newobject solvables;
+  Queue solvables() {
     Queue q;
     int i;
     queue_init(&q);
@@ -4499,6 +4503,14 @@ rb_eval_string(
     queue_init_clone(&q, &$self->decisionlistq);
     return q;
   }
+  const char *reasonstr(bool noinfo=0) {
+    if (noinfo || !$self->type)
+      return solver_reason2str($self->solv, $self->reason);
+    return solver_decisioninfo2str($self->solv, $self->bits, $self->type, $self->source, $self->target, $self->dep_id);
+  }
+#if defined(SWIGPERL) || defined(SWIGTCL)
+  %rename("str") __str__;
+#endif
   const char *__str__() {
     Pool *pool = $self->solv->pool;
     Queue q;
