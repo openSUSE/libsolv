@@ -355,6 +355,7 @@ SOLV_1.0 {
 		solver_create_state_maps;
 		solver_create_transaction;
 		solver_decisioninfo2str;
+		solver_decisionlist_merged;
 		solver_decisionlist_solvables;
 		solver_decisionreason2str;
 		solver_describe_decision;

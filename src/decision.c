@@ -904,6 +904,16 @@ solver_decisionlist_solvables(Solver *solv, Queue *decisionlistq, int pos, Queue
     }
 }
 
+int
+solver_decisionlist_merged(Solver *solv, Queue *decisionlistq, int pos)
+{
+  int cnt = 0;
+  for (; pos < decisionlistq->count; pos += 8, cnt++)
+    if ((decisionlistq->elements[pos + 3] & DMS_MERGED) == 0)
+      break;
+  return cnt;
+}
+
 /* special version of solver_ruleinfo2str which supports merged decisions */
 const char *
 solver_decisioninfo2str(Solver *solv, int bits, int type, Id from, Id to, Id dep)

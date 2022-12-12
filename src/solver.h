@@ -381,6 +381,7 @@ extern void solver_get_decisionlist(Solver *solv, Id p, int flags, Queue *decisi
 extern void solver_get_decisionlist_multiple(Solver *solv, Queue *pq, int flags, Queue *decisionlistq);
 extern void solver_get_learnt(Solver *solv, Id id, int flags, Queue *q);
 extern void solver_decisionlist_solvables(Solver *solv, Queue *decisionlistq, int pos, Queue *q);
+extern int solver_decisionlist_merged(Solver *solv, Queue *decisionlistq, int pos);
 
 extern int solver_alternatives_count(Solver *solv);
 extern int solver_get_alternative(Solver *solv, Id alternative, Id *idp, Id *fromp, Id *chosenp, Queue *choices, int *levelp);
