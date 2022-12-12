@@ -3782,8 +3782,8 @@ rb_eval_string(
     return solver_alternatives_count($self);
   }
 
-  %newobject alternative;
-  Alternative *alternative(Id aid) {
+  %newobject get_alternative;
+  Alternative *get_alternative(Id aid) {
     Alternative *a = solv_calloc(1, sizeof(*a));
     a->solv = $self;
     queue_init(&a->choices);
@@ -3800,9 +3800,9 @@ rb_eval_string(
     return a;
   }
 
-  %typemap(out) Queue all_alternatives Queue2Array(Alternative *, 1, Solver_alternative(arg1, id));
-  %newobject all_alternatives;
-  Queue all_alternatives() {
+  %typemap(out) Queue alternatives Queue2Array(Alternative *, 1, Solver_get_alternative(arg1, id));
+  %newobject alternatives;
+  Queue alternatives() {
     Queue q;
     int i, cnt;
     queue_init(&q);
