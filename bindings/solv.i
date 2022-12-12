@@ -915,9 +915,10 @@ struct myappdata {
 };
 
 /* special internal decisionset constructor from a prepared decisionlist */
-static Decisionset *decisionset_fromids(Solver *solv, Id *ids)
+static Decisionset *decisionset_fromids(Solver *solv, Id *ids, int cnt)
 {
   Decisionset *d = solv_calloc(1, sizeof(*d));
+  int i;
   d->solv = solv;
   queue_init(&d->decisionlistq);
   d->p = ids[0];
@@ -928,35 +929,25 @@ static Decisionset *decisionset_fromids(Solver *solv, Id *ids)
   d->source = ids[5];
   d->target = ids[6];
   d->dep_id = ids[7];
-  queue_insertn(&d->decisionlistq, 0, ids[8], ids + 9);
-  if (ids[8] > 3)
+  for (i = 0; i < cnt; i += 8)
+    queue_insertn(&d->decisionlistq, d->decisionlistq.count, 3, ids + i);
+  if (cnt > 8)
     d->infoid = 0;
   return d;
 }
 
 /* prepare a decisionlist so we can feed it to decisionset_fromids */
 static void prepare_decisionset_queue(Solver *solv, Queue *q) {
-  Queue pq;
-  queue_init(&pq);
-  int i, cnt = 0;
-  for (i = 0; i < q->count; i += 8)
+  int i, cnt;
+  for (i = cnt = 0; i < q->count; cnt++)
     {
-      int j, dc;
-      solver_decisionlist_solvables(solv, q, i, &pq);
-      dc = pq.count ? pq.count : 1;
-      queue_insertn(q, cnt, 8 + 2 + dc * 3, 0);
-      i += 8 + 2 + dc * 3;
-      q->elements[cnt] = cnt + 1 - q->count;
-      memcpy(q->elements + cnt + 1, q->elements + i, 8 * sizeof(Id));
-      q->elements[cnt + 9] = 3 * dc;
-      for (j = 0; j < dc; j++, i += 8)
-        memcpy(q->elements + cnt + 10 + j * 3, q->elements + i, 3 * sizeof(Id));
-      i -= 8;
-      cnt++;
+      i += 1 + 8 + 8 * solver_decisionlist_merged(solv, q, i);  /* +1 as we insert one element */
+      queue_insert(q, cnt, i - cnt);
     }
-  queue_free(&pq);
+  if (cnt)
+    queue_unshift(q, 1);        /* start of first block */
   for (i = 0; i < cnt; i++)
-    q->elements[i] += q->count - i;
+    q->elements[i] += cnt - i;
   q->count = cnt;   /* hack */
 }
 
@@ -3445,7 +3436,7 @@ returnself(matchsolvable)
     solver_get_decisionlist($self->solv, $self->id, SOLVER_DECISIONLIST_PROBLEM | SOLVER_DECISIONLIST_SORTED, &q);
     return q;
   }
-  %typemap(out) Queue get_decisionsetlist Queue2Array(Decisionset *, 1, decisionset_fromids(arg1->solv, idp + id));
+  %typemap(out) Queue get_decisionsetlist Queue2Array(Decisionset *, 1, decisionset_fromids(arg1->solv, idp + id, idp[1] - id + 1));
   %newobject get_decisionsetlist;
   Queue get_decisionsetlist() {
     Queue q;
@@ -4116,7 +4107,7 @@ rb_eval_string(
     solver_get_decisionlist($self->solv, $self->id, SOLVER_DECISIONLIST_LEARNTRULE | SOLVER_DECISIONLIST_SORTED, &q);
     return q;
   }
-  %typemap(out) Queue get_decisionsetlist Queue2Array(Decisionset *, 1, decisionset_fromids(arg1->solv, idp + id));
+  %typemap(out) Queue get_decisionsetlist Queue2Array(Decisionset *, 1, decisionset_fromids(arg1->solv, idp + id, idp[1] - id + 1));
   %newobject get_decisionsetlist;
   Queue get_decisionsetlist() {
     Queue q;

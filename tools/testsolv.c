@@ -165,12 +165,11 @@ doshowproof(Solver *solv, Id id, int flags, Queue *lq)
 	continue;	/* do not show "obvious" decisions */
 
       solver_decisionlist_solvables(solv, &q, i, &qp);
-      if (qp.count)
-        i += qp.count * 8 - 8;
       if (reason == SOLVER_REASON_UNSOLVABLE)
         printf("unsolvable: ");
       else
         printf("%s %s: ", v < 0 ? "conflicted" : "installed", pool_solvidset2str(pool, &qp));
+      i += solver_decisionlist_merged(solv, &q, i) * 8;
       if (type == 0)
 	{
 	  printf("%s\n", solver_reason2str(solv, reason));
