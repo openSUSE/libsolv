@@ -688,6 +688,14 @@ basically the inverse of the ``considered'' methods above, i.e. calling
 installation. Note you need to recreate the whatprovides hash after changing the
 list.
 
+	const char *solvableset2str(Solvable *solvables)
+	my $str = $pool->solvableset2str($solvables);
+	str = pool.solvableset2str(solvables)
+	str = pool.solvableset2str(solvables)
+
+Return a string describing a list of solvables. The method tries to reduce
+the output by using version ranges if possible.
+
 === DATA RETRIEVAL METHODS ===
 
 In the following functions, the _keyname_ argument describes what to retrieve.
@@ -780,6 +788,14 @@ Lookup an existing Repository by id. You can also do this by using the
 
 Return a string describing the Solvable with the specified id. The string
 consists of the name, version, and architecture of the Solvable.
+
+	const char *solvidset2str(Id *solvids)
+	my $str = $pool->solvidset2str(\@solvids);
+	str = pool.solvidset2str(solvids)
+	str = pool.solvidset2str(solvids)
+
+Return a string describing a list of solvables. The method tries to reduce
+the output by using version ranges if possible.
 
 	Id str2id(const char *str, bool create = 1)
 	my $id = pool->str2id($string);

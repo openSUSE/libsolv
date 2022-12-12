@@ -1215,6 +1215,21 @@ my \fI@ids\fR \fB=\fR \fI$pool\fR\fB\->get_disabled_list()\fR;
 .\}
 .sp
 Get/set the list of solvables that are not eligible for installation\&. This is basically the inverse of the \(lqconsidered\(rq methods above, i\&.e\&. calling \(lqset_disabled_list()\(rq with an empty list will make all solvables eligible for installation\&. Note you need to recreate the whatprovides hash after changing the list\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBconst char *solvableset2str(Solvable *\fR\fIsolvables\fR\fB)\fR
+my \fI$str\fR \fB=\fR \fI$pool\fR\fB\->solvableset2str(\fR\fI$solvables\fR\fB)\fR;
+\fIstr\fR \fB=\fR \fIpool\fR\fB\&.solvableset2str(\fR\fIsolvables\fR\fB)\fR
+\fIstr\fR \fB=\fR \fIpool\fR\fB\&.solvableset2str(\fR\fIsolvables\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return a string describing a list of solvables\&. The method tries to reduce the output by using version ranges if possible\&.
 .SS "DATA RETRIEVAL METHODS"
 .sp
 In the following functions, the \fIkeyname\fR argument describes what to retrieve\&. For the standard cases you can use the available Id constants\&. For example,
@@ -1400,6 +1415,21 @@ my \fI$str\fR \fB=\fR \fI$pool\fR\fB\->solvid2str(\fR\fI$id\fR\fB)\fR;
 .\}
 .sp
 Return a string describing the Solvable with the specified id\&. The string consists of the name, version, and architecture of the Solvable\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBconst char *solvidset2str(Id *\fR\fIsolvids\fR\fB)\fR
+my \fI$str\fR \fB=\fR \fI$pool\fR\fB\->solvidset2str(\e\fR\fI@solvids\fR\fB)\fR;
+\fIstr\fR \fB=\fR \fIpool\fR\fB\&.solvidset2str(\fR\fIsolvids\fR\fB)\fR
+\fIstr\fR \fB=\fR \fIpool\fR\fB\&.solvidset2str(\fR\fIsolvids\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return a string describing a list of solvables\&. The method tries to reduce the output by using version ranges if possible\&.
 .sp
 .if n \{\
 .RS 4
