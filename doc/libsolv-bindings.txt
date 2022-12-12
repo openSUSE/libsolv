@@ -496,21 +496,21 @@ a Dep object or a simple Id as argument.
 Filter list of solvables by repo priority, architecture and version.
 
 	Solvable *whatcontainsdep(Id keyname, DepId dep, Id marker = -1)
-	my @solvables = $pool->whatcontainsdep($keyname, $dep)
+	my @solvables = $pool->whatcontainsdep($keyname, $dep);
 	solvables = pool.whatcontainsdep(keyname, dep)
 	solvables = pool.whatcontainsdep(keyname, dep)
 
 Return all solvables for which keyname contains the dependency.
 
 	Solvable *whatmatchesdep(Id keyname, DepId dep, Id marker = -1)
-	my @solvables = $pool->whatmatchesdep($keyname, $sdep)
+	my @solvables = $pool->whatmatchesdep($keyname, $sdep);
 	solvables = pool.whatmatchesdep(keyname, dep)
 	solvables = pool.whatmatchesdep(keyname, dep)
 
 Return all solvables that have dependencies in keyname that match the dependency.
 
 	Solvable *whatmatchessolvable(Id keyname, Solvable solvable, Id marker = -1)
-	my @solvables = $pool->whatmatchessolvable($keyname, $solvable)
+	my @solvables = $pool->whatmatchessolvable($keyname, $solvable);
 	solvables = pool.whatmatchessolvable(keyname, solvable)
 	solvables = pool.whatmatchessolvable(keyname, solvable)
 
@@ -1449,7 +1449,7 @@ correct marker for the keyname and returns the first part of the
 array, use 1 to select the second part or 0 to retrieve all ids
 including the marker.
 
-	const char *lookup_location(unsigned int *OUTPUT);
+	const char *lookup_location(unsigned int *OUTPUT)
 	my ($location, $mediano) = $solvable->lookup_location();
 	location, mediano = solvable.lookup_location()
 	location, mediano = solvable.lookup_location()
@@ -1458,7 +1458,7 @@ Return a tuple containing the on-media location and an optional
 media number for multi-part repositories (e.g. repositories
 spawning multiple DVDs).
 
-	const char *lookup_sourcepkg();
+	const char *lookup_sourcepkg()
 	my $sourcepkg = $solvable->lookup_sourcepkg();
 	sourcepkg = solvable.lookup_sourcepkg()
 	sourcepkg = solvable.lookup_sourcepkg()
@@ -1477,21 +1477,21 @@ Return a sourcepkg name associated with solvable.
 Iterate over the matching data elements. See the Dataiterator class for more
 information.
 
-	void add_deparray(Id keyname, DepId dep, Id marker = -1);
+	void add_deparray(Id keyname, DepId dep, Id marker = -1)
 	$solvable->add_deparray($keyname, $dep);
 	solvable.add_deparray(keyname, dep)
 	solvable.add_deparray(keyname, dep)
 
 Add a new dependency to the attributes stored in keyname.
 
-	void unset(Id keyname);
+	void unset(Id keyname)
 	$solvable->unset($keyname);
 	solvable.unset(keyname)
 	solvable.unset(keyname)
 
 Delete data stored for the specific keyname.
 
-	bool installable();
+	bool installable()
 	$solvable->installable()
 	solvable.installable()
 	solvable.installable?
@@ -1499,7 +1499,7 @@ Delete data stored for the specific keyname.
 Return true if the solvable is installable on the system. Solvables
 are not installable if the system does not support their architecture.
 
-	bool isinstalled();
+	bool isinstalled()
 	$solvable->isinstalled()
 	solvable.isinstalled()
 	solvable.isinstalled?
@@ -1626,6 +1626,7 @@ one.
 Iterate through the matches. If there is a match, the object
 in d will be of type Datamatch.
 
+
 The Datamatch Class
 -------------------
 Objects of this type will be created for every value matched
@@ -1730,7 +1731,7 @@ that cannot be represented as a string.
 
 === METHODS ===
 
-	Datapos pos();
+	Datapos pos()
 	my $pos = $d->pos();
 	pos = d.pos()
 	pos = d.pos()
@@ -1739,7 +1740,7 @@ The position object of the current match. It can be used to do
 sub-searches starting at the match (if it is of an array type).
 See the Datapos class for more information.
 
-	Datapos parentpos();
+	Datapos parentpos()
 	my $pos = $d->parentpos();
 	pos = d.parentpos()
 	pos = d.parentpos()
@@ -1966,6 +1967,7 @@ Do a matchsolvable operation and combine the result with the current selection.
 
 Return a string describing the selection.
 
+
 The Job Class
 -------------
 Jobs are the way to specify to the dependency solver what to do.
@@ -2172,7 +2174,7 @@ selection part of the ``how'' attribute.
 Return the set of solvables of the job as an array of Solvable
 objects.
 
-	bool isemptyupdate();
+	bool isemptyupdate()
 	$job->isemptyupdate()
 	job.isemptyupdate()
 	job.isemptyupdate?
@@ -2251,6 +2253,7 @@ package "screen-2.1" will ask the user for confirmation because of the
 different architecture. When using the Selection class to create jobs
 the set bits are automatically added, e.g. selecting ``screen.i586'' will
 automatically add SOLVER_SETARCH, and thus no problem will be reported.
+
 
 The Solver Class
 ----------------
@@ -2468,6 +2471,15 @@ To fulfill the dependencies a package needs to be installed that is
 obsoleted by an installed package. See the POOL_FLAG_NOINSTALLEDOBSOLETES
 flag.
 
+*SOLVER_RULE_PKG_RECOMMENDS*::
+The package contains a recommended dependency.
+
+*SOLVER_RULE_PKG_SUPPLEMENTS*::
+The package contains a dependency to specify it supplements another package.
+
+*SOLVER_RULE_PKG_CONSTRAINS*::
+The package contains a constraint against some other package (disttype conda).
+
 *SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP*::
 The user asked for installation of a package providing a specific
 dependency, but no available package provides it.
@@ -2587,6 +2599,11 @@ This is a special case of SOLVER_REASON_WEAKDEP.
 *SOLVER_REASON_SUPPLEMENTED*::
 This is a special case of SOLVER_REASON_WEAKDEP.
 
+*SOLVER_REASON_UNSOLVABLE*::
+This is a special case where a rule cannot be fulfilled.
+
+*SOLVER_REASON_PREMISE*::
+This is a special case for the premises of learnt rules.
 
 === ATTRIBUTES ===
 
@@ -2639,7 +2656,7 @@ interfaces that show both the job result and the problems.
 Return the reason why a specific solvable was installed or erased. For most of
 the reasons the rule that triggered the decision is also returned.
 
-	Solvable *get_recommended(bool noselected=0);
+	Solvable *get_recommended(bool noselected=0)
 	my @solvables = $solver->get_recommended();
 	solvables = solver.get_recommended()
 	solvables = solver.get_recommended()
@@ -2647,13 +2664,37 @@ the reasons the rule that triggered the decision is also returned.
 Return all solvables that are recommended by the solver run result. This includes
 solvables included in the result, set noselected if you want to filter those.
 
-	Solvable *get_suggested(bool noselected=0);
+	Solvable *get_suggested(bool noselected=0)
 	my @solvables = $solver->get_suggested();
 	solvables = solver.get_suggested()
 	solvables = solver.get_suggested()
 
 Return all solvables that are suggested by the solver run result. This includes
 solvables included in the result, set noselected if you want to filter those.
+
+	Decision *get_decisionlist(Solvable *s)
+	my @decisions = $solver->get_decisionlist($solvable);
+	decisions = solver.get_decisionlist(solvable)
+	decisions = solver.get_decisionlist(solvable)
+
+Return a list of decisions that caused the specific solvable to be installed or
+erased. This is usually more useful than the describe_decision() method, as it
+returns every involved decision instead of just a single one.
+
+	Alternative *alternatives()
+	my @alternatives = $solver->alternatives();
+	alternatives = solver.alternatives()
+	alternatives = solver.alternatives()
+
+Return all alternatives recorded in the solver run. See the Alternative class
+for more information.
+
+	int alternatives_count()
+	my $cnt = $solver->alternatives_count();
+	cnt = solver.alternatives_count()
+	cnt = solver.alternatives_count()
+
+Return the number of alternatives without creating alternative objects.
 
 
 The Problem Class
@@ -2700,6 +2741,31 @@ all the needed information why there was a problem, but it's hard to present
 them to the user in a sensible way. The default is to filter out all update and
 job rules (unless the returned rules only consist of those types).
 
+	Decision *get_decisionlist()
+	my @decisions = $problem->get_decisionlist();
+	decisions = problem.get_decisionlist()
+	decisions = problem.get_decisionlist()
+
+Return a list of decisions prooving the problem. This is somewhat similar to
+the findallproblemrules(), but the output is in an order that makes it easier
+to understand why the solver could not find a solution.
+
+	Decisionset *get_decisionsetlist()
+	my @decisionsets = $problem->get_decisionsetlist();
+	decisionsets = problem.get_decisionsetlist()
+	decisionsets = problem.get_decisionsetlist()
+
+Like the get_decisionlist() method, but the decisions are merged into
+individual sets.
+
+	Rule *get_learnt()
+	my @learnt = $problem->get_learnt();
+	learnt = problem.get_learnt()
+	learnt = problem.get_lerant()
+
+Return a list of learnt rules that are part of the problem proof. This
+is useful for presenting a complete proof to the user.
+
 	Solution *solutions()
 	my @solutions = $problem->solutions();
 	solutions = problem.solutions()
@@ -2723,6 +2789,7 @@ Return the number of solutions without creating solution objects.
 Return a string describing the problem. This is a convenience function, it is
 a shorthand for calling findproblemrule(), then ruleinfo() on the problem
 rule and problemstr() on the ruleinfo object.
+
 
 The Rule Class
 --------------
@@ -2771,12 +2838,35 @@ As the same dependency rule can get created because of multiple dependencies, on
 Ruleinfo is not enough to describe the reason. Thus the allinfos() method returns
 an array of all infos about a rule.
 
+	Decision *get_decisionlist()
+	my @decisions = $rule->get_decisionlist();
+	decisions = rule.get_decisionlist()
+	decisions = rule.get_decisionlist()
+
+Return a list of decisions prooving a learnt rule.
+
+	Decision *get_decisionsetlist()
+	my @decisionsets = $rule->get_decisionsetlist();
+	decisionsets = rule.get_decisionsetlist()
+	decisionsets = rule.get_decisionsetlist()
+
+Like the get_decisionlist() method, but the decisions are merged into
+individual sets.
+
+	Rule *get_learnt()
+	my @learnt = $rule->get_learnt();
+	learnt = rule.get_learnt()
+	learnt = rule.get_lerant()
+
+Return a list of learnt rules that are part of the learnt rule proof.
+
 	<equality>
 	if ($rule1 == $rule2)
 	if rule1 == rule2:
 	if rule1 == rule2
 
 Two rules are equal if they belong to the same solver and have the same id.
+
 
 The Ruleinfo Class
 ------------------
@@ -2807,7 +2897,7 @@ rule type list and the special type list.
 The dependency leading to the creation of the rule.
 
 	Dep *dep_id;				/* read only */
-	$ruleinfo->{'dep_id'}
+	$ruleinfo->{dep_id}
 	ruleinfo.dep_id
 	ruleinfo.dep_id
 
@@ -2825,8 +2915,8 @@ The involved Solvable, e.g. the one containing the dependency.
 	ruleinfo.othersolvable
 	ruleinfo.othersolvable
 
-The other involved Solvable (if any), e.g. the one containing providing
-the dependency for conflicts.
+The other involved Solvable (if any), e.g. the one providing
+the dependency.
 
 	const char *problemstr();
 	my $str = $ruleinfo->problemstr();
@@ -2835,6 +2925,15 @@ the dependency for conflicts.
 
 A string describing the ruleinfo from a problem perspective. This probably
 only makes sense if the rule is part of a problem.
+
+	<stringification>
+	my $str = $ruleinfo->str;
+	str = str(ruleinfo)
+	str = ruleinfo.to_s
+
+A string describing the ruleinfo, i.e. the reason why the corresponding rule
+has been created.
+
 
 The Solution Class
 ------------------
@@ -2992,6 +3091,7 @@ you should replace the old job with the new one.
 
 A string describing the change the solution element consists of.
 
+
 The Transaction Class
 ---------------------
 Transactions describe the output of a solver run. A transaction contains
@@ -3126,14 +3226,14 @@ Back pointer to pool.
 
 === METHODS ===
 
-	bool isempty();
+	bool isempty()
 	$trans->isempty()
 	trans.isempty()
 	trans.isempty?
 
 Returns true if the transaction does not do anything, i.e. has no elements.
 
-	Solvable *newsolvables();
+	Solvable *newsolvables()
 	my @newsolvables = $trans->newsolvables();
 	newsolvables = trans.newsolvables()
 	newsolvables = trans.newsolvables()
@@ -3141,14 +3241,14 @@ Returns true if the transaction does not do anything, i.e. has no elements.
 Return all packages that are to be installed by the transaction. These are
 the packages that need to be downloaded from the repositories.
 
-	Solvable *keptsolvables();
+	Solvable *keptsolvables()
 	my @keptsolvables = $trans->keptsolvables();
 	keptsolvables = trans.keptsolvables()
 	keptsolvables = trans.keptsolvables()
 
 Return all installed packages that the transaction will keep installed.
 
-	Solvable *steps();
+	Solvable *steps()
 	my @steps = $trans->steps();
 	steps = trans.steps()
 	steps = trans.steps()
@@ -3176,7 +3276,7 @@ the result to match your preferences, see the mode argument flag in
 the CONSTANTS section. See the TransactionClass class for how to deal
 with the returned objects.
 
-	Solvable othersolvable(Solvable *solvable);
+	Solvable othersolvable(Solvable *solvable)
 	my $other = $trans->othersolvable($solvable);
 	other = trans.othersolvable(solvable)
 	other = trans.othersolvable(solvable)
@@ -3194,7 +3294,7 @@ a package with the same name.
 Thus, the ``other'' solvable is normally the package that is also shown
 for a given package.
 
-	Solvable *allothersolvables(Solvable *solvable);
+	Solvable *allothersolvables(Solvable *solvable)
 	my @others = $trans->allothersolvables($solvable);
 	others = trans.allothersolvables(solvable)
 	others = trans.allothersolvables(solvable)
@@ -3204,14 +3304,14 @@ be installed packages, returns all of the packages that the new package
 replaces. The special ``other'' solvable is always the first entry of the
 returned array.
 
-	long long calc_installsizechange();
+	long long calc_installsizechange()
 	my $change = $trans->calc_installsizechange();
 	change = trans.calc_installsizechange()
 	change = trans.calc_installsizechange()
 
 Return the size change of the installed system in kilobytes (kibibytes).
 
-	void order(int flags = 0);
+	void order(int flags = 0)
 	$trans->order();
 	trans.order()
 	trans.order()
@@ -3241,6 +3341,7 @@ in passive mode, but
 in active mode. If the mode contains SOLVER_TRANSACTION_SHOW_ALL, the
 passive mode list will be unchanged but the active mode list will just
 contain A-2-1.
+
 
 The Transactionclass Class
 --------------------------
@@ -3305,6 +3406,7 @@ The id of the new vendor or architecture.
 	solvables = class.solvables()
 
 Return the solvables for all transaction elements in the class.
+
 
 Checksums
 ---------
@@ -3455,7 +3557,7 @@ Return file file descriptor of the file. If the file is not open, `-1` is
 returned.
 
 	void cloexec(bool state)
-	$file->cloexec($state)
+	$file->cloexec($state);
 	file.cloexec(state)
 	file.cloexec(state)
 
@@ -3518,7 +3620,7 @@ The id of the repodata area. Repodata ids of different repositories overlap.
 
 === METHODS ===
 
-	internalize();
+	internalize()
 	$data->internalize();
 	data.internalize()
 	data.internalize()
@@ -3526,7 +3628,7 @@ The id of the repodata area. Repodata ids of different repositories overlap.
 Internalize newly added data. The lookup functions will only see the new data
 after it has been internalized.
 
-	bool write(FILE *fp);
+	bool write(FILE *fp)
 	$data->write($fp);
 	data.write(fp)
 	data.write(fp)
@@ -3547,13 +3649,13 @@ Convert a string (directory) into an Id and back. If the string is currently not
 pool and _create_ is false, zero is returned.
 
 	void add_dirstr(Id solvid, Id keyname, Id dir, const char *str)
-	$data->add_dirstr($solvid, $keyname, $dir, $string)
+	$data->add_dirstr($solvid, $keyname, $dir, $string);
 	data.add_dirstr(solvid, keyname, dir, string)
 	data.add_dirstr(solvid, keyname, dir, string)
 
 Add a file path consisting of a dirname Id and a basename string.
 
-	bool add_solv(FILE *fp, int flags = 0);
+	bool add_solv(FILE *fp, int flags = 0)
 	$data->add_solv($fp);
 	data.add_solv(fp)
 	data.add_solv(fp)
@@ -3562,15 +3664,15 @@ Replace a stub repodata object with the data from a solv file. This method
 automatically adds the REPO_USE_LOADING flag. It should only be used from
 a load callback.
 
-	void create_stubs();
-	$data->create_stubs()
+	void create_stubs()
+	$data->create_stubs();
 	data.create_stubs()
 	data.create_stubs()
 
 Create stub repodatas from the information stored in the repodata meta
 area.
 
-	void extend_to_repo();
+	void extend_to_repo()
 	$data->extend_to_repo();
 	data.extend_to_repo()
 	data.extend_to_repo()
@@ -3627,62 +3729,62 @@ SOLVID_META solvid that stores repodata meta information.
 
 === DATA STORAGE METHODS ===
 
-	void set_str(Id solvid, Id keyname, const char *str);
+	void set_str(Id solvid, Id keyname, const char *str)
 	$data->set_str($solvid, $keyname, $str);
 	data.set_str(solvid, keyname, str)
 	data.set_str(solvid, keyname, str)
 
-	void set_id(Id solvid, Id keyname, DepId id);
+	void set_id(Id solvid, Id keyname, DepId id)
 	$data->set_id($solvid, $keyname, $id);
 	data.set_id(solvid, keyname, id)
 	data.set_id(solvid, keyname, id)
 
-	void set_num(Id solvid, Id keyname, unsigned long long num);
+	void set_num(Id solvid, Id keyname, unsigned long long num)
 	$data->set_num($solvid, $keyname, $num);
 	data.set_num(solvid, keyname, num)
 	data.set_num(solvid, keyname, num)
 
-	void set_void(Id solvid, Id keyname);
+	void set_void(Id solvid, Id keyname)
 	$data->set_void($solvid, $keyname);
 	data.set_void(solvid, keyname)
 	data.set_void(solvid, keyname)
 
-	void set_poolstr(Id solvid, Id keyname, const char *str);
+	void set_poolstr(Id solvid, Id keyname, const char *str)
 	$data->set_poolstr($solvid, $keyname, $str);
 	data.set_poolstr(solvid, keyname, str)
 	data.set_poolstr(solvid, keyname, str)
 
-	void set_checksum(Id solvid, Id keyname, Chksum *chksum);
+	void set_checksum(Id solvid, Id keyname, Chksum *chksum)
 	$data->set_checksum($solvid, $keyname, $chksum);
 	data.set_checksum(solvid, keyname, chksum)
 	data.set_checksum(solvid, keyname, chksum)
 
-	void set_sourcepkg(Id solvid, const char *sourcepkg);
+	void set_sourcepkg(Id solvid, const char *sourcepkg)
 	$data.set_sourcepkg($solvid, $sourcepkg);
 	data.set_sourcepkg(solvid, sourcepkg)
 	data.set_sourcepkg(solvid, sourcepkg)
 
-	void set_location(Id solvid, unsigned int mediano, const char *location);
+	void set_location(Id solvid, unsigned int mediano, const char *location)
 	$data.set_location($solvid, $mediano, $location);
 	data.set_location(solvid, mediano, location)
 	data.set_location(solvid, mediano, location)
 
-	void add_idarray(Id solvid, Id keyname, DepId id);
+	void add_idarray(Id solvid, Id keyname, DepId id)
 	$data->add_idarray($solvid, $keyname, $id);
 	data.add_idarray(solvid, keyname, id)
 	data.add_idarray(solvid, keyname, id)
 
-	Id new_handle();
+	Id new_handle()
 	my $handle = $data->new_handle();
 	handle = data.new_handle()
 	handle = data.new_handle()
 
-	void add_flexarray(Id solvid, Id keyname, Id handle);
+	void add_flexarray(Id solvid, Id keyname, Id handle)
 	$data->add_flexarray($solvid, $keyname, $handle);
 	data.add_flexarray(solvid, keyname, handle)
 	data.add_flexarray(solvid, keyname, handle)
 
-	void unset(Id solvid, Id keyname);
+	void unset(Id solvid, Id keyname)
 	$data->unset($solvid, $keyname);
 	data.unset(solvid, keyname)
 	data.unset(solvid, keyname)
@@ -3722,7 +3824,7 @@ Back pointer to repository object.
 
 Create a Dataiterator at the position of the datapos object.
 
-	const char *lookup_deltalocation(unsigned int *OUTPUT);
+	const char *lookup_deltalocation(unsigned int *OUTPUT)
 	my ($location, $mediano) = $datapos->lookup_deltalocation();
 	location, mediano = datapos.lookup_deltalocation()
 	location, mediano = datapos.lookup_deltalocation()
@@ -3731,7 +3833,7 @@ Return a tuple containing the on-media location and an optional media number
 for a delta rpm. This obviously only works if the data position points to
 structure describing a delta rpm.
 
-	const char *lookup_deltaseq();
+	const char *lookup_deltaseq()
 	my $seq = $datapos->lookup_deltaseq();
 	seq = datapos.lookup_deltaseq();
 	seq = datapos.lookup_deltaseq();
@@ -3784,6 +3886,263 @@ the Ids of the global pool even if the repodata area contains its own pool.
 
 Iterate over the matching data elements. See the Dataiterator class for more
 information.
+
+
+The Alternative Class
+---------------------
+An Alternative object describes a branch point in the solving process. The
+solver found more than one good way to fulfill a dependency and chose one.
+It recorded the other possibilities in the alternative object so that they
+can be presented to the user in the case a different solution is preferable.
+
+=== ATTRIBUTES ===
+
+	Solver *solv;			/* read only */
+	$alternative->{solv}
+	alternative.solv
+	alternative.solv
+
+Back pointer to solver object.
+
+	Id type;			/* read only */
+	$alternative->{type}
+	alternative.type
+	alternative.type
+
+The type of the alternative. Alternatives can be created because of rule
+fulfillment, because of recommended packages, and because of suggested
+packages (currently unused). See below for a list of valid types.
+
+	Rule rule;			/* read only */
+	$alternative->{rule}
+	alternative.rule
+	alternative.rule
+
+The rule that caused the creation of the alternative (SOLVER_ALTERNATIVE_TYPE_RULE).
+
+	Dep *dep;			/* read only */
+	$ruleinfo->{dep}
+	ruleinfo.dep
+	ruleinfo.dep
+
+The dependency that caused the creation of the alternative (SOLVER_ALTERNATIVE_TYPE_RECOMMENDS).
+
+	Dep *depsolvable;		/* read only */
+	$ruleinfo->{depsolvable}
+	ruleinfo.depsolvable
+	ruleinfo.depsolvable
+
+The package containing the dependency (SOLVER_ALTERNATIVE_TYPE_RECOMMENDS).
+
+	Solvable chosen;		/* read only */
+	$alternative->{chosen}
+	alternative.chosen
+	alternative.chosen
+
+The solvable that the solver chose from the alternative's package set.
+
+=== CONSTANTS ===
+
+*SOLVER_ALTERNATIVE_TYPE_RULE*::
+
+The alternative was created when fulfilling a rule.
+
+*SOLVER_ALTERNATIVE_TYPE_RECOMMENDS*::
+
+The alternative was created when fulfilling a recommends dependency.
+
+*SOLVER_ALTERNATIVE_TYPE_SUGGESTS*::
+
+The alternative was created when fulfilling a suggests dependency.
+
+=== METHODS ===
+
+	Solvable *choices()
+	my @choices = $alternative->choices();
+	choices = alternative.choices
+	choices = alternative.choices
+
+Return the set of solvables that the solver could choose from when
+creating the alternative.
+
+	<stringification>
+	my $str = $alternative->str;
+	str = str(alternative)
+	str = alternative.to_s
+
+Return a string describing the alternative.
+
+
+The Decision Class
+------------------
+A decision is created when the solver fulfills dependencies. It can be
+either to install a package to satisfy a dependency or to conflict a
+dependency because it conflicts with another package or its dependencies
+cannot be met. Most decisions are caused by rule processing, but there
+are some other types like orphaned package handling or weak dependency
+handling.
+
+=== ATTRIBUTES ===
+
+	Solver *solv;			/* read only */
+	$decision->{solv}
+	decision.solv
+	decision.solv
+
+Back pointer to solver object.
+
+	Id p;				/* read only */
+	$decision->{p}
+	decision.p
+	decision.p
+
+The decision package id, positive for installs and negative for conflicts.
+
+	int reason;			/* read only */
+	$decision->{reason}
+	decision.reason
+	decision.reason
+
+The reason for the decision. See the SOLVER_REASON_ constants.
+
+	int infoid;			/* read only */
+	$decision->{infoid}
+	decision.infoid
+	decision.infoid
+
+Extra info for the decision. This is the rule id for decisions caused
+by rule fulfillment.
+
+	Solvable solvable;		/* read only */
+	$decision->{solvable}
+	decision.solvable
+	decision.solvable
+
+The decision package object.
+
+	Rule rule()			/* read only */
+	$decision->{rule}
+	decision.rule
+	decision.rule
+
+The rule object for decisions that where caused by rule fulfilment.
+
+=== METHODS ===
+
+	Ruleinfo info()
+	my $info = $decision->info();
+	info = decision.info()
+	info = decision.info()
+
+Return a Ruleinfo object describing the decision. Some reasons like
+SOLVER_REASON_WEAKDEP are not caused by rules, but can be expressed
+by a Ruleinfo object.
+
+	Ruleinfo *allinfos()
+	my @infos = $decision->allinfos();
+	infos = decision.allinfos()
+	infos = decision.allinfos()
+
+Same as info(), but all Ruleinfo objects describing the decision are
+returned.
+
+	const char *reasonstr()
+	my str = $decision->reasonstr()
+	str = decision.reasonstr()
+	str = decision.reasonstr()
+
+Return a string describing why a decision was done (but without
+the decision itself).
+
+	<stringification>
+	my $str = $decison->str;
+	str = str(decision)
+	str = decision.to_s
+
+Return a string describing the decision (but without the reason).
+
+
+The Decisionset Class
+---------------------
+A decisionset consists of multiple decisions of the same reason and type
+that can be presented to the user as a single action.
+
+=== ATTRIBUTES ===
+
+	Solver *solv;			/* read only */
+	$decision->{solv}
+	decision.solv
+	decision.solv
+
+Back pointer to solver object.
+
+	Id p;				/* read only */
+	$decision->{p}
+	decision.p
+	decision.p
+
+The package id of the first decision, positive for installs and negative for conflicts.
+
+	int reason;			/* read only */
+	$decision->{reason}
+	decision.reason
+	decision.reason
+
+The reason for the decisions in the set. See the SOLVER_REASON_ constants.
+
+	int type;			/* read only */
+	$ruleinfo->{type}
+	ruleinfo.type
+	ruleinfo.type
+
+The type of the decision info. See the constant section of the solver class for the
+rule type list and the special type list.
+
+	Dep *dep;			/* read only */
+	$ruleinfo->{dep}
+	ruleinfo.dep
+	ruleinfo.dep
+
+The dependency that caused the decision
+
+	Dep *dep_id;			/* read only */
+	$ruleinfo->{dep_id}
+	ruleinfo.dep_id
+	ruleinfo.dep_id
+
+The Id of the dependency that caused the decision.
+
+=== METHODS ===
+
+	Decision *decisions()
+	my @decisions = $decisionset->decisions();
+	decisions = decisionset.decisions()
+	decisions = decisionset.decisions()
+
+Return all the decisions of the set.
+
+	Solvable *solvables()
+	my @pkgs = $decisionset->solvables();
+	pkgs = decisionset.solvables()
+	pkgs = decisionset.solvables()
+
+Return all the packages that were decided in the set.
+
+	const char *reasonstr()
+	my str = $decision->reasonstr();
+	str = decision.reasonstr()
+	str = decision.reasonstr()
+
+Return a string describing why the decisions were done (but without
+the decisions themself).
+
+	<stringification>
+	my $str = $decison->str;
+	str = str(decision)
+	str = decision.to_s
+
+Return a string describing the decisions (but without the reason).
+
 
 Author
 ------
