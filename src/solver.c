@@ -4873,11 +4873,12 @@ solver_alternative2str(Solver *solv, int type, Id id, Id from)
       int rtype;
       Id depfrom, depto, dep;
       char buf[64];
-      if (solver_ruleclass(solv, id) == SOLVER_RULE_CHOICE)
-	id = solver_rule2pkgrule(solv, id);
-      if (solver_ruleclass(solv, id) == SOLVER_RULE_RECOMMENDS)
+      int rclass = solver_ruleclass(solv, id);
+      if (rclass == SOLVER_RULE_CHOICE || rclass == SOLVER_RULE_RECOMMENDS)
 	id = solver_rule2pkgrule(solv, id);
       rtype = solver_ruleinfo(solv, id, &depfrom, &depto, &dep);
+      if (rtype == SOLVER_RULE_BEST && depto > 0)
+	rtype = solver_ruleinfo(solv, depto, &depfrom, &depto, &dep);
       if ((rtype & SOLVER_RULE_TYPEMASK) == SOLVER_RULE_JOB)
 	{
 	  if ((depto & SOLVER_SELECTMASK) == SOLVER_SOLVABLE_PROVIDES)
@@ -4889,6 +4890,12 @@ solver_alternative2str(Solver *solv, int type, Id id, Id from)
 	  const char *s = pool_dep2str(pool, dep);
 	  return pool_tmpappend(pool, s, ", required by ", pool_solvid2str(pool, depfrom));
 	}
+      if (rtype == SOLVER_RULE_PKG_RECOMMENDS)
+	{
+	  const char *s = pool_dep2str(pool, dep);
+	  return pool_tmpappend(pool, s, ", recommended by ", pool_solvid2str(pool, depfrom));
+	}
+      /* XXX: add deconstruction of learnt rules */
       sprintf(buf, "Rule #%d", id);
       return pool_tmpjoin(pool, buf, 0, 0);
     }
