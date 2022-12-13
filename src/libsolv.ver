@@ -345,6 +345,7 @@ SOLV_1.0 {
 		solver_allruleinfos;
 		solver_allweakdepinfos;
 		solver_alternative2str;
+		solver_alternativeinfo;
 		solver_alternatives_count;
 		solver_calc_decisioninfo_bits;
 		solver_calc_duchanges;

@@ -385,6 +385,7 @@ extern int solver_decisionlist_merged(Solver *solv, Queue *decisionlistq, int po
 
 extern int solver_alternatives_count(Solver *solv);
 extern int solver_get_alternative(Solver *solv, Id alternative, Id *idp, Id *fromp, Id *chosenp, Queue *choices, int *levelp);
+extern int solver_alternativeinfo(Solver *solv, int type, Id id, Id from, Id *fromp, Id *top, Id *depp);
 
 extern void solver_calculate_multiversionmap(Pool *pool, Queue *job, Map *multiversionmap);
 extern void solver_calculate_noobsmap(Pool *pool, Queue *job, Map *multiversionmap);	/* obsolete */
