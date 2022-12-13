@@ -3733,13 +3733,14 @@ returnself(matchsolvable)
     return solver_create_transaction($self);
   }
 
+  /* legacy, use get_decision */
   int describe_decision(XSolvable *s, XRule **OUTPUT) {
     Id ruleid;
     int reason = solver_describe_decision($self, s->id, &ruleid);
     *OUTPUT = new_XRule($self, ruleid);
     return reason;
   }
-
+  /* legacy, use get_decision and the info/allinfos method */
   %newobject describe_weakdep_decision_raw;
   Queue describe_weakdep_decision_raw(XSolvable *s) {
     Queue q;
@@ -3861,13 +3862,10 @@ rb_eval_string(
 
   %newobject get_decision;
   Decision *get_decision(XSolvable *s) {
-    Id info, p;
-    int reason;
+    Id info;
     int lvl = solver_get_decisionlevel($self, s->id);
-    if (!lvl)
-      return 0;
-    p = lvl > 0 ? s->id : -s->id;
-    reason = solver_describe_decision($self, p, &info);
+    Id p = lvl > 0 ? s->id : -s->id;
+    int reason = solver_describe_decision($self, p, &info);
     return new_Decision($self, p, reason, info);
   }
 
