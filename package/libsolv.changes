@@ -1,4 +1,20 @@
 -------------------------------------------------------------------
+Tue Dec 13 11:47:50 CET 2022 - mls@suse.de
+
+- fix "keep installed" jobs not disabling "best update" rules
+- do not autouninstall suse ptf packages
+- ensure duplinvolvedmap_all is reset when a solver is reused
+- special case file dependencies in the testcase writer
+- support stringification of multiple solvables
+- new weakdep introspection interface similar to ruleinfos
+- support decision reason queries
+- support merging of related decissions
+- support stringification of ruleinfo, decisioninfo and decision reasons
+- support better info about alternatives
+- new '-P' and '-W' options for testsolv
+- bump version to 0.7.23
+
+-------------------------------------------------------------------
 Mon Mar 21 10:05:32 CET 2022 - mls@suse.de
 
 - reworked choice rule generation to cover more usecases

@@ -1,6 +1,31 @@
 
 This file contains the major changes between libsolv versions:
 
+Version 0.7.23
+- selected bug fixes:
+  * fix "keep installed" jobs not disabling "best update" rules
+  * do not autouninstall suse ptf packages
+  * ensure duplinvolvedmap_all is reset when a solver is reused
+  * special case file dependencies in the testcase writer
+- new features:
+  * support stringification of multiple solvables
+    new function: pool_solvidset2str
+  * new weakdep introspection interface similar to ruleinfos
+    new functions: solver_weakdepinfo, solver_allweakdepinfos
+  * support decision reason queries
+    new functions: solver_get_decisionlist, solver_get_decisionlist_multiple,
+                   solver_get_learnt
+  * support merging of related decissions
+    new functions: solver_decisionlist_solvables, solver_decisionlist_merged,
+                   solver_calc_decisioninfo_bits, solver_merge_decisioninfo_bits
+  * support stringification of ruleinfo, decisioninfo and decision reasons
+    new functions: solver_ruleinfo2str, solver_decisioninfo2str,
+                   solver_decisionreason2str, solver_reason2str
+  * support better info about alternatives
+    new function: solver_alternativeinfo()
+  * new '-P' and '-W' options for testsolv to show proofs and
+    decision reasons
+    
 Version 0.7.22
 - selected bug fixes:
   * reworked choice rule generation to cover more usecases
