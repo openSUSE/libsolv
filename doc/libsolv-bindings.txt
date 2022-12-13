@@ -2664,21 +2664,13 @@ Return the transaction to implement the calculated package changes. A transactio
 is available even if problems were found, this is useful for interactive user
 interfaces that show both the job result and the problems.
 
-	int reason = describe_decision(Solvable *s, Rule *OUTPUT)
-	my ($reason, $rule) = $solver->describe_decision($solvable);
-	(reason, rule) = solver.describe_decision(solvable)
-	(reason, rule) = solver.describe_decision(solvable)
-
-Return the reason why a specific solvable was installed or erased. For most of
-the reasons the rule that triggered the decision is also returned.
-
 	Solvable *get_recommended(bool noselected=0)
 	my @solvables = $solver->get_recommended();
 	solvables = solver.get_recommended()
 	solvables = solver.get_recommended()
 
 Return all solvables that are recommended by the solver run result. This includes
-solvables included in the result, set noselected if you want to filter those.
+solvables included in the result; set noselected if you want to filter those.
 
 	Solvable *get_suggested(bool noselected=0)
 	my @solvables = $solver->get_suggested();
@@ -2686,7 +2678,15 @@ solvables included in the result, set noselected if you want to filter those.
 	solvables = solver.get_suggested()
 
 Return all solvables that are suggested by the solver run result. This includes
-solvables included in the result, set noselected if you want to filter those.
+solvables included in the result; set noselected if you want to filter those.
+
+	Decision = get_decision(Solvable *s)
+	my $decision = $solver->get_decision($solvable);
+	decision = solver.get_decision(solvable);
+	decision = solver.get_decision(solvable);
+
+Return a decision object that describes why a specific solvable was installed or erased.
+See the Decision class for more information.
 
 	Decision *get_decisionlist(Solvable *s)
 	my @decisions = $solver->get_decisionlist($solvable);
@@ -2694,7 +2694,7 @@ solvables included in the result, set noselected if you want to filter those.
 	decisions = solver.get_decisionlist(solvable)
 
 Return a list of decisions that caused the specific solvable to be installed or
-erased. This is usually more useful than the describe_decision() method, as it
+erased. This is usually more useful than the get_decision() method, as it
 returns every involved decision instead of just a single one.
 
 	Alternative *alternatives()

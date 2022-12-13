@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 12/12/2022
+.\"      Date: 12/13/2022
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "12/12/2022" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "12/13/2022" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -4339,21 +4339,6 @@ Return the transaction to implement the calculated package changes\&. A transact
 .RS 4
 .\}
 .nf
-\fBint\fR \fIreason\fR \fB= describe_decision(Solvable *\fR\fIs\fR\fB, Rule *\fR\fIOUTPUT\fR\fB)\fR
-my \fB(\fR\fI$reason\fR\fB,\fR \fI$rule\fR\fB) =\fR \fI$solver\fR\fB\->describe_decision(\fR\fI$solvable\fR\fB)\fR;
-\fB(\fR\fIreason\fR\fB,\fR \fIrule\fR\fB) =\fR \fIsolver\fR\fB\&.describe_decision(\fR\fIsolvable\fR\fB)\fR
-\fB(\fR\fIreason\fR\fB,\fR \fIrule\fR\fB) =\fR \fIsolver\fR\fB\&.describe_decision(\fR\fIsolvable\fR\fB)\fR
-.fi
-.if n \{\
-.RE
-.\}
-.sp
-Return the reason why a specific solvable was installed or erased\&. For most of the reasons the rule that triggered the decision is also returned\&.
-.sp
-.if n \{\
-.RS 4
-.\}
-.nf
 \fBSolvable *get_recommended(bool\fR \fInoselected\fR\fB=0)\fR
 my \fI@solvables\fR \fB=\fR \fI$solver\fR\fB\->get_recommended()\fR;
 \fIsolvables\fR \fB=\fR \fIsolver\fR\fB\&.get_recommended()\fR
@@ -4363,7 +4348,7 @@ my \fI@solvables\fR \fB=\fR \fI$solver\fR\fB\->get_recommended()\fR;
 .RE
 .\}
 .sp
-Return all solvables that are recommended by the solver run result\&. This includes solvables included in the result, set noselected if you want to filter those\&.
+Return all solvables that are recommended by the solver run result\&. This includes solvables included in the result; set noselected if you want to filter those\&.
 .sp
 .if n \{\
 .RS 4
@@ -4378,7 +4363,22 @@ my \fI@solvables\fR \fB=\fR \fI$solver\fR\fB\->get_suggested()\fR;
 .RE
 .\}
 .sp
-Return all solvables that are suggested by the solver run result\&. This includes solvables included in the result, set noselected if you want to filter those\&.
+Return all solvables that are suggested by the solver run result\&. This includes solvables included in the result; set noselected if you want to filter those\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fIDecision\fR \fB= get_decision(Solvable *\fR\fIs\fR\fB)\fR
+my \fI$decision\fR \fB=\fR \fI$solver\fR\fB\->get_decision(\fR\fI$solvable\fR\fB)\fR;
+\fIdecision\fR \fB=\fR \fIsolver\fR\fB\&.get_decision(\fR\fIsolvable\fR\fB)\fR;
+\fIdecision\fR \fB=\fR \fIsolver\fR\fB\&.get_decision(\fR\fIsolvable\fR\fB)\fR;
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return a decision object that describes why a specific solvable was installed or erased\&. See the Decision class for more information\&.
 .sp
 .if n \{\
 .RS 4
@@ -4393,7 +4393,7 @@ my \fI@decisions\fR \fB=\fR \fI$solver\fR\fB\->get_decisionlist(\fR\fI$solvable\
 .RE
 .\}
 .sp
-Return a list of decisions that caused the specific solvable to be installed or erased\&. This is usually more useful than the describe_decision() method, as it returns every involved decision instead of just a single one\&.
+Return a list of decisions that caused the specific solvable to be installed or erased\&. This is usually more useful than the get_decision() method, as it returns every involved decision instead of just a single one\&.
 .sp
 .if n \{\
 .RS 4
