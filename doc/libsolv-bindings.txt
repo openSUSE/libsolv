@@ -3440,7 +3440,10 @@ Create a checksum object. Currently the following types are supported:
 
 	REPOKEY_TYPE_MD5
 	REPOKEY_TYPE_SHA1
+	REPOKEY_TYPE_SHA224
 	REPOKEY_TYPE_SHA256
+	REPOKEY_TYPE_SHA384
+	REPOKEY_TYPE_SHA512
 
 These keys are constants in the *solv* class.
 
