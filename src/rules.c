@@ -2485,6 +2485,20 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
 	return;
       /* now the hard part: disable some update rules */
 
+      /* if the job asks for a single solvable to stay, disable the update rule */
+      if (select == SOLVER_SOLVABLE && pool->solvables[what].repo == installed && solv->bestrules_info)
+        if ((set & (SOLVER_SETEVR | SOLVER_SETARCH | SOLVER_SETVENDOR)) == (SOLVER_SETEVR | SOLVER_SETARCH | SOLVER_SETVENDOR))
+	  {
+	    int ni = solv->bestrules_end - solv->bestrules;
+	    for (i = solv->bestrules_up - solv->bestrules; i < ni; i++)
+	      if (solv->bestrules_info[i] == what)
+		{
+	          queue_push2(q, DISABLE_UPDATE, what);		/* will also disable the best rule */
+		  break;
+		}
+	    return;
+	  }
+
       /* first check if we have installed or multiversion packages in the job */
       FOR_JOB_SELECT(p, pp, select, what)
 	{
