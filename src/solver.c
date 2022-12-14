@@ -4708,6 +4708,59 @@ solver_get_alternative(Solver *solv, Id alternative, Id *idp, Id *fromp, Id *cho
   return elements[-4] ? SOLVER_ALTERNATIVE_TYPE_RECOMMENDS : SOLVER_ALTERNATIVE_TYPE_RULE;
 }
 
+static int
+find_alternative_rule_from_learnt_rec(Solver *solv, int rid, Map *m, int cnt)
+{
+  Pool *pool = solv->pool;
+  int why = solv->learnt_why.elements[rid - solv->learntrules];
+  while ((rid = solv->learnt_pool.elements[why++]) != 0)
+    {
+      Rule *r = solv->rules + rid;
+      Id p, pp;
+      int c;
+      if (rid >= solv->learntrules)
+	{
+	  if ((rid = find_alternative_rule_from_learnt_rec(solv, rid, m, cnt)))
+	    return rid;
+	  continue;
+	}
+      c = 0;
+      FOR_RULELITERALS(p, pp, r)
+	if (p > 0 && MAPTST(m, p))
+	  c++;
+      if (c == cnt)	/* all bits hit */
+	return rid;
+    }
+  return 0;
+}
+
+static int
+find_alternative_rule_from_learnt(Solver *solv, int rid)
+{
+  Pool *pool = solv->pool;
+  Map m;
+  int i, count, cnt;
+  Id *elements = solv->branches.elements;
+
+  /* find alternative by rule id */
+  for (count = solv->branches.count; count; count -= elements[count - 2])
+    if (elements[count - 4] == 0 && elements[count - 3] == rid)
+      break;
+  if (!count)
+    return 0;
+  map_init(&m, pool->nsolvables);
+  cnt = 0;
+  for (i = count - elements[count - 2]; i < count - 4; i++)
+    if (elements[i] > 0)
+      {
+        MAPSET(&m, elements[i]);
+        cnt++;
+      }
+  rid = find_alternative_rule_from_learnt_rec(solv, rid, &m, cnt);
+  map_free(&m);
+  return rid;
+}
+
 int
 solver_alternativeinfo(Solver *solv, int type, Id id, Id from, Id *fromp, Id *top, Id *depp)
 {
@@ -4728,6 +4781,13 @@ solver_alternativeinfo(Solver *solv, int type, Id id, Id from, Id *fromp, Id *to
   else if (type == SOLVER_ALTERNATIVE_TYPE_RULE)
     {
       int rclass = solver_ruleclass(solv, id);
+      if (rclass == SOLVER_RULE_LEARNT)
+	{
+	  id = find_alternative_rule_from_learnt(solv, id);
+	  if (!id)
+	    return SOLVER_RULE_LEARNT;
+          rclass = solver_ruleclass(solv, id);
+	}
       if (rclass == SOLVER_RULE_CHOICE || rclass == SOLVER_RULE_RECOMMENDS)
 	id = solver_rule2pkgrule(solv, id);
       else if (rclass == SOLVER_RULE_BEST)
@@ -4741,11 +4801,6 @@ solver_alternativeinfo(Solver *solv, int type, Id id, Id from, Id *fromp, Id *to
 	      return SOLVER_RULE_UPDATE;
 	    }
 	  id = -info;		/* best job, delegate to job rule */
-	}
-      else if (rclass == SOLVER_RULE_LEARNT)
-	{
-	  /* XXX: deconstruct learnt rules */
-	  return SOLVER_RULE_LEARNT;
 	}
       return solver_ruleinfo(solv, id, fromp, top, depp);
     }
