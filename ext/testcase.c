@@ -1558,59 +1558,20 @@ testcase_solverresult(Solver *solv, int resultflags)
     }
   if ((resultflags & TESTCASE_RESULT_ALTERNATIVES) != 0)
     {
-      char *altprefix;
-      Queue q, rq;
+      Queue q;
       int cnt;
       Id alternative;
       queue_init(&q);
-      queue_init(&rq);
       cnt = solver_alternatives_count(solv);
       for (alternative = 1; alternative <= cnt; alternative++)
 	{
 	  Id id, from, chosen;
-	  char num[20];
+	  char num[20], *s;
 	  int type = solver_get_alternative(solv, alternative, &id, &from, &chosen, &q, 0);
-	  altprefix = solv_dupjoin("alternative ", testcase_alternativeid(solv, type, id, from), " ");
+	  char *altprefix = solv_dupjoin("alternative ", testcase_alternativeid(solv, type, id, from), " ");
 	  strcpy(num, " 0 ");
-	  if (type == SOLVER_ALTERNATIVE_TYPE_RECOMMENDS)
-	    {
-	      char *s = pool_tmpjoin(pool, altprefix, num, testcase_solvid2str(pool, from));
-	      s = pool_tmpappend(pool, s, " recommends ", testcase_dep2str(pool, id));
-	      strqueue_push(&sq, s);
-	    }
-	  else if (type == SOLVER_ALTERNATIVE_TYPE_RULE)
-	    {
-	      /* map choice rules back to pkg rules */
-	      if (solver_ruleclass(solv, id) == SOLVER_RULE_CHOICE)
-		id = solver_rule2pkgrule(solv, id);
-	      if (solver_ruleclass(solv, id) == SOLVER_RULE_RECOMMENDS)
-		id = solver_rule2pkgrule(solv, id);
-	      solver_allruleinfos(solv, id, &rq);
-	      for (i = 0; i < rq.count; i += 4)
-		{
-		  int rtype = rq.elements[i];
-		  if ((rtype & SOLVER_RULE_TYPEMASK) == SOLVER_RULE_JOB)
-		    {
-		      const char *js = testcase_job2str(pool, rq.elements[i + 2], rq.elements[i + 3]);
-		      char *s = pool_tmpjoin(pool, altprefix, num, "job ");
-		      s = pool_tmpappend(pool, s, js, 0);
-		      strqueue_push(&sq, s);
-		    }
-		  else if (rtype == SOLVER_RULE_PKG_REQUIRES)
-		    {
-		      char *s = pool_tmpjoin(pool, altprefix, num, testcase_solvid2str(pool, rq.elements[i + 1]));
-		      s = pool_tmpappend(pool, s, " requires ", testcase_dep2str(pool, rq.elements[i + 3]));
-		      strqueue_push(&sq, s);
-		    }
-		  else if (rtype == SOLVER_RULE_UPDATE || rtype == SOLVER_RULE_FEATURE)
-		    {
-		      const char *js = testcase_solvid2str(pool, rq.elements[i + 1]);
-		      char *s = pool_tmpjoin(pool, altprefix, num, "update ");
-		      s = pool_tmpappend(pool, s, js, 0);
-		      strqueue_push(&sq, s);
-		    }
-		}
-	    }
+          s = pool_tmpjoin(pool, altprefix, num, solver_alternative2str(solv, type, id, from));
+	  strqueue_push(&sq, s);
 	  for (i = 0; i < q.count; i++)
 	    {
 	      Id p = q.elements[i];
@@ -1629,7 +1590,6 @@ testcase_solverresult(Solver *solv, int resultflags)
 	  solv_free(altprefix);
 	}
       queue_free(&q);
-      queue_free(&rq);
     }
   if ((resultflags & TESTCASE_RESULT_RULES) != 0)
     {
