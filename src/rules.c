@@ -659,8 +659,12 @@ add_complex_deprules(Solver *solv, Id p, Id dep, int type, int dontfix, Queue *w
 	      int oldcount = solv->ruleinfoq->count;
 	      addpkgrule(solv, qele[0], 0, d, type, dep);
 	      /* fixup from element of ruleinfo */
-	      if (solv->ruleinfoq->count > oldcount)
-		solv->ruleinfoq->elements[oldcount + 1] = p;
+	      if (solv->ruleinfoq->count > oldcount && solv->ruleinfoq->elements[oldcount + 1] != p)
+		{
+		  if (solv->ruleinfoq->elements[oldcount + 2])
+		    solv->ruleinfoq->elements[oldcount + 2] = solv->ruleinfoq->elements[oldcount + 1];
+		  solv->ruleinfoq->elements[oldcount + 1] = p;
+		}
 	    }
 	  else
 	    addpkgrule(solv, qele[0], 0, d, type, dep);
