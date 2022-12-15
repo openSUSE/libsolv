@@ -18,7 +18,7 @@ result transaction,problems <inline>
 nextjob
 solverflags yumobsoletes
 job update all packages
-result transaction,problems <inline>
+result transaction,problems,alternatives <inline>
 #>erase c-27-1.x86_64@system d-28-1.x86_64@available
 #>install d-28-1.x86_64@available
 #>install e-28-1.x86_64@available

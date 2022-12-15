@@ -1242,6 +1242,37 @@ takebranch(Solver *solv, int pos, int end, const char *msg, int disablerules)
   return setpropagatelearn(solv, level, p, disablerules, why, reason);
 }
 
+static void
+prune_yumobs(Solver *solv, Queue *dq, Id ruleid)
+{
+  Pool *pool = solv->pool;
+  Rule *r;
+  Map m;
+  int i, rid;
+  Id pp, p2, p = dq->elements[0];
+
+  if (!pool->solvables[p].obsoletes)
+    return;
+  map_init(&m, 0);
+  for (rid = solv->yumobsrules, r = solv->rules + rid; rid < solv->yumobsrules_end; rid++, r++)
+    {
+      if (r->p != -p)
+	continue;
+      if (!m.size)
+	map_grow(&m, pool->nsolvables);
+      FOR_RULELITERALS(p2, pp, r)
+	if (p2 > 0)
+	  MAPSET(&m, p2);
+    }
+  for (i = 1; i < dq->count; i++)
+    if (!MAPTST(&m, dq->elements[i]))
+      break;
+  map_free(&m);
+  if (i == dq->count)
+    dq->count = 1;
+}
+
+
 /*-------------------------------------------------------------------
  *
  * select and install
@@ -1265,6 +1296,9 @@ selectandinstall(Solver *solv, int level, Queue *dq, int disablerules, Id ruleid
    * do some special supplements ordering */
   if (dq->count > 1 && solv->do_extra_reordering)
     reorder_dq_for_future_installed(solv, level, dq);
+  /* check if the candidates are all connected via yumobs rules */
+  if (dq->count > 1 && solv->yumobsrules_end > solv->yumobsrules)
+    prune_yumobs(solv, dq, ruleid);
   /* if we have multiple candidates we open a branch */
   if (dq->count > 1)
     createbranch(solv, level, dq, 0, ruleid);
