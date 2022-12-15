@@ -4111,7 +4111,7 @@ for (j = 0; j < qq.count; j++)
 
       if (!qq.count)
 	continue;
-      /* at least two goups, build rules */
+      /* at least two groups, build rules */
       group = 0;
       for (j = 0; j < qq.count; j++)
 	{
