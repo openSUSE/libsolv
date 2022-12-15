@@ -1,6 +1,7 @@
 ### or in CC1
 ####>=Con: CC2 <UNLESS> (A1 | A2 | A3)
-
+###
+feature complex_deps
 repo system 0 empty
 repo test 0 testtags <inline>
 #>=Pkg: Q 1 1 noarch
@@ -29,7 +30,7 @@ repo test 0 testtags <inline>
 #>=Req: CC2
 #>=Pkg: A 1 1 noarch
 #>=Req: C = 2-2
-system unset * system
+system unset rpm system
 job install name Q
 result transaction,problems,alternatives <inline>
 #>alternative d80be72d  0 ((A1 or A2 or A3) if CC1), required by CC2-1-1.noarch
