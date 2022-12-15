@@ -3,7 +3,7 @@ repo system 0 testtags <inline>
 repo test 0 testtags <inline>
 #>=Pkg: X 2 1 noarch
 #>=Pkg: B 1 1 noarch
-#>=Obs: X = 1
+#>=Obs: X = 1-1
 system unset * system
 job update all packages
 result transaction,problems,alternatives <inline>
