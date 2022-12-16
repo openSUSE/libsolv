@@ -1121,10 +1121,25 @@ setpropagatelearn(Solver *solv, int level, Id decision, int disablerules, Id rul
 }
 
 static void
+queue_prunezeros(Queue *q)
+{
+  int i, j;
+  for (i = 0; i < q->count; i++)
+    if (q->elements[i] == 0)
+      break;
+  if (i == q->count)
+    return;
+  for (j = i++; i < q->count; i++)
+    if (q->elements[i])
+      q->elements[j++] = q->elements[i];
+  queue_truncate(q, j);
+}
+
+static void
 reorder_dq_for_future_installed(Solver *solv, int level, Queue *dq)
 {
   Pool *pool = solv->pool;
-  int i, j, haveone = 0, dqcount = dq->count;
+  int i, haveone = 0, dqcount = dq->count;
   int decisionqcount = solv->decisionq.count;
   Id p;
   Solvable *s;
@@ -1165,10 +1180,7 @@ reorder_dq_for_future_installed(Solver *solv, int level, Queue *dq)
 	  dq->elements[i] = 0;
         }
     }
-  for (i = j = 0; i < dq->count; i++)
-    if (dq->elements[i])
-      dq->elements[j++] = dq->elements[i];
-  queue_truncate(dq, j);
+  queue_prunezeros(dq);
   FOR_REPO_SOLVABLES(solv->installed, p, s)
     if (solv->decisionmap[p] == level + 1)
       solv->decisionmap[p] = 0;
@@ -1248,28 +1260,37 @@ prune_yumobs(Solver *solv, Queue *dq, Id ruleid)
   Pool *pool = solv->pool;
   Rule *r;
   Map m;
-  int i, rid;
-  Id pp, p2, p = dq->elements[0];
+  int i, j, rid;
 
-  if (!pool->solvables[p].obsoletes)
-    return;
   map_init(&m, 0);
-  for (rid = solv->yumobsrules, r = solv->rules + rid; rid < solv->yumobsrules_end; rid++, r++)
+  for (i = 0; i < dq->count - 1; i++)
     {
-      if (r->p != -p)
+      Id p2, pp, p = dq->elements[i];
+      if (!p || !pool->solvables[p].obsoletes)
+        continue;
+      for (rid = solv->yumobsrules, r = solv->rules + rid; rid < solv->yumobsrules_end; rid++, r++)
+	if (r->p == -p)
+	  break;
+      if (rid == solv->yumobsrules_end)
 	continue;
       if (!m.size)
 	map_grow(&m, pool->nsolvables);
-      FOR_RULELITERALS(p2, pp, r)
-	if (p2 > 0)
-	  MAPSET(&m, p2);
+      else
+	MAPZERO(&m);
+      for (; rid < solv->yumobsrules_end; rid++, r++)
+	{
+	  if (r->p != -p)
+	    continue;
+	  FOR_RULELITERALS(p2, pp, r)
+	    if (p2 > 0)
+	      MAPSET(&m, p2);
+	}
+      for (j = i + 1; j < dq->count; j++)
+	if (MAPTST(&m, dq->elements[j]))
+	  dq->elements[j] = 0;
     }
-  for (i = 1; i < dq->count; i++)
-    if (!MAPTST(&m, dq->elements[i]))
-      break;
   map_free(&m);
-  if (i == dq->count)
-    dq->count = 1;
+  queue_prunezeros(dq);
 }
 
 
