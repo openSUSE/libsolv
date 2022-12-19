@@ -1628,11 +1628,11 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
 	    {
 	      FOR_PROVIDES(p2, pp2, obs)   /* and all matching providers of the obsoletes */
 		{
-		  Solvable *ps2 = pool->solvables + p2;
-		  if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, ps2, obs))
+		  if (p2 != n)
 		    continue;
-		  if (p2 == n)		/* match ! */
-		    break;
+		  if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, s, obs))
+		    continue;
+		  break;
 		}
 	      if (p2)			/* match! */
 		break;
