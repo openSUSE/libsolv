@@ -1461,7 +1461,7 @@ pool_whatmatchesdep(Pool *pool, Id keyname, Id dep, Queue *q, int marker)
     {
       Id pp;
       FOR_PROVIDES(p, pp, dep)
-        if (pool_match_dep(pool, p, dep))
+        if (pool_match_nevr(pool, pool->solvables + p, dep))
 	  queue_push(q, p);
       return;
     }
