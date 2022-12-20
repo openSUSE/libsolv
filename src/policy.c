@@ -1511,7 +1511,7 @@ policy_create_obsolete_index(Solver *solv)
 	{
 	  FOR_PROVIDES(p, pp, obs)
 	    {
-	      Solvable *ps = pool->solvables + p;;
+	      Solvable *ps = pool->solvables + p;
 	      if (ps->repo != installed)
 		continue;
 	      if (ps->name == s->name)
@@ -1545,7 +1545,7 @@ policy_create_obsolete_index(Solver *solv)
 	{
 	  FOR_PROVIDES(p, pp, obs)
 	    {
-	      Solvable *ps = pool->solvables + p;;
+	      Solvable *ps = pool->solvables + p;
 	      if (ps->repo != installed)
 		continue;
 	      if (ps->name == s->name)
@@ -1562,6 +1562,29 @@ policy_create_obsolete_index(Solver *solv)
 }
 
 
+/* return true if solvable s obsoletes solvable with id pi */
+static inline int
+is_obsoleting(Pool *pool, Solvable *s, Id pi)
+{
+  Id p, pp, obs, *obsp;
+  Solvable *si = pool->solvables + pi;
+  if (pool->obsoleteusescolors && !pool_colormatch(pool, si, s))
+    return 0;
+  obsp = s->repo->idarraydata + s->obsoletes;
+  while ((obs = *obsp++) != 0)	/* for all obsoletes */
+    {
+      FOR_PROVIDES(p, pp, obs)   /* and all matching providers of the obsoletes */
+	{
+	  if (p != pi)
+	    continue;
+	  if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, si, obs))
+	    continue;
+	  return 1;
+	}
+    }
+  return 0;
+}
+
 /*
  * find update candidates
  *
@@ -1576,8 +1599,7 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
 {
   /* installed packages get a special upgrade allowed rule */
   Pool *pool = solv->pool;
-  Id p, pp, n, p2, pp2;
-  Id obs, *obsp;
+  Id p, pp, n;
   Solvable *ps;
   int haveprovobs = 0;
   int allowdowngrade = allow_all ? 1 : solv->allowdowngrade;
@@ -1618,31 +1640,14 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
 	continue;
       else if ((!solv->noupdateprovide || solv->needupdateprovide) && ps->obsoletes)   /* provides/obsoletes combination ? */
 	{
-	  /* check if package ps obsoletes installed package s */
+	  /* check if package ps that provides s->name obsoletes installed package s */
 	  /* implicitobsoleteusescolors is somewhat wrong here, but we nevertheless
 	   * use it to limit our update candidates */
-	  if ((pool->obsoleteusescolors || pool->implicitobsoleteusescolors) && !pool_colormatch(pool, s, ps))
+	  if (pool->implicitobsoleteusescolors && !pool_colormatch(pool, s, ps))
 	    continue;
-	  obsp = ps->repo->idarraydata + ps->obsoletes;
-	  while ((obs = *obsp++) != 0)	/* for all obsoletes */
-	    {
-	      FOR_PROVIDES(p2, pp2, obs)   /* and all matching providers of the obsoletes */
-		{
-		  if (p2 != n)
-		    continue;
-		  if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, s, obs))
-		    continue;
-		  break;
-		}
-	      if (p2)			/* match! */
-		break;
-	    }
-	  if (!obs)			/* continue if no match */
+	  if (!is_obsoleting(pool, ps, n))
 	    continue;
-	  /* here we have 'p' with a matching provides/obsoletes combination
-	   * thus flagging p as a valid update candidate for s
-	   */
-	  haveprovobs = 1;
+	  haveprovobs = 1;		/* have matching provides/obsoletes combination */
 	}
       else
         continue;
@@ -1664,13 +1669,13 @@ policy_findupdatepackages(Solver *solv, Solvable *s, Queue *qs, int allow_all)
       for (opp = solv->obsoletes_data + solv->obsoletes[n - solv->installed->start]; (p = *opp++) != 0;)
 	{
 	  ps = pool->solvables + p;
-	  if (!allowarchchange && s->arch != ps->arch && policy_illegal_archchange(solv, s, ps))
-	    continue;
-	  if (!allowvendorchange && s->vendor != ps->vendor && policy_illegal_vendorchange(solv, s, ps))
-	    continue;
 	  /* implicitobsoleteusescolors is somewhat wrong here, but we nevertheless
 	   * use it to limit our update candidates */
 	  if (pool->implicitobsoleteusescolors && !pool_colormatch(pool, s, ps))
+	    continue;
+	  if (!allowarchchange && s->arch != ps->arch && policy_illegal_archchange(solv, s, ps))
+	    continue;
+	  if (!allowvendorchange && s->vendor != ps->vendor && policy_illegal_vendorchange(solv, s, ps))
 	    continue;
 	  queue_push(qs, p);
 	}
