@@ -293,7 +293,7 @@ main(int argc, char **argv)
   char *rootdir = 0;
   char *keyname = 0;
   int keyname_depstr = 0;
-  int keyname_alldeps = 0;		/* dnf repoquesy --alldeps */
+  int keyname_alldeps = 0;		/* dnf repoquery --alldeps */
   int debuglevel = 0;
   int answer, acnt = 0;
   char *testcase = 0;
@@ -385,7 +385,7 @@ main(int argc, char **argv)
 	}
       else if (argc > 1 && !strcmp(argv[1], "--alldeps"))
 	{
-	  keyname_alldeps = 1;		/* dnf repoquesy --alldeps */
+	  keyname_alldeps = 1;		/* dnf repoquery --alldeps */
 	  argc--;
 	  argv++;
 	}
