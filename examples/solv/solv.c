@@ -788,16 +788,7 @@ rerunsolver:
       for (problem = 1; problem <= pcnt; problem++)
 	{
 	  int take = 0;
-	  Id rid;
-	  printf("Problem %d/%d:\n", problem, pcnt);
-	  rid = solver_findproblemrule(solv, problem);
-	  if (rid)
-	    {
-	      Id source, target, dep;
-	      SolverRuleinfo type = solver_ruleinfo(solv, rid, &source, &target, &dep);
-	      printf("%s\n", solver_problemruleinfo2str(solv, type, source, target, dep));
-	    }
-	  printf("\n");
+	  printf("Problem %d/%d:\n%s\n\n", problem, pcnt, solver_problem2str(solv, problem));
 	  scnt = solver_solution_count(solv, problem);
 	  for (solution = 1; solution <= scnt; solution++)
 	    {
