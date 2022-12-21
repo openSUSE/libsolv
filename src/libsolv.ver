@@ -342,6 +342,7 @@ SOLV_1.0 {
 		solvable_trivial_installable_queue;
 		solvable_trivial_installable_repo;
 		solvable_unset;
+		solver_all_solutionelements;
 		solver_allruleinfos;
 		solver_allweakdepinfos;
 		solver_alternative2str;
@@ -414,6 +415,7 @@ SOLV_1.0 {
 		solver_set_flag;
 		solver_solution_count;
 		solver_solutionelement2str;
+		solver_solutionelementtype2str;
 		solver_solutionelement_count;
 		solver_solutionelement_internalid;
 		solver_solutionelement_extrajobflags;

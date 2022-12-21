@@ -788,14 +788,26 @@ rerunsolver:
       for (problem = 1; problem <= pcnt; problem++)
 	{
 	  int take = 0;
+	  Id rid;
 	  printf("Problem %d/%d:\n", problem, pcnt);
-	  solver_printprobleminfo(solv, problem);
+	  rid = solver_findproblemrule(solv, problem);
+	  if (rid)
+	    {
+	      Id source, target, dep;
+	      SolverRuleinfo type = solver_ruleinfo(solv, rid, &source, &target, &dep);
+	      printf("%s\n", solver_problemruleinfo2str(solv, type, source, target, dep));
+	    }
 	  printf("\n");
 	  scnt = solver_solution_count(solv, problem);
 	  for (solution = 1; solution <= scnt; solution++)
 	    {
+	      Queue sq;
 	      printf("Solution %d:\n", solution);
-	      solver_printsolution(solv, problem, solution);
+	      queue_init(&sq);
+	      solver_all_solutionelements(solv, problem, solution, 1, &sq);
+	      for (i = 0; i < sq.count; i += 3)
+		printf("  - %s\n", solver_solutionelementtype2str(solv, sq.elements[i], sq.elements[i + 1], sq.elements[i + 2]));
+	      queue_free(&sq);
 	      printf("\n");
 	    }
 	  for (;;)

@@ -22,6 +22,7 @@
 #include "pool.h"
 #include "util.h"
 #include "evr.h"
+#include "policy.h"
 #include "solverdebug.h"
 
 /**********************************************************************************/
@@ -986,6 +987,7 @@ solver_solutionelement_internalid(Solver *solv, Id problem, Id solution)
   return solv->solutions.elements[solidx + 2 * solv->solutions.elements[solidx] + 3];
 }
 
+/* currently just SOLVER_CLEANDEPS */
 Id
 solver_solutionelement_extrajobflags(Solver *solv, Id problem, Id solution)
 {
@@ -1040,6 +1042,56 @@ solver_next_solutionelement(Solver *solv, Id problem, Id solution, Id element, I
   return element + 1;
 }
 
+static inline void
+queue_push3(Queue *q, Id id1, Id id2, Id id3)
+{
+  queue_push(q, id1);
+  queue_push2(q, id2, id3);
+}
+
+static void
+add_expanded_replace(Solver *solv, Id p, Id rp, Queue *q)
+{
+  int illegal = policy_is_illegal(solv, solv->pool->solvables + p, solv->pool->solvables + rp, 0);
+  if ((illegal & POLICY_ILLEGAL_DOWNGRADE) != 0)
+    queue_push3(q, SOLVER_SOLUTION_REPLACE_DOWNGRADE, p, rp);
+  if ((illegal & POLICY_ILLEGAL_ARCHCHANGE) != 0)
+    queue_push3(q, SOLVER_SOLUTION_REPLACE_ARCHCHANGE, p, rp);
+  if ((illegal & POLICY_ILLEGAL_VENDORCHANGE) != 0)
+    queue_push3(q, SOLVER_SOLUTION_REPLACE_VENDORCHANGE, p, rp);
+  if ((illegal & POLICY_ILLEGAL_NAMECHANGE) != 0)
+    queue_push3(q, SOLVER_SOLUTION_REPLACE_NAMECHANGE, p, rp);
+  if (!illegal || (illegal & ~(POLICY_ILLEGAL_DOWNGRADE | POLICY_ILLEGAL_ARCHCHANGE | POLICY_ILLEGAL_VENDORCHANGE | POLICY_ILLEGAL_NAMECHANGE)))
+    queue_push3(q, SOLVER_SOLUTION_REPLACE, p, rp);
+}
+
+/* solutionelements are (type, p, rp) triplets */
+void
+solver_all_solutionelements(Solver *solv, Id problem, Id solution, int expandreplaces, Queue *q)
+{
+  int i, cnt;
+  Id solidx = solv->problems.elements[problem * 2 - 1];
+  solidx = solv->solutions.elements[solidx + solution];
+  queue_empty(q);
+  if (!solidx)
+    return;
+  cnt = solv->solutions.elements[solidx++];
+  for (i = 0; i < cnt; i++)
+    {
+      Id p = solv->solutions.elements[solidx++];
+      Id rp = solv->solutions.elements[solidx++];
+      if (p > 0)
+	{
+	  if (rp && expandreplaces)
+	    add_expanded_replace(solv, p, rp, q);
+	  else
+	    queue_push3(q, rp ? SOLVER_SOLUTION_REPLACE : SOLVER_SOLUTION_ERASE, p, rp);
+	}
+      else
+        queue_push3(q, p, rp, 0);
+    }
+}
+
 void
 solver_take_solutionelement(Solver *solv, Id p, Id rp, Id extrajobflags, Queue *job)
 {
@@ -1056,6 +1108,11 @@ solver_take_solutionelement(Solver *solv, Id p, Id rp, Id extrajobflags, Queue *
       job->elements[rp - 1] = SOLVER_NOOP;
       job->elements[rp] = 0;
       return;
+    }
+  if (p == SOLVER_SOLUTION_ERASE)
+    {
+      p = rp;
+      rp = 0;
     }
   if (rp <= 0 && p <= 0)
     return;	/* just in case */
@@ -1402,62 +1459,66 @@ solver_problem2str(Solver *solv, Id problem)
 }
 
 const char *
-solver_solutionelement2str(Solver *solv, Id p, Id rp)
+solver_solutionelementtype2str(Solver *solv, int type, Id p, Id rp)
 {
   Pool *pool = solv->pool;
-  if (p == SOLVER_SOLUTION_JOB || p == SOLVER_SOLUTION_POOLJOB)
+  Solvable *s;
+  const char *str;
+
+  switch (type)
     {
-      Id how, what;
-      if (p == SOLVER_SOLUTION_JOB)
-	rp += solv->pooljobcnt;
-      how = solv->job.elements[rp - 1];
-      what = solv->job.elements[rp];
-      return pool_tmpjoin(pool, "do not ask to ", pool_job2str(pool, how, what, 0), 0);
-    }
-  else if (p == SOLVER_SOLUTION_INFARCH)
-    {
-      Solvable *s = pool->solvables + rp;
+    case SOLVER_SOLUTION_JOB:
+    case SOLVER_SOLUTION_POOLJOB:
+      if (type == SOLVER_SOLUTION_JOB)
+	p += solv->pooljobcnt;
+      return pool_tmpjoin(pool, "do not ask to ", pool_job2str(pool, solv->job.elements[p - 1], solv->job.elements[p], 0), 0);
+    case SOLVER_SOLUTION_INFARCH:
+      s = pool->solvables + p;
       if (solv->installed && s->repo == solv->installed)
         return pool_tmpjoin(pool, "keep ", pool_solvable2str(pool, s), " despite the inferior architecture");
       else
         return pool_tmpjoin(pool, "install ", pool_solvable2str(pool, s), " despite the inferior architecture");
-    }
-  else if (p == SOLVER_SOLUTION_DISTUPGRADE)
-    {
-      Solvable *s = pool->solvables + rp;
+    case SOLVER_SOLUTION_DISTUPGRADE:
+      s = pool->solvables + p;
       if (solv->installed && s->repo == solv->installed)
         return pool_tmpjoin(pool, "keep obsolete ", pool_solvable2str(pool, s), 0);
       else
         return pool_tmpjoin(pool, "install ", pool_solvable2str(pool, s), " from excluded repository");
-    }
-  else if (p == SOLVER_SOLUTION_BEST)
-    {
-      Solvable *s = pool->solvables + rp;
+    case SOLVER_SOLUTION_BEST:
+      s = pool->solvables + p;
       if (solv->installed && s->repo == solv->installed)
         return pool_tmpjoin(pool, "keep old ", pool_solvable2str(pool, s), 0);
       else
         return pool_tmpjoin(pool, "install ", pool_solvable2str(pool, s), " despite the old version");
+    case SOLVER_SOLUTION_BLACK:
+      return pool_tmpjoin(pool, "install ", pool_solvid2str(pool, p), 0);
+    case SOLVER_SOLUTION_STRICTREPOPRIORITY:
+      return pool_tmpjoin(pool, "install ", pool_solvid2str(pool, p), " despite the repo priority");
+
+    /* replace types: p -> rp */
+    case SOLVER_SOLUTION_ERASE:
+      return pool_tmpjoin(pool, "allow deinstallation of ", pool_solvid2str(pool, p), 0);
+    case SOLVER_SOLUTION_REPLACE:
+      str = pool_tmpjoin(pool, "allow replacement of ", pool_solvid2str(pool, p), 0);
+      return pool_tmpappend(pool, str, " with ", pool_solvid2str(pool, rp));
+    case SOLVER_SOLUTION_REPLACE_DOWNGRADE:
+      return pool_tmpjoin(pool, "allow ", policy_illegal2str(solv, POLICY_ILLEGAL_DOWNGRADE, pool->solvables + p, pool->solvables + rp), 0);
+    case SOLVER_SOLUTION_REPLACE_ARCHCHANGE:
+      return pool_tmpjoin(pool, "allow ", policy_illegal2str(solv, POLICY_ILLEGAL_ARCHCHANGE, pool->solvables + p, pool->solvables + rp), 0);
+    case SOLVER_SOLUTION_REPLACE_VENDORCHANGE:
+      return pool_tmpjoin(pool, "allow ", policy_illegal2str(solv, POLICY_ILLEGAL_VENDORCHANGE, pool->solvables + p, pool->solvables + rp), 0);
+    case SOLVER_SOLUTION_REPLACE_NAMECHANGE:
+      return pool_tmpjoin(pool, "allow ", policy_illegal2str(solv, POLICY_ILLEGAL_NAMECHANGE, pool->solvables + p, pool->solvables + rp), 0);
+    default:
+      break;
     }
-  else if (p == SOLVER_SOLUTION_BLACK)
-    {
-      Solvable *s = pool->solvables + rp;
-      return pool_tmpjoin(pool, "install ", pool_solvable2str(pool, s), 0);
-    }
-  else if (p > 0 && rp == 0)
-    return pool_tmpjoin(pool, "allow deinstallation of ", pool_solvid2str(pool, p), 0);
-  else if (p == SOLVER_SOLUTION_STRICTREPOPRIORITY)
-    {
-      Solvable *s = pool->solvables + rp;
-      return pool_tmpjoin(pool, "install ", pool_solvable2str(pool, s), " despite the repo priority");
-    }
-  else if (p > 0 && rp > 0)
-    {
-      const char *sp = pool_solvid2str(pool, p);
-      const char *srp = pool_solvid2str(pool, rp);
-      const char *str = pool_tmpjoin(pool, "allow replacement of ", sp, 0);
-      return pool_tmpappend(pool, str, " with ", srp);
-    }
-  else
-    return "bad solution element";
+  return "bad solution element";
 }
 
+const char *
+solver_solutionelement2str(Solver *solv, Id p, Id rp)
+{
+  if (p > 0)
+    return solver_solutionelementtype2str(solv, rp ? SOLVER_SOLUTION_REPLACE : SOLVER_SOLUTION_ERASE, p, rp);
+  return solver_solutionelementtype2str(solv, p, rp, 0);
+}

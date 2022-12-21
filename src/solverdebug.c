@@ -505,43 +505,17 @@ solver_printcompleteprobleminfo(Solver *solv, Id problem)
   queue_free(&q);
 }
 
-static int illegals[] = {
-  POLICY_ILLEGAL_DOWNGRADE,
-  POLICY_ILLEGAL_NAMECHANGE,
-  POLICY_ILLEGAL_ARCHCHANGE,
-  POLICY_ILLEGAL_VENDORCHANGE,
-  0
-};
-
 void
 solver_printsolution(Solver *solv, Id problem, Id solution)
 {
   Pool *pool = solv->pool;
-  Id p, rp, element;
-
-  element = 0;
-  while ((element = solver_next_solutionelement(solv, problem, solution, element, &p, &rp)) != 0)
-    {
-      if (p > 0 && rp > 0)
-	{
-	  /* for replacements we want to know why it was illegal */
-	  Solvable *s = pool->solvables + p, *rs = pool->solvables + rp;
-	  int illegal = policy_is_illegal(solv, s, rs, 0);
-	  if (illegal)
-	    {
-	      int i;
-	      for (i = 0; illegals[i]; i++)
-	        if ((illegal & illegals[i]) != 0)
-		  {
-		    POOL_DEBUG(SOLV_DEBUG_RESULT, "  - allow %s\n", policy_illegal2str(solv, illegals[i], s, rs));
-		    illegal ^= illegals[i];
-		  }
-	      if (!illegal)
-	        continue;
-	    }
-	}
-      POOL_DEBUG(SOLV_DEBUG_RESULT, "  - %s\n", solver_solutionelement2str(solv, p, rp));
-    }
+  Queue q;
+  int i;
+  queue_init(&q);
+  solver_all_solutionelements(solv, problem, solution, 1, &q);
+  for (i = 0; i < q.count; i += 3)
+    POOL_DEBUG(SOLV_DEBUG_RESULT, "  - %s\n", solver_solutionelementtype2str(solv, q.elements[i], q.elements[i + 1], q.elements[i + 2]));
+  queue_free(&q);
 }
 
 void

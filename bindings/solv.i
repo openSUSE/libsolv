@@ -773,13 +773,6 @@ typedef int bool;
 #define RARRAY_LEN(ary) (RARRAY(ary)->len)
 #endif
 
-#define SOLVER_SOLUTION_ERASE                   -100
-#define SOLVER_SOLUTION_REPLACE                 -101
-#define SOLVER_SOLUTION_REPLACE_DOWNGRADE       -102
-#define SOLVER_SOLUTION_REPLACE_ARCHCHANGE      -103
-#define SOLVER_SOLUTION_REPLACE_VENDORCHANGE    -104
-#define SOLVER_SOLUTION_REPLACE_NAMECHANGE      -105
-
 typedef void *AppObjectPtr;
 typedef Id DepId;
 
@@ -839,7 +832,6 @@ typedef struct {
   Solver *solv;
   Id problemid;
   Id solutionid;
-  Id id;
 
   Id type;
   Id p;
@@ -1273,7 +1265,6 @@ typedef struct {
   Solver *const solv;
   Id const problemid;
   Id const solutionid;
-  Id const id;
   Id const type;
 } Solutionelement;
 
@@ -1283,7 +1274,7 @@ typedef struct {
   Id const type;
   Id const dep_id;
   Id const chosen_id;
-  int level;
+  int const level;
 } Alternative;
 
 %nodefaultctor Transaction;
@@ -3463,94 +3454,32 @@ returnself(matchsolvable)
   int element_count() {
     return solver_solutionelement_count($self->solv, $self->problemid, $self->id);
   }
-
-  %typemap(out) Queue elements Queue2Array(Solutionelement *, 4, new_Solutionelement(arg1->solv, arg1->problemid, arg1->id, id, idp[1], idp[2], idp[3]));
+  %typemap(out) Queue elements Queue2Array(Solutionelement *, 3, new_Solutionelement(arg1->solv, arg1->problemid, arg1->id, id, idp[1], idp[2]));
   %newobject elements;
   Queue elements(bool expandreplaces=0) {
     Queue q;
-    int i, cnt;
     queue_init(&q);
-    cnt = solver_solutionelement_count($self->solv, $self->problemid, $self->id);
-    for (i = 1; i <= cnt; i++)
-      {
-        Id p, rp, type;
-        solver_next_solutionelement($self->solv, $self->problemid, $self->id, i - 1, &p, &rp);
-        if (p > 0) {
-          type = rp ? SOLVER_SOLUTION_REPLACE : SOLVER_SOLUTION_ERASE;
-        } else {
-          type = p;
-          p = rp;
-          rp = 0;
-        }
-        if (type == SOLVER_SOLUTION_REPLACE && expandreplaces) {
-          int illegal = policy_is_illegal(self->solv, self->solv->pool->solvables + p, self->solv->pool->solvables + rp, 0);
-          if (illegal) {
-            if ((illegal & POLICY_ILLEGAL_DOWNGRADE) != 0) {
-              queue_push2(&q, i, SOLVER_SOLUTION_REPLACE_DOWNGRADE);
-              queue_push2(&q, p, rp);
-            }
-            if ((illegal & POLICY_ILLEGAL_ARCHCHANGE) != 0) {
-              queue_push2(&q, i, SOLVER_SOLUTION_REPLACE_ARCHCHANGE);
-              queue_push2(&q, p, rp);
-            }
-            if ((illegal & POLICY_ILLEGAL_VENDORCHANGE) != 0) {
-              queue_push2(&q, i, SOLVER_SOLUTION_REPLACE_VENDORCHANGE);
-              queue_push2(&q, p, rp);
-            }
-            if ((illegal & POLICY_ILLEGAL_NAMECHANGE) != 0) {
-              queue_push2(&q, i, SOLVER_SOLUTION_REPLACE_NAMECHANGE);
-              queue_push2(&q, p, rp);
-            }
-            continue;
-          }
-        }
-        queue_push2(&q, i, type);
-        queue_push2(&q, p, rp);
-      }
+    solver_all_solutionelements($self->solv, $self->problemid, $self->id, expandreplaces, &q);
     return q;
   }
 }
 
 %extend Solutionelement {
-  Solutionelement(Solver *solv, Id problemid, Id solutionid, Id id, Id type, Id p, Id rp) {
+  Solutionelement(Solver *solv, Id problemid, Id solutionid, Id type, Id p, Id rp) {
     Solutionelement *e;
     e = solv_calloc(1, sizeof(*e));
     e->solv = solv;
     e->problemid = problemid;
     e->solutionid = solutionid;
-    e->id = id;
     e->type = type;
     e->p = p;
     e->rp = rp;
     return e;
   }
   const char *str() {
-    Id p = $self->type;
-    Id rp = $self->p;
-    int illegal = 0;
-    if (p == SOLVER_SOLUTION_ERASE)
-      {
-        p = rp;
-        rp = 0;
-      }
-    else if (p == SOLVER_SOLUTION_REPLACE)
-      {
-        p = rp;
-        rp = $self->rp;
-      }
-    else if (p == SOLVER_SOLUTION_REPLACE_DOWNGRADE)
-      illegal = POLICY_ILLEGAL_DOWNGRADE;
-    else if (p == SOLVER_SOLUTION_REPLACE_ARCHCHANGE)
-      illegal = POLICY_ILLEGAL_ARCHCHANGE;
-    else if (p == SOLVER_SOLUTION_REPLACE_VENDORCHANGE)
-      illegal = POLICY_ILLEGAL_VENDORCHANGE;
-    else if (p == SOLVER_SOLUTION_REPLACE_NAMECHANGE)
-      illegal = POLICY_ILLEGAL_NAMECHANGE;
-    if (illegal)
-      return pool_tmpjoin($self->solv->pool, "allow ", policy_illegal2str($self->solv, illegal, $self->solv->pool->solvables + $self->p, $self->solv->pool->solvables + $self->rp), 0);
-    return solver_solutionelement2str($self->solv, p, rp);
+    return solver_solutionelementtype2str($self->solv, $self->type, $self->p, $self->rp);
   }
-  %typemap(out) Queue replaceelements Queue2Array(Solutionelement *, 1, new_Solutionelement(arg1->solv, arg1->problemid, arg1->solutionid, arg1->id, id, arg1->p, arg1->rp));
+  %typemap(out) Queue replaceelements Queue2Array(Solutionelement *, 1, new_Solutionelement(arg1->solv, arg1->problemid, arg1->solutionid, id, arg1->p, arg1->rp));
   %newobject replaceelements;
   Queue replaceelements() {
     Queue q;
@@ -4375,19 +4304,19 @@ rb_eval_string(
     }
   %}
   Queue choices_raw() {
-    Queue r;
-    queue_init_clone(&r, &$self->choices);
-    return r;
+    Queue q;
+    queue_init_clone(&q, &$self->choices);
+    return q;
   }
   %typemap(out) Queue choices Queue2Array(XSolvable *, 1, new_XSolvable(arg1->solv->pool, id));
   Queue choices() {
     int i;
-    Queue r;
-    queue_init_clone(&r, &$self->choices);
-    for (i = 0; i < r.count; i++)
-      if (r.elements[i] < 0)
-        r.elements[i] = -r.elements[i];
-    return r;
+    Queue q;
+    queue_init_clone(&q, &$self->choices);
+    for (i = 0; i < q.count; i++)
+      if (q.elements[i] < 0)
+        q.elements[i] = -q.elements[i];
+    return q;
   }
 #if defined(SWIGPERL) || defined(SWIGTCL)
   %rename("str") __str__;
