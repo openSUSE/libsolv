@@ -232,13 +232,13 @@ check_complex_dep(Solver *solv, Id dep, Map *m, Queue **cqp)
 {
   Pool *pool = solv->pool;
   Queue q;
-  queue_init(&q);
   Id p;
   int i, qcnt;
 
 #if 0
   printf("check_complex_dep %s\n", pool_dep2str(pool, dep));
 #endif
+  queue_init(&q);
   i = pool_normalize_complex_dep(pool, dep, &q, CPLXDEPS_EXPAND);
   if (i == 0 || i == 1)
     {

@@ -183,7 +183,7 @@ solver_unifyrules(Solver *solv)
 	    binr++;
 	  else
 	    {
-	      dp = solv->pool->whatprovidesdata + r->d;
+	      dp = pool->whatprovidesdata + r->d;
 	      while (*dp++)
 		lits++;
 	    }
@@ -1935,8 +1935,8 @@ solver_addtodupmaps(Solver *solv, Id p, Id how, int targeted)
 void
 solver_createdupmaps(Solver *solv)
 {
-  Queue *job = &solv->job;
   Pool *pool = solv->pool;
+  Queue *job = &solv->job;
   Repo *installed = solv->installed;
   Id select, how, what, p, pp;
   Solvable *s;
@@ -2203,12 +2203,12 @@ reenableblackrule(Solver *solv, Id p)
 void
 solver_addblackrules(Solver *solv)
 {
-  int i;
-  Id how, select, what, p, pp;
-  Queue *job = &solv->job;
   Pool *pool = solv->pool;
   Repo *installed = solv->installed;
+  Id how, select, what, p, pp;
+  Queue *job = &solv->job;
   Map updatemap;
+  int i;
 
   map_init(&updatemap, 0);
   solv->blackrules = solv->nrules;
@@ -3990,7 +3990,7 @@ find_obsolete_group(Solver *solv, Id obs, Queue *q)
     }
   /* find names so that we can build groups */
   queue_init_clone(&qn, q);
-  prune_to_best_version(solv->pool, &qn);
+  prune_to_best_version(pool, &qn);
 #if 0
 {
   for (i = 0; i < qn.count; i++)

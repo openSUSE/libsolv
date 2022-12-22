@@ -151,11 +151,11 @@ makeruledecisions(Solver *solv, int disablerules)
 	      solv->decisionmap[vv] = v > 0 ? 1 : -1;
 	      IF_POOLDEBUG (SOLV_DEBUG_PROPAGATE)
 		{
-		  Solvable *s = solv->pool->solvables + vv;
+		  Solvable *s = pool->solvables + vv;
 		  if (v < 0)
-		    POOL_DEBUG(SOLV_DEBUG_PROPAGATE, "conflicting %s (assertion)\n", pool_solvable2str(solv->pool, s));
+		    POOL_DEBUG(SOLV_DEBUG_PROPAGATE, "conflicting %s (assertion)\n", pool_solvable2str(pool, s));
 		  else
-		    POOL_DEBUG(SOLV_DEBUG_PROPAGATE, "installing  %s (assertion)\n", pool_solvable2str(solv->pool, s));
+		    POOL_DEBUG(SOLV_DEBUG_PROPAGATE, "installing  %s (assertion)\n", pool_solvable2str(pool, s));
 		}
 	      continue;
 	    }
@@ -311,11 +311,11 @@ makeruledecisions(Solver *solv, int disablerules)
 	      solv->decisionmap[vv] = v > 0 ? 1 : -1;
 	      IF_POOLDEBUG (SOLV_DEBUG_PROPAGATE)
 		{
-		  Solvable *s = solv->pool->solvables + vv;
+		  Solvable *s = pool->solvables + vv;
 		  if (v < 0)
-		    POOL_DEBUG(SOLV_DEBUG_PROPAGATE, "conflicting %s (weak assertion)\n", pool_solvable2str(solv->pool, s));
+		    POOL_DEBUG(SOLV_DEBUG_PROPAGATE, "conflicting %s (weak assertion)\n", pool_solvable2str(pool, s));
 		  else
-		    POOL_DEBUG(SOLV_DEBUG_PROPAGATE, "installing  %s (weak assertion)\n", pool_solvable2str(solv->pool, s));
+		    POOL_DEBUG(SOLV_DEBUG_PROPAGATE, "installing  %s (weak assertion)\n", pool_solvable2str(pool, s));
 		}
 	      continue;
 	    }
