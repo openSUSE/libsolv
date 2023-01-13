@@ -90,7 +90,7 @@ showwhy(Solver *solv, const char *showwhypkgstr)
 
   i = testcase_str2solvid(pool, showwhypkgstr);
   if (i)
-    solver_get_decisionlist(solv, i, SOLVER_DECISIONLIST_SOLVABLE, &dq);
+    solver_get_decisionlist(solv, i, SOLVER_DECISIONLIST_SOLVABLE | SOLVER_DECISIONLIST_SORTED, &dq);
   else
     {
       int selflags = SELECTION_NAME | SELECTION_CANON;
@@ -99,7 +99,7 @@ showwhy(Solver *solv, const char *showwhypkgstr)
       if (!iq.count)
 	printf("No package matches %s\n", showwhypkgstr);
       queue_empty(&dq);
-      solver_get_decisionlist_multiple(solv, &iq, SOLVER_DECISIONLIST_SOLVABLE, &dq);
+      solver_get_decisionlist_multiple(solv, &iq, SOLVER_DECISIONLIST_SOLVABLE | SOLVER_DECISIONLIST_SORTED, &dq);
     }
   for (ii = 0; ii < dq.count; ii += 3)
     {
