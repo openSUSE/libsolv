@@ -322,6 +322,50 @@ move_decision(Queue *q, int to, int from)
   queue_deleten(q, from + 8, 8); 
 }
 
+/* sort a block of SOLVER_REASON_UNIT_RULE decisions */
+static void
+sort_unit_decisions(Solver *solv, Queue *q, int start, int end, Map *m)
+{
+  Pool *pool = solv->pool;
+  int i, j, k, doing = 1;
+  if (start + 8 == end)
+    {
+      Id truelit = q->elements[start];
+      MAPSET(m, truelit >= 0 ? truelit : -truelit);
+      return;
+    }
+  /* alternate between conflicts and installs, starting with conflicts */
+  for (i = start; i < end; doing ^= 1)
+    {
+      for (j = k = i; j < end; j += 8)
+	{
+	  Rule *or;
+	  Id p, pp;
+	  Id truelit = q->elements[j];
+	  if ((doing == 0 && truelit < 0) || (doing != 0 && truelit >= 0))
+	    continue;
+	  or = solv->rules + q->elements[j + 2];
+	  FOR_RULELITERALS(p, pp, or)
+	    if (p != truelit && !MAPTST(m, p >= 0 ? p : -p))
+	      break;
+	  if (p)
+	    continue;	/* not unit yet */
+	  if (j > k)
+	    move_decision(q, k, j);
+	  k += 8;
+	}
+      if (k == i)
+	continue;
+      if (i + 8 < k)
+	solv_sort(q->elements + i, (k - i) / 8, 8 * sizeof(Id), decisionsort_cmp, solv);
+      for (; i < k; i += 8)
+	{
+	  Id truelit = q->elements[i];
+	  MAPSET(m, truelit >= 0 ? truelit : -truelit);
+	}
+    }
+}
+
 static void
 solver_get_proof(Solver *solv, Id id, int flags, Queue *q)
 {
@@ -329,8 +373,7 @@ solver_get_proof(Solver *solv, Id id, int flags, Queue *q)
   Map seen, seent;	/* seent: was the literal true or false */
   Id rid, truelit;
   int first = 1;
-  int why, i, j, k;
-  int cnt, doing;
+  int why, i, cnt;
 
   queue_empty(q);
   if ((flags & SOLVER_DECISIONLIST_TYPEMASK) == SOLVER_DECISIONLIST_PROBLEM)
@@ -444,42 +487,7 @@ solver_get_proof(Solver *solv, Id id, int flags, Queue *q)
       /* sort premise block */
       if (i > 8)
 	solv_sort(q->elements, i / 8, 8 * sizeof(Id), decisionsort_cmp, solv);
-
-      /* move rules:
-       *   if a package is installed, move conflicts right after
-       *   if a package is conflicted, move requires right after
-       */
-      doing = 1;
-      while (i < q->count - 8)
-	{
-	  doing ^= 1;
-	  for (j = k = i; j < q->count - 8; j += 8)
-	    {
-	      Rule *or;
-	      Id p, pp;
-	      Id truelit = q->elements[j];
-	      if ((doing == 0 && truelit < 0) || (doing != 0 && truelit >= 0))
-		continue;
-	      or = solv->rules + q->elements[j + 2];
-	      FOR_RULELITERALS(p, pp, or)
-		if (p != truelit && !MAPTST(&seen, p >= 0 ? p : -p))
-		  break;
-	      if (p)
-		continue;	/* not unit yet */
-	      if (j > k)
-		move_decision(q, k, j);
-	      k += 8;
-	    }
-	  if (k == i)
-	    continue;
-	  if (i + 8 < k)
-	    solv_sort(q->elements + i, (k - i) / 8, 8 * sizeof(Id), decisionsort_cmp, solv);
-	  for (; i < k; i += 8)
-	    {
-	      Id truelit = q->elements[i];
-	      MAPSET(&seen, truelit >= 0 ? truelit : -truelit);
-	    }
-	}
+      sort_unit_decisions(solv, q, i, q->count - 8, &seen);
     }
 
   map_free(&seen);
@@ -676,8 +684,39 @@ getdecisionlist(Solver *solv, Map *dm, int flags, Queue *decisionlistq)
 	}
     }
   queue_free(&iq);
-  if ((flags & (SOLVER_DECISIONLIST_SORTED | SOLVER_DECISIONLIST_WITHINFO)) == SOLVER_DECISIONLIST_SORTED)
+  if ((flags & SOLVER_DECISIONLIST_SORTED) != 0)
     {
+      /* reuse dm as "seen" map */
+      MAPZERO(dm);
+      MAPSET(dm, 1);
+      for (i = 0; i < decisionlistq->count; i += 8)
+	{
+	  if (decisionlistq->elements[i + 1] != SOLVER_REASON_UNIT_RULE)
+	    {
+	      Id p = decisionlistq->elements[i] < 0 ? -decisionlistq->elements[i] : decisionlistq->elements[i];
+	      MAPSET(dm, p);
+	    }
+	  else
+	    {
+	      int j;
+	      for (j = i + 8; j < decisionlistq->count; j += 8)
+		if (decisionlistq->elements[j + 1] != SOLVER_REASON_UNIT_RULE)
+		  break;
+	      sort_unit_decisions(solv, decisionlistq, i, j, dm);
+	    }
+	}
+    }
+  if ((flags & SOLVER_DECISIONLIST_WITHINFO) != 0)
+    {
+      /* set decisioninfo bits */
+      for (i = 0; i < decisionlistq->count; i += 8)
+	decisionlistq->elements[i + 3] = solver_calc_decisioninfo_bits(solv, decisionlistq->elements[i], decisionlistq->elements[i + 4], decisionlistq->elements[i + 5], decisionlistq->elements[i + 6], decisionlistq->elements[i + 7]);
+      if (flags & SOLVER_DECISIONLIST_MERGEDINFO)
+	decisionmerge(solv, decisionlistq);
+    }
+  else if ((flags & SOLVER_DECISIONLIST_SORTED) != 0)
+    {
+      /* strip the info elements we added for sorting */
       int j;
       for (i = j = 0; i < decisionlistq->count; i += 8)
 	{
@@ -686,14 +725,6 @@ getdecisionlist(Solver *solv, Map *dm, int flags, Queue *decisionlistq)
 	  decisionlistq->elements[j++] = decisionlistq->elements[i + 2];
 	}
       queue_truncate(decisionlistq, j);
-    }
-  else
-    {
-      /* set decisioninfo bits */
-      for (i = 0; i < decisionlistq->count; i += 8)
-	decisionlistq->elements[i + 3] = solver_calc_decisioninfo_bits(solv, decisionlistq->elements[i], decisionlistq->elements[i + 4], decisionlistq->elements[i + 5], decisionlistq->elements[i + 6], decisionlistq->elements[i + 7]);
-      if (flags & SOLVER_DECISIONLIST_MERGEDINFO)
-	decisionmerge(solv, decisionlistq);
     }
 }
 
@@ -707,6 +738,7 @@ solver_get_decisionlist(Solver *solv, Id id, int flags, Queue *decisionlistq)
   map_init(&dm, pool->nsolvables);
   MAPSET(&dm, id);
   getdecisionlist(solv, &dm, flags, decisionlistq);
+  map_free(&dm);
   if (!decisionlistq->count)
     {
       queue_push(decisionlistq, -id);
@@ -718,7 +750,6 @@ solver_get_decisionlist(Solver *solv, Id id, int flags, Queue *decisionlistq)
 	  queue_push2(decisionlistq, 0, 0);
 	}
     }
-  map_free(&dm);
 }
 
 void
@@ -738,6 +769,7 @@ solver_get_decisionlist_multiple(Solver *solv, Queue *idq, int flags, Queue *dec
 	MAPSET(&dm, p);
     }
   getdecisionlist(solv, &dm, flags, decisionlistq);
+  map_free(&dm);
   for (i = 0; i < idq->count; i++)
     {
       Id p = idq->elements[i];
@@ -752,7 +784,6 @@ solver_get_decisionlist_multiple(Solver *solv, Queue *idq, int flags, Queue *dec
 	  queue_push2(decisionlistq, 0, 0);
 	}
     }
-  map_free(&dm);
 }
 
 
