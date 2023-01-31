@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 12/13/2022
+.\"      Date: 01/31/2023
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "12/13/2022" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "01/31/2023" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -610,6 +610,16 @@ If a package is installed in multiversion mode, rpm used to ignore both the impl
 \fBPOOL_FLAG_ADDFILEPROVIDESFILTERED\fR
 .RS 4
 Make the addfileprovides method only add files from the standard locations (i\&.e\&. the \(lqbin\(rq and \(lqetc\(rq directories)\&. This is useful if you have only few packages that use non\-standard file dependencies, but you still want the fast speed that addfileprovides() generates\&.
+.RE
+.PP
+\fBPOOL_FLAG_NOWHATPROVIDESAUX\fR
+.RS 4
+Disable the creation of the auxillary whatprovides index\&. This saves a bit of memory but also makes the whatprovides lookups a bit slower\&.
+.RE
+.PP
+\fBPOOL_FLAG_WHATPROVIDESWITHDISABLED\fR
+.RS 4
+Make the whatprovides index also contain disabled packages\&. This means that you do not need to recreate the index if a package is enabled/disabled, i\&.e\&. the pool→considered bitmap is changed\&.
 .RE
 .SS "METHODS"
 .sp

@@ -352,6 +352,15 @@ useful if you have only few packages that use non-standard file
 dependencies, but you still want the fast speed that addfileprovides()
 generates.
 
+*POOL_FLAG_NOWHATPROVIDESAUX*::
+Disable the creation of the auxillary whatprovides index. This saves
+a bit of memory but also makes the whatprovides lookups a bit slower.
+
+*POOL_FLAG_WHATPROVIDESWITHDISABLED*::
+Make the whatprovides index also contain disabled packages. This
+means that you do not need to recreate the index if a package is
+enabled/disabled, i.e. the pool->considered bitmap is changed.
+
 === METHODS ===
 
 	void free()
