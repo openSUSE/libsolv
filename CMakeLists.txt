@@ -1,4 +1,4 @@
-PROJECT (libsolv)
+PROJECT (libsolv C)
 
 CMAKE_MINIMUM_REQUIRED (VERSION 2.8.5)
 
