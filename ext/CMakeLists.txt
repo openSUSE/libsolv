@@ -103,6 +103,7 @@ IF (ENABLE_CUDFREPO)
 ENDIF (ENABLE_CUDFREPO)
 
 IF (ENABLE_HAIKU)
+    enable_language(CXX)
     SET (libsolvext_SRCS ${libsolvext_SRCS}
 	repo_haiku.cpp)
     SET (libsolvext_HEADERS ${libsolvext_HEADERS}
