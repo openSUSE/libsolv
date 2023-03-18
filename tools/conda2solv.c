@@ -32,7 +32,8 @@ usage(int status)
 {
   fprintf(stderr, "\nUsage:\n"
           "conda2solv\n"
-          "  reads a 'synthesis' repository from <stdin> and writes a .solv file to <stdout>\n"
+          "  reads a conda repository from <stdin> and writes a .solv file to <stdout>\n"
+          "  -S : include signature data\n"
           "  -h : print help & exit\n"
          );
    exit(status);
@@ -44,13 +45,17 @@ main(int argc, char **argv)
   Pool *pool;
   Repo *repo;
   int c;
+  int flags = 0;
 
-  while ((c = getopt(argc, argv, "h")) >= 0)
+  while ((c = getopt(argc, argv, "hS")) >= 0)
     {
       switch(c)
 	{
 	case 'h':
 	  usage(0);
+	  break;
+	case 'S':
+	  flags |= CONDA_ADD_WITH_SIGNATUREDATA;
 	  break;
 	default:
 	  usage(1);
@@ -59,7 +64,7 @@ main(int argc, char **argv)
     }
   pool = pool_create();
   repo = repo_create(pool, "<stdin>");
-  if (repo_add_conda(repo, stdin, 0))
+  if (repo_add_conda(repo, stdin, flags))
     {
       fprintf(stderr, "conda2solv: %s\n", pool_errstr(pool));
       exit(1);

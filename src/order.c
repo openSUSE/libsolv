@@ -35,19 +35,23 @@ struct s_TransactionOrderdata {
   Id *invedgedata;
   int ninvedgedata;
   Queue *cycles;
+  Queue *edgedataq;		/* from SOLVER_TRANSACTION_KEEP_ORDEREDGES */
 };
 
 #define TYPE_BROKEN	(1<<0)
 #define TYPE_CON    	(1<<1)
 
-#define TYPE_REQ_P    	(1<<2)
-#define TYPE_PREREQ_P 	(1<<3)
+/* uninstall edges */
+#define TYPE_REQ_UI    	(1<<4)
+#define TYPE_PREREQ_UI 	(1<<5)
+#define TYPE_REQ_UU    	(1<<6)
+#define TYPE_PREREQ_UU 	(1<<7)
 
-#define TYPE_SUG	(1<<4)
-#define TYPE_REC	(1<<5)
-
-#define TYPE_REQ    	(1<<6)
-#define TYPE_PREREQ 	(1<<7)
+/* install edges */
+#define TYPE_SUG	(1<<8)
+#define TYPE_REC	(1<<9)
+#define TYPE_REQ    	(1<<10)
+#define TYPE_PREREQ 	(1<<11)
 
 #define TYPE_CYCLETAIL  (1<<16)
 #define TYPE_CYCLEHEAD  (1<<17)
@@ -70,6 +74,11 @@ transaction_clone_orderdata(Transaction *trans, Transaction *srctrans)
       trans->orderdata->cycles = solv_calloc(1, sizeof(Queue));
       queue_init_clone(trans->orderdata->cycles, od->cycles);
     }
+  if (od->edgedataq)
+    {
+      trans->orderdata->edgedataq = solv_calloc(1, sizeof(Queue));
+      queue_init_clone(trans->orderdata->edgedataq, od->edgedataq);
+    }
 }
 
 void
@@ -84,6 +93,11 @@ transaction_free_orderdata(Transaction *trans)
 	{
 	  queue_free(od->cycles);
 	  od->cycles = solv_free(od->cycles);
+	}
+      if (od->edgedataq)
+	{
+	  queue_init(od->edgedataq);
+	  od->edgedataq = solv_free(od->edgedataq);
 	}
       trans->orderdata = solv_free(trans->orderdata);
     }
@@ -100,6 +114,7 @@ struct orderdata {
   Queue cycles;
   Queue cyclesdata;
   int ncycles;
+  Queue edgedataq;
 };
 
 static void
@@ -212,27 +227,34 @@ addedge(struct orderdata *od, Id from, Id to, int type)
 }
 
 static inline int
-havescripts(Pool *pool, Id solvid)
+havescripts(Pool *pool, Id solvid, Queue *ignoreinst)
 {
   Solvable *s = pool->solvables + solvid;
-  const char *dep;
   if (s->requires)
     {
       Id req, *reqp;
-      int inpre = 0;
       reqp = s->repo->idarraydata + s->requires;
       while ((req = *reqp++) != 0)
+        if (req == SOLVABLE_PREREQMARKER)
+	  break;
+      if (!req)
+	return 0;
+      while ((req = *reqp++) != 0)
 	{
-          if (req == SOLVABLE_PREREQMARKER)
-	    {
-	      inpre = 1;
-	      continue;
-	    }
-	  if (!inpre)
-	    continue;
-	  dep = pool_id2str(pool, req);
+	  const char *dep = pool_id2str(pool, req);
 	  if (*dep == '/' && strcmp(dep, "/sbin/ldconfig") != 0)
-	    return 1;
+	    {
+	      if (ignoreinst && ignoreinst->count)
+		{
+		  int i;
+		  for (i = 0; i < ignoreinst->count; i++)
+		    if (req == ignoreinst->elements[i])
+		      break;
+		  if (i < ignoreinst->count)
+		    continue;
+		}
+	      return 1;
+	    }
 	}
     }
   return 0;
@@ -247,7 +269,7 @@ addsolvableedges(struct orderdata *od, Solvable *s)
   int i, j, pre, numins;
   Repo *installed = pool->installed;
   Solvable *s2;
-  Queue depq;
+  Queue depq, ignoreinst;
   int provbyinst;
 
 #if 0
@@ -255,9 +277,20 @@ addsolvableedges(struct orderdata *od, Solvable *s)
 #endif
   p = s - pool->solvables;
   queue_init(&depq);
+  queue_init(&ignoreinst);
   if (s->requires)
     {
       Id req, *reqp;
+      if (installed && s->repo == installed)
+	{
+	  reqp = s->repo->idarraydata + s->requires;
+	  while ((req = *reqp++) != 0)
+	    if (req == SOLVABLE_PREREQMARKER)
+	      {
+	        solvable_lookup_idarray(s, SOLVABLE_PREREQ_IGNOREINST, &ignoreinst);
+		break;
+	      }
+	}
       reqp = s->repo->idarraydata + s->requires;
       pre = TYPE_REQ;
       while ((req = *reqp++) != 0)
@@ -266,6 +299,16 @@ addsolvableedges(struct orderdata *od, Solvable *s)
 	    {
 	      pre = TYPE_PREREQ;
 	      continue;
+	    }
+	  if (pre == TYPE_PREREQ && ignoreinst.count)
+	    {
+	      /* check if this req is filtered. assumes that ignoreinst.count is small */
+	      int i;
+	      for (i = 0; i < ignoreinst.count; i++)
+		if (req == ignoreinst.elements[i])
+		  break;
+	      if (i < ignoreinst.count)
+		continue;
 	    }
 	  queue_empty(&depq);
 	  numins = 0;	/* number of packages to be installed providing it */
@@ -300,9 +343,9 @@ addsolvableedges(struct orderdata *od, Solvable *s)
 		  queue_pushunique(&depq, p2);
 		}
 	    }
-	  if (provbyinst)
+	  if (provbyinst && s->repo == installed)
 	    {
-	      /* prune to harmless ->inst edges */
+	      /* prune to harmless uninst->inst edges */
 	      for (i = j = 0; i < depq.count; i++)
 		if (pool->solvables[depq.elements[i]].repo != installed)
 		  depq.elements[j++] = depq.elements[i];
@@ -326,7 +369,7 @@ addsolvableedges(struct orderdata *od, Solvable *s)
 #if 0
 				  printf("add interrreq uninst->inst edge (%s -> %s -> %s)\n", pool_solvid2str(pool, depq.elements[i]), pool_dep2str(pool, req), pool_solvid2str(pool, depq.elements[j]));
 #endif
-				  addedge(od, depq.elements[i], depq.elements[j], pre == TYPE_PREREQ ? TYPE_PREREQ_P : TYPE_REQ_P);
+				  addedge(od, depq.elements[i], depq.elements[j], pre == TYPE_PREREQ ? TYPE_PREREQ_UI : TYPE_REQ_UI);
 				}
 			    }
 			}
@@ -344,7 +387,7 @@ addsolvableedges(struct orderdata *od, Solvable *s)
 	      if (pool->solvables[p2].repo != installed)
 		{
 		  /* all elements of depq are installs, thus have different TEs */
-		  if (pool->solvables[p].repo != installed)
+		  if (s->repo != installed)
 		    {
 #if 0
 		      printf("add inst->inst edge (%s -> %s -> %s)\n", pool_solvid2str(pool, p), pool_dep2str(pool, req), pool_solvid2str(pool, p2));
@@ -356,7 +399,7 @@ addsolvableedges(struct orderdata *od, Solvable *s)
 #if 0
 		      printf("add uninst->inst edge (%s -> %s -> %s)\n", pool_solvid2str(pool, p), pool_dep2str(pool, req), pool_solvid2str(pool, p2));
 #endif
-		      addedge(od, p, p2, pre == TYPE_PREREQ ? TYPE_PREREQ_P : TYPE_REQ_P);
+		      addedge(od, p, p2, pre == TYPE_PREREQ ? TYPE_PREREQ_UI : TYPE_REQ_UI);
 		    }
 		}
 	      else
@@ -365,16 +408,16 @@ addsolvableedges(struct orderdata *od, Solvable *s)
 		    continue;	/* no inst->uninst edges, please! */
 
 		  /* uninst -> uninst edge. Those make trouble. Only add if we must */
-		  if (trans->transaction_installed[p - installed->start] && !havescripts(pool, p))
+		  if (trans->transaction_installed[p - installed->start] && !havescripts(pool, p, &ignoreinst))
 		    {
 		      /* p is obsoleted by another package and has no scripts */
-		      /* we assume that the obsoletor is good enough to replace p */
+		      /* we assume that the obsoleter is good enough to replace p */
 		      continue;
 		    }
 #if 0
 		  printf("add uninst->uninst edge (%s -> %s -> %s)\n", pool_solvid2str(pool, p), pool_dep2str(pool, req), pool_solvid2str(pool, p2));
 #endif
-	          addedge(od, p2, p, pre == TYPE_PREREQ ? TYPE_PREREQ_P : TYPE_REQ_P);
+	          addedge(od, p2, p, pre == TYPE_PREREQ ? TYPE_PREREQ_UU : TYPE_REQ_UU);
 		}
 	    }
 	}
@@ -515,9 +558,25 @@ addsolvableedges(struct orderdata *od, Solvable *s)
 	    }
 	}
     }
+  queue_free(&ignoreinst);
   queue_free(&depq);
 }
 
+static inline int
+scriptletedge(Pool *pool, struct orderdata *od, Id *cycle, int k)
+{
+  int deg = od->edgedata[cycle[k + 1] + 1];
+  if ((deg & TYPE_REQ_UU) || (deg & TYPE_PREREQ_UU))
+    {
+      /* the UU edges are reverse edges, so we have to check the next element for scripts */
+      if (havescripts(pool, od->tes[cycle[k + 2]].p, 0))
+	return 1;
+      deg &= ~(TYPE_REQ_UU | TYPE_PREREQ_UU);
+    }
+  if (deg && havescripts(pool, od->tes[cycle[k]].p, 0))
+    return 1;
+  return 0;
+}
 
 /* break an edge in a cycle */
 static void
@@ -533,23 +592,31 @@ breakcycle(struct orderdata *od, Id *cycle)
   for (k = 0; cycle[k + 1]; k += 2)
     {
       ddeg = od->edgedata[cycle[k + 1] + 1];
+      /* map UU to UI for the comparison */
+      if (ddeg & TYPE_REQ_UU)
+	{
+	  ddeg ^= TYPE_REQ_UU;
+	  ddeg |= TYPE_REQ_UI;
+	}
+      if (ddeg & TYPE_PREREQ_UU)
+	{
+	  ddeg ^= TYPE_PREREQ_UU;
+	  ddeg |= TYPE_PREREQ_UI;
+	}
       if (ddeg > ddegmax)
 	ddegmax = ddeg;
       if (!k || ddeg < ddegmin)
 	{
 	  l = k;
 	  ddegmin = ddeg;
-	  continue;
 	}
-      if (ddeg == ddegmin)
+      else if (ddeg == ddegmin)
 	{
-	  if (havescripts(pool, od->tes[cycle[l]].p) && !havescripts(pool, od->tes[cycle[k]].p))
+          if (scriptletedge(pool, od, cycle, l) && !scriptletedge(pool, od, cycle, k))
 	    {
 	      /* prefer k, as l comes from a package with contains scriptlets */
 	      l = k;
-	      continue;
 	    }
-	  /* same edge value, check for prereq */
 	}
     }
 
@@ -573,10 +640,11 @@ breakcycle(struct orderdata *od, Id *cycle)
   /* break that edge */
   od->edgedata[cycle[l + 1] + 1] |= TYPE_BROKEN;
 
-#if 1
-  if (ddegmin < TYPE_REQ)
+    
+  IF_POOLDEBUG (SOLV_DEBUG_SOLUTIONS)
+    ;
+  else if (ddegmin < TYPE_REQ)
     return;
-#endif
 
   /* cycle recorded, print it */
   if (ddegmin >= TYPE_REQ && (ddegmax & TYPE_PREREQ) != 0)
@@ -767,6 +835,21 @@ addcycleedges(struct orderdata *od, Id *cycle, Queue *todo)
     }
 }
 
+static int
+share_cycle(struct orderdata *od, Id p1, Id p2)
+{
+  int i, seen = 0;
+  for (i = 0; i < od->cyclesdata.count; i++)
+    {
+      Id p = od->cyclesdata.elements[i];
+      if (p == 0)
+	seen = 0;
+      else if ((p == p1 || p == p2) && ++seen == 2)
+        return 1;
+    }
+  return 0;
+}
+
 void
 transaction_order(Transaction *trans, int flags)
 {
@@ -784,19 +867,15 @@ transaction_order(Transaction *trans, int flags)
   int oldcount;
   int start, now;
   Repo *lastrepo;
-  int lastmedia;
+  int lastmedia, lastte;
   Id *temedianr;
+  unsigned char *incycle;
 
   start = now = solv_timems(0);
   POOL_DEBUG(SOLV_DEBUG_STATS, "ordering transaction\n");
   /* free old data if present */
   if (trans->orderdata)
-    {
-      struct s_TransactionOrderdata *od = trans->orderdata;
-      od->tes = solv_free(od->tes);
-      od->invedgedata = solv_free(od->invedgedata);
-      trans->orderdata = solv_free(trans->orderdata);
-    }
+    transaction_free_orderdata(trans);
 
   /* create a transaction element for every active component */
   numte = 0;
@@ -821,6 +900,8 @@ transaction_order(Transaction *trans, int flags)
   od.edgedata[0] = 0;
   od.nedgedata = 1;
   queue_init(&od.cycles);
+  queue_init(&od.cyclesdata);
+  queue_init(&od.edgedataq);
 
   /* initialize TEs */
   for (i = 0, te = od.tes + 1; i < tr->count; i++)
@@ -930,24 +1011,42 @@ transaction_order(Transaction *trans, int flags)
   POOL_DEBUG(SOLV_DEBUG_STATS, "cycles broken: %d\n", od.ncycles);
   POOL_DEBUG(SOLV_DEBUG_STATS, "cycle breaking took %d ms\n", solv_timems(now));
 
-  now = solv_timems(0);
-  /* now go through all broken cycles and create cycle edges to help
-     the ordering */
-   for (i = od.cycles.count - 4; i >= 0; i -= 4)
-     {
-       if (od.cycles.elements[i + 2] >= TYPE_REQ)
-         addcycleedges(&od, od.cyclesdata.elements + od.cycles.elements[i], &todo);
-     }
-   for (i = od.cycles.count - 4; i >= 0; i -= 4)
-     {
-       if (od.cycles.elements[i + 2] < TYPE_REQ)
-         addcycleedges(&od, od.cyclesdata.elements + od.cycles.elements[i], &todo);
-     }
-  POOL_DEBUG(SOLV_DEBUG_STATS, "cycle edge creation took %d ms\n", solv_timems(now));
+  incycle = 0;
+  if (od.cycles.count)
+    {
+      now = solv_timems(0);
+      incycle = solv_calloc(numte, 1);
+      /* now go through all broken cycles and create cycle edges to help
+	 the ordering */
+      for (i = od.cycles.count - 4; i >= 0; i -= 4)
+	{
+	  if (od.cycles.elements[i + 2] >= TYPE_REQ)
+	    addcycleedges(&od, od.cyclesdata.elements + od.cycles.elements[i], &todo);
+	}
+      for (i = od.cycles.count - 4; i >= 0; i -= 4)
+	{
+	  if (od.cycles.elements[i + 2] < TYPE_REQ)
+	    addcycleedges(&od, od.cyclesdata.elements + od.cycles.elements[i], &todo);
+	}
+      for (i = od.cycles.count - 4; i >= 0; i -= 4)
+	{
+	  for (j = od.cycles.elements[i]; od.cyclesdata.elements[j]; j++)
+	    incycle[od.cyclesdata.elements[j]] = 1;
+	}
+      POOL_DEBUG(SOLV_DEBUG_STATS, "cycle edge creation took %d ms\n", solv_timems(now));
+    }
 
 #if 0
   dump_tes(&od);
 #endif
+  if ((flags & SOLVER_TRANSACTION_KEEP_ORDEREDGES) != 0)
+    {
+      queue_insertn(&od.edgedataq, 0, od.nedgedata, od.edgedata);
+      queue_insertn(&od.edgedataq, 0, numte, 0);
+      for (i = 1, te = od.tes + i; i < numte; i++, te++)
+	od.edgedataq.elements[i] = te->edges + numte;
+    }
+
   /* all edges are finally set up and there are no cycles, now the easy part.
    * Create an ordered transaction */
   now = solv_timems(0);
@@ -1011,6 +1110,7 @@ transaction_order(Transaction *trans, int flags)
 
   lastrepo = 0;
   lastmedia = 0;
+  lastte = 0;
   temedianr = solv_calloc(numte, sizeof(Id));
   for (i = 1; i < numte; i++)
     {
@@ -1027,7 +1127,22 @@ transaction_order(Transaction *trans, int flags)
       if (uninstq.count)
 	i = queue_shift(&uninstq);
       else if (samerepoq.count)
-	i = queue_shift(&samerepoq);
+	{
+	  if (lastte && incycle && incycle[lastte])
+	    {
+	      /* last installed package was in a cycle, prefer packages from the same cycle */
+	      for (j = 0; j < samerepoq.count; j++)
+		if (incycle[samerepoq.elements[j]] && share_cycle(&od, lastte, samerepoq.elements[j]))
+		  {
+		    /* yes, bring to front! */
+		    i = samerepoq.elements[j];
+		    queue_delete(&samerepoq, j);
+		    queue_unshift(&samerepoq, i);
+		    break;
+		  }
+	    }
+	  i = queue_shift(&samerepoq);
+	}
       else if (todo.count)
 	{
 	  /* find next repo/media */
@@ -1060,6 +1175,9 @@ transaction_order(Transaction *trans, int flags)
 
       te = od.tes + i;
       queue_push(tr, te->p);
+      if (pool->solvables[te->p].repo != installed)
+	lastte = i;
+	
 #if 0
 printf("do %s [%d]\n", pool_solvid2str(pool, te->p), temedianr[i]);
 #endif
@@ -1083,6 +1201,7 @@ printf("free %s [%d]\n", pool_solvid2str(pool, te2->p), temedianr[od.invedgedata
 	}
     }
   solv_free(temedianr);
+  solv_free(incycle);
   queue_free(&todo);
   queue_free(&samerepoq);
   queue_free(&uninstq);
@@ -1097,7 +1216,7 @@ printf("free %s [%d]\n", pool_solvid2str(pool, te2->p), temedianr[od.invedgedata
   POOL_DEBUG(SOLV_DEBUG_STATS, "creating new transaction took %d ms\n", solv_timems(now));
   POOL_DEBUG(SOLV_DEBUG_STATS, "transaction ordering took %d ms\n", solv_timems(start));
 
-  if ((flags & (SOLVER_TRANSACTION_KEEP_ORDERDATA | SOLVER_TRANSACTION_KEEP_ORDERCYCLES)) != 0)
+  if ((flags & (SOLVER_TRANSACTION_KEEP_ORDERDATA | SOLVER_TRANSACTION_KEEP_ORDERCYCLES | SOLVER_TRANSACTION_KEEP_ORDEREDGES)) != 0)
     {
       struct s_TransactionOrderdata *tod;
       trans->orderdata = tod = solv_calloc(1, sizeof(*trans->orderdata));
@@ -1112,7 +1231,7 @@ printf("free %s [%d]\n", pool_solvid2str(pool, te2->p), temedianr[od.invedgedata
 	  queue_insertn(cycles, cycles->count, od.cycles.count, od.cycles.elements);
 	  queue_push(cycles, od.cycles.count / 4);
 	}
-      if ((flags & SOLVER_TRANSACTION_KEEP_ORDERDATA) != 0)
+      if ((flags & (SOLVER_TRANSACTION_KEEP_ORDERDATA | SOLVER_TRANSACTION_KEEP_ORDEREDGES)) != 0)
 	{
 	  tod->tes = od.tes;
 	  tod->ntes = numte;
@@ -1121,10 +1240,16 @@ printf("free %s [%d]\n", pool_solvid2str(pool, te2->p), temedianr[od.invedgedata
 	  od.tes = 0;
 	  od.invedgedata = 0;
 	}
+      if ((flags & SOLVER_TRANSACTION_KEEP_ORDEREDGES) != 0)
+	{
+	  Queue *edgedataq = tod->edgedataq = solv_calloc(1, sizeof(Queue));
+	  queue_init_clone(edgedataq, &od.edgedataq);
+	}
     }
   solv_free(od.tes);
   solv_free(od.invedgedata);
   queue_free(&od.cycles);
+  queue_free(&od.edgedataq);
   queue_free(&od.cyclesdata);
 }
 
@@ -1329,7 +1454,7 @@ transaction_check_order(Transaction *trans)
 	lastins = p;
       if (s->repo != pool->installed)
 	MAPSET(&ins, p);
-      if (havescripts(pool, p))
+      if (havescripts(pool, p, 0))
 	{
 	  MAPZERO(&seen);
 	  transaction_check_pkg(trans, p, p, &ins, &seen, 1, lastins, 0);
@@ -1399,3 +1524,32 @@ transaction_order_get_cycle(Transaction *trans, Id cid, Queue *q)
   return severity;
 }
 
+void
+transaction_order_get_edges(Transaction *trans, Id p, Queue *q, int unbroken)
+{
+  struct s_TransactionOrderdata *od = trans->orderdata;
+  struct s_TransactionElement *te;
+  int i;
+  Queue *eq;
+
+  queue_empty(q);
+  if (!od || !od->edgedataq)
+    return;
+  for (i = 1, te = od->tes + i; i < od->ntes; i++, te++)
+    if (te->p == p)
+      break;
+  if (i == od->ntes)
+    return;
+  eq = od->edgedataq;
+  for (i = eq->elements[i]; eq->elements[i]; i += 2)
+    {
+      int type = eq->elements[i + 1];
+      if (unbroken)
+	{
+	  type &= ~(TYPE_BROKEN | TYPE_CYCLETAIL | TYPE_CYCLEHEAD);
+	  if (type == 0)
+	    continue;
+	}
+      queue_push2(q, od->tes[eq->elements[i]].p, type);
+    }
+}

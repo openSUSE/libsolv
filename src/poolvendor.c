@@ -53,13 +53,13 @@ Id pool_vendor2mask(Pool *pool, Id vendor)
   vstr = pool_id2str(pool, vendor);
   m = 1;
   mask = 0;
-  for (v = pool->vendorclasses; ; v++)
+  for (v = pool->vendorclasses; ; )
     {
-      vs = *v;
+      vs = *v++;
       if (vs == 0)	/* end of block? */
 	{
-	  v++;
-	  if (*v == 0)
+	  vs = *v++;
+	  if (vs == 0)
 	    break;
 	  if (m == (1 << 31))
 	    break;	/* sorry, out of bits */
@@ -69,7 +69,7 @@ Id pool_vendor2mask(Pool *pool, Id vendor)
 	{
 	  if (*vs != '!')
 	    mask |= m;
-	  while (v[1])	/* forward to next block */
+	  while (*v)	/* forward to next block */
 	    v++;
 	}
     }

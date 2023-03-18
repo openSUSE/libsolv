@@ -70,6 +70,7 @@ SOLV_1.0 {
 		pool_freewhatprovides;
 		pool_get_flag;
 		pool_get_rootdir;
+		pool_get_custom_vendorcheck;
 		pool_id2evr;
 		pool_id2langid;
 		pool_id2rel;
@@ -112,6 +113,7 @@ SOLV_1.0 {
 		pool_shrink_rels;
 		pool_shrink_strings;
 		pool_solvable2str;
+		pool_solvidset2str;
 		pool_str2id;
 		pool_strn2id;
 		pool_tmpappend;
@@ -255,6 +257,7 @@ SOLV_1.0 {
 		repowriter_set_keyqueue;
 		repowriter_set_repodatarange;
 		repowriter_set_solvablerange;
+		repowriter_set_userdata;
 		repowriter_write;
 		selection_add;
 		selection_filter;
@@ -288,6 +291,7 @@ SOLV_1.0 {
 		solv_malloc;
 		solv_malloc2;
 		solv_oom;
+		solv_read_userdata;
 		solv_realloc;
 		solv_realloc2;
 		solv_replacebadutf8;
@@ -304,6 +308,7 @@ SOLV_1.0 {
 		solv_version_major;
 		solv_version_minor;
 		solv_version_patch;
+		solv_toolversion;
 		solvable_add_deparray;
 		solvable_add_idarray;
 		solvable_add_poolstr_array;
@@ -337,9 +342,13 @@ SOLV_1.0 {
 		solvable_trivial_installable_queue;
 		solvable_trivial_installable_repo;
 		solvable_unset;
+		solver_all_solutionelements;
 		solver_allruleinfos;
+		solver_allweakdepinfos;
 		solver_alternative2str;
+		solver_alternativeinfo;
 		solver_alternatives_count;
+		solver_calc_decisioninfo_bits;
 		solver_calc_duchanges;
 		solver_calc_installsizechange;
 		solver_calculate_multiversionmap;
@@ -347,6 +356,10 @@ SOLV_1.0 {
 		solver_create;
 		solver_create_state_maps;
 		solver_create_transaction;
+		solver_decisioninfo2str;
+		solver_decisionlist_merged;
+		solver_decisionlist_solvables;
+		solver_decisionreason2str;
 		solver_describe_decision;
 		solver_describe_weakdep_decision;
 		solver_findallproblemrules;
@@ -356,13 +369,17 @@ SOLV_1.0 {
 		solver_get_alternative;
 		solver_get_decisionblock;
 		solver_get_decisionlevel;
+		solver_get_decisionlist;
+		solver_get_decisionlist_multiple;
 		solver_get_decisionqueue;
 		solver_get_flag;
 		solver_get_lastdecisionblocklevel;
+		solver_get_learnt;
 		solver_get_orphaned;
 		solver_get_recommendations;
 		solver_get_unneeded;
 		solver_get_userinstalled;
+		solver_merge_decisioninfo_bits;
 		solver_next_problem;
 		solver_next_solution;
 		solver_next_solutionelement;
@@ -383,6 +400,7 @@ SOLV_1.0 {
 		solver_problem2str;
 		solver_problem_count;
 		solver_problemruleinfo2str;
+		solver_reason2str;
 		solver_rule2job;
 		solver_rule2jobidx;
 		solver_rule2pkgrule;
@@ -390,12 +408,14 @@ SOLV_1.0 {
 		solver_rule2solvable;
 		solver_ruleclass;
 		solver_ruleinfo;
+		solver_ruleinfo2str;
 		solver_ruleliterals;
 		solver_rulecmp;
 		solver_select2str;
 		solver_set_flag;
 		solver_solution_count;
 		solver_solutionelement2str;
+		solver_solutionelementtype2str;
 		solver_solutionelement_count;
 		solver_solutionelement_internalid;
 		solver_solutionelement_extrajobflags;
@@ -404,6 +424,7 @@ SOLV_1.0 {
 		solver_take_solutionelement;
 		solver_trivial_installable;
 		solver_unifyrules;
+		solver_weakdepinfo;
 		stringpool_clone;
 		stringpool_free;
 		stringpool_freehash;
@@ -430,6 +451,7 @@ SOLV_1.0 {
 		transaction_order_add_choices;
 		transaction_order_get_cycle;
 		transaction_order_get_cycleids;
+		transaction_order_get_edges;
 		transaction_print;
 		transaction_type;
 	local:

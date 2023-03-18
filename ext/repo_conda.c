@@ -17,14 +17,36 @@
 #include "solv_jsonparser.h"
 #include "conda.h"
 #include "repo_conda.h"
+#include "solv_xfopen.h"
+
+struct sigdata {
+  char *sigs;
+};
+
+struct xdata {
+  char *fn;
+  char *pkgjson;
+  int delayedlocation;
+};
 
 struct parsedata {
   Pool *pool;
   Repo *repo;
   Repodata *data;
+  int flags;
+
+  char *subdir;
+  char *error;
 
   Stringpool fnpool;
   Queue fndata;
+
+  Stringpool sigpool;
+  struct sigdata *sigdata;
+  int nsigdata;
+
+  struct xdata *xdata;
+  int nxdata;
 };
 
 static int
@@ -135,8 +157,103 @@ fn2data(struct parsedata *pd, const char *fn, Id *fntypep, int create)
   return pd->fndata.elements + 2 * fnid;
 }
 
+struct sigdata *
+fn2sigdata(struct parsedata *pd, const char *fn, int create)
+{
+  Id id = stringpool_str2id(&pd->sigpool, fn, create);
+  if (!id && !create)
+    return 0;
+  if (id >= pd->nsigdata)
+    {
+      int n = id - pd->nsigdata + 1;
+      pd->sigdata = solv_realloc2(pd->sigdata, pd->nsigdata + n, sizeof(struct sigdata));
+      memset(pd->sigdata + pd->nsigdata, 0, n * sizeof(struct sigdata));
+      pd->nsigdata += n;
+    }
+  return pd->sigdata + id;
+}
+
+void
+freesigdata(struct parsedata *pd)
+{
+  int i;
+  for (i = 0; i < pd->nsigdata; i++)
+    solv_free(pd->sigdata[i].sigs);
+  pd->sigdata = solv_free(pd->sigdata);
+  pd->nsigdata = 0;
+}
+
+static void
+set_xdata(struct parsedata *pd, int handle, char *fn, char *pkgjson, int delayedlocation)
+{
+  struct xdata *xd;
+  handle -= pd->repo->start;
+  if (handle >= pd->nxdata)
+    {
+      int n;
+      if (!fn && !pkgjson && !delayedlocation)
+	return;
+      n = handle - pd->nxdata + 16;
+      pd->xdata = solv_realloc2(pd->xdata, pd->nxdata + n, sizeof(struct xdata));
+      memset(pd->xdata + pd->nxdata, 0, n * sizeof(struct xdata));
+      pd->nxdata += n;
+    }
+  xd = pd->xdata + handle;
+  if (xd->fn)
+    solv_free(xd->fn);
+  if (xd->pkgjson)
+    solv_free(xd->pkgjson);
+  xd->fn = fn;
+  xd->pkgjson = pkgjson;
+  xd->delayedlocation = delayedlocation;
+}
+
+static void
+move_xdata(struct parsedata *pd, int fromhandle, int tohandle)
+{
+  char *fn = 0, *pkgjson = 0;
+  int delayedlocation = 0;
+  fromhandle -= pd->repo->start;
+  if (fromhandle < pd->nxdata)
+    {
+      struct xdata *xd = pd->xdata + fromhandle;
+      fn = xd->fn;
+      pkgjson = xd->pkgjson;
+      delayedlocation = xd->delayedlocation;
+      xd->fn = 0;
+      xd->pkgjson = 0;
+      xd->delayedlocation = 0;
+    }
+  set_xdata(pd, tohandle, fn, pkgjson, delayedlocation);
+}
+
+static int parse_package(struct parsedata *pd, struct solv_jsonparser *jp, char *kfn, char *pkgjson);
+
 static int
-parse_package(struct parsedata *pd, struct solv_jsonparser *jp, char *kfn)
+parse_package_with_pkgjson(struct parsedata *pd, struct solv_jsonparser *jp, char *kfn)
+{
+  FILE *fp;
+  int type;
+  char *pkgjson = NULL;
+  int line = jp->line;
+
+  type = jsonparser_collect(jp, JP_OBJECT, &pkgjson);
+  if (type == JP_OBJECT_END && (fp = solv_fmemopen(pkgjson, strlen(pkgjson), "r")) != 0)
+    {
+      struct solv_jsonparser jp2;
+      jsonparser_init(&jp2, fp);
+      jp2.line = line;
+      type = jsonparser_parse(&jp2);
+      type = type == JP_OBJECT ? parse_package(pd, &jp2, kfn, pkgjson) : JP_ERROR;
+      jsonparser_free(&jp2);
+      fclose(fp);
+    }
+  solv_free(pkgjson);
+  return type;
+}
+
+static int
+parse_package(struct parsedata *pd, struct solv_jsonparser *jp, char *kfn, char *pkgjson)
 {
   int type = JP_OBJECT;
   Pool *pool= pd->pool;
@@ -146,6 +263,9 @@ parse_package(struct parsedata *pd, struct solv_jsonparser *jp, char *kfn)
   char *fn = 0;
   char *subdir = 0;
   Id *fndata = 0, fntype = 0;
+
+  if (!pkgjson && (pd->flags & CONDA_ADD_WITH_SIGNATUREDATA) != 0)
+    return parse_package_with_pkgjson(pd, jp, kfn);
 
   handle = repo_add_solvable(pd->repo);
   s = pool_id2solvable(pool, handle);
@@ -191,9 +311,20 @@ parse_package(struct parsedata *pd, struct solv_jsonparser *jp, char *kfn)
       else
 	type = jsonparser_skip(jp, type);
     }
+  /* if we have a global subdir make sure that it matches */
+  if (subdir && pd->subdir && strcmp(subdir, pd->subdir) != 0)
+    {
+      pd->error = "subdir mismatch";
+      return JP_ERROR;
+    }
+
   if (fn || kfn)
     {
-      repodata_set_location(data, handle, 0, subdir, fn ? fn : kfn);
+      int delayedlocation = (subdir || pd->subdir) ? 0 : 1;
+      if (pkgjson || delayedlocation)
+	set_xdata(pd, handle, solv_strdup(fn ? fn : kfn), pkgjson ? solv_strdup(pkgjson) : 0, delayedlocation);
+      if (!delayedlocation)
+        repodata_set_location(data, handle, 0, subdir ? subdir : pd->subdir, fn ? fn : kfn);
       fndata = fn2data(pd, fn ? fn : kfn, &fntype, 1);
     }
   solv_free(fn);
@@ -210,12 +341,14 @@ parse_package(struct parsedata *pd, struct solv_jsonparser *jp, char *kfn)
 	{
 	  /* ignore this package */
 	  repo_free_solvable(pd->repo, handle, 1);
+	  set_xdata(pd, handle, 0, 0, 0);
 	  return type;
 	}
       if (fndata[0] && fndata[0] < fntype)
 	{
 	  /* replace old package */
 	  swap_solvables(pool, data, handle, fndata[1]);
+	  move_xdata(pd, handle, fndata[1]);
 	  repo_free_solvable(pd->repo, handle, 1);
 	  handle = fndata[1];
 	}
@@ -234,7 +367,7 @@ parse_packages(struct parsedata *pd, struct solv_jsonparser *jp)
       if (type == JP_OBJECT)
 	{
 	  char *fn = solv_strdup(jp->key);
-	  type = parse_package(pd, jp, fn);
+	  type = parse_package(pd, jp, fn, 0);
 	  solv_free(fn);
 	}
       else
@@ -250,7 +383,7 @@ parse_packages2(struct parsedata *pd, struct solv_jsonparser *jp)
   while (type > 0 && (type = jsonparser_parse(jp)) > 0 && type != JP_ARRAY_END)
     {
       if (type == JP_OBJECT)
-	type = parse_package(pd, jp, 0);
+	type = parse_package(pd, jp, 0, 0);
       else
 	type = jsonparser_skip(jp, type);
     }
@@ -258,19 +391,62 @@ parse_packages2(struct parsedata *pd, struct solv_jsonparser *jp)
 }
 
 static int
-parse_main(struct parsedata *pd, struct solv_jsonparser *jp, int flags)
+parse_info(struct parsedata *pd, struct solv_jsonparser *jp)
 {
   int type = JP_OBJECT;
   while (type > 0 && (type = jsonparser_parse(jp)) > 0 && type != JP_OBJECT_END)
     {
+      if (type == JP_STRING && !strcmp(jp->key, "subdir"))
+	{
+	  if (!pd->subdir)
+	    pd->subdir = strdup(jp->value);
+	  else if (strcmp(pd->subdir, jp->value))
+	    {
+	      pd->error = "subdir mismatch";
+	      return JP_ERROR;
+	    }
+	}
+    }
+  return type;
+}
+
+static int
+parse_signatures(struct parsedata *pd, struct solv_jsonparser *jp)
+{
+  int type = JP_OBJECT;
+  while (type > 0 && (type = jsonparser_parse(jp)) > 0 && type != JP_OBJECT_END)
+    {
+      struct sigdata *sd;
+      if (type != JP_OBJECT)
+	{
+	  type = jsonparser_skip(jp, type);
+	  continue;
+	}
+      sd = fn2sigdata(pd, jp->key, 1);
+      sd->sigs = solv_free(sd->sigs);
+      type = jsonparser_collect(jp, type, &sd->sigs);
+    }
+  return type;
+}
+
+static int
+parse_main(struct parsedata *pd, struct solv_jsonparser *jp)
+{
+  int type = JP_OBJECT;
+  while (type > 0 && (type = jsonparser_parse(jp)) > 0 && type != JP_OBJECT_END)
+    {
+      if (type == JP_OBJECT && !strcmp("info", jp->key))
+	type = parse_info(pd, jp);
       if (type == JP_OBJECT && !strcmp("packages", jp->key))
 	type = parse_packages(pd, jp);
       else if (type == JP_ARRAY && !strcmp("packages", jp->key))
 	type = parse_packages2(pd, jp);
-      else if (type == JP_OBJECT && !strcmp("packages.conda", jp->key) && !(flags & CONDA_ADD_USE_ONLY_TAR_BZ2))
+      else if (type == JP_OBJECT && !strcmp("packages.conda", jp->key) && !(pd->flags & CONDA_ADD_USE_ONLY_TAR_BZ2))
 	type = parse_packages(pd, jp);
-      else if (type == JP_ARRAY && !strcmp("packages.conda", jp->key) && !(flags & CONDA_ADD_USE_ONLY_TAR_BZ2))
+      else if (type == JP_ARRAY && !strcmp("packages.conda", jp->key) && !(pd->flags & CONDA_ADD_USE_ONLY_TAR_BZ2))
 	type = parse_packages2(pd, jp);
+      if (type == JP_OBJECT && !strcmp("signatures", jp->key))
+	type = parse_signatures(pd, jp);
       else
 	type = jsonparser_skip(jp, type);
     }
@@ -292,18 +468,57 @@ repo_add_conda(Repo *repo, FILE *fp, int flags)
   pd.pool = pool;
   pd.repo = repo;
   pd.data = data;
+  pd.flags = flags;
   stringpool_init_empty(&pd.fnpool);
+  stringpool_init_empty(&pd.sigpool);
   queue_init(&pd.fndata);
 
   jsonparser_init(&jp, fp);
   if ((type = jsonparser_parse(&jp)) != JP_OBJECT)
     ret = pool_error(pool, -1, "repository does not start with an object");
-  else if ((type = parse_main(&pd, &jp, flags)) != JP_OBJECT_END)
-    ret = pool_error(pool, -1, "parse error line %d", jp.line);
+  else if ((type = parse_main(&pd, &jp)) != JP_OBJECT_END)
+    {
+      if (pd.error)
+        ret = pool_error(pool, -1, "parse error line %d: %s", jp.line, pd.error);
+      else
+        ret = pool_error(pool, -1, "parse error line %d", jp.line);
+    }
   jsonparser_free(&jp);
+
+  /* finalize parsed packages */
+  if (pd.xdata)
+    {
+      int i;
+      struct xdata *xd = pd.xdata;
+      for (i = 0; i < pd.nxdata; i++, xd++)
+	{
+	  if (!xd->fn)
+	    continue;
+	  if (xd->delayedlocation)
+	    repodata_set_location(data, repo->start + i, 0, pd.subdir, xd->fn);
+	  if (xd->pkgjson && pd.nsigdata)
+	    {
+	      struct sigdata *sd = fn2sigdata(&pd, xd->fn, 0);
+	      if (sd && sd->sigs)
+		{
+		  char *s = pool_tmpjoin(pool, "{\"info\":", xd->pkgjson, ",\"signatures\":");
+		  s = pool_tmpappend(pool, s, sd->sigs, "}");
+		  repodata_set_str(data, repo->start + i, SOLVABLE_SIGNATUREDATA, s);
+		}
+	    }
+	  solv_free(xd->fn);
+	  solv_free(xd->pkgjson);
+	}
+      solv_free(pd.xdata);
+    }
+
+  if (pd.sigdata)
+    freesigdata(&pd);
+  stringpool_free(&pd.sigpool);
 
   queue_free(&pd.fndata);
   stringpool_free(&pd.fnpool);
+  solv_free(pd.subdir);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
 

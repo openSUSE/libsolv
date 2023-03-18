@@ -100,6 +100,9 @@ static struct resultflags2str {
   { TESTCASE_RESULT_CLEANDEPS,		"cleandeps" },
   { TESTCASE_RESULT_JOBS,		"jobs" },
   { TESTCASE_RESULT_USERINSTALLED,	"userinstalled" },
+  { TESTCASE_RESULT_ORDER,		"order" },
+  { TESTCASE_RESULT_ORDEREDGES,		"orderedges" },
+  { TESTCASE_RESULT_PROOF,		"proof" },
   { 0, 0 }
 };
 
@@ -135,6 +138,7 @@ static struct solverflags2str {
   { SOLVER_FLAG_STRONG_RECOMMENDS,          "strongrecommends", 0 },
   { SOLVER_FLAG_INSTALL_ALSO_UPDATES,       "installalsoupdates", 0 },
   { SOLVER_FLAG_ONLY_NAMESPACE_RECOMMENDED, "onlynamespacerecommended", 0 },
+  { SOLVER_FLAG_STRICT_REPO_PRIORITY,       "strictrepopriority", 0 },
   { 0, 0, 0 }
 };
 
@@ -437,6 +441,45 @@ testcase_str2repo(Pool *pool, const char *str)
 	repo = 0;
     }
   return repo;
+}
+
+static const char *
+testcase_escape(Pool *pool, const char *str)
+{
+  size_t nbad = 0;
+  const char *p;
+  char *new, *np;
+  for (p = str; *p; p++)
+    if (*p == '\\' || *p == ' ' || *p == '\t')
+      nbad++;
+  if (!nbad)
+    return str;
+  new = pool_alloctmpspace(pool, strlen(str) + 1 + nbad * 2);
+  for (np = new, p = str; *p; p++)
+    {
+      *np++ = *p;
+      if (*p == '\\' || *p == ' ' || *p == '\t')
+	{
+	  np[-1] = '\\';
+	  solv_bin2hex((unsigned char *)p, 1, np);
+	  np += 2;
+	}
+    }
+  *np = 0;
+  return new;
+}
+
+static void
+testcase_unescape_inplace(char *str)
+{
+  char *p, *q;
+  for (p = q = str; *p;)
+    {
+      *q++ = *p++;
+      if (p[-1] == '\\')
+	solv_hex2bin((const char **)&p, (unsigned char *)q - 1, 1);
+    }
+  *q = 0;
 }
 
 /* check evr and buildflavors */
@@ -1194,6 +1237,7 @@ static struct rclass2str {
   { SOLVER_RULE_YUMOBS, "yumobs" },
   { SOLVER_RULE_BLACK, "black" },
   { SOLVER_RULE_RECOMMENDS, "recommends" },
+  { SOLVER_RULE_STRICT_REPO_PRIORITY, "strictrepoprio" },
   { 0, 0 }
 };
 
@@ -1316,6 +1360,82 @@ testcase_solverresult(Solver *solv, int resultflags)
 	}
     }
 
+  if ((resultflags & TESTCASE_RESULT_PROOF) != 0)
+    {
+      char *probprefix;
+      int pcnt, problem;
+      Queue q, lq;
+
+      queue_init(&q);
+      queue_init(&lq);
+      pcnt = solver_problem_count(solv);
+      for (problem = 1; problem <= pcnt + lq.count; problem++)
+	{
+	  if (problem <= pcnt)
+	    {
+	      s = testcase_problemid(solv, problem);
+	      solver_get_decisionlist(solv, problem, SOLVER_DECISIONLIST_PROBLEM, &q);
+	    }
+	  else
+	    {
+	      s = testcase_ruleid(solv, lq.elements[problem - pcnt - 1]);
+	      solver_get_decisionlist(solv, lq.elements[problem - pcnt - 1], SOLVER_DECISIONLIST_LEARNTRULE, &q);
+	    }
+	  probprefix = solv_dupjoin("proof ", s, 0);
+	  for (i = 0; i < q.count; i += 3)
+	    {
+	      SolverRuleinfo rclass;
+	      Queue rq;
+	      Id truelit = q.elements[i];
+	      Id rid = q.elements[i + 2];
+	      char *rprefix;
+	      char nbuf[16];
+
+	      rclass = solver_ruleclass(solv, rid);
+	      if (rclass == SOLVER_RULE_LEARNT)
+		queue_pushunique(&lq, rid);
+	      queue_init(&rq);
+	      solver_ruleliterals(solv, rid, &rq);
+	      sprintf(nbuf, "%3d", i / 3);
+	      rprefix = solv_dupjoin(probprefix, " ", nbuf);
+	      if (q.elements[i + 1] == SOLVER_REASON_PREMISE)
+		{
+		  rprefix = solv_dupappend(rprefix, " premise", 0);
+		  queue_empty(&rq);
+		  queue_push(&rq, truelit);
+		}
+	      else
+		{
+		  rprefix = solv_dupappend(rprefix, " ", testcase_rclass2str(rclass));
+		  rprefix = solv_dupappend(rprefix, " ", testcase_ruleid(solv, rid));
+		}
+	      strqueue_push(&sq, rprefix);
+	      solv_free(rprefix);
+	      rprefix = solv_dupjoin(probprefix, " ", nbuf);
+	      rprefix = solv_dupappend(rprefix, ": ", 0);
+	      for (j = 0; j < rq.count; j++)
+		{
+		  const char *s;
+		  Id p = rq.elements[j];
+		  if (p == truelit)
+		    s = pool_tmpjoin(pool, rprefix, "-->", 0);
+		  else
+		    s = pool_tmpjoin(pool, rprefix, "   ", 0);
+		  if (p < 0)
+		    s = pool_tmpappend(pool, s, " -", testcase_solvid2str(pool, -p));
+		  else
+		    s = pool_tmpappend(pool, s, "  ", testcase_solvid2str(pool, p));
+		  strqueue_push(&sq, s);
+		}
+	      solv_free(rprefix);
+	      queue_free(&rq);
+	    }
+	  solv_free(probprefix);
+	}
+      queue_free(&q);
+      queue_free(&lq);
+    }
+
   if ((resultflags & TESTCASE_RESULT_ORPHANED) != 0)
     {
       Queue q;
@@ -1392,61 +1512,66 @@ testcase_solverresult(Solver *solv, int resultflags)
 	}
       queue_free(&q);
     }
+  if ((resultflags & TESTCASE_RESULT_ORDER) != 0)
+    {
+      int i;
+      char buf[256];
+      Id p;
+      Transaction *trans = solver_create_transaction(solv);
+      transaction_order(trans, 0);
+      for (i = 0; i < trans->steps.count; i++)
+	{
+	  p = trans->steps.elements[i];
+	  if (pool->installed && pool->solvables[p].repo == pool->installed)
+	    sprintf(buf, "%4d erase ", i + 1);
+	  else
+	    sprintf(buf, "%4d install ", i + 1);
+	  s = pool_tmpjoin(pool, "order ", buf, testcase_solvid2str(pool, p));
+	  strqueue_push(&sq, s);
+	}
+      transaction_free(trans);
+    }
+  if ((resultflags & TESTCASE_RESULT_ORDEREDGES) != 0)
+    {
+      Queue q;
+      int i, j;
+      Id p, p2;
+      Transaction *trans = solver_create_transaction(solv);
+      transaction_order(trans, SOLVER_TRANSACTION_KEEP_ORDEREDGES);
+      queue_init(&q);
+      for (i = 0; i < trans->steps.count; i++)
+	{
+	  p = trans->steps.elements[i];
+	  transaction_order_get_edges(trans, p, &q, 1);
+	  for (j = 0; j < q.count; j += 2)
+	    {
+	      char typebuf[32], *s;
+	      p2 = q.elements[j];
+	      sprintf(typebuf, " -%x-> ", q.elements[j + 1]);
+	      s = pool_tmpjoin(pool, "orderedge ", testcase_solvid2str(pool, p), typebuf);
+	      s = pool_tmpappend(pool, s, testcase_solvid2str(pool, p2), 0);
+	      strqueue_push(&sq, s);
+	    }
+	}
+      queue_free(&q);
+      transaction_free(trans);
+    }
   if ((resultflags & TESTCASE_RESULT_ALTERNATIVES) != 0)
     {
-      char *altprefix;
-      Queue q, rq;
+      Queue q;
       int cnt;
       Id alternative;
       queue_init(&q);
-      queue_init(&rq);
       cnt = solver_alternatives_count(solv);
       for (alternative = 1; alternative <= cnt; alternative++)
 	{
 	  Id id, from, chosen;
-	  char num[20];
+	  char num[20], *s;
 	  int type = solver_get_alternative(solv, alternative, &id, &from, &chosen, &q, 0);
-	  altprefix = solv_dupjoin("alternative ", testcase_alternativeid(solv, type, id, from), " ");
+	  char *altprefix = solv_dupjoin("alternative ", testcase_alternativeid(solv, type, id, from), " ");
 	  strcpy(num, " 0 ");
-	  if (type == SOLVER_ALTERNATIVE_TYPE_RECOMMENDS)
-	    {
-	      char *s = pool_tmpjoin(pool, altprefix, num, testcase_solvid2str(pool, from));
-	      s = pool_tmpappend(pool, s, " recommends ", testcase_dep2str(pool, id));
-	      strqueue_push(&sq, s);
-	    }
-	  else if (type == SOLVER_ALTERNATIVE_TYPE_RULE)
-	    {
-	      /* map choice rules back to pkg rules */
-	      if (solver_ruleclass(solv, id) == SOLVER_RULE_CHOICE)
-		id = solver_rule2pkgrule(solv, id);
-	      if (solver_ruleclass(solv, id) == SOLVER_RULE_RECOMMENDS)
-		id = solver_rule2pkgrule(solv, id);
-	      solver_allruleinfos(solv, id, &rq);
-	      for (i = 0; i < rq.count; i += 4)
-		{
-		  int rtype = rq.elements[i];
-		  if ((rtype & SOLVER_RULE_TYPEMASK) == SOLVER_RULE_JOB)
-		    {
-		      const char *js = testcase_job2str(pool, rq.elements[i + 2], rq.elements[i + 3]);
-		      char *s = pool_tmpjoin(pool, altprefix, num, "job ");
-		      s = pool_tmpappend(pool, s, js, 0);
-		      strqueue_push(&sq, s);
-		    }
-		  else if (rtype == SOLVER_RULE_PKG_REQUIRES)
-		    {
-		      char *s = pool_tmpjoin(pool, altprefix, num, testcase_solvid2str(pool, rq.elements[i + 1]));
-		      s = pool_tmpappend(pool, s, " requires ", testcase_dep2str(pool, rq.elements[i + 3]));
-		      strqueue_push(&sq, s);
-		    }
-		  else if (rtype == SOLVER_RULE_UPDATE || rtype == SOLVER_RULE_FEATURE)
-		    {
-		      const char *js = testcase_solvid2str(pool, rq.elements[i + 1]);
-		      char *s = pool_tmpjoin(pool, altprefix, num, "update ");
-		      s = pool_tmpappend(pool, s, js, 0);
-		      strqueue_push(&sq, s);
-		    }
-		}
-	    }
+          s = pool_tmpjoin(pool, altprefix, num, solver_alternative2str(solv, type, id, from));
+	  strqueue_push(&sq, s);
 	  for (i = 0; i < q.count; i++)
 	    {
 	      Id p = q.elements[i];
@@ -1465,7 +1590,6 @@ testcase_solverresult(Solver *solv, int resultflags)
 	  solv_free(altprefix);
 	}
       queue_free(&q);
-      queue_free(&rq);
     }
   if ((resultflags & TESTCASE_RESULT_RULES) != 0)
     {
@@ -1582,6 +1706,43 @@ testcase_solverresult(Solver *solv, int resultflags)
   return result;
 }
 
+static void
+dump_custom_vendorcheck(Pool *pool, Strqueue *sq, int (*vendorcheck)(Pool *, Solvable *, Solvable *))
+{
+  Id p, lastvendor = 0;
+  Queue vq;
+  int i, j;
+  char *cmd;
+
+  queue_init(&vq);
+  FOR_POOL_SOLVABLES(p)
+    {
+      Id vendor = pool->solvables[p].vendor;
+      if (!vendor || vendor == lastvendor)
+	continue;
+      lastvendor = vendor;
+      for (i = 0; i < vq.count; i += 2)
+	if (vq.elements[i] == vendor)
+	  break;
+      if (i == vq.count)
+        queue_push2(&vq, vendor, p);
+    }
+  for (i = 0; i < vq.count; i += 2)
+    {
+      Solvable *s1 = pool->solvables + vq.elements[i + 1];
+      for (j = i + 2; j < vq.count; j += 2)
+	{
+	  Solvable *s2 = pool->solvables + vq.elements[j + 1];
+	  if (vendorcheck(pool, s1, s2) || vendorcheck(pool, s2, s1))
+	    continue;
+	  cmd = pool_tmpjoin(pool, "vendorclass", 0, 0);
+	  cmd = pool_tmpappend(pool, cmd, " ", testcase_escape(pool, pool_id2str(pool, vq.elements[i])));
+	  cmd = pool_tmpappend(pool, cmd, " ", testcase_escape(pool, pool_id2str(pool, vq.elements[j])));
+	  strqueue_push(sq, cmd);
+	}
+    }
+  queue_free(&vq);
+}
 
 static int
 testcase_write_mangled(Solver *solv, const char *dir, int resultflags, const char *testcasename, const char *resultname)
@@ -1595,6 +1756,7 @@ testcase_write_mangled(Solver *solv, const char *dir, int resultflags, const cha
   Strqueue sq;
   char *cmd, *out, *result;
   const char *s;
+  int (*vendorcheck)(Pool *, Solvable *, Solvable *);
 
   if (!testcasename)
     testcasename = "testcase.t";
@@ -1671,12 +1833,15 @@ testcase_write_mangled(Solver *solv, const char *dir, int resultflags, const cha
       strqueue_push(&sq, cmd);
     }
 
-  if (pool->vendorclasses)
+  vendorcheck = pool_get_custom_vendorcheck(pool);
+  if (vendorcheck)
+    dump_custom_vendorcheck(pool, &sq, vendorcheck);
+  else if (pool->vendorclasses)
     {
       cmd = 0;
       for (i = 0; pool->vendorclasses[i]; i++)
 	{
-	  cmd = pool_tmpappend(pool, cmd ? cmd : "vendorclass", " ", pool->vendorclasses[i]);
+	  cmd = pool_tmpappend(pool, cmd ? cmd : "vendorclass", " ", testcase_escape(pool, pool->vendorclasses[i]));
 	  if (!pool->vendorclasses[i + 1])
 	    {
 	      strqueue_push(&sq, cmd);
@@ -2096,7 +2261,7 @@ testcase_read(Pool *pool, FILE *fp, const char *testcase, Queue *job, char **res
 	    }
           repo->priority = prio;
           repo->subpriority = subprio;
-	  if (strcmp(pieces[3], "empty") != 0)
+	  if (strcmp(pieces[3], "empty") != 0 && npieces > 4)
 	    {
 	      const char *repotype = pool_tmpjoin(pool, pieces[3], 0, 0);	/* gets overwritten in <inline> case */
 	      if (!strcmp(pieces[4], "<inline>"))
@@ -2237,6 +2402,9 @@ testcase_read(Pool *pool, FILE *fp, const char *testcase, Queue *job, char **res
 	}
       else if (!strcmp(pieces[0], "vendorclass") && npieces > 1)
 	{
+	  int i;
+	  for (i = 1; i < npieces; i++)
+	    testcase_unescape_inplace(pieces[i]);
 	  pool_addvendorclass(pool, (const char **)(pieces + 1));
 	}
       else if (!strcmp(pieces[0], "namespace") && npieces > 1)
@@ -2317,7 +2485,10 @@ testcase_read(Pool *pool, FILE *fp, const char *testcase, Queue *job, char **res
 		}
 	    }
 	  if (resultp)
+	  {
+	    solv_free(*resultp);
 	    *resultp = result;
+	  }
 	  else
 	    solv_free(result);
 	  if (resultflagsp)

@@ -9,6 +9,7 @@
 #include "selection.h"
 #include "solverdebug.h"
 #include "testcase.h"
+#include "evr.h"
 
 static struct resultflags2str {
   Id flag;
@@ -76,6 +77,121 @@ free_considered(Pool *pool)
     }
 }
 
+void
+showwhy(Solver *solv, const char *showwhypkgstr)
+{
+  Pool *pool = solv->pool;
+  Queue dq, rq, iq;
+  int ii, i;
+
+  queue_init(&dq);
+  queue_init(&rq);
+  queue_init(&iq);
+
+  i = testcase_str2solvid(pool, showwhypkgstr);
+  if (i)
+    solver_get_decisionlist(solv, i, SOLVER_DECISIONLIST_SOLVABLE | SOLVER_DECISIONLIST_SORTED, &dq);
+  else
+    {
+      int selflags = SELECTION_NAME | SELECTION_CANON;
+      selection_make(pool, &dq, showwhypkgstr, selflags);
+      selection_solvables(pool, &dq, &iq);
+      if (!iq.count)
+	printf("No package matches %s\n", showwhypkgstr);
+      queue_empty(&dq);
+      solver_get_decisionlist_multiple(solv, &iq, SOLVER_DECISIONLIST_SOLVABLE | SOLVER_DECISIONLIST_SORTED, &dq);
+    }
+  for (ii = 0; ii < dq.count; ii += 3)
+    {
+      Id v = dq.elements[ii];
+      int reason = dq.elements[ii + 1];
+      int info = dq.elements[ii + 2];
+
+      printf("%s %s:\n", v < 0 ? "conflicted" : "installed", testcase_solvid2str(pool, v >= 0 ? v : -v));
+      /* special case some reasons where we want to show multiple rule infos or extra info */
+      if (reason == SOLVER_REASON_WEAKDEP || reason == SOLVER_REASON_UNIT_RULE || reason == SOLVER_REASON_RESOLVE)
+	{
+	  queue_empty(&iq);
+	  if (reason == SOLVER_REASON_WEAKDEP)
+	    solver_allweakdepinfos(solv, v, &iq);
+	  else if (info > 0)
+	    solver_allruleinfos(solv, info, &iq);
+	  if (iq.count)
+	    {
+	      for (i = 0; i < iq.count; i += 4)
+		{
+		  int bits;
+		  if (iq.elements[i] == SOLVER_RULE_LEARNT)
+		    {
+		      printf("  a learnt rule:\n");
+		      solver_ruleliterals(solv, info, &rq);
+		      for (i = 0; i < rq.count; i++)
+			{
+			  Id p2 = rq.elements[i];
+			  printf("    %c %s\n", p2 > 0 ? '+' : '-', testcase_solvid2str(pool, p2 > 0 ? p2 : -p2));
+			}
+		      continue;
+		    }
+		  bits = solver_calc_decisioninfo_bits(solv, v, iq.elements[i], iq.elements[i + 1], iq.elements[i + 2], iq.elements[i + 3]);
+		  printf("  %s\n", solver_decisioninfo2str(solv, bits, iq.elements[i], iq.elements[i + 1], iq.elements[i + 2], iq.elements[i + 3]));
+		}
+	      continue;
+	    }
+	}
+      printf("  %s\n", solver_decisionreason2str(solv, v, reason, info));
+    }
+  queue_free(&iq);
+  queue_free(&rq);
+  queue_free(&dq);
+}
+
+void
+doshowproof(Solver *solv, Id id, int flags, Queue *lq)
+{
+  Pool *pool = solv->pool;
+  Queue q, qp;
+  int i, j;
+
+  queue_init(&q);
+  queue_init(&qp);
+  solver_get_decisionlist(solv, id, flags | SOLVER_DECISIONLIST_SORTED | SOLVER_DECISIONLIST_WITHINFO | SOLVER_DECISIONLIST_MERGEDINFO, &q);
+  for (i = 0; i < q.count; i += 8)
+    {
+      Id v = q.elements[i];
+      int reason = q.elements[i + 1], bits = q.elements[i + 3], type = q.elements[i + 4];
+      Id from = q.elements[i + 5], to = q.elements[i + 6], dep = q.elements[i + 7];
+
+      if (reason != SOLVER_REASON_UNSOLVABLE && type == SOLVER_RULE_PKG_SAME_NAME)
+	continue;	/* do not show "obvious" decisions */
+
+      solver_decisionlist_solvables(solv, &q, i, &qp);
+      if (reason == SOLVER_REASON_UNSOLVABLE)
+        printf("unsolvable: ");
+      else
+        printf("%s %s: ", v < 0 ? "conflicted" : "installed", pool_solvidset2str(pool, &qp));
+      i += solver_decisionlist_merged(solv, &q, i) * 8;
+      if (type == 0)
+	{
+	  printf("%s\n", solver_reason2str(solv, reason));
+	  continue;
+	}
+      if (type == SOLVER_RULE_LEARNT && lq)
+	{
+	  for (j = 0; j < lq->count; j++)
+	    if (lq->elements[j] == q.elements[i + 2])
+	      break;
+	  if (j < lq->count)
+	    {
+	      printf("learnt rule #%d\n", j + 1);
+	      continue;
+	    }
+	}
+      printf("%s\n", solver_decisioninfo2str(solv, bits, type, from, to, dep));
+    }
+  queue_free(&qp);
+  queue_free(&q);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -84,12 +200,14 @@ main(int argc, char **argv)
   Queue solq;
   Solver *solv, *reusesolv = 0;
   char *result = 0;
+  char *showwhypkgstr = 0;
   int resultflags = 0;
   int debuglevel = 0;
   int writeresult = 0;
   char *writetestcase = 0;
   int multijob = 0;
   int rescallback = 0;
+  int showproof = 0;
   int c;
   int ex = 0;
   const char *list = 0;
@@ -98,7 +216,7 @@ main(int argc, char **argv)
   const char *p;
 
   queue_init(&solq);
-  while ((c = getopt(argc, argv, "vmrhL:l:s:T:")) >= 0)
+  while ((c = getopt(argc, argv, "vmrhL:l:s:T:W:P")) >= 0)
     {
       switch (c)
       {
@@ -122,6 +240,9 @@ main(int argc, char **argv)
 	  list = optarg;
 	  list_with_deps = 1;
           break;
+        case 'W':
+	  showwhypkgstr = optarg;
+          break;
         case 's':
 	  if ((p = strchr(optarg, ':')))
 	    queue_push2(&solq, atoi(optarg), atoi(p + 1));
@@ -130,6 +251,9 @@ main(int argc, char **argv)
           break;
         case 'T':
 	  writetestcase = optarg;
+          break;
+        case 'P':
+	  showproof = 1;
           break;
         default:
 	  usage(1);
@@ -228,6 +352,36 @@ main(int argc, char **argv)
 		  queue_free(&q);
 		}
 	    }
+	  else if (showwhypkgstr)
+	    {
+	      solver_solve(solv, &job);
+	      showwhy(solv, showwhypkgstr);
+	    }
+	  else if (showproof)
+	    {
+	      int pcnt = solver_solve(solv, &job);
+	      int problem;
+	      if (!pcnt)
+		printf("nothing to proof\n");
+	      for (problem = 1; problem <= pcnt; problem++)
+		{
+		  Queue lq;
+		  int i;
+		  queue_init(&lq);
+		  solver_get_learnt(solv, problem, SOLVER_DECISIONLIST_PROBLEM, &lq);
+		  for (i = 0; i < lq.count; i++)
+		    {
+		      printf("Learnt rule #%d:\n", i + 1);
+		      doshowproof(solv, lq.elements[i], SOLVER_DECISIONLIST_LEARNTRULE, &lq);
+		      printf("\n");
+		    }
+		  printf("Proof #%d:\n", problem);
+		  doshowproof(solv, problem, SOLVER_DECISIONLIST_PROBLEM, &lq);
+		  queue_free(&lq);
+		  if (problem < pcnt)
+		    printf("\n");
+		}
+	    }
 	  else if (result || writeresult)
 	    {
 	      char *myresult, *resultdiff;
@@ -298,7 +452,13 @@ main(int argc, char **argv)
 	    {
 	      int pcnt = solver_solve(solv, &job);
 	      if (writetestcase)
-		testcase_write(solv, writetestcase, resultflags, 0, 0);
+		{
+		  if (!testcase_write(solv, writetestcase, resultflags, 0, 0))
+		    {
+		      fprintf(stderr, "Could not write testcase: %s\n", pool_errstr(pool));
+		      exit(1);
+		    }
+		}
 	      if (pcnt && solq.count)
 		{
 		  int i, taken = 0;

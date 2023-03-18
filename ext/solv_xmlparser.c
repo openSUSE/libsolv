@@ -54,6 +54,47 @@ character_data(void *userData, const XML_Char *s, int len)
 }
 
 #ifdef WITH_LIBXML2
+static void fixup_att_inplace(char *at)
+{
+  while ((at = strchr(at, '&')) != 0)
+    {
+      at++;
+      if (!memcmp(at, "#38;", 4))
+	memmove(at, at + 4, strlen(at + 4) + 1);
+    }
+}
+
+static const xmlChar **fixup_atts(struct solv_xmlparser *xmlp, const xmlChar **atts)
+{
+  size_t needsize = 0;
+  size_t natts;
+  char **at;
+
+  for (natts = 0; atts[natts]; natts++)
+    if (strchr((char *)atts[natts], '&'))
+      needsize += strlen((const char *)atts[natts]) + 1;
+  if (!needsize)
+    return atts;
+  at = xmlp->attsdata = solv_realloc(xmlp->attsdata, (natts + 1) * sizeof(xmlChar *) + needsize);
+  needsize = (natts + 1) * sizeof(xmlChar *);
+  for (natts = 0; atts[natts]; natts++)
+    {
+      at[natts] = (char *)atts[natts];
+      if (strchr(at[natts], '&'))
+        {
+	  size_t l = strlen(at[natts]) + 1;
+	  memcpy((char *)at + needsize, at[natts], l);
+	  at[natts] = (char *)at + needsize;
+	  needsize += l;
+	  fixup_att_inplace(at[natts]);
+        }
+    }
+  at[natts] = 0;
+  return (const xmlChar **)at;
+}
+#endif
+
+#ifdef WITH_LIBXML2
 static void
 start_element(void *userData, const xmlChar *name, const xmlChar **atts)
 #else
@@ -97,6 +138,8 @@ start_element(void *userData, const char *name, const char **atts)
       static const char *nullattr;
       atts = (const xmlChar **)&nullattr;
     }
+  else if (xmlp->state != oldstate)
+    atts = fixup_atts(xmlp, atts);
 #endif
   if (xmlp->state != oldstate)
     xmlp->startelement(xmlp, xmlp->state, el->element, (const char **)atts);
@@ -177,6 +220,7 @@ solv_xmlparser_free(struct solv_xmlparser *xmlp)
   queue_free(&xmlp->elementq);
   xmlp->content = solv_free(xmlp->content);
   xmlp->errstr = solv_free(xmlp->errstr);
+  xmlp->attsdata = solv_free(xmlp->attsdata);
 }
 
 static void

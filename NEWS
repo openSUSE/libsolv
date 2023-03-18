@@ -1,6 +1,64 @@
 
-This file contains the major changes between
-libsolv versions:
+This file contains the major changes between libsolv versions:
+
+Version 0.7.23
+- selected bug fixes:
+  * fix "keep installed" jobs not disabling "best update" rules
+  * do not autouninstall suse ptf packages
+  * ensure duplinvolvedmap_all is reset when a solver is reused
+  * special case file dependencies in the testcase writer
+- new features:
+  * support stringification of multiple solvables
+    new function: pool_solvidset2str
+  * new weakdep introspection interface similar to ruleinfos
+    new functions: solver_weakdepinfo, solver_allweakdepinfos
+  * support decision reason queries
+    new functions: solver_get_decisionlist, solver_get_decisionlist_multiple,
+                   solver_get_learnt
+  * support merging of related decissions
+    new functions: solver_decisionlist_solvables, solver_decisionlist_merged,
+                   solver_calc_decisioninfo_bits, solver_merge_decisioninfo_bits
+  * support stringification of ruleinfo, decisioninfo and decision reasons
+    new functions: solver_ruleinfo2str, solver_decisioninfo2str,
+                   solver_decisionreason2str, solver_reason2str
+  * support better info about alternatives
+    new function: solver_alternativeinfo()
+  * new '-P' and '-W' options for testsolv to show proofs and
+    decision reasons
+    
+Version 0.7.22
+- selected bug fixes:
+  * reworked choice rule generation to cover more usecases
+  * support SOLVABLE_PREREQ_IGNOREINST in the ordering code
+- new features:
+  * support parsing of Debian's Multi-Arch indicator
+
+Version 0.7.21
+- selected bug fixes:
+  * fix segfault on conflict resolution when using bindings
+  * fix split provides not working if the update includes a forbidden
+    vendor change
+- new features:
+  * support strict repository priorities
+    new solver flag: SOLVER_FLAG_STRICT_REPO_PRIORITY
+  * support zstd compressed control files in debian packages
+  * add an ifdef allowing to rename Solvable dependency members
+    ("requires" is a keyword in C++20)
+  * support setting/reading userdata in solv files
+    new functions: repowriter_set_userdata, solv_read_userdata
+  * support queying of the custom vendor check function
+    new function: pool_get_custom_vendorcheck
+  * support solv files with an idarray block
+  * allow accessing the toolversion at runtime
+
+Version 0.7.20
+- selected bug fixes:
+  * fix misparsing of '&' in attributes with libxml2
+  * choice rules: treat orphaned packages as newest
+  * fix compatibility with Python 3.10
+- new features:
+  * new SOLVER_EXCLUDEFROMWEAK job to ignore pkgs for weak dependencies
+  * support for environments in comps parser
 
 Version 0.7.19
 - selected bug fixes:

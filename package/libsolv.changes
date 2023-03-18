@@ -1,4 +1,58 @@
 -------------------------------------------------------------------
+Tue Dec 13 11:47:50 CET 2022 - mls@suse.de
+
+- fix "keep installed" jobs not disabling "best update" rules
+- do not autouninstall suse ptf packages
+- ensure duplinvolvedmap_all is reset when a solver is reused
+- special case file dependencies in the testcase writer
+- support stringification of multiple solvables
+- new weakdep introspection interface similar to ruleinfos
+- support decision reason queries
+- support merging of related decissions
+- support stringification of ruleinfo, decisioninfo and decision reasons
+- support better info about alternatives
+- new '-P' and '-W' options for testsolv
+- bump version to 0.7.23
+
+-------------------------------------------------------------------
+Mon Mar 21 10:05:32 CET 2022 - mls@suse.de
+
+- reworked choice rule generation to cover more usecases
+- support SOLVABLE_PREREQ_IGNOREINST in the ordering code
+  [bsc#1196514]
+- support parsing of Debian's Multi-Arch indicator
+- bump version to 0.7.22
+
+-------------------------------------------------------------------
+Fri Feb 25 17:32:20 CET 2022 - mls@suse.de
+
+- fix segfault on conflict resolution when using bindings
+- fix split provides not working if the update includes a forbidden
+  vendor change
+- support strict repository priorities
+  new solver flag: SOLVER_FLAG_STRICT_REPO_PRIORITY
+- support zstd compressed control files in debian packages
+- add an ifdef allowing to rename Solvable dependency members
+  ("requires" is a keyword in C++20)
+- support setting/reading userdata in solv files
+  new functions: repowriter_set_userdata, solv_read_userdata
+- support queying of the custom vendor check function
+  new function: pool_get_custom_vendorcheck
+- support solv files with an idarray block
+- allow accessing the toolversion at runtime
+- bump version to 0.7.21
+
+-------------------------------------------------------------------
+Sat Sep 25 22:45:07 CEST 2021 - mls@suse.de
+
+- fix misparsing of '&' in attributes with libxml2
+- choice rules: treat orphaned packages as newest [bsc#1190465]
+- fix compatibility with Python 3.10
+- new SOLVER_EXCLUDEFROMWEAK job type
+- support for environments in comps parser
+- bump version to 0.7.20
+
+-------------------------------------------------------------------
 Fri Jul 30 11:43:29 UTC 2021 - Dominique Leuenberger <dimstar@opensuse.org>
 
 - Disable python2 usage on suse_version >= 1550 by default (still

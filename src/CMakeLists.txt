@@ -20,7 +20,7 @@ SET (libsolv_SRCS
     transaction.c order.c rules.c problems.c linkedpkg.c cplxdeps.c
     chksum.c md5.c sha1.c sha2.c solvversion.c selection.c
     fileprovides.c diskusage.c suse.c solver_util.c cleandeps.c
-    userinstalled.c filelistfilter.c)
+    userinstalled.c filelistfilter.c decision.c)
 
 SET (libsolv_HEADERS
     bitmap.h evr.h hash.h policy.h poolarch.h poolvendor.h pool.h

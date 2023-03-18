@@ -53,6 +53,8 @@ unsigned char *repopagestore_load_page_range(Repopagestore *store, unsigned int 
 
 /* compress a page, return compressed len */
 unsigned int repopagestore_compress_page(unsigned char *page, unsigned int len, unsigned char *cpage, unsigned int max);
+/* uncompress a page, return uncompressed len */
+unsigned int repopagestore_decompress_page(const unsigned char *cpage, unsigned int len, unsigned char *page, unsigned int max);
 
 /* setup page data for repodata_load_page_range */
 int repopagestore_read_or_setup_pages(Repopagestore *store, FILE *fp, unsigned int pagesz, unsigned int blobsz);

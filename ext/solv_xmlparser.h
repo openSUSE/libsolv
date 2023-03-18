@@ -30,6 +30,7 @@ struct solv_xmlparser {
 
   Id *elementhelper;
   void *parser;
+  void *attsdata;
 };
 
 #define SOLV_XMLPARSER_OK	0

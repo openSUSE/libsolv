@@ -13,7 +13,7 @@ solverflags ignorerecommended
 job install pkg a-1-1.noarch@available
 job favor name b2
 result transaction,problems,alternatives <inline>
-#>alternative 64eb4d87  0 a-1-1.noarch@available requires b
+#>alternative 64eb4d87  0 b, required by a-1-1.noarch
 #>alternative 64eb4d87  1 + b2-1-1.noarch@available
 #>alternative 64eb4d87  2   b1-1-1.noarch@available
 #>install a-1-1.noarch@available

@@ -79,6 +79,9 @@ struct s_Solver {
   Id blackrules;			/* rules from blacklisted packages */
   Id blackrules_end;
 
+  Id strictrepopriorules;			/* rules from strict priority repositories */
+  Id strictrepopriorules_end;
+
   Id choicerules;			/* choice rules (always weak) */
   Id choicerules_end;
   Id *choicerules_info;			/* the rule we used to generate the choice rule */
@@ -175,6 +178,7 @@ struct s_Solver {
   int strongrecommends;			/* true: create weak rules for recommends */
   int install_also_updates;		/* true: do not prune install job rules to installed packages */
   int only_namespace_recommended;	/* true: only install packages recommended by namespace */
+  int strict_repo_priority;			/* true: only use packages from highest precedence/priority */
 
   int process_orphans;			/* true: do special orphan processing */
   Map dupmap;				/* dup to those packages */
@@ -298,8 +302,11 @@ typedef struct s_Solver Solver;
 #define SOLVER_REASON_WEAKDEP		7
 #define SOLVER_REASON_RESOLVE_ORPHAN	8
 
-#define SOLVER_REASON_RECOMMENDED	16
-#define SOLVER_REASON_SUPPLEMENTED	17
+#define SOLVER_REASON_RECOMMENDED	16		/* deprecated */
+#define SOLVER_REASON_SUPPLEMENTED	17		/* deprecated */
+
+#define SOLVER_REASON_UNSOLVABLE	18
+#define SOLVER_REASON_PREMISE		19
 
 
 #define SOLVER_FLAG_ALLOW_DOWNGRADE		1
@@ -329,6 +336,7 @@ typedef struct s_Solver Solver;
 #define SOLVER_FLAG_STRONG_RECOMMENDS		25
 #define SOLVER_FLAG_INSTALL_ALSO_UPDATES	26
 #define SOLVER_FLAG_ONLY_NAMESPACE_RECOMMENDED	27
+#define SOLVER_FLAG_STRICT_REPO_PRIORITY	28
 
 #define GET_USERINSTALLED_NAMES			(1 << 0)	/* package names instead of ids */
 #define GET_USERINSTALLED_INVERTED		(1 << 1)	/* autoinstalled */
@@ -337,6 +345,16 @@ typedef struct s_Solver Solver;
 #define SOLVER_ALTERNATIVE_TYPE_RULE		1
 #define SOLVER_ALTERNATIVE_TYPE_RECOMMENDS	2
 #define SOLVER_ALTERNATIVE_TYPE_SUGGESTS	3
+
+/* solver_get_decisionlist / solver_get_learnt flags */
+#define SOLVER_DECISIONLIST_SOLVABLE		(1 << 1)
+#define SOLVER_DECISIONLIST_PROBLEM		(1 << 2)
+#define SOLVER_DECISIONLIST_LEARNTRULE		(1 << 3)
+#define SOLVER_DECISIONLIST_WITHINFO		(1 << 8)
+#define SOLVER_DECISIONLIST_SORTED		(1 << 9)
+#define SOLVER_DECISIONLIST_MERGEDINFO		(1 << 10)
+
+#define SOLVER_DECISIONLIST_TYPEMASK		(0xff)
 
 extern Solver *solver_create(Pool *pool);
 extern void solver_free(Solver *solv);
@@ -358,10 +376,16 @@ extern void pool_add_userinstalled_jobs(Pool *pool, Queue *q, Queue *job, int fl
 extern void solver_get_cleandeps(Solver *solv, Queue *cleandepsq);
 
 extern int  solver_describe_decision(Solver *solv, Id p, Id *infop);
-extern void solver_describe_weakdep_decision(Solver *solv, Id p, Queue *whyq);
+
+extern void solver_get_decisionlist(Solver *solv, Id p, int flags, Queue *decisionlistq);
+extern void solver_get_decisionlist_multiple(Solver *solv, Queue *pq, int flags, Queue *decisionlistq);
+extern void solver_get_learnt(Solver *solv, Id id, int flags, Queue *q);
+extern void solver_decisionlist_solvables(Solver *solv, Queue *decisionlistq, int pos, Queue *q);
+extern int solver_decisionlist_merged(Solver *solv, Queue *decisionlistq, int pos);
 
 extern int solver_alternatives_count(Solver *solv);
 extern int solver_get_alternative(Solver *solv, Id alternative, Id *idp, Id *fromp, Id *chosenp, Queue *choices, int *levelp);
+extern int solver_alternativeinfo(Solver *solv, int type, Id id, Id from, Id *fromp, Id *top, Id *depp);
 
 extern void solver_calculate_multiversionmap(Pool *pool, Queue *job, Map *multiversionmap);
 extern void solver_calculate_noobsmap(Pool *pool, Queue *job, Map *multiversionmap);	/* obsolete */
@@ -373,10 +397,20 @@ extern int solver_calc_installsizechange(Solver *solv);
 extern void pool_job2solvables(Pool *pool, Queue *pkgs, Id how, Id what);
 extern int  pool_isemptyupdatejob(Pool *pool, Id how, Id what);
 
+/* decisioninfo merging */
+extern int solver_calc_decisioninfo_bits(Solver *solv, Id decision, int type, Id from, Id to, Id dep);
+extern int solver_merge_decisioninfo_bits(Solver *solv, int state1, int type1, Id from1, Id to1, Id dep1, int state2, int type2, Id from2, Id to2, Id dep2);
+
 extern const char *solver_select2str(Pool *pool, Id select, Id what);
 extern const char *pool_job2str(Pool *pool, Id how, Id what, Id flagmask);
 extern const char *solver_alternative2str(Solver *solv, int type, Id id, Id from);
+extern const char *solver_reason2str(Solver *solv, int reason);
+extern const char *solver_decisionreason2str(Solver *solv, Id decision, int reason, Id info);
+extern const char *solver_decisioninfo2str(Solver *solv, int bits, int type, Id from, Id to, Id dep);
 
+
+/* deprecated, use solver_allweakdepinfos/solver_weakdepinfo instead */
+extern void solver_describe_weakdep_decision(Solver *solv, Id p, Queue *whyq);
 
 /* iterate over all literals of a rule */
 #define FOR_RULELITERALS(l, pp, r)				\

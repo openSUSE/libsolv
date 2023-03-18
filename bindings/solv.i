@@ -138,7 +138,7 @@ typedef struct {
     int v;
     int e = asval_meth(o, &v);
     if (!SWIG_IsOK(e))
-      SWIG_exception_fail(SWIG_ArgError(e), "list in argument $argnum must contain only" typestr);
+      SWIG_exception_fail(SWIG_ArgError(e), "list in argument $argnum must contain only " typestr);
     queue_push(&$1, v);
   }
 }
@@ -773,13 +773,6 @@ typedef int bool;
 #define RARRAY_LEN(ary) (RARRAY(ary)->len)
 #endif
 
-#define SOLVER_SOLUTION_ERASE                   -100
-#define SOLVER_SOLUTION_REPLACE                 -101
-#define SOLVER_SOLUTION_REPLACE_DOWNGRADE       -102
-#define SOLVER_SOLUTION_REPLACE_ARCHCHANGE      -103
-#define SOLVER_SOLUTION_REPLACE_VENDORCHANGE    -104
-#define SOLVER_SOLUTION_REPLACE_NAMECHANGE      -105
-
 typedef void *AppObjectPtr;
 typedef Id DepId;
 
@@ -839,7 +832,6 @@ typedef struct {
   Solver *solv;
   Id problemid;
   Id solutionid;
-  Id id;
 
   Id type;
   Id p;
@@ -849,7 +841,7 @@ typedef struct {
 typedef struct {
   Solver *solv;
   Id rid;
-  Id type;
+  int type;
   Id source;
   Id target;
   Id dep_id;
@@ -882,6 +874,26 @@ typedef struct {
 } Selection;
 
 typedef struct {
+  Solver *solv;
+  Id p;
+  int reason;
+  Id infoid;
+} Decision;
+
+typedef struct {
+  Solver *solv;
+  Queue decisionlistq;
+  Id p;
+  int reason;
+  Id infoid;
+  int bits;
+  int type;
+  Id source;
+  Id target;
+  Id dep_id;
+} Decisionset;
+
+typedef struct {
   FILE *fp;
 } SolvFp;
 
@@ -894,6 +906,42 @@ struct myappdata {
   int disowned;
 };
 
+/* special internal decisionset constructor from a prepared decisionlist */
+static Decisionset *decisionset_fromids(Solver *solv, Id *ids, int cnt)
+{
+  Decisionset *d = solv_calloc(1, sizeof(*d));
+  int i;
+  d->solv = solv;
+  queue_init(&d->decisionlistq);
+  d->p = ids[0];
+  d->reason = ids[1];
+  d->infoid = ids[2];
+  d->bits = ids[3];
+  d->type = ids[4];
+  d->source = ids[5];
+  d->target = ids[6];
+  d->dep_id = ids[7];
+  for (i = 0; i < cnt; i += 8)
+    queue_insertn(&d->decisionlistq, d->decisionlistq.count, 3, ids + i);
+  if (cnt > 8)
+    d->infoid = 0;
+  return d;
+}
+
+/* prepare a decisionlist so we can feed it to decisionset_fromids */
+static void prepare_decisionset_queue(Solver *solv, Queue *q) {
+  int i, cnt;
+  for (i = cnt = 0; i < q->count; cnt++)
+    {
+      i += 1 + 8 + 8 * solver_decisionlist_merged(solv, q, i);  /* +1 as we insert one element */
+      queue_insert(q, cnt, i - cnt);
+    }
+  if (cnt)
+    queue_unshift(q, 1);        /* start of first block */
+  for (i = 0; i < cnt; i++)
+    q->elements[i] += cnt - i;
+  q->count = cnt;   /* hack */
+}
 
 %}
 
@@ -1068,7 +1116,7 @@ typedef struct {
 
 typedef struct {
   Solver* const solv;
-  Id const type;
+  int const type;
   Id const dep_id;
 } Ruleinfo;
 
@@ -1119,6 +1167,26 @@ typedef struct {
   int subpriority;
   int const nsolvables;
 } Repo;
+
+%nodefaultctor Decision;
+typedef struct {
+  Solver *const solv;
+  Id const p;
+  int const reason;
+  Id const infoid;
+} Decision;
+
+%nodefaultctor Decisionset;
+%nodefaultdtor Decisionset;
+typedef struct {
+  Solver *const solv;
+  Id const p;
+  int const reason;
+  Id const infoid;
+  int const bits;
+  int const type;
+  Id const dep_id;
+} Decisionset;
 
 %nodefaultctor Solver;
 %nodefaultdtor Solver;
@@ -1197,7 +1265,6 @@ typedef struct {
   Solver *const solv;
   Id const problemid;
   Id const solutionid;
-  Id const id;
   Id const type;
 } Solutionelement;
 
@@ -1205,11 +1272,9 @@ typedef struct {
 typedef struct {
   Solver *const solv;
   Id const type;
-  Id const rid;
-  Id const from_id;
   Id const dep_id;
   Id const chosen_id;
-  int level;
+  int const level;
 } Alternative;
 
 %nodefaultctor Transaction;
@@ -1628,10 +1693,14 @@ returnself(matchsolvable)
   static const int POOL_FLAG_NOINSTALLEDOBSOLETES = POOL_FLAG_NOINSTALLEDOBSOLETES;
   static const int POOL_FLAG_HAVEDISTEPOCH = POOL_FLAG_HAVEDISTEPOCH;
   static const int POOL_FLAG_NOOBSOLETESMULTIVERSION = POOL_FLAG_NOOBSOLETESMULTIVERSION;
+  static const int POOL_FLAG_ADDFILEPROVIDESFILTERED = POOL_FLAG_ADDFILEPROVIDESFILTERED;
+  static const int POOL_FLAG_NOWHATPROVIDESAUX = POOL_FLAG_NOWHATPROVIDESAUX;
+  static const int POOL_FLAG_WHATPROVIDESWITHDISABLED = POOL_FLAG_WHATPROVIDESWITHDISABLED;
   static const int DISTTYPE_RPM = DISTTYPE_RPM;
   static const int DISTTYPE_DEB = DISTTYPE_DEB;
   static const int DISTTYPE_ARCH = DISTTYPE_ARCH;
   static const int DISTTYPE_HAIKU = DISTTYPE_HAIKU;
+  static const int DISTTYPE_CONDA = DISTTYPE_CONDA;
 
   Pool() {
     Pool *pool = pool_create();
@@ -1900,6 +1969,13 @@ returnself(matchsolvable)
   const char *solvid2str(Id solvid) {
     return pool_solvid2str($self, solvid);
   }
+  const char *solvidset2str(Queue q) {
+    return pool_solvidset2str($self, &q);
+  }
+  const char *solvableset2str(Queue solvables) {
+    return pool_solvidset2str($self, &solvables);
+  }
+
   void addfileprovides() {
     pool_addfileprovides($self);
   }
@@ -3337,6 +3413,31 @@ returnself(matchsolvable)
       queue_push(&q, i);
     return q;
   }
+  %typemap(out) Queue get_learnt Queue2Array(XRule *, 1, new_XRule(arg1->solv, id));
+  %newobject get_learnt;
+  Queue get_learnt() {
+    Queue q;
+    queue_init(&q);
+    solver_get_learnt($self->solv, $self->id, SOLVER_DECISIONLIST_PROBLEM, &q);
+    return q;
+  }
+  %typemap(out) Queue get_decisionlist Queue2Array(Decision *, 3, new_Decision(arg1->solv, id, idp[1], idp[2]));
+  %newobject get_decisionlist;
+  Queue get_decisionlist() {
+    Queue q;
+    queue_init(&q);
+    solver_get_decisionlist($self->solv, $self->id, SOLVER_DECISIONLIST_PROBLEM | SOLVER_DECISIONLIST_SORTED, &q);
+    return q;
+  }
+  %typemap(out) Queue get_decisionsetlist Queue2Array(Decisionset *, 1, decisionset_fromids(arg1->solv, idp + id, idp[1] - id + 1));
+  %newobject get_decisionsetlist;
+  Queue get_decisionsetlist() {
+    Queue q;
+    queue_init(&q);
+    solver_get_decisionlist($self->solv, $self->id, SOLVER_DECISIONLIST_PROBLEM | SOLVER_DECISIONLIST_SORTED | SOLVER_DECISIONLIST_WITHINFO | SOLVER_DECISIONLIST_MERGEDINFO, &q);
+    prepare_decisionset_queue($self->solv, &q);
+    return q;
+  }
 #if defined(SWIGPERL) || defined(SWIGTCL)
   %rename("str") __str__;
 #endif
@@ -3357,94 +3458,32 @@ returnself(matchsolvable)
   int element_count() {
     return solver_solutionelement_count($self->solv, $self->problemid, $self->id);
   }
-
-  %typemap(out) Queue elements Queue2Array(Solutionelement *, 4, new_Solutionelement(arg1->solv, arg1->problemid, arg1->id, id, idp[1], idp[2], idp[3]));
+  %typemap(out) Queue elements Queue2Array(Solutionelement *, 3, new_Solutionelement(arg1->solv, arg1->problemid, arg1->id, id, idp[1], idp[2]));
   %newobject elements;
   Queue elements(bool expandreplaces=0) {
     Queue q;
-    int i, cnt;
     queue_init(&q);
-    cnt = solver_solutionelement_count($self->solv, $self->problemid, $self->id);
-    for (i = 1; i <= cnt; i++)
-      {
-        Id p, rp, type;
-        solver_next_solutionelement($self->solv, $self->problemid, $self->id, i - 1, &p, &rp);
-        if (p > 0) {
-          type = rp ? SOLVER_SOLUTION_REPLACE : SOLVER_SOLUTION_ERASE;
-        } else {
-          type = p;
-          p = rp;
-          rp = 0;
-        }
-        if (type == SOLVER_SOLUTION_REPLACE && expandreplaces) {
-          int illegal = policy_is_illegal(self->solv, self->solv->pool->solvables + p, self->solv->pool->solvables + rp, 0);
-          if (illegal) {
-            if ((illegal & POLICY_ILLEGAL_DOWNGRADE) != 0) {
-              queue_push2(&q, i, SOLVER_SOLUTION_REPLACE_DOWNGRADE);
-              queue_push2(&q, p, rp);
-            }
-            if ((illegal & POLICY_ILLEGAL_ARCHCHANGE) != 0) {
-              queue_push2(&q, i, SOLVER_SOLUTION_REPLACE_ARCHCHANGE);
-              queue_push2(&q, p, rp);
-            }
-            if ((illegal & POLICY_ILLEGAL_VENDORCHANGE) != 0) {
-              queue_push2(&q, i, SOLVER_SOLUTION_REPLACE_VENDORCHANGE);
-              queue_push2(&q, p, rp);
-            }
-            if ((illegal & POLICY_ILLEGAL_NAMECHANGE) != 0) {
-              queue_push2(&q, i, SOLVER_SOLUTION_REPLACE_NAMECHANGE);
-              queue_push2(&q, p, rp);
-            }
-            continue;
-          }
-        }
-        queue_push2(&q, i, type);
-        queue_push2(&q, p, rp);
-      }
+    solver_all_solutionelements($self->solv, $self->problemid, $self->id, expandreplaces, &q);
     return q;
   }
 }
 
 %extend Solutionelement {
-  Solutionelement(Solver *solv, Id problemid, Id solutionid, Id id, Id type, Id p, Id rp) {
+  Solutionelement(Solver *solv, Id problemid, Id solutionid, Id type, Id p, Id rp) {
     Solutionelement *e;
     e = solv_calloc(1, sizeof(*e));
     e->solv = solv;
     e->problemid = problemid;
-    e->solutionid = id;
-    e->id = id;
+    e->solutionid = solutionid;
     e->type = type;
     e->p = p;
     e->rp = rp;
     return e;
   }
   const char *str() {
-    Id p = $self->type;
-    Id rp = $self->p;
-    int illegal = 0;
-    if (p == SOLVER_SOLUTION_ERASE)
-      {
-        p = rp;
-        rp = 0;
-      }
-    else if (p == SOLVER_SOLUTION_REPLACE)
-      {
-        p = rp;
-        rp = $self->rp;
-      }
-    else if (p == SOLVER_SOLUTION_REPLACE_DOWNGRADE)
-      illegal = POLICY_ILLEGAL_DOWNGRADE;
-    else if (p == SOLVER_SOLUTION_REPLACE_ARCHCHANGE)
-      illegal = POLICY_ILLEGAL_ARCHCHANGE;
-    else if (p == SOLVER_SOLUTION_REPLACE_VENDORCHANGE)
-      illegal = POLICY_ILLEGAL_VENDORCHANGE;
-    else if (p == SOLVER_SOLUTION_REPLACE_NAMECHANGE)
-      illegal = POLICY_ILLEGAL_NAMECHANGE;
-    if (illegal)
-      return pool_tmpjoin($self->solv->pool, "allow ", policy_illegal2str($self->solv, illegal, $self->solv->pool->solvables + $self->p, $self->solv->pool->solvables + $self->rp), 0);
-    return solver_solutionelement2str($self->solv, p, rp);
+    return solver_solutionelementtype2str($self->solv, $self->type, $self->p, $self->rp);
   }
-  %typemap(out) Queue replaceelements Queue2Array(Solutionelement *, 1, new_Solutionelement(arg1->solv, arg1->problemid, arg1->solutionid, arg1->id, id, arg1->p, arg1->rp));
+  %typemap(out) Queue replaceelements Queue2Array(Solutionelement *, 1, new_Solutionelement(arg1->solv, arg1->problemid, arg1->solutionid, id, arg1->p, arg1->rp));
   %newobject replaceelements;
   Queue replaceelements() {
     Queue q;
@@ -3517,6 +3556,9 @@ returnself(matchsolvable)
   static const int SOLVER_RULE_PKG_OBSOLETES = SOLVER_RULE_PKG_OBSOLETES;
   static const int SOLVER_RULE_PKG_IMPLICIT_OBSOLETES = SOLVER_RULE_PKG_IMPLICIT_OBSOLETES;
   static const int SOLVER_RULE_PKG_INSTALLED_OBSOLETES = SOLVER_RULE_PKG_INSTALLED_OBSOLETES;
+  static const int SOLVER_RULE_PKG_RECOMMENDS = SOLVER_RULE_PKG_RECOMMENDS;
+  static const int SOLVER_RULE_PKG_CONSTRAINS = SOLVER_RULE_PKG_CONSTRAINS;
+  static const int SOLVER_RULE_PKG_SUPPLEMENTS = SOLVER_RULE_PKG_SUPPLEMENTS;
   static const int SOLVER_RULE_UPDATE = SOLVER_RULE_UPDATE;
   static const int SOLVER_RULE_FEATURE = SOLVER_RULE_FEATURE;
   static const int SOLVER_RULE_JOB = SOLVER_RULE_JOB;
@@ -3528,6 +3570,11 @@ returnself(matchsolvable)
   static const int SOLVER_RULE_INFARCH = SOLVER_RULE_INFARCH;
   static const int SOLVER_RULE_CHOICE = SOLVER_RULE_CHOICE;
   static const int SOLVER_RULE_LEARNT = SOLVER_RULE_LEARNT;
+  static const int SOLVER_RULE_BEST  = SOLVER_RULE_BEST;
+  static const int SOLVER_RULE_YUMOBS = SOLVER_RULE_YUMOBS;
+  static const int SOLVER_RULE_RECOMMENDS = SOLVER_RULE_RECOMMENDS;
+  static const int SOLVER_RULE_BLACK = SOLVER_RULE_BLACK;
+  static const int SOLVER_RULE_STRICT_REPO_PRIORITY = SOLVER_RULE_STRICT_REPO_PRIORITY;
 
   static const int SOLVER_SOLUTION_JOB = SOLVER_SOLUTION_JOB;
   static const int SOLVER_SOLUTION_POOLJOB = SOLVER_SOLUTION_POOLJOB;
@@ -3571,6 +3618,7 @@ returnself(matchsolvable)
   static const int SOLVER_FLAG_STRONG_RECOMMENDS = SOLVER_FLAG_STRONG_RECOMMENDS;
   static const int SOLVER_FLAG_INSTALL_ALSO_UPDATES = SOLVER_FLAG_INSTALL_ALSO_UPDATES;
   static const int SOLVER_FLAG_ONLY_NAMESPACE_RECOMMENDED = SOLVER_FLAG_ONLY_NAMESPACE_RECOMMENDED;
+  static const int SOLVER_FLAG_STRICT_REPO_PRIORITY = SOLVER_FLAG_STRICT_REPO_PRIORITY;
 
   static const int SOLVER_REASON_UNRELATED = SOLVER_REASON_UNRELATED;
   static const int SOLVER_REASON_UNIT_RULE = SOLVER_REASON_UNIT_RULE;
@@ -3583,6 +3631,8 @@ returnself(matchsolvable)
   static const int SOLVER_REASON_RESOLVE_ORPHAN = SOLVER_REASON_RESOLVE_ORPHAN;
   static const int SOLVER_REASON_RECOMMENDED = SOLVER_REASON_RECOMMENDED;
   static const int SOLVER_REASON_SUPPLEMENTED = SOLVER_REASON_SUPPLEMENTED;
+  static const int SOLVER_REASON_UNSOLVABLE = SOLVER_REASON_UNSOLVABLE;
+  static const int SOLVER_REASON_PREMISE = SOLVER_REASON_PREMISE;
 
   /* legacy */
   static const int SOLVER_RULE_RPM = SOLVER_RULE_RPM;
@@ -3616,13 +3666,14 @@ returnself(matchsolvable)
     return solver_create_transaction($self);
   }
 
+  /* legacy, use get_decision */
   int describe_decision(XSolvable *s, XRule **OUTPUT) {
-    int ruleid;
+    Id ruleid;
     int reason = solver_describe_decision($self, s->id, &ruleid);
     *OUTPUT = new_XRule($self, ruleid);
     return reason;
   }
-
+  /* legacy, use get_decision and the info/allinfos method */
   %newobject describe_weakdep_decision_raw;
   Queue describe_weakdep_decision_raw(XSolvable *s) {
     Queue q;
@@ -3665,8 +3716,8 @@ rb_eval_string(
     return solver_alternatives_count($self);
   }
 
-  %newobject alternative;
-  Alternative *alternative(Id aid) {
+  %newobject get_alternative;
+  Alternative *get_alternative(Id aid) {
     Alternative *a = solv_calloc(1, sizeof(*a));
     a->solv = $self;
     queue_init(&a->choices);
@@ -3683,9 +3734,9 @@ rb_eval_string(
     return a;
   }
 
-  %typemap(out) Queue all_alternatives Queue2Array(Alternative *, 1, Solver_alternative(arg1, id));
-  %newobject all_alternatives;
-  Queue all_alternatives() {
+  %typemap(out) Queue alternatives Queue2Array(Alternative *, 1, Solver_get_alternative(arg1, id));
+  %newobject alternatives;
+  Queue alternatives() {
     Queue q;
     int i, cnt;
     queue_init(&q);
@@ -3711,6 +3762,60 @@ rb_eval_string(
           q.elements[j++] = q.elements[i];
       queue_truncate(&q, j);
     }
+    return q;
+  }
+
+  %typemap(out) Queue all_decisions Queue2Array(Decision *, 3, new_Decision(arg1, id, idp[1], idp[2]));
+  %newobject all_decisions;
+  Queue all_decisions(int filter=0) {
+    int i, j, cnt;
+    Queue q;
+    queue_init(&q);
+    solver_get_decisionqueue($self, &q);
+    if (filter) {
+      for (i = j = 0; i < q.count; i++)
+        if ((filter > 0 && q.elements[i] > 1) ||
+            (filter < 0 && q.elements[i] < 0))
+          q.elements[j++] = q.elements[i];
+      queue_truncate(&q, j);
+    }
+    cnt = q.count;
+    for (i = 0; i < cnt; i++) {
+      Id ruleid, p = q.elements[i];
+      int reason;
+      if (p == 0 || p == 1)
+        continue;       /* ignore system solvable */
+      reason = solver_describe_decision($self, p > 0 ? p : -p, &ruleid);
+      queue_push(&q, p);
+      queue_push2(&q, reason, ruleid);
+    }
+    queue_deleten(&q, 0, cnt);
+    return q;
+  }
+
+  %newobject get_decision;
+  Decision *get_decision(XSolvable *s) {
+    Id info;
+    int lvl = solver_get_decisionlevel($self, s->id);
+    Id p = lvl > 0 ? s->id : -s->id;
+    int reason = solver_describe_decision($self, p, &info);
+    return new_Decision($self, p, reason, info);
+  }
+
+  %typemap(out) Queue get_learnt Queue2Array(XRule *, 1, new_XRule(arg1, id));
+  %newobject get_learnt;
+  Queue get_learnt(XSolvable *s) {
+    Queue q;
+    queue_init(&q);
+    solver_get_learnt($self, s->id, SOLVER_DECISIONLIST_SOLVABLE, &q);
+    return q;
+  }
+  %typemap(out) Queue get_decisionlist Queue2Array(Decision *, 3, new_Decision(arg1, id, idp[1], idp[2]));
+  %newobject get_decisionlist;
+  Queue get_decisionlist(XSolvable *s) {
+    Queue q;
+    queue_init(&q);
+    solver_get_decisionlist($self, s->id, SOLVER_DECISIONLIST_SOLVABLE, &q);
     return q;
   }
 
@@ -3912,14 +4017,40 @@ rb_eval_string(
   Ruleinfo *info() {
     Id type, source, target, dep;
     type = solver_ruleinfo($self->solv, $self->id, &source, &target, &dep);
-    return new_Ruleinfo($self, type, source, target, dep);
+    return new_Ruleinfo($self->solv, $self->id, type, source, target, dep);
   }
-  %typemap(out) Queue allinfos Queue2Array(Ruleinfo *, 4, new_Ruleinfo(arg1, id, idp[1], idp[2], idp[3]));
+  %typemap(out) Queue allinfos Queue2Array(Ruleinfo *, 4, new_Ruleinfo(arg1->solv, arg1->id, id, idp[1], idp[2], idp[3]));
   %newobject allinfos;
   Queue allinfos() {
     Queue q;
     queue_init(&q);
     solver_allruleinfos($self->solv, $self->id, &q);
+    return q;
+  }
+
+  %typemap(out) Queue get_learnt Queue2Array(XRule *, 1, new_XRule(arg1->solv, id));
+  %newobject get_learnt;
+  Queue get_learnt() {
+    Queue q;
+    queue_init(&q);
+    solver_get_learnt($self->solv, $self->id, SOLVER_DECISIONLIST_LEARNTRULE, &q);
+    return q;
+  }
+  %typemap(out) Queue get_decisionlist Queue2Array(Decision *, 3, new_Decision(arg1->solv, id, idp[1], idp[2]));
+  %newobject get_decisionlist;
+  Queue get_decisionlist() {
+    Queue q;
+    queue_init(&q);
+    solver_get_decisionlist($self->solv, $self->id, SOLVER_DECISIONLIST_LEARNTRULE | SOLVER_DECISIONLIST_SORTED, &q);
+    return q;
+  }
+  %typemap(out) Queue get_decisionsetlist Queue2Array(Decisionset *, 1, decisionset_fromids(arg1->solv, idp + id, idp[1] - id + 1));
+  %newobject get_decisionsetlist;
+  Queue get_decisionsetlist() {
+    Queue q;
+    queue_init(&q);
+    solver_get_decisionlist($self->solv, $self->id, SOLVER_DECISIONLIST_LEARNTRULE | SOLVER_DECISIONLIST_SORTED | SOLVER_DECISIONLIST_WITHINFO | SOLVER_DECISIONLIST_MERGEDINFO, &q);
+    prepare_decisionset_queue($self->solv, &q);
     return q;
   }
 
@@ -3952,10 +4083,10 @@ rb_eval_string(
 }
 
 %extend Ruleinfo {
-  Ruleinfo(XRule *r, Id type, Id source, Id target, Id dep_id) {
+  Ruleinfo(Solver *solv, Id rid, Id type, Id source, Id target, Id dep_id) {
     Ruleinfo *ri = solv_calloc(1, sizeof(*ri));
-    ri->solv = r->solv;
-    ri->rid = r->id;
+    ri->solv = solv;
+    ri->rid = rid;
     ri->type = type;
     ri->source = source;
     ri->target = target;
@@ -3981,6 +4112,12 @@ rb_eval_string(
   %}
   const char *problemstr() {
     return solver_problemruleinfo2str($self->solv, $self->type, $self->source, $self->target, $self->dep_id);
+  }
+#if defined(SWIGPERL) || defined(SWIGTCL)
+  %rename("str") __str__;
+#endif
+  const char *__str__() {
+    return solver_ruleinfo2str($self->solv, $self->type, $self->source, $self->target, $self->dep_id);
   }
 }
 
@@ -4170,24 +4307,21 @@ rb_eval_string(
       return new_Dep(a->solv->pool, a->dep_id);
     }
   %}
-
   Queue choices_raw() {
-    Queue r;
-    queue_init_clone(&r, &$self->choices);
-    return r;
+    Queue q;
+    queue_init_clone(&q, &$self->choices);
+    return q;
   }
-
   %typemap(out) Queue choices Queue2Array(XSolvable *, 1, new_XSolvable(arg1->solv->pool, id));
   Queue choices() {
     int i;
-    Queue r;
-    queue_init_clone(&r, &$self->choices);
-    for (i = 0; i < r.count; i++)
-      if (r.elements[i] < 0)
-        r.elements[i] = -r.elements[i];
-    return r;
+    Queue q;
+    queue_init_clone(&q, &$self->choices);
+    for (i = 0; i < q.count; i++)
+      if (q.elements[i] < 0)
+        q.elements[i] = -q.elements[i];
+    return q;
   }
-
 #if defined(SWIGPERL) || defined(SWIGTCL)
   %rename("str") __str__;
 #endif
@@ -4195,6 +4329,138 @@ rb_eval_string(
     return solver_alternative2str($self->solv, $self->type, $self->type == SOLVER_ALTERNATIVE_TYPE_RULE ? $self->rid : $self->dep_id, $self->from_id);
   }
 }
+
+%extend Decision {
+  Decision(Solver *solv, Id p, int reason, Id infoid) {
+    Decision *d = solv_calloc(1, sizeof(*d));
+    d->solv = solv;
+    d->p = p;
+    d->reason = reason;
+    d->infoid = infoid;
+    return d;
+  }
+  %newobject rule;
+  XRule * const rule;
+  %newobject solvable;
+  XSolvable * const solvable;
+  %{
+    SWIGINTERN XRule *Decision_rule_get(Decision *d) {
+      return d->reason == SOLVER_REASON_WEAKDEP || d->infoid <= 0 ? 0 : new_XRule(d->solv, d->infoid);
+    }
+    SWIGINTERN XSolvable *Decision_solvable_get(Decision *d) {
+      return new_XSolvable(d->solv->pool, d->p >= 0 ? d->p : -d->p);
+    }
+  %}
+  %newobject info;
+  Ruleinfo *info() {
+    Id type, source, target, dep;
+    if ($self->reason == SOLVER_REASON_WEAKDEP) {
+      type = solver_weakdepinfo($self->solv, $self->p, &source, &target, &dep);
+    } else if ($self->infoid) {
+      type = solver_ruleinfo($self->solv, $self->infoid, &source, &target, &dep);
+    } else {
+      return 0;
+    }
+    return new_Ruleinfo($self->solv, $self->infoid, type, source, target, dep);
+  }
+  %typemap(out) Queue allinfos Queue2Array(Ruleinfo *, 4, new_Ruleinfo(arg1->solv, arg1->infoid, id, idp[1], idp[2], idp[3]));
+  %newobject allinfos;
+  Queue allinfos() {
+    Queue q;
+    queue_init(&q);
+    if ($self->reason == SOLVER_REASON_WEAKDEP) {
+      solver_allweakdepinfos($self->solv, $self->p, &q);
+    } else if ($self->infoid) {
+      solver_allruleinfos($self->solv, $self->infoid, &q);
+    }
+    return q;
+  }
+  const char *reasonstr(bool noinfo=0) {
+    if (noinfo)
+      return solver_reason2str($self->solv, $self->reason);
+    return solver_decisionreason2str($self->solv, $self->p, $self->reason, $self->infoid);
+  }
+#if defined(SWIGPERL) || defined(SWIGTCL)
+  %rename("str") __str__;
+#endif
+  const char *__str__() {
+    Pool *pool = $self->solv->pool;
+    if ($self->p == 0 && $self->reason == SOLVER_REASON_UNSOLVABLE)
+      return "unsolvable";
+    if ($self->p >= 0)
+      return pool_tmpjoin(pool, "install ", pool_solvid2str(pool, $self->p), 0);
+    else
+      return pool_tmpjoin(pool, "conflict ", pool_solvid2str(pool, -$self->p), 0);
+  }
+}
+
+%extend Decisionset {
+  Decisionset(Solver *solv) {
+    Decisionset *d = solv_calloc(1, sizeof(*d));
+    d->solv = solv;
+    queue_init(&d->decisionlistq);
+    return d;
+  }
+  ~Decisionset() {
+    queue_free(&$self->decisionlistq);
+    solv_free($self);
+  }
+  %newobject info;
+  Ruleinfo *info() {
+    return new_Ruleinfo($self->solv, $self->infoid, $self->type, $self->source, $self->target, $self->dep_id);
+  }
+  %newobject dep;
+  Dep * const dep;
+  %{
+    SWIGINTERN Dep *Decisionset_dep_get(Decisionset *d) {
+      return new_Dep(d->solv->pool, d->dep_id);
+    }
+  %}
+  %typemap(out) Queue solvables Queue2Array(XSolvable *, 1, new_XSolvable(arg1->solv->pool, id));
+  %newobject solvables;
+  Queue solvables() {
+    Queue q;
+    int i;
+    queue_init(&q);
+    for (i = 0; i < $self->decisionlistq.count; i += 3)
+      if ($self->decisionlistq.elements[i] != 0)
+        queue_push(&q, $self->decisionlistq.elements[i] > 0 ? $self->decisionlistq.elements[i] : -$self->decisionlistq.elements[i]);
+    return q;
+  }
+  %typemap(out) Queue decisions Queue2Array(Decision *, 3, new_Decision(arg1->solv, id, idp[1], idp[2]));
+  %newobject decisions;
+  Queue decisions() {
+    Queue q;
+    queue_init_clone(&q, &$self->decisionlistq);
+    return q;
+  }
+  const char *reasonstr(bool noinfo=0) {
+    if (noinfo || !$self->type)
+      return solver_reason2str($self->solv, $self->reason);
+    return solver_decisioninfo2str($self->solv, $self->bits, $self->type, $self->source, $self->target, $self->dep_id);
+  }
+#if defined(SWIGPERL) || defined(SWIGTCL)
+  %rename("str") __str__;
+#endif
+  const char *__str__() {
+    Pool *pool = $self->solv->pool;
+    Queue q;
+    int i;
+    const char *s;
+    if (!$self->decisionlistq.elements)
+      return "";
+    if ($self->p == 0 && $self->reason == SOLVER_REASON_UNSOLVABLE)
+      return "unsolvable";
+    queue_init(&q);
+    for (i = 0; i < $self->decisionlistq.count; i += 3)
+      if ($self->decisionlistq.elements[i] != 0)
+        queue_push(&q, $self->decisionlistq.elements[i] > 0 ? $self->decisionlistq.elements[i] : -$self->decisionlistq.elements[i]);
+    s = pool_solvidset2str(pool, &q);
+    queue_free(&q);
+    return pool_tmpjoin(pool, $self->p >= 0 ? "install " : "conflict ", s, 0);
+  }
+}
+
 
 #if defined(SWIGTCL)
 %init %{

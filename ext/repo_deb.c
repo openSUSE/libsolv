@@ -11,9 +11,16 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <zlib.h>
-#include <lzma.h>
 #include <errno.h>
+#ifdef ENABLE_ZLIB_COMPRESSION
+#include <zlib.h>
+#endif
+#ifdef ENABLE_LZMA_COMPRESSION
+#include <lzma.h>
+#endif
+#ifdef ENABLE_ZSTD_COMPRESSION
+#include <zstd.h>
+#endif
 
 #include "pool.h"
 #include "repo.h"
@@ -29,6 +36,10 @@
 #if !defined(S_ISREG) && defined(S_IFMT) && defined(S_IFREG)
 #define S_ISREG(m) (((m) & S_IFMT) == S_IFREG)
 #endif
+
+#define MAX_CONTROL_SIZE	0x1000000
+
+#ifdef ENABLE_ZLIB_COMPRESSION
 
 static unsigned char *
 decompress_gz(unsigned char *in, int inl, int *outlp, int maxoutl)
@@ -107,6 +118,18 @@ decompress_gz(unsigned char *in, int inl, int *outlp, int maxoutl)
   return out;
 }
 
+#else
+
+static unsigned char *
+decompress_gz(unsigned char *in, int inl, int *outlp, int maxoutl)
+{
+  return 0;
+}
+
+#endif	/* ENABLE_ZLIB_COMPRESSION */
+
+#ifdef ENABLE_LZMA_COMPRESSION
+
 static unsigned char *
 decompress_xz(unsigned char *in, int inl, int *outlp, int maxoutl)
 {
@@ -158,6 +181,81 @@ decompress_xz(unsigned char *in, int inl, int *outlp, int maxoutl)
   *outlp = outl;
   return out;
 }
+
+#else
+
+static unsigned char *
+decompress_xz(unsigned char *in, int inl, int *outlp, int maxoutl)
+{
+  return 0;
+}
+
+#endif	/* ENABLE_LZMA_COMPRESSION */
+
+#ifdef ENABLE_ZSTD_COMPRESSION
+
+static unsigned char *
+decompress_zstd(unsigned char *in, int inl, int *outlp, int maxoutl)
+{
+  ZSTD_DStream *dstream;
+  ZSTD_inBuffer inbuf;
+  ZSTD_outBuffer outbuf;
+  int ret;
+
+  dstream = ZSTD_createDStream();
+  if (!dstream)
+    return 0;
+  if (ZSTD_isError(ZSTD_initDStream(dstream)))
+    {
+      ZSTD_freeDStream(dstream);
+      return 0;
+    }
+  inbuf.src = in;
+  inbuf.pos = 0;
+  inbuf.size = inl;
+  outbuf.dst = solv_malloc(4096);
+  outbuf.pos = 0;
+  outbuf.size = 4096;
+  for (;;)
+    {
+      if (outbuf.pos == outbuf.size)
+	{
+	  outbuf.size += 4096;
+	  if (outbuf.size >= maxoutl)
+	    {
+	      ret = 1;
+	      break;
+	    }
+	  outbuf.dst = solv_realloc(outbuf.dst, outbuf.size + 4096);
+	}
+      ret = ZSTD_decompressStream(dstream, &outbuf, &inbuf);
+      if (ret == 0 && inbuf.pos == inbuf.size)
+	break;
+      if (ZSTD_isError(ret) || (inbuf.pos == inbuf.size && outbuf.pos < outbuf.size))
+	{
+	  ret = 1;
+	  break;
+	}
+    }
+  ZSTD_freeDStream(dstream);
+  if (ret)
+    {
+      solv_free(outbuf.dst);
+      return 0;
+    }
+  *outlp = outbuf.pos;
+  return outbuf.dst;
+}
+
+#else
+
+static unsigned char *
+decompress_zstd(unsigned char *in, int inl, int *outlp, int maxoutl)
+{
+  return 0;
+}
+
+#endif	/* ENABLE_ZSTD_COMPRESSION */
 
 static Id
 parseonedep(Pool *pool, char *p)
@@ -364,6 +462,10 @@ control2solvable(Solvable *s, Repodata *data, char *control)
 	      checksumtype = REPOKEY_TYPE_MD5;
 	    }
 	  break;
+	case 'M' << 8 | 'U':
+	  if (!strcasecmp(tag, "multi-arch"))
+	    repodata_set_poolstr(data, s - pool->solvables, SOLVABLE_MULTIARCH, q);
+	  break;
 	case 'P' << 8 | 'A':
 	  if (!strcasecmp(tag, "package"))
 	    s->name = pool_str2id(pool, q, 1);
@@ -544,6 +646,7 @@ repo_add_debdb(Repo *repo, int flags)
 #define CONTROL_COMP_NONE	0
 #define CONTROL_COMP_GZIP	1
 #define CONTROL_COMP_XZ		2
+#define CONTROL_COMP_ZSTD	3
 
 Id
 repo_add_deb(Repo *repo, const char *deb, int flags)
@@ -599,6 +702,8 @@ repo_add_deb(Repo *repo, const char *deb, int flags)
     control_comp = CONTROL_COMP_GZIP;
   else if (!strncmp((char *)buf + 8 + 60 + vlen, "control.tar.xz  ", 16) || !strncmp((char *)buf + 8 + 60 + vlen, "control.tar.xz/ ", 16))
     control_comp = CONTROL_COMP_XZ;
+  else if (!strncmp((char *)buf + 8 + 60 + vlen, "control.tar.zst ", 16) || !strncmp((char *)buf + 8 + 60 + vlen, "control.tar.zst/", 16))
+    control_comp = CONTROL_COMP_ZSTD;
   else if (!strncmp((char *)buf + 8 + 60 + vlen, "control.tar     ", 16) || !strncmp((char *)buf + 8 + 60 + vlen, "control.tar/    ", 16))
     control_comp = CONTROL_COMP_NONE;
   else
@@ -611,7 +716,7 @@ repo_add_deb(Repo *repo, const char *deb, int flags)
    * just keeps from allocating arbitrarily large amounts of memory.
    */
   clen = atoi((char *)buf + 8 + 60 + vlen + 48);
-  if (clen <= 0 || clen >= 0x1000000)
+  if (clen <= 0 || clen >= MAX_CONTROL_SIZE)
     {
       pool_error(pool, -1, "%s: control.tar has illegal size", deb);
       fclose(fp);
@@ -645,9 +750,11 @@ repo_add_deb(Repo *repo, const char *deb, int flags)
     }
   ctar = 0;
   if (control_comp == CONTROL_COMP_GZIP)
-    ctar = decompress_gz(ctgz, clen, &ctarlen, 0x1000000);
+    ctar = decompress_gz(ctgz, clen, &ctarlen, MAX_CONTROL_SIZE);
   else if (control_comp == CONTROL_COMP_XZ)
-    ctar = decompress_xz(ctgz, clen, &ctarlen, 0x1000000);
+    ctar = decompress_xz(ctgz, clen, &ctarlen, MAX_CONTROL_SIZE);
+  else if (control_comp == CONTROL_COMP_ZSTD)
+    ctar = decompress_zstd(ctgz, clen, &ctarlen, MAX_CONTROL_SIZE);
   else
     {
       ctarlen = clen;
@@ -656,7 +763,7 @@ repo_add_deb(Repo *repo, const char *deb, int flags)
   solv_free(ctgz);
   if (!ctar)
     {
-      pool_error(pool, -1, "%s: control.tar is corrupt", deb);
+      pool_error(pool, -1, "%s: control.tar decompression error", deb);
       return 0;
     }
   bp = ctar;

@@ -26,6 +26,7 @@ job install name B
 job install name B2
 job disfavor name C
 result transaction,problems,alternatives <inline>
+#>alternative 6b91d100  0 C, recommended by B-1-1.noarch
 #>alternative 6b91d100  1 + D-1-1.noarch@available
 #>alternative 6b91d100  2   E-1-1.noarch@available
 #>install B-1-1.noarch@available

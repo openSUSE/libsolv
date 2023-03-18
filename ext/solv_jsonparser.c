@@ -136,6 +136,8 @@ parseutf8(struct solv_jsonparser *jp, int surrogate)
 	return -1;
       r = (r << 4) | c;
     }
+  if (r == 0)
+    return -1;		/* no embedded NULs for now */
   if (!surrogate && r >= 0xd800 && r < 0xdc00)
     {
       /* utf16 surrogate pair encodes 0x10000 - 0x10ffff */
@@ -197,11 +199,47 @@ parsestring(struct solv_jsonparser *jp)
 }
 
 static int
+parsestring_raw(struct solv_jsonparser *jp)
+{
+  int c;
+  savec(jp, '\"');
+  for (;;)
+    {
+      if ((c = nextc(jp)) < 32)
+	return JP_ERROR;
+      if (c == '"')
+	break;
+      if (c == '\\')
+	{
+	  c = nextc(jp);
+	  if (!c || !strchr("\"\\/\nbfnrtu", c))
+	    return JP_ERROR;
+	  savec(jp, '\\');
+	  if (c == 'u')
+	    {
+	      int i;
+	      for (i = 0; i < 4; i++)
+		{
+		  savec(jp, c);
+		  c = nextc(jp);
+		  if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')))
+		    return JP_ERROR;
+		}
+	    }
+	}
+      savec(jp, c);
+    }
+  savec(jp, '\"');
+  savec(jp, 0);
+  return JP_STRING;
+}
+
+static int
 parsevalue(struct solv_jsonparser *jp)
 {
   int c = skipspace(jp);
   if (c == '"')
-    return parsestring(jp);
+    return jp->flags & JP_FLAG_RAWSTRINGS ? parsestring_raw(jp) : parsestring(jp);
   if ((c >= '0' && c <= '9') || c == '+' || c == '-' || c == '.')
     return parsenumber(jp, c);
   if ((c >= 'a' && c <= 'z'))
@@ -287,3 +325,54 @@ jsonparser_skip(struct solv_jsonparser *jp, int type)
   return type;
 }
 
+int
+jsonparser_collect(struct solv_jsonparser *jp, int type, char **jsonp)
+{
+  char *buf = 0;
+  size_t nbuf = 0;
+  int depth = jp->depth + 1, endtype = type + 1;
+  int oldflags = jp->flags;
+
+  if (type == JP_NUMBER || type == JP_BOOL || type == JP_NULL)
+    {
+      *jsonp = solv_strdup(jp->value);
+      return type;
+    }
+  if (type != JP_ARRAY && type != JP_OBJECT)
+    {
+      *jsonp = 0;
+      return JP_ERROR;
+    }
+  buf = solv_extend(buf, nbuf, 1, 1, 255);
+  buf[nbuf++] = type == JP_OBJECT ? '{' : '[';
+  jp->flags |= JP_FLAG_RAWSTRINGS;
+  while (type > 0 && (type != endtype || jp->depth != depth))
+    {
+      type = jsonparser_parse(jp);
+      if (type <= 0)
+        break;
+      buf = solv_extend(buf, nbuf, jp->keylen + jp->valuelen + 2, 1, 255);
+      if (type == JP_OBJECT_END || type == JP_ARRAY_END)
+        {
+          if (buf[nbuf - 1] == ',')
+            nbuf--;
+          buf[nbuf++] = type == JP_OBJECT_END ? '}' : ']';
+        }
+      else if (jp->key)
+        {
+          memcpy(buf + nbuf, jp->key, jp->keylen);
+          nbuf += jp->keylen;
+          buf[nbuf++] = ':';
+        }
+      if (jp->valuelen)
+        memcpy(buf + nbuf, jp->value, jp->valuelen);
+      nbuf += jp->valuelen;
+      buf[nbuf++] = type == JP_OBJECT ? '{' : type == JP_ARRAY ? '[' : ',';
+    }
+  jp->flags = oldflags;
+  buf[nbuf - 1] = 0;	/* overwrites trailing ',' */
+  if (type != endtype)
+    buf = solv_free(buf);
+  *jsonp = buf;
+  return type;
+}

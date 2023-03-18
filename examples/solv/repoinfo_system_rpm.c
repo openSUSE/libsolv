@@ -161,4 +161,29 @@ commit_transactionelement_rpm(Pool *pool, Id type, Id p, FILE *fp)
     }
 }
 
+#ifdef SUSE
+char *
+suse_find_baseproduct_evr(Pool *pool)
+{
+  char *evrstr = 0;
+  Pool *productspool = pool_create();
+  Repo *productsrepo = repo_create(productspool, "products");
+  Id p;
+  Solvable *s;
+
+  pool_set_rootdir(productspool, pool_get_rootdir(pool));
+  repo_add_products(productsrepo, PRODUCTS_PATH, REPO_USE_ROOTDIR);
+  FOR_REPO_SOLVABLES(productsrepo, p, s)
+    {
+      const char *type = solvable_lookup_str(s, PRODUCT_TYPE);
+      if (!type || strcmp(type, "base") != 0)
+	continue;
+      evrstr = solv_strdup(pool_id2str(productspool, s->evr));
+      break;
+    }
+  pool_free(productspool);
+  return evrstr;
+}
+#endif
+
 #endif

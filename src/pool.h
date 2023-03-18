@@ -258,7 +258,7 @@ extern void pool_setnamespacecallback(Pool *pool, Id (*cb)(struct s_Pool *, void
 extern void pool_flush_namespaceproviders(Pool *pool, Id ns, Id evr);
 
 extern void pool_set_custom_vendorcheck(Pool *pool, int (*vendorcheck)(struct s_Pool *, Solvable *, Solvable *));
-
+extern int (*pool_get_custom_vendorcheck(Pool *pool))(struct s_Pool *, Solvable *, Solvable *);
 
 extern char *pool_alloctmpspace(Pool *pool, int len);
 extern void  pool_freetmpspace(Pool *pool, const char *space);
@@ -297,6 +297,7 @@ static inline const char *pool_solvid2str(Pool *pool, Id p)
 {
   return pool_solvable2str(pool, pool->solvables + p);
 }
+extern const char *pool_solvidset2str(Pool *pool, Queue *q);
 
 void pool_set_languages(Pool *pool, const char **languages, int nlanguages);
 Id pool_id2langid(Pool *pool, Id id, const char *lang, int create);

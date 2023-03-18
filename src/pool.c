@@ -1461,7 +1461,7 @@ pool_whatmatchesdep(Pool *pool, Id keyname, Id dep, Queue *q, int marker)
     {
       Id pp;
       FOR_PROVIDES(p, pp, dep)
-        if (pool_match_dep(pool, p, dep))
+        if (pool_match_nevr(pool, pool->solvables + p, dep))
 	  queue_push(q, p);
       return;
     }
@@ -2077,6 +2077,11 @@ void
 pool_set_custom_vendorcheck(Pool *pool, int (*vendorcheck)(Pool *, Solvable *, Solvable *))
 {
   pool->custom_vendorcheck = vendorcheck;
+}
+
+int (*pool_get_custom_vendorcheck(Pool *pool))(Pool *, Solvable *, Solvable *)
+{
+  return pool->custom_vendorcheck;
 }
 
 /* EOF */

@@ -388,7 +388,13 @@ writedeps(Repo *repo, FILE *fp, const char *tag, Id key, Solvable *s, Offset off
 	  fprintf(fp, "+%s\n", tag);
 	  tagwritten = 1;
 	}
-      fprintf(fp, "%s\n", idstr);
+      if (*idstr == '/' && !ISRELDEP(id)) {
+        fprintf(fp, "%s\n", pool_id2str(pool, id));
+      } else if (*idstr == '/') {
+        fprintf(fp, "\\2f%s\n", idstr + 1);
+      } else {
+        fprintf(fp, "%s\n", idstr);
+      }
     }
   if (tagwritten)
     fprintf(fp, "-%s\n", tag);
@@ -489,6 +495,9 @@ testcase_write_testtags(Repo *repo, FILE *fp)
       ti = solvable_lookup_num(s, SOLVABLE_BUILDTIME, 0);
       if (ti)
 	fprintf(fp, "=Tim: %u\n", ti);
+      ti = solvable_lookup_num(s, SOLVABLE_INSTALLTIME, 0);
+      if (ti)
+	fprintf(fp, "=Itm: %u\n", ti);
       writefilelist(repo, fp, "Fls:", s);
     }
   queue_free(&q);
@@ -634,6 +643,11 @@ testcase_add_testtags(Repo *repo, FILE *fp, int flags)
 	  t = atoi(line + 6);
 	  if (t)
 	    repodata_set_num(data, s - pool->solvables, SOLVABLE_BUILDTIME, t);
+	  break;
+	case 'I' << 16 | 't' << 8 | 'm':
+	  t = atoi(line + 6);
+	  if (t)
+	    repodata_set_num(data, s - pool->solvables, SOLVABLE_INSTALLTIME, t);
 	  break;
 	case 'R' << 16 | 'e' << 8 | 'q':
 	  s->requires = adddep(repo, s->requires, line + 6, -SOLVABLE_PREREQMARKER);

@@ -32,6 +32,8 @@ typedef struct s_Repowriter {
   int (*keyfilter)(Repo *repo, Repokey *key, void *kfdata);
   void *kfdata;
   Queue *keyq;
+  void *userdata;
+  int userdatalen;
 } Repowriter;
 
 /* repowriter flags */
@@ -46,6 +48,7 @@ void repowriter_set_keyfilter(Repowriter *writer, int (*keyfilter)(Repo *repo, R
 void repowriter_set_keyqueue(Repowriter *writer, Queue *keyq);
 void repowriter_set_repodatarange(Repowriter *writer, int repodatastart, int repodataend);
 void repowriter_set_solvablerange(Repowriter *writer, int solvablestart, int solvableend);
+void repowriter_set_userdata(Repowriter *writer, const void *data, int len);
 int repowriter_write(Repowriter *writer, FILE *fp);
 
 /* convenience functions */

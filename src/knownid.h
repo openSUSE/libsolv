@@ -270,7 +270,9 @@ KNOWNID(SOLVABLE_TRACK_FEATURES,	"solvable:track_features"),	/* conda */
 KNOWNID(SOLVABLE_ISDEFAULT,		"solvable:isdefault"),
 KNOWNID(SOLVABLE_LANGONLY,		"solvable:langonly"),
 
-KNOWNID(UPDATE_COLLECTIONLIST,      "update:collectionlist"),  /* list of UPDATE_COLLECTION (actually packages) and UPDATE_MODULE */
+KNOWNID(UPDATE_COLLECTIONLIST,		"update:collectionlist"),	/* list of UPDATE_COLLECTION (actually packages) and UPDATE_MODULE */
+KNOWNID(SOLVABLE_MULTIARCH,		"solvable:multiarch"),		/* debian multi-arch field */
+KNOWNID(SOLVABLE_SIGNATUREDATA,		"solvable:signaturedata"),	/* conda */
 
 KNOWNID(ID_NUM_INTERNAL,		0)
 

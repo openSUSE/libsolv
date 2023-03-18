@@ -26,7 +26,7 @@ typedef struct s_Solvsig {
   Id htype;
   unsigned int created;
   unsigned int expires;
-  char keyid[17];
+  char keyid[16 + 1];
 } Solvsig;
 
 Solvsig *solvsig_create(FILE *fp);

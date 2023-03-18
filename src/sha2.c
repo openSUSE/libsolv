@@ -607,7 +607,7 @@ static void SHA256_Last(SHA256_CTX* context) {
 	SHA256_Transform(context, context->buffer);
 }
 
-void solv_SHA256_Final(sha2_byte digest[], SHA256_CTX* context) {
+void solv_SHA256_Final(sha2_byte digest[SHA256_DIGEST_LENGTH], SHA256_CTX* context) {
 	sha2_word32	*d = (sha2_word32*)digest;
 
 	/* Sanity check: */
@@ -904,7 +904,7 @@ static void SHA512_Last(SHA512_CTX* context) {
 	SHA512_Transform(context, context->buffer);
 }
 
-void solv_SHA512_Final(sha2_byte digest[], SHA512_CTX* context) {
+void solv_SHA512_Final(sha2_byte digest[SHA512_DIGEST_LENGTH], SHA512_CTX* context) {
 	sha2_word64	*d = (sha2_word64*)digest;
 
 	/* Sanity check: */
@@ -948,7 +948,7 @@ void solv_SHA384_Update(SHA384_CTX* context, const sha2_byte* data, size_t len) 
 	solv_SHA512_Update((SHA512_CTX*)context, data, len);
 }
 
-void solv_SHA384_Final(sha2_byte digest[], SHA384_CTX* context) {
+void solv_SHA384_Final(sha2_byte digest[SHA384_DIGEST_LENGTH], SHA384_CTX* context) {
 	sha2_word64	*d = (sha2_word64*)digest;
 
 	/* Sanity check: */
@@ -993,7 +993,7 @@ void solv_SHA224_Update(SHA224_CTX* context, const sha2_byte* data, size_t len) 
 	solv_SHA256_Update((SHA256_CTX*)context, data, len);
 }
 
-void solv_SHA224_Final(sha2_byte digest[], SHA224_CTX* context) {
+void solv_SHA224_Final(sha2_byte digest[SHA224_DIGEST_LENGTH], SHA224_CTX* context) {
 	sha2_word32	*d = (sha2_word32*)digest;
 
 	/* Sanity check: */

@@ -183,7 +183,7 @@ solver_unifyrules(Solver *solv)
 	    binr++;
 	  else
 	    {
-	      dp = solv->pool->whatprovidesdata + r->d;
+	      dp = pool->whatprovidesdata + r->d;
 	      while (*dp++)
 		lits++;
 	    }
@@ -659,8 +659,12 @@ add_complex_deprules(Solver *solv, Id p, Id dep, int type, int dontfix, Queue *w
 	      int oldcount = solv->ruleinfoq->count;
 	      addpkgrule(solv, qele[0], 0, d, type, dep);
 	      /* fixup from element of ruleinfo */
-	      if (solv->ruleinfoq->count > oldcount)
-		solv->ruleinfoq->elements[oldcount + 1] = p;
+	      if (solv->ruleinfoq->count > oldcount && solv->ruleinfoq->elements[oldcount + 1] != p)
+		{
+		  if (solv->ruleinfoq->elements[oldcount + 2])
+		    solv->ruleinfoq->elements[oldcount + 2] = solv->ruleinfoq->elements[oldcount + 1];
+		  solv->ruleinfoq->elements[oldcount + 1] = p;
+		}
 	    }
 	  else
 	    addpkgrule(solv, qele[0], 0, d, type, dep);
@@ -1931,8 +1935,8 @@ solver_addtodupmaps(Solver *solv, Id p, Id how, int targeted)
 void
 solver_createdupmaps(Solver *solv)
 {
-  Queue *job = &solv->job;
   Pool *pool = solv->pool;
+  Queue *job = &solv->job;
   Repo *installed = solv->installed;
   Id select, how, what, p, pp;
   Solvable *s;
@@ -2199,12 +2203,12 @@ reenableblackrule(Solver *solv, Id p)
 void
 solver_addblackrules(Solver *solv)
 {
-  int i;
-  Id how, select, what, p, pp;
-  Queue *job = &solv->job;
   Pool *pool = solv->pool;
   Repo *installed = solv->installed;
+  Id how, select, what, p, pp;
+  Queue *job = &solv->job;
   Map updatemap;
+  int i;
 
   map_init(&updatemap, 0);
   solv->blackrules = solv->nrules;
@@ -2257,6 +2261,89 @@ solver_addblackrules(Solver *solv)
 
 /***********************************************************************
  ***
+ ***  Strict repo prio rule part
+ ***/
+
+/* add rules to exclude solvables provided by lower
+ * precedence repositories */
+void solver_addstrictrepopriorules(struct s_Solver *solv, Map *addedmap)
+{
+  Pool *pool = solv->pool;
+  Solvable *s;
+  Id p, p2, pp2;
+  Map priomap;
+  int max_prio;
+
+  map_init_clone(&priomap, addedmap);
+  solv->strictrepopriorules = solv->nrules;
+
+  FOR_POOL_SOLVABLES(p)
+  {
+    if (!MAPTST(&priomap, p))
+      continue;
+
+    s = pool->solvables + p;
+    max_prio = s->repo->priority;
+    FOR_PROVIDES(p2, pp2, s->name)
+      {
+	Solvable *s2 = pool->solvables + p2;
+	if (s->name != s2->name)
+	  continue;
+	if (s2->repo->priority > max_prio)
+	  max_prio = s2->repo->priority;
+      }
+	  
+    FOR_PROVIDES(p2, pp2, s->name)
+      {
+	Solvable *s2 = pool->solvables + p2;
+	if (s->name != s2->name || !MAPTST(&priomap, p2))
+	  continue;
+	MAPCLR(&priomap, p2);
+	if (pool->installed && s2->repo == pool->installed)
+	  continue;
+	if (s2->repo->priority < max_prio)
+	  solver_addrule(solv, -p2, 0, 0);
+      }
+  }
+  solv->strictrepopriorules_end = solv->nrules;
+  map_free(&priomap);
+}
+
+static inline void
+disablerepopriorule(Solver *solv, Id name)
+{
+  Pool *pool = solv->pool;
+  Rule *r;
+  int i;
+  for (i = solv->strictrepopriorules, r = solv->rules + i; i < solv->strictrepopriorules_end; i++, r++)
+    {
+      if (r->p < 0 && r->d >= 0 && pool->solvables[-r->p].name == name)
+	solver_disablerule(solv, r);
+    }
+}
+
+static inline void
+reenablerepopriorule(Solver *solv, Id name)
+{
+  Pool *pool = solv->pool;
+  Rule *r;
+  int i;
+  for (i = solv->strictrepopriorules, r = solv->rules + i; i < solv->strictrepopriorules_end; i++, r++)
+    {
+      if (r->p < 0 && r->d < 0 && pool->solvables[-r->p].name == name)
+	{
+	  solver_enablerule(solv, r);
+	  IF_POOLDEBUG (SOLV_DEBUG_SOLUTIONS)
+	    {
+	      POOL_DEBUG(SOLV_DEBUG_SOLUTIONS, "@@@ re-enabling ");
+	      solver_printruleclass(solv, SOLV_DEBUG_SOLUTIONS, r);
+	    }
+	}
+    }
+}
+
+/***********************************************************************
+ ***
  ***  Policy rule disabling/reenabling
  ***
  ***  Disable all policy rules that conflict with our jobs. If a job
@@ -2264,10 +2351,11 @@ solver_addblackrules(Solver *solv)
  ***
  ***/
 
-#define DISABLE_UPDATE	1
-#define DISABLE_INFARCH	2
-#define DISABLE_DUP	3
-#define DISABLE_BLACK	4
+#define DISABLE_UPDATE	 1
+#define DISABLE_INFARCH	 2
+#define DISABLE_DUP	 3
+#define DISABLE_BLACK	 4
+#define DISABLE_REPOPRIO 5
 
 static void
 jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
@@ -2367,6 +2455,26 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
 		}
 	    }
 	}
+      if ((set & SOLVER_SETREPO) != 0 && solv->strictrepopriorules != solv->strictrepopriorules_end)
+	{
+	  if (select == SOLVER_SOLVABLE)
+	    queue_push2(q, DISABLE_REPOPRIO, pool->solvables[what].name);
+	  else
+	    {
+	      int qcnt = q->count;
+	      FOR_JOB_SELECT(p, pp, select, what)
+		{
+		  s = pool->solvables + p;
+		  /* unify names */
+		  for (i = qcnt; i < q->count; i += 2)
+		    if (q->elements[i + 1] == s->name)
+		      break;
+		  if (i < q->count)
+		    continue;
+		  queue_push2(q, DISABLE_REPOPRIO, s->name);
+		}
+	    }
+	}
       if ((set & SOLVER_SETEVR) != 0 && solv->blackrules != solv->blackrules_end)
         {
 	  if (select == SOLVER_SOLVABLE)
@@ -2380,6 +2488,20 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
       if (!installed || installed->end == installed->start)
 	return;
       /* now the hard part: disable some update rules */
+
+      /* if the job asks for a single solvable to stay, disable the update rule */
+      if (select == SOLVER_SOLVABLE && pool->solvables[what].repo == installed && solv->bestrules_info)
+        if ((set & (SOLVER_SETEVR | SOLVER_SETARCH | SOLVER_SETVENDOR)) == (SOLVER_SETEVR | SOLVER_SETARCH | SOLVER_SETVENDOR))
+	  {
+	    int ni = solv->bestrules_end - solv->bestrules;
+	    for (i = solv->bestrules_up - solv->bestrules; i < ni; i++)
+	      if (solv->bestrules_info[i] == what)
+		{
+	          queue_push2(q, DISABLE_UPDATE, what);		/* will also disable the best rule */
+		  break;
+		}
+	    return;
+	  }
 
       /* first check if we have installed or multiversion packages in the job */
       FOR_JOB_SELECT(p, pp, select, what)
@@ -2553,6 +2675,9 @@ solver_disablepolicyrules(Solver *solv)
 	case DISABLE_BLACK:
 	  disableblackrule(solv, arg);
 	  break;
+	case DISABLE_REPOPRIO:
+	  disablerepopriorule(solv, arg);
+	  break;
 	default:
 	  break;
 	}
@@ -2658,6 +2783,9 @@ solver_reenablepolicyrules(Solver *solv, int jobidx)
 	  break;
 	case DISABLE_BLACK:
 	  reenableblackrule(solv, arg);
+	  break;
+	case DISABLE_REPOPRIO:
+	  reenablerepopriorule(solv, arg);
 	  break;
 	}
     }
@@ -2898,7 +3026,7 @@ solver_ruleinfo(Solver *solv, Id rid, Id *fromp, Id *top, Id *depp)
 	  qp = rq.elements[i + 1];
 	  qo = rq.elements[i + 2];
 	  qd = rq.elements[i + 3];
-	  if (type == SOLVER_RULE_PKG || type > qt)
+	  if (type == SOLVER_RULE_PKG || qt == SOLVER_RULE_PKG_SAME_NAME || type > qt)
 	    {
 	      type = qt;
 	      if (fromp)
@@ -2907,6 +3035,8 @@ solver_ruleinfo(Solver *solv, Id rid, Id *fromp, Id *top, Id *depp)
 		*top = qo;
 	      if (depp)
 		*depp = qd;
+	      if (qt == SOLVER_RULE_PKG_SAME_NAME)
+		break;			/* prefer SOLVER_RULE_PKG_SAME_NAME */
 	    }
 	}
       queue_free(&rq);
@@ -2966,8 +3096,12 @@ solver_ruleinfo(Solver *solv, Id rid, Id *fromp, Id *top, Id *depp)
     }
   if (rid >= solv->bestrules && rid < solv->bestrules_end)
     {
+      /* > 0: the package we are updating */
       if (fromp && solv->bestrules_info[rid - solv->bestrules] > 0)
 	*fromp = solv->bestrules_info[rid - solv->bestrules];
+      /* < 0: the job rule */
+      if (top && solv->bestrules_info[rid - solv->bestrules] < 0)
+	*top = -solv->bestrules_info[rid - solv->bestrules];
       return SOLVER_RULE_BEST;
     }
   if (rid >= solv->yumobsrules && rid < solv->yumobsrules_end)
@@ -2992,10 +3126,24 @@ solver_ruleinfo(Solver *solv, Id rid, Id *fromp, Id *top, Id *depp)
 	*fromp = -r->p;
       return SOLVER_RULE_BLACK;
     }
+  if (rid >= solv->strictrepopriorules && rid < solv->strictrepopriorules_end)
+    {
+      if (fromp)
+	*fromp = -r->p;
+      return SOLVER_RULE_STRICT_REPO_PRIORITY;
+    }
   if (rid >= solv->choicerules && rid < solv->choicerules_end)
-    return SOLVER_RULE_CHOICE;
+    {
+      if (solv->choicerules_info && fromp)
+	*fromp = solv->choicerules_info[rid - solv->choicerules];
+      return SOLVER_RULE_CHOICE;
+    }
   if (rid >= solv->recommendsrules && rid < solv->recommendsrules_end)
-    return SOLVER_RULE_RECOMMENDS;
+    {
+      if (solv->recommendsrules_info && fromp)
+	*fromp = solv->recommendsrules_info[rid - solv->recommendsrules];
+      return SOLVER_RULE_RECOMMENDS;
+    }
   if (rid >= solv->learntrules)
     return SOLVER_RULE_LEARNT;
   return SOLVER_RULE_UNKNOWN;
@@ -3028,8 +3176,8 @@ solver_ruleclass(Solver *solv, Id rid)
     return SOLVER_RULE_CHOICE;
   if (rid >= solv->recommendsrules && rid < solv->recommendsrules_end)
     return SOLVER_RULE_RECOMMENDS;
-  if (rid >= solv->blackrules && rid < solv->blackrules_end)
-    return SOLVER_RULE_BLACK;
+  if (rid >= solv->strictrepopriorules && rid < solv->strictrepopriorules_end)
+    return SOLVER_RULE_STRICT_REPO_PRIORITY;
   if (rid >= solv->learntrules && rid < solv->nrules)
     return SOLVER_RULE_LEARNT;
   return SOLVER_RULE_UNKNOWN;
@@ -3080,10 +3228,10 @@ solver_rule2job(Solver *solv, Id rid, Id *whatp)
 Id
 solver_rule2solvable(Solver *solv, Id rid)
 {
-  if (rid >= solv->updaterules && rid < solv->updaterules_end)
-    return rid - solv->updaterules;
-  if (rid >= solv->featurerules && rid < solv->featurerules_end)
-    return rid - solv->featurerules;
+  if (rid >= solv->updaterules && rid < solv->updaterules_end && solv->installed)
+    return solv->installed->start + (rid - solv->updaterules);
+  if (rid >= solv->featurerules && rid < solv->featurerules_end && solv->installed)
+    return solv->installed->start + (rid - solv->featurerules);
   return 0;
 }
 
@@ -3139,6 +3287,12 @@ solver_rule2rules(Solver *solv, Id rid, Queue *q, int recursive)
 
 
 /* check if the newest versions of pi still provides the dependency we're looking for */
+/* pi: installed package
+ * r: rule for the dependency
+ * m: map with all positive elements of r
+ * return 0: at least one provider
+ * return 1: the newest versions do not provide the dependency
+ */
 static int
 solver_choicerulecheck(Solver *solv, Id pi, Rule *r, Map *m, Queue *q)
 {
@@ -3185,94 +3339,6 @@ solver_choicerulecheck(Solver *solv, Id pi, Rule *r, Map *m, Queue *q)
     if (MAPTST(m, q->elements[i]))
       return 0;		/* at least one provides it */
   return 1;	/* none of the new packages provided it */
-}
-
-static int
-solver_choicerulecheck2(Solver *solv, Id pi, Id pt, Queue *q)
-{
-  Pool *pool = solv->pool;
-  Rule *ur;
-  Id p, pp;
-  int i;
-
-  if (!q->count || q->elements[0] != pi)
-    {
-      if (q->count)
-        queue_empty(q);
-      ur = solv->rules + solv->updaterules + (pi - pool->installed->start);
-      if (!ur->p)
-        ur = solv->rules + solv->featurerules + (pi - pool->installed->start);
-      if (!ur->p)
-	return 0;
-      queue_push2(q, pi, 0);
-      FOR_RULELITERALS(p, pp, ur)
-	if (p > 0 && p != pi)
-	  queue_push(q, p);
-      queue_push(q, pi);
-    }
-  if (q->count <= 3)
-    return q->count == 3 && q->elements[2] == pt ? 1 : 0;
-  if (!q->elements[1])
-    {
-      queue_deleten(q, 0, 2);
-      policy_filter_unwanted(solv, q, POLICY_MODE_CHOOSE);
-      queue_unshift(q, 1);	/* filter mark */
-      queue_unshift(q, pi);
-    }
-  for (i = 2; i < q->count; i++)
-    if (q->elements[i] == pt)
-      return 1;
-  return 0;	/* not newest */
-}
-
-static int
-solver_choicerulecheck3(Solver *solv, Id pt, Queue *q)
-{
-  Pool *pool = solv->pool;
-  Id p, pp;
-  int i;
-
-  if (!q->count || q->elements[0] != pt)
-    {
-      Solvable *s = pool->solvables + pt;
-      if (q->count)
-        queue_empty(q);
-      /* no installed package, so check all with same name */
-      queue_push2(q, pt, 0);
-      FOR_PROVIDES(p, pp, s->name)
-        if (pool->solvables[p].name == s->name && p != pt)
-          queue_push(q, p);
-      queue_push(q, pt);
-    }
-  if (q->count <= 3)
-    return q->count == 3 && q->elements[2] == pt ? 1 : 0;
-  if (!q->elements[1])
-    {
-      queue_deleten(q, 0, 2);
-      policy_filter_unwanted(solv, q, POLICY_MODE_CHOOSE);
-      queue_unshift(q, 1);	/* filter mark */
-      queue_unshift(q, pt);
-    }
-  for (i = 2; i < q->count; i++)
-    if (q->elements[i] == pt)
-      return 1;
-  return 0;	/* not newest */
-}
-
-static inline void
-queue_removeelement(Queue *q, Id el)
-{
-  int i, j;
-  for (i = 0; i < q->count; i++)
-    if (q->elements[i] == el)
-      break;
-  if (i < q->count)
-    {
-      for (j = i++; i < q->count; i++)
-	if (q->elements[i] != el)
-	  q->elements[j++] = q->elements[i];
-      queue_truncate(q, j);
-    }
 }
 
 static Id
@@ -3323,14 +3389,14 @@ solver_addchoicerules(Solver *solv)
   Pool *pool = solv->pool;
   Map m, mneg;
   Rule *r;
-  Queue q, qi, qcheck, qcheck2, infoq;
+  Queue q, qi, qcheck, infoq;
   int i, j, rid, havechoice, negcnt;
   Id p, d, pp, p2;
   Solvable *s;
   Id lastaddedp, lastaddedd;
   int lastaddedcnt;
   unsigned int now;
-  int isnewest = 0;
+  int isinstalled;
 
   solv->choicerules = solv->nrules;
   if (!pool->installed)
@@ -3342,7 +3408,6 @@ solver_addchoicerules(Solver *solv)
   queue_init(&q);
   queue_init(&qi);
   queue_init(&qcheck);
-  queue_init(&qcheck2);
   queue_init(&infoq);
   map_init(&m, pool->nsolvables);
   map_init(&mneg, pool->nsolvables);
@@ -3362,20 +3427,28 @@ solver_addchoicerules(Solver *solv)
       if (r->p >= 0 || ((r->d == 0 || r->d == -1) && r->w2 <= 0))
 	continue;	/* only look at requires rules */
       /* solver_printrule(solv, SOLV_DEBUG_RESULT, r); */
-      queue_empty(&q);
       queue_empty(&qi);
       havechoice = 0;
+      isinstalled = 0;
       FOR_RULELITERALS(p, pp, r)
 	{
 	  if (p < 0)
-	    continue;
+	    {
+	      Solvable *s = pool->solvables - p;
+	      p2 = s->repo == pool->installed ? -p : 0;
+	      if (p2)
+		{
+		  if (!(solv->updatemap_all || (solv->updatemap.size && MAPTST(&solv->updatemap, p2 - solv->installed->start))))
+		    isinstalled = 1;
+		}
+	      continue;
+	    }
 	  s = pool->solvables + p;
 	  if (!s->repo)
 	    continue;
 	  if (s->repo == pool->installed)
 	    {
 	      queue_push2(&qi, p, p);
-	      queue_push(&q, p);
 	      continue;
 	    }
 	  /* find an installed package p2 that we can update/downgrade to p */
@@ -3387,7 +3460,6 @@ solver_addchoicerules(Solver *solv)
 	      if (policy_is_illegal(solv, pool->solvables + p2, s, 0))
 		continue;
 	      queue_push2(&qi, p2, p);
-	      queue_push(&q, p);
 	      continue;
 	    }
 	  /* package p is independent of the installed ones */
@@ -3396,53 +3468,46 @@ solver_addchoicerules(Solver *solv)
 #if 0
       printf("havechoice: %d qcount %d qicount %d\n", havechoice, q.count, qi.count);
 #endif
-      if (!havechoice || !q.count || !qi.count)
+      if (!havechoice || !qi.count)
 	continue;	/* no choice */
 
       FOR_RULELITERALS(p, pp, r)
         if (p > 0)
 	  MAPSET(&m, p);
 
-      isnewest = 1;
-      FOR_RULELITERALS(p, pp, r)
+      if (!isinstalled)
 	{
-	  if (p > 0)
-	    break;
-	  p2 = choicerule_find_installed(pool, -p);
-	  if (p2 && !solver_choicerulecheck2(solv, p2, -p, &qcheck2))
+	  /* do extra checking for packages related to installed packages */
+	  for (i = j = 0; i < qi.count; i += 2)
 	    {
-	      isnewest = 0;
-	      break;
+	      p2 = qi.elements[i];
+	      if (solv->updatemap_all || (solv->updatemap.size && MAPTST(&solv->updatemap, p2 - solv->installed->start)))
+		{
+		  if (solver_choicerulecheck(solv, p2, r, &m, &qcheck))
+		    continue;
+		}
+	      qi.elements[j++] = p2;
+	      qi.elements[j++] = qi.elements[i + 1];
 	    }
-	  if (!p2 && !solver_choicerulecheck3(solv, -p, &qcheck2))
-	    {
-	      isnewest = 0;
-	      break;
-	    }
+	  queue_truncate(&qi, j);
 	}
-      /* do extra checking */
-      for (i = j = 0; i < qi.count; i += 2)
-	{
-	  p2 = qi.elements[i];
-	  if (!p2)
-	    continue;
-	  if (isnewest && solver_choicerulecheck(solv, p2, r, &m, &qcheck))
-	    {
-	      /* oops, remove element p from q */
-	      queue_removeelement(&q, qi.elements[i + 1]);
-	      continue;
-	    }
-	  qi.elements[j++] = p2;
-	}
-      queue_truncate(&qi, j);
 
-      if (!q.count || !qi.count)
+      if (!qi.count)
 	{
 	  FOR_RULELITERALS(p, pp, r)
 	    if (p > 0)
 	      MAPCLR(&m, p);
 	  continue;
 	}
+
+      queue_empty(&q);
+      /* split q from qi */
+      for (i = j = 0; i < qi.count; i += 2)
+	{
+	  queue_push(&q, qi.elements[i + 1]);
+	  qi.elements[j++] = qi.elements[i];
+	}
+      queue_truncate(&qi, j);
 
 
       /* now check the update rules of the installed package.
@@ -3463,6 +3528,7 @@ solver_addchoicerules(Solver *solv)
 	      break;
 	  if (p)
 	    break;
+	  /* speed improvement: only check each package once */
 	  for (j = i + 1; j < qi.count; j++)
 	    if (qi.elements[i] == qi.elements[j])
 	      qi.elements[j] = 0;
@@ -3520,7 +3586,6 @@ solver_addchoicerules(Solver *solv)
   queue_free(&q);
   queue_free(&qi);
   queue_free(&qcheck);
-  queue_free(&qcheck2);
   queue_free(&infoq);
   map_free(&m);
   map_free(&mneg);
@@ -3560,6 +3625,7 @@ solver_disablechoicerules(Solver *solv, Rule *r)
       if (p)
 	solver_disablerule(solv, r);
     }
+  map_free(&m);
 }
 
 static void
@@ -3924,7 +3990,7 @@ find_obsolete_group(Solver *solv, Id obs, Queue *q)
     }
   /* find names so that we can build groups */
   queue_init_clone(&qn, q);
-  prune_to_best_version(solv->pool, &qn);
+  prune_to_best_version(pool, &qn);
 #if 0
 {
   for (i = 0; i < qn.count; i++)
@@ -4045,7 +4111,7 @@ for (j = 0; j < qq.count; j++)
 
       if (!qq.count)
 	continue;
-      /* at least two goups, build rules */
+      /* at least two groups, build rules */
       group = 0;
       for (j = 0; j < qq.count; j++)
 	{
@@ -4227,3 +4293,122 @@ solver_check_brokenorphanrules(Solver *solv, Queue *dq)
     }
 }
 
+const char *
+solver_ruleinfo2str(Solver *solv, SolverRuleinfo type, Id source, Id target, Id dep)
+{
+  Pool *pool = solv->pool;
+  char *s;
+  Solvable *ss;
+  switch (type)
+    {
+    case SOLVER_RULE_DISTUPGRADE:
+      return pool_tmpjoin(pool, pool_solvid2str(pool, source), " does not belong to a distupgrade repository", 0);
+    case SOLVER_RULE_INFARCH:
+      return pool_tmpjoin(pool, pool_solvid2str(pool, source), " has inferior architecture", 0);
+    case SOLVER_RULE_UPDATE:
+      return pool_tmpjoin(pool, pool_solvid2str(pool, source), " needs to stay installed or be updated", 0);
+    case SOLVER_RULE_FEATURE:
+      return pool_tmpjoin(pool, pool_solvid2str(pool, source), " needs to stay installed or be updated/downgraded", 0);
+    case SOLVER_RULE_JOB:
+      return pool_tmpjoin(pool, "job ", pool_job2str(pool, target, dep, 0), 0);
+    case SOLVER_RULE_JOB_UNSUPPORTED:
+      return pool_tmpjoin(pool, "unsupported job ", pool_job2str(pool, target, dep, 0), 0);
+    case SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP:
+      return pool_tmpjoin(pool, "nothing provides requested ", pool_dep2str(pool, dep), 0);
+    case SOLVER_RULE_JOB_UNKNOWN_PACKAGE:
+      return pool_tmpjoin(pool, "requested package ", pool_dep2str(pool, dep), " does not exist");
+    case SOLVER_RULE_JOB_PROVIDED_BY_SYSTEM:
+      return pool_tmpjoin(pool, "requested ", pool_dep2str(pool, dep), " is provided by the system");
+    case SOLVER_RULE_BEST:
+      if (source > 0)
+        return pool_tmpjoin(pool, "install best update candidate for ", pool_solvid2str(pool, source), 0);
+      if (target > 0)
+	{
+	  target = solver_rule2job(solv, target, &dep);
+	  return pool_tmpjoin(pool, "best package for job ", pool_job2str(pool, target, dep, 0), 0);
+	}
+     return "best rule";
+    case SOLVER_RULE_PKG:
+      return "bad pkg rule type";
+    case SOLVER_RULE_PKG_NOT_INSTALLABLE:
+      ss = pool->solvables + source;
+      if (pool_disabled_solvable(pool, ss))
+        return pool_tmpjoin(pool, pool_solvid2str(pool, source), " is disabled", 0);
+      if (ss->arch && ss->arch != ARCH_SRC && ss->arch != ARCH_NOSRC &&
+          pool->id2arch && pool_arch2score(pool, ss->arch) == 0)
+        return pool_tmpjoin(pool, pool_solvid2str(pool, source), " does not have a compatible architecture", 0);
+      return pool_tmpjoin(pool, pool_solvid2str(pool, source), " is not installable", 0);
+    case SOLVER_RULE_PKG_NOTHING_PROVIDES_DEP:
+      s = pool_tmpjoin(pool, "nothing provides ", pool_dep2str(pool, dep), 0);
+      return pool_tmpappend(pool, s, " needed by ", pool_solvid2str(pool, source));
+    case SOLVER_RULE_PKG_SAME_NAME:
+      s = pool_tmpjoin(pool, "cannot install both ", pool_solvid2str(pool, source), 0);
+      return pool_tmpappend(pool, s, " and ", pool_solvid2str(pool, target));
+    case SOLVER_RULE_PKG_CONFLICTS:
+      s = pool_tmpappend(pool, pool_solvid2str(pool, source), " conflicts with ", pool_dep2str(pool, dep));
+      if (target)
+        s = pool_tmpappend(pool, s, " provided by ", pool_solvid2str(pool, target));
+      return s;
+    case SOLVER_RULE_PKG_SELF_CONFLICT:
+      s = pool_tmpjoin(pool, pool_solvid2str(pool, source), " conflicts with ", 0);
+      return pool_tmpappend(pool, s, pool_dep2str(pool, dep), " provided by itself");
+    case SOLVER_RULE_PKG_OBSOLETES:
+      s = pool_tmpappend(pool, pool_solvid2str(pool, source), " obsoletes ", pool_dep2str(pool, dep));
+      if (target)
+	s = pool_tmpappend(pool, s, " provided by ", pool_solvid2str(pool, target));
+      return s;
+    case SOLVER_RULE_PKG_INSTALLED_OBSOLETES:
+      s = pool_tmpjoin(pool, "installed ", pool_solvid2str(pool, source), 0);
+      s = pool_tmpappend(pool, s, " obsoletes ", pool_dep2str(pool, dep));
+      if (target)
+	s = pool_tmpappend(pool, s, " provided by ", pool_solvid2str(pool, target));
+      return s;
+    case SOLVER_RULE_PKG_IMPLICIT_OBSOLETES:
+      s = pool_tmpappend(pool, pool_solvid2str(pool, source), " implicitly obsoletes ", pool_dep2str(pool, dep));
+      if (target)
+	s = pool_tmpappend(pool, s, " provided by ", pool_solvid2str(pool, target));
+      return s;
+    case SOLVER_RULE_PKG_REQUIRES:
+      return pool_tmpjoin(pool, pool_solvid2str(pool, source), " requires ", pool_dep2str(pool, dep));
+    case SOLVER_RULE_PKG_RECOMMENDS:
+      return pool_tmpjoin(pool, pool_solvid2str(pool, source), " recommends ", pool_dep2str(pool, dep));
+    case SOLVER_RULE_PKG_CONSTRAINS:
+      s = pool_tmpappend(pool, pool_solvid2str(pool, source), " has constraint ", pool_dep2str(pool, dep));
+      return pool_tmpappend(pool, s, " conflicting with ", pool_solvid2str(pool, target));
+    case SOLVER_RULE_PKG_SUPPLEMENTS:
+      s = pool_tmpjoin(pool, pool_solvid2str(pool, source), " supplements ", pool_dep2str(pool, dep));
+      if (target)
+	s = pool_tmpappend(pool, s, " provided by ", pool_solvid2str(pool, target));
+      return s;
+    case SOLVER_RULE_YUMOBS:
+      s = pool_tmpjoin(pool, "both ", pool_solvid2str(pool, source), " and ");
+      s = pool_tmpjoin(pool, s, pool_solvid2str(pool, target), " obsolete ");
+      return pool_tmpappend(pool, s, pool_dep2str(pool, dep), 0);
+    case SOLVER_RULE_BLACK:
+      return pool_tmpjoin(pool, pool_solvid2str(pool, source), " can only be installed by a direct request", 0);
+    case SOLVER_RULE_STRICT_REPO_PRIORITY:
+      return pool_tmpjoin(pool, pool_solvid2str(pool, source), " is excluded by strict repo priority", 0);
+    case SOLVER_RULE_LEARNT:
+      return "learnt rule";
+    case SOLVER_RULE_CHOICE:
+      if (source > 0)
+	{
+	  const char *s2;
+          type = solver_ruleinfo(solv, source, &source, &target, &dep);
+	  s2 = solver_ruleinfo2str(solv, type, source, target, dep);
+	  return pool_tmpjoin(pool, s2, " (limited version)", 0);
+	}
+      return "choice rule";
+    case SOLVER_RULE_RECOMMENDS:
+      if (source > 0)
+	{
+	  const char *s2;
+          type = solver_ruleinfo(solv, source, &source, &target, &dep);
+	  s2 = solver_ruleinfo2str(solv, type, source, target, dep);
+	  return pool_tmpjoin(pool, s2, " (limited version)", 0);
+	}
+      return "recommends rule";
+    default:
+      return "bad rule type";
+    }
+}

@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 11/18/2020
+.\"      Date: 01/31/2023
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "11/18/2020" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "01/31/2023" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -31,7 +31,7 @@
 libsolv-bindings \- access libsolv from perl/python/ruby
 .SH "DESCRIPTION"
 .sp
-Libsolv\(cqs language bindings offer an abstract, object orientated interface to the library\&. The supported languages are currently perl, python, and ruby\&. All example code (except in the specifics sections, of course) lists first the \(lqC\-ish\(rq interface, then the syntax for perl, python, and ruby (in that order)\&.
+Libsolv\(cqs language bindings offer an abstract, object orientated interface to the library\&. The supported languages are currently perl, python, ruby and tcl\&. All example code (except in the specifics sections, of course) lists first the \(lqC\-ish\(rq interface, then the syntax for perl, python, and ruby (in that order)\&.
 .SH "PERL SPECIFICS"
 .sp
 Libsolv\(cqs perl bindings can be loaded with the following statement:
@@ -611,6 +611,16 @@ If a package is installed in multiversion mode, rpm used to ignore both the impl
 .RS 4
 Make the addfileprovides method only add files from the standard locations (i\&.e\&. the \(lqbin\(rq and \(lqetc\(rq directories)\&. This is useful if you have only few packages that use non\-standard file dependencies, but you still want the fast speed that addfileprovides() generates\&.
 .RE
+.PP
+\fBPOOL_FLAG_NOWHATPROVIDESAUX\fR
+.RS 4
+Disable the creation of the auxillary whatprovides index\&. This saves a bit of memory but also makes the whatprovides lookups a bit slower\&.
+.RE
+.PP
+\fBPOOL_FLAG_WHATPROVIDESWITHDISABLED\fR
+.RS 4
+Make the whatprovides index also contain disabled packages\&. This means that you do not need to recreate the index if a package is enabled/disabled, i\&.e\&. the pool→considered bitmap is changed\&.
+.RE
 .SS "METHODS"
 .sp
 .if n \{\
@@ -867,7 +877,7 @@ Filter list of solvables by repo priority, architecture and version\&.
 .\}
 .nf
 \fBSolvable *whatcontainsdep(Id\fR \fIkeyname\fR\fB, DepId\fR \fIdep\fR\fB, Id\fR \fImarker\fR \fB= \-1)\fR
-my \fI@solvables\fR \fB=\fR \fI$pool\fR\fB\->whatcontainsdep(\fR\fI$keyname\fR\fB,\fR \fI$dep\fR\fB)\fR
+my \fI@solvables\fR \fB=\fR \fI$pool\fR\fB\->whatcontainsdep(\fR\fI$keyname\fR\fB,\fR \fI$dep\fR\fB)\fR;
 \fIsolvables\fR \fB=\fR \fIpool\fR\fB\&.whatcontainsdep(\fR\fIkeyname\fR\fB,\fR \fIdep\fR\fB)\fR
 \fIsolvables\fR \fB=\fR \fIpool\fR\fB\&.whatcontainsdep(\fR\fIkeyname\fR\fB,\fR \fIdep\fR\fB)\fR
 .fi
@@ -882,7 +892,7 @@ Return all solvables for which keyname contains the dependency\&.
 .\}
 .nf
 \fBSolvable *whatmatchesdep(Id\fR \fIkeyname\fR\fB, DepId\fR \fIdep\fR\fB, Id\fR \fImarker\fR \fB= \-1)\fR
-my \fI@solvables\fR \fB=\fR \fI$pool\fR\fB\->whatmatchesdep(\fR\fI$keyname\fR\fB,\fR \fI$sdep\fR\fB)\fR
+my \fI@solvables\fR \fB=\fR \fI$pool\fR\fB\->whatmatchesdep(\fR\fI$keyname\fR\fB,\fR \fI$sdep\fR\fB)\fR;
 \fIsolvables\fR \fB=\fR \fIpool\fR\fB\&.whatmatchesdep(\fR\fIkeyname\fR\fB,\fR \fIdep\fR\fB)\fR
 \fIsolvables\fR \fB=\fR \fIpool\fR\fB\&.whatmatchesdep(\fR\fIkeyname\fR\fB,\fR \fIdep\fR\fB)\fR
 .fi
@@ -897,7 +907,7 @@ Return all solvables that have dependencies in keyname that match the dependency
 .\}
 .nf
 \fBSolvable *whatmatchessolvable(Id\fR \fIkeyname\fR\fB, Solvable\fR \fIsolvable\fR\fB, Id\fR \fImarker\fR \fB= \-1)\fR
-my \fI@solvables\fR \fB=\fR \fI$pool\fR\fB\->whatmatchessolvable(\fR\fI$keyname\fR\fB,\fR \fI$solvable\fR\fB)\fR
+my \fI@solvables\fR \fB=\fR \fI$pool\fR\fB\->whatmatchessolvable(\fR\fI$keyname\fR\fB,\fR \fI$solvable\fR\fB)\fR;
 \fIsolvables\fR \fB=\fR \fIpool\fR\fB\&.whatmatchessolvable(\fR\fIkeyname\fR\fB,\fR \fIsolvable\fR\fB)\fR
 \fIsolvables\fR \fB=\fR \fIpool\fR\fB\&.whatmatchessolvable(\fR\fIkeyname\fR\fB,\fR \fIsolvable\fR\fB)\fR
 .fi
@@ -1215,6 +1225,21 @@ my \fI@ids\fR \fB=\fR \fI$pool\fR\fB\->get_disabled_list()\fR;
 .\}
 .sp
 Get/set the list of solvables that are not eligible for installation\&. This is basically the inverse of the \(lqconsidered\(rq methods above, i\&.e\&. calling \(lqset_disabled_list()\(rq with an empty list will make all solvables eligible for installation\&. Note you need to recreate the whatprovides hash after changing the list\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBconst char *solvableset2str(Solvable *\fR\fIsolvables\fR\fB)\fR
+my \fI$str\fR \fB=\fR \fI$pool\fR\fB\->solvableset2str(\fR\fI$solvables\fR\fB)\fR;
+\fIstr\fR \fB=\fR \fIpool\fR\fB\&.solvableset2str(\fR\fIsolvables\fR\fB)\fR
+\fIstr\fR \fB=\fR \fIpool\fR\fB\&.solvableset2str(\fR\fIsolvables\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return a string describing a list of solvables\&. The method tries to reduce the output by using version ranges if possible\&.
 .SS "DATA RETRIEVAL METHODS"
 .sp
 In the following functions, the \fIkeyname\fR argument describes what to retrieve\&. For the standard cases you can use the available Id constants\&. For example,
@@ -1400,6 +1425,21 @@ my \fI$str\fR \fB=\fR \fI$pool\fR\fB\->solvid2str(\fR\fI$id\fR\fB)\fR;
 .\}
 .sp
 Return a string describing the Solvable with the specified id\&. The string consists of the name, version, and architecture of the Solvable\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBconst char *solvidset2str(Id *\fR\fIsolvids\fR\fB)\fR
+my \fI$str\fR \fB=\fR \fI$pool\fR\fB\->solvidset2str(\e\fR\fI@solvids\fR\fB)\fR;
+\fIstr\fR \fB=\fR \fIpool\fR\fB\&.solvidset2str(\fR\fIsolvids\fR\fB)\fR
+\fIstr\fR \fB=\fR \fIpool\fR\fB\&.solvidset2str(\fR\fIsolvids\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return a string describing a list of solvables\&. The method tries to reduce the output by using version ranges if possible\&.
 .sp
 .if n \{\
 .RS 4
@@ -2601,7 +2641,7 @@ Generic lookup methods\&. Retrieve data stored for the specific keyname\&. The l
 .RS 4
 .\}
 .nf
-\fBconst char *lookup_location(unsigned int *\fR\fIOUTPUT\fR\fB)\fR;
+\fBconst char *lookup_location(unsigned int *\fR\fIOUTPUT\fR\fB)\fR
 my \fB(\fR\fI$location\fR\fB,\fR \fI$mediano\fR\fB) =\fR \fI$solvable\fR\fB\->lookup_location()\fR;
 \fIlocation\fR\fB,\fR \fImediano\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_location()\fR
 \fIlocation\fR\fB,\fR \fImediano\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_location()\fR
@@ -2616,7 +2656,7 @@ Return a tuple containing the on\-media location and an optional media number fo
 .RS 4
 .\}
 .nf
-\fBconst char *lookup_sourcepkg()\fR;
+\fBconst char *lookup_sourcepkg()\fR
 my \fI$sourcepkg\fR \fB=\fR \fI$solvable\fR\fB\->lookup_sourcepkg()\fR;
 \fIsourcepkg\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_sourcepkg()\fR
 \fIsourcepkg\fR \fB=\fR \fIsolvable\fR\fB\&.lookup_sourcepkg()\fR
@@ -2658,7 +2698,7 @@ Iterate over the matching data elements\&. See the Dataiterator class for more i
 .RS 4
 .\}
 .nf
-\fBvoid add_deparray(Id\fR \fIkeyname\fR\fB, DepId\fR \fIdep\fR\fB, Id\fR \fImarker\fR \fB= \-1)\fR;
+\fBvoid add_deparray(Id\fR \fIkeyname\fR\fB, DepId\fR \fIdep\fR\fB, Id\fR \fImarker\fR \fB= \-1)\fR
 \fI$solvable\fR\fB\->add_deparray(\fR\fI$keyname\fR\fB,\fR \fI$dep\fR\fB)\fR;
 \fIsolvable\fR\fB\&.add_deparray(\fR\fIkeyname\fR\fB,\fR \fIdep\fR\fB)\fR
 \fIsolvable\fR\fB\&.add_deparray(\fR\fIkeyname\fR\fB,\fR \fIdep\fR\fB)\fR
@@ -2673,7 +2713,7 @@ Add a new dependency to the attributes stored in keyname\&.
 .RS 4
 .\}
 .nf
-\fBvoid unset(Id\fR \fIkeyname\fR\fB)\fR;
+\fBvoid unset(Id\fR \fIkeyname\fR\fB)\fR
 \fI$solvable\fR\fB\->unset(\fR\fI$keyname\fR\fB)\fR;
 \fIsolvable\fR\fB\&.unset(\fR\fIkeyname\fR\fB)\fR
 \fIsolvable\fR\fB\&.unset(\fR\fIkeyname\fR\fB)\fR
@@ -2688,7 +2728,7 @@ Delete data stored for the specific keyname\&.
 .RS 4
 .\}
 .nf
-\fBbool installable()\fR;
+\fBbool installable()\fR
 \fI$solvable\fR\fB\->installable()\fR
 \fIsolvable\fR\fB\&.installable()\fR
 \fIsolvable\fR\fB\&.installable?\fR
@@ -2703,7 +2743,7 @@ Return true if the solvable is installable on the system\&. Solvables are not in
 .RS 4
 .\}
 .nf
-\fBbool isinstalled()\fR;
+\fBbool isinstalled()\fR
 \fI$solvable\fR\fB\->isinstalled()\fR
 \fIsolvable\fR\fB\&.isinstalled()\fR
 \fIsolvable\fR\fB\&.isinstalled?\fR
@@ -3132,7 +3172,7 @@ The value in binary form, useful for checksums and other data that cannot be rep
 .RS 4
 .\}
 .nf
-\fBDatapos pos()\fR;
+\fBDatapos pos()\fR
 my \fI$pos\fR \fB=\fR \fI$d\fR\fB\->pos()\fR;
 \fIpos\fR \fB=\fR \fId\fR\fB\&.pos()\fR
 \fIpos\fR \fB=\fR \fId\fR\fB\&.pos()\fR
@@ -3147,7 +3187,7 @@ The position object of the current match\&. It can be used to do sub\-searches s
 .RS 4
 .\}
 .nf
-\fBDatapos parentpos()\fR;
+\fBDatapos parentpos()\fR
 my \fI$pos\fR \fB=\fR \fI$d\fR\fB\->parentpos()\fR;
 \fIpos\fR \fB=\fR \fId\fR\fB\&.parentpos()\fR
 \fIpos\fR \fB=\fR \fId\fR\fB\&.parentpos()\fR
@@ -3617,6 +3657,11 @@ Prefer the specified packages if the solver encounters an alternative\&. If a jo
 Avoid the specified packages if the solver encounters an alternative\&. This can also be used to block recommended or supplemented packages from being installed\&.
 .RE
 .PP
+\fBSOLVER_EXCLUDEFROMWEAK\fR
+.RS 4
+Avoid the specified packages to satisfy recommended or supplemented dependencies\&. Unlike SOLVER_DISFAVOR, it does not interfere with other rules\&.
+.RE
+.PP
 \fBSOLVER_JOBMASK\fR
 .RS 4
 A mask containing all the above action bits\&.
@@ -3759,7 +3804,7 @@ Return the set of solvables of the job as an array of Solvable objects\&.
 .RS 4
 .\}
 .nf
-\fBbool isemptyupdate()\fR;
+\fBbool isemptyupdate()\fR
 \fI$job\fR\fB\->isemptyupdate()\fR
 \fIjob\fR\fB\&.isemptyupdate()\fR
 \fIjob\fR\fB\&.isemptyupdate?\fR
@@ -3959,7 +4004,7 @@ A rule of an unknown class\&. You should never encounter those\&.
 .PP
 \fBSOLVER_RULE_PKG\fR
 .RS 4
-A package dependency rule\&.
+A rule generated because of a package dependency\&.
 .RE
 .PP
 \fBSOLVER_RULE_UPDATE\fR
@@ -4011,7 +4056,7 @@ The package contains a required dependency which was not provided by any package
 .PP
 \fBSOLVER_RULE_PKG_REQUIRES\fR
 .RS 4
-Similar to SOLVER_RULE_PKG_NOTHING_PROVIDES_DEP, but in this case some packages provided the dependency but none of them could be installed due to other dependency issues\&.
+The package contains a required dependency which was provided by at least one package\&.
 .RE
 .PP
 \fBSOLVER_RULE_PKG_SELF_CONFLICT\fR
@@ -4021,12 +4066,12 @@ The package conflicts with itself\&. This is not allowed by older rpm versions\&
 .PP
 \fBSOLVER_RULE_PKG_CONFLICTS\fR
 .RS 4
-To fulfill the dependencies two packages need to be installed, but one of the packages contains a conflict with the other one\&.
+The package conflices with some other package\&.
 .RE
 .PP
 \fBSOLVER_RULE_PKG_SAME_NAME\fR
 .RS 4
-The dependencies can only be fulfilled by multiple versions of a package, but installing multiple versions of the same package is not allowed\&.
+This rules make sure that only one version of a package is installed in the system\&.
 .RE
 .PP
 \fBSOLVER_RULE_PKG_OBSOLETES\fR
@@ -4042,6 +4087,21 @@ To fulfill the dependencies two packages need to be installed, but one of the pa
 \fBSOLVER_RULE_PKG_INSTALLED_OBSOLETES\fR
 .RS 4
 To fulfill the dependencies a package needs to be installed that is obsoleted by an installed package\&. See the POOL_FLAG_NOINSTALLEDOBSOLETES flag\&.
+.RE
+.PP
+\fBSOLVER_RULE_PKG_RECOMMENDS\fR
+.RS 4
+The package contains a recommended dependency\&.
+.RE
+.PP
+\fBSOLVER_RULE_PKG_SUPPLEMENTS\fR
+.RS 4
+The package contains a dependency to specify it supplements another package\&.
+.RE
+.PP
+\fBSOLVER_RULE_PKG_CONSTRAINS\fR
+.RS 4
+The package contains a constraint against some other package (disttype conda)\&.
 .RE
 .PP
 \fBSOLVER_RULE_JOB_NOTHING_PROVIDES_DEP\fR
@@ -4199,6 +4259,16 @@ This is a special case of SOLVER_REASON_WEAKDEP\&.
 .RS 4
 This is a special case of SOLVER_REASON_WEAKDEP\&.
 .RE
+.PP
+\fBSOLVER_REASON_UNSOLVABLE\fR
+.RS 4
+This is a special case where a rule cannot be fulfilled\&.
+.RE
+.PP
+\fBSOLVER_REASON_PREMISE\fR
+.RS 4
+This is a special case for the premises of learnt rules\&.
+.RE
 .SS "ATTRIBUTES"
 .sp
 .if n \{\
@@ -4279,22 +4349,7 @@ Return the transaction to implement the calculated package changes\&. A transact
 .RS 4
 .\}
 .nf
-\fBint\fR \fIreason\fR \fB= describe_decision(Solvable *\fR\fIs\fR\fB, Rule *\fR\fIOUTPUT\fR\fB)\fR
-my \fB(\fR\fI$reason\fR\fB,\fR \fI$rule\fR\fB) =\fR \fI$solver\fR\fB\->describe_decision(\fR\fI$solvable\fR\fB)\fR;
-\fB(\fR\fIreason\fR\fB,\fR \fIrule\fR\fB) =\fR \fIsolver\fR\fB\&.describe_decision(\fR\fIsolvable\fR\fB)\fR
-\fB(\fR\fIreason\fR\fB,\fR \fIrule\fR\fB) =\fR \fIsolver\fR\fB\&.describe_decision(\fR\fIsolvable\fR\fB)\fR
-.fi
-.if n \{\
-.RE
-.\}
-.sp
-Return the reason why a specific solvable was installed or erased\&. For most of the reasons the rule that triggered the decision is also returned\&.
-.sp
-.if n \{\
-.RS 4
-.\}
-.nf
-\fBSolvable *get_recommended(bool\fR \fInoselected\fR\fB=0)\fR;
+\fBSolvable *get_recommended(bool\fR \fInoselected\fR\fB=0)\fR
 my \fI@solvables\fR \fB=\fR \fI$solver\fR\fB\->get_recommended()\fR;
 \fIsolvables\fR \fB=\fR \fIsolver\fR\fB\&.get_recommended()\fR
 \fIsolvables\fR \fB=\fR \fIsolver\fR\fB\&.get_recommended()\fR
@@ -4303,13 +4358,13 @@ my \fI@solvables\fR \fB=\fR \fI$solver\fR\fB\->get_recommended()\fR;
 .RE
 .\}
 .sp
-Return all solvables that are recommended by the solver run result\&. This includes solvables included in the result, set noselected if you want to filter those\&.
+Return all solvables that are recommended by the solver run result\&. This includes solvables included in the result; set noselected if you want to filter those\&.
 .sp
 .if n \{\
 .RS 4
 .\}
 .nf
-\fBSolvable *get_suggested(bool\fR \fInoselected\fR\fB=0)\fR;
+\fBSolvable *get_suggested(bool\fR \fInoselected\fR\fB=0)\fR
 my \fI@solvables\fR \fB=\fR \fI$solver\fR\fB\->get_suggested()\fR;
 \fIsolvables\fR \fB=\fR \fIsolver\fR\fB\&.get_suggested()\fR
 \fIsolvables\fR \fB=\fR \fIsolver\fR\fB\&.get_suggested()\fR
@@ -4318,7 +4373,67 @@ my \fI@solvables\fR \fB=\fR \fI$solver\fR\fB\->get_suggested()\fR;
 .RE
 .\}
 .sp
-Return all solvables that are suggested by the solver run result\&. This includes solvables included in the result, set noselected if you want to filter those\&.
+Return all solvables that are suggested by the solver run result\&. This includes solvables included in the result; set noselected if you want to filter those\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fIDecision\fR \fB= get_decision(Solvable *\fR\fIs\fR\fB)\fR
+my \fI$decision\fR \fB=\fR \fI$solver\fR\fB\->get_decision(\fR\fI$solvable\fR\fB)\fR;
+\fIdecision\fR \fB=\fR \fIsolver\fR\fB\&.get_decision(\fR\fIsolvable\fR\fB)\fR;
+\fIdecision\fR \fB=\fR \fIsolver\fR\fB\&.get_decision(\fR\fIsolvable\fR\fB)\fR;
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return a decision object that describes why a specific solvable was installed or erased\&. See the Decision class for more information\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBDecision *get_decisionlist(Solvable *\fR\fIs\fR\fB)\fR
+my \fI@decisions\fR \fB=\fR \fI$solver\fR\fB\->get_decisionlist(\fR\fI$solvable\fR\fB)\fR;
+\fIdecisions\fR \fB=\fR \fIsolver\fR\fB\&.get_decisionlist(\fR\fIsolvable\fR\fB)\fR
+\fIdecisions\fR \fB=\fR \fIsolver\fR\fB\&.get_decisionlist(\fR\fIsolvable\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return a list of decisions that caused the specific solvable to be installed or erased\&. This is usually more useful than the get_decision() method, as it returns every involved decision instead of just a single one\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBAlternative *alternatives()\fR
+my \fI@alternatives\fR \fB=\fR \fI$solver\fR\fB\->alternatives()\fR;
+\fIalternatives\fR \fB=\fR \fIsolver\fR\fB\&.alternatives()\fR
+\fIalternatives\fR \fB=\fR \fIsolver\fR\fB\&.alternatives()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return all alternatives recorded in the solver run\&. See the Alternative class for more information\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBint alternatives_count()\fR
+my \fI$cnt\fR \fB=\fR \fI$solver\fR\fB\->alternatives_count()\fR;
+\fIcnt\fR \fB=\fR \fIsolver\fR\fB\&.alternatives_count()\fR
+\fIcnt\fR \fB=\fR \fIsolver\fR\fB\&.alternatives_count()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return the number of alternatives without creating alternative objects\&.
 .SH "THE PROBLEM CLASS"
 .sp
 Problems are the way of the solver to interact with the user\&. You can simply list all problems and terminate your program, but a better way is to present solutions to the user and let him pick the ones he likes\&.
@@ -4384,6 +4499,51 @@ my \fI@probrules\fR \fB=\fR \fI$problem\fR\fB\->findallproblemrules()\fR;
 .\}
 .sp
 Return all rules responsible for the problem\&. The returned set of rules contains all the needed information why there was a problem, but it\(cqs hard to present them to the user in a sensible way\&. The default is to filter out all update and job rules (unless the returned rules only consist of those types)\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBDecision *get_decisionlist()\fR
+my \fI@decisions\fR \fB=\fR \fI$problem\fR\fB\->get_decisionlist()\fR;
+\fIdecisions\fR \fB=\fR \fIproblem\fR\fB\&.get_decisionlist()\fR
+\fIdecisions\fR \fB=\fR \fIproblem\fR\fB\&.get_decisionlist()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return a list of decisions prooving the problem\&. This is somewhat similar to the findallproblemrules(), but the output is in an order that makes it easier to understand why the solver could not find a solution\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBDecisionset *get_decisionsetlist()\fR
+my \fI@decisionsets\fR \fB=\fR \fI$problem\fR\fB\->get_decisionsetlist()\fR;
+\fIdecisionsets\fR \fB=\fR \fIproblem\fR\fB\&.get_decisionsetlist()\fR
+\fIdecisionsets\fR \fB=\fR \fIproblem\fR\fB\&.get_decisionsetlist()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Like the get_decisionlist() method, but the decisions are merged into individual sets\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBRule *get_learnt()\fR
+my \fI@learnt\fR \fB=\fR \fI$problem\fR\fB\->get_learnt()\fR;
+\fIlearnt\fR \fB=\fR \fIproblem\fR\fB\&.get_learnt()\fR
+\fIlearnt\fR \fB=\fR \fIproblem\fR\fB\&.get_lerant()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return a list of learnt rules that are part of the problem proof\&. This is useful for presenting a complete proof to the user\&.
 .sp
 .if n \{\
 .RS 4
@@ -4514,6 +4674,51 @@ As the same dependency rule can get created because of multiple dependencies, on
 .RS 4
 .\}
 .nf
+\fBDecision *get_decisionlist()\fR
+my \fI@decisions\fR \fB=\fR \fI$rule\fR\fB\->get_decisionlist()\fR;
+\fIdecisions\fR \fB=\fR \fIrule\fR\fB\&.get_decisionlist()\fR
+\fIdecisions\fR \fB=\fR \fIrule\fR\fB\&.get_decisionlist()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return a list of decisions prooving a learnt rule\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBDecision *get_decisionsetlist()\fR
+my \fI@decisionsets\fR \fB=\fR \fI$rule\fR\fB\->get_decisionsetlist()\fR;
+\fIdecisionsets\fR \fB=\fR \fIrule\fR\fB\&.get_decisionsetlist()\fR
+\fIdecisionsets\fR \fB=\fR \fIrule\fR\fB\&.get_decisionsetlist()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Like the get_decisionlist() method, but the decisions are merged into individual sets\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBRule *get_learnt()\fR
+my \fI@learnt\fR \fB=\fR \fI$rule\fR\fB\->get_learnt()\fR;
+\fIlearnt\fR \fB=\fR \fIrule\fR\fB\&.get_learnt()\fR
+\fIlearnt\fR \fB=\fR \fIrule\fR\fB\&.get_lerant()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return a list of learnt rules that are part of the learnt rule proof\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
 \fB<equality>\fR
 \fBif (\fR\fI$rule1\fR \fB==\fR \fI$rule2\fR\fB)\fR
 \fBif\fR \fIrule1\fR \fB==\fR \fIrule2\fR\fB:\fR
@@ -4579,7 +4784,7 @@ The dependency leading to the creation of the rule\&.
 .\}
 .nf
 \fBDep *dep_id;\fR                            /* read only */
-\fI$ruleinfo\fR\fB\->{\*(Aqdep_id\*(Aq}\fR
+\fI$ruleinfo\fR\fB\->{\fR\fIdep_id\fR\fB}\fR
 \fIruleinfo\fR\fB\&.dep_id\fR
 \fIruleinfo\fR\fB\&.dep_id\fR
 .fi
@@ -4617,7 +4822,7 @@ The involved Solvable, e\&.g\&. the one containing the dependency\&.
 .RE
 .\}
 .sp
-The other involved Solvable (if any), e\&.g\&. the one containing providing the dependency for conflicts\&.
+The other involved Solvable (if any), e\&.g\&. the one providing the dependency\&.
 .sp
 .if n \{\
 .RS 4
@@ -4633,6 +4838,21 @@ my \fI$str\fR \fB=\fR \fI$ruleinfo\fR\fB\->problemstr()\fR;
 .\}
 .sp
 A string describing the ruleinfo from a problem perspective\&. This probably only makes sense if the rule is part of a problem\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fB<stringification>\fR
+my \fI$str\fR \fB=\fR \fI$ruleinfo\fR\fB\->str\fR;
+\fIstr\fR \fB= str(\fR\fIruleinfo\fR\fB)\fR
+\fIstr\fR \fB=\fR \fIruleinfo\fR\fB\&.to_s\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+A string describing the ruleinfo, i\&.e\&. the reason why the corresponding rule has been created\&.
 .SH "THE SOLUTION CLASS"
 .sp
 A solution solves one specific problem\&. It consists of multiple solution elements that all need to be executed\&.
@@ -5071,7 +5291,7 @@ Back pointer to pool\&.
 .RS 4
 .\}
 .nf
-\fBbool isempty()\fR;
+\fBbool isempty()\fR
 \fI$trans\fR\fB\->isempty()\fR
 \fItrans\fR\fB\&.isempty()\fR
 \fItrans\fR\fB\&.isempty?\fR
@@ -5086,7 +5306,7 @@ Returns true if the transaction does not do anything, i\&.e\&. has no elements\&
 .RS 4
 .\}
 .nf
-\fBSolvable *newsolvables()\fR;
+\fBSolvable *newsolvables()\fR
 my \fI@newsolvables\fR \fB=\fR \fI$trans\fR\fB\->newsolvables()\fR;
 \fInewsolvables\fR \fB=\fR \fItrans\fR\fB\&.newsolvables()\fR
 \fInewsolvables\fR \fB=\fR \fItrans\fR\fB\&.newsolvables()\fR
@@ -5101,7 +5321,7 @@ Return all packages that are to be installed by the transaction\&. These are the
 .RS 4
 .\}
 .nf
-\fBSolvable *keptsolvables()\fR;
+\fBSolvable *keptsolvables()\fR
 my \fI@keptsolvables\fR \fB=\fR \fI$trans\fR\fB\->keptsolvables()\fR;
 \fIkeptsolvables\fR \fB=\fR \fItrans\fR\fB\&.keptsolvables()\fR
 \fIkeptsolvables\fR \fB=\fR \fItrans\fR\fB\&.keptsolvables()\fR
@@ -5116,7 +5336,7 @@ Return all installed packages that the transaction will keep installed\&.
 .RS 4
 .\}
 .nf
-\fBSolvable *steps()\fR;
+\fBSolvable *steps()\fR
 my \fI@steps\fR \fB=\fR \fI$trans\fR\fB\->steps()\fR;
 \fIsteps\fR \fB=\fR \fItrans\fR\fB\&.steps()\fR
 \fIsteps\fR \fB=\fR \fItrans\fR\fB\&.steps()\fR
@@ -5161,7 +5381,7 @@ Group the transaction elements into classes so that they can be displayed in a s
 .RS 4
 .\}
 .nf
-\fBSolvable othersolvable(Solvable *\fR\fIsolvable\fR\fB)\fR;
+\fBSolvable othersolvable(Solvable *\fR\fIsolvable\fR\fB)\fR
 my \fI$other\fR \fB=\fR \fI$trans\fR\fB\->othersolvable(\fR\fI$solvable\fR\fB)\fR;
 \fIother\fR \fB=\fR \fItrans\fR\fB\&.othersolvable(\fR\fIsolvable\fR\fB)\fR
 \fIother\fR \fB=\fR \fItrans\fR\fB\&.othersolvable(\fR\fIsolvable\fR\fB)\fR
@@ -5180,7 +5400,7 @@ Thus, the \(lqother\(rq solvable is normally the package that is also shown for 
 .RS 4
 .\}
 .nf
-\fBSolvable *allothersolvables(Solvable *\fR\fIsolvable\fR\fB)\fR;
+\fBSolvable *allothersolvables(Solvable *\fR\fIsolvable\fR\fB)\fR
 my \fI@others\fR \fB=\fR \fI$trans\fR\fB\->allothersolvables(\fR\fI$solvable\fR\fB)\fR;
 \fIothers\fR \fB=\fR \fItrans\fR\fB\&.allothersolvables(\fR\fIsolvable\fR\fB)\fR
 \fIothers\fR \fB=\fR \fItrans\fR\fB\&.allothersolvables(\fR\fIsolvable\fR\fB)\fR
@@ -5195,7 +5415,7 @@ For installed packages, returns all of the packages that replace us\&. For to be
 .RS 4
 .\}
 .nf
-\fBlong long calc_installsizechange()\fR;
+\fBlong long calc_installsizechange()\fR
 my \fI$change\fR \fB=\fR \fI$trans\fR\fB\->calc_installsizechange()\fR;
 \fIchange\fR \fB=\fR \fItrans\fR\fB\&.calc_installsizechange()\fR
 \fIchange\fR \fB=\fR \fItrans\fR\fB\&.calc_installsizechange()\fR
@@ -5210,7 +5430,7 @@ Return the size change of the installed system in kilobytes (kibibytes)\&.
 .RS 4
 .\}
 .nf
-\fBvoid order(int\fR \fIflags\fR \fB= 0)\fR;
+\fBvoid order(int\fR \fIflags\fR \fB= 0)\fR
 \fI$trans\fR\fB\->order()\fR;
 \fItrans\fR\fB\&.order()\fR
 \fItrans\fR\fB\&.order()\fR
@@ -5400,7 +5620,10 @@ Create a checksum object\&. Currently the following types are supported:
 .nf
 \fBREPOKEY_TYPE_MD5\fR
 \fBREPOKEY_TYPE_SHA1\fR
+\fBREPOKEY_TYPE_SHA224\fR
 \fBREPOKEY_TYPE_SHA256\fR
+\fBREPOKEY_TYPE_SHA384\fR
+\fBREPOKEY_TYPE_SHA512\fR
 .fi
 .if n \{\
 .RE
@@ -5644,7 +5867,7 @@ Return file file descriptor of the file\&. If the file is not open, \-1 is retur
 .\}
 .nf
 \fBvoid cloexec(bool\fR \fIstate\fR\fB)\fR
-\fI$file\fR\fB\->cloexec(\fR\fI$state\fR\fB)\fR
+\fI$file\fR\fB\->cloexec(\fR\fI$state\fR\fB)\fR;
 \fIfile\fR\fB\&.cloexec(\fR\fIstate\fR\fB)\fR
 \fIfile\fR\fB\&.cloexec(\fR\fIstate\fR\fB)\fR
 .fi
@@ -5738,7 +5961,7 @@ The id of the repodata area\&. Repodata ids of different repositories overlap\&.
 .RS 4
 .\}
 .nf
-\fBinternalize()\fR;
+\fBinternalize()\fR
 \fI$data\fR\fB\->internalize()\fR;
 \fIdata\fR\fB\&.internalize()\fR
 \fIdata\fR\fB\&.internalize()\fR
@@ -5753,7 +5976,7 @@ Internalize newly added data\&. The lookup functions will only see the new data 
 .RS 4
 .\}
 .nf
-\fBbool write(FILE *\fR\fIfp\fR\fB)\fR;
+\fBbool write(FILE *\fR\fIfp\fR\fB)\fR
 \fI$data\fR\fB\->write(\fR\fI$fp\fR\fB)\fR;
 \fIdata\fR\fB\&.write(\fR\fIfp\fR\fB)\fR
 \fIdata\fR\fB\&.write(\fR\fIfp\fR\fB)\fR
@@ -5797,7 +6020,7 @@ Convert a string (directory) into an Id and back\&. If the string is currently n
 .\}
 .nf
 \fBvoid add_dirstr(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, Id\fR \fIdir\fR\fB, const char *\fR\fIstr\fR\fB)\fR
-\fI$data\fR\fB\->add_dirstr(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB,\fR \fI$dir\fR\fB,\fR \fI$string\fR\fB)\fR
+\fI$data\fR\fB\->add_dirstr(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB,\fR \fI$dir\fR\fB,\fR \fI$string\fR\fB)\fR;
 \fIdata\fR\fB\&.add_dirstr(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fIdir\fR\fB,\fR \fIstring\fR\fB)\fR
 \fIdata\fR\fB\&.add_dirstr(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fIdir\fR\fB,\fR \fIstring\fR\fB)\fR
 .fi
@@ -5811,7 +6034,7 @@ Add a file path consisting of a dirname Id and a basename string\&.
 .RS 4
 .\}
 .nf
-\fBbool add_solv(FILE *\fR\fIfp\fR\fB, int\fR \fIflags\fR \fB= 0)\fR;
+\fBbool add_solv(FILE *\fR\fIfp\fR\fB, int\fR \fIflags\fR \fB= 0)\fR
 \fI$data\fR\fB\->add_solv(\fR\fI$fp\fR\fB)\fR;
 \fIdata\fR\fB\&.add_solv(\fR\fIfp\fR\fB)\fR
 \fIdata\fR\fB\&.add_solv(\fR\fIfp\fR\fB)\fR
@@ -5826,8 +6049,8 @@ Replace a stub repodata object with the data from a solv file\&. This method aut
 .RS 4
 .\}
 .nf
-\fBvoid create_stubs()\fR;
-\fI$data\fR\fB\->create_stubs()\fR
+\fBvoid create_stubs()\fR
+\fI$data\fR\fB\->create_stubs()\fR;
 \fIdata\fR\fB\&.create_stubs()\fR
 \fIdata\fR\fB\&.create_stubs()\fR
 .fi
@@ -5841,7 +6064,7 @@ Create stub repodatas from the information stored in the repodata meta area\&.
 .RS 4
 .\}
 .nf
-\fBvoid extend_to_repo()\fR;
+\fBvoid extend_to_repo()\fR
 \fI$data\fR\fB\->extend_to_repo()\fR;
 \fIdata\fR\fB\&.extend_to_repo()\fR
 \fIdata\fR\fB\&.extend_to_repo()\fR
@@ -5953,7 +6176,7 @@ Lookup functions\&. Return the data element stored in the specified solvable\&. 
 .RS 4
 .\}
 .nf
-\fBvoid set_str(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, const char *\fR\fIstr\fR\fB)\fR;
+\fBvoid set_str(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, const char *\fR\fIstr\fR\fB)\fR
 \fI$data\fR\fB\->set_str(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB,\fR \fI$str\fR\fB)\fR;
 \fIdata\fR\fB\&.set_str(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fIstr\fR\fB)\fR
 \fIdata\fR\fB\&.set_str(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fIstr\fR\fB)\fR
@@ -5966,7 +6189,7 @@ Lookup functions\&. Return the data element stored in the specified solvable\&. 
 .RS 4
 .\}
 .nf
-\fBvoid set_id(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, DepId\fR \fIid\fR\fB)\fR;
+\fBvoid set_id(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, DepId\fR \fIid\fR\fB)\fR
 \fI$data\fR\fB\->set_id(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB,\fR \fI$id\fR\fB)\fR;
 \fIdata\fR\fB\&.set_id(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fIid\fR\fB)\fR
 \fIdata\fR\fB\&.set_id(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fIid\fR\fB)\fR
@@ -5979,7 +6202,7 @@ Lookup functions\&. Return the data element stored in the specified solvable\&. 
 .RS 4
 .\}
 .nf
-\fBvoid set_num(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, unsigned long long\fR \fInum\fR\fB)\fR;
+\fBvoid set_num(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, unsigned long long\fR \fInum\fR\fB)\fR
 \fI$data\fR\fB\->set_num(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB,\fR \fI$num\fR\fB)\fR;
 \fIdata\fR\fB\&.set_num(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fInum\fR\fB)\fR
 \fIdata\fR\fB\&.set_num(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fInum\fR\fB)\fR
@@ -5992,7 +6215,7 @@ Lookup functions\&. Return the data element stored in the specified solvable\&. 
 .RS 4
 .\}
 .nf
-\fBvoid set_void(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB)\fR;
+\fBvoid set_void(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB)\fR
 \fI$data\fR\fB\->set_void(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB)\fR;
 \fIdata\fR\fB\&.set_void(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
 \fIdata\fR\fB\&.set_void(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
@@ -6005,7 +6228,7 @@ Lookup functions\&. Return the data element stored in the specified solvable\&. 
 .RS 4
 .\}
 .nf
-\fBvoid set_poolstr(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, const char *\fR\fIstr\fR\fB)\fR;
+\fBvoid set_poolstr(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, const char *\fR\fIstr\fR\fB)\fR
 \fI$data\fR\fB\->set_poolstr(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB,\fR \fI$str\fR\fB)\fR;
 \fIdata\fR\fB\&.set_poolstr(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fIstr\fR\fB)\fR
 \fIdata\fR\fB\&.set_poolstr(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fIstr\fR\fB)\fR
@@ -6018,7 +6241,7 @@ Lookup functions\&. Return the data element stored in the specified solvable\&. 
 .RS 4
 .\}
 .nf
-\fBvoid set_checksum(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, Chksum *\fR\fIchksum\fR\fB)\fR;
+\fBvoid set_checksum(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, Chksum *\fR\fIchksum\fR\fB)\fR
 \fI$data\fR\fB\->set_checksum(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB,\fR \fI$chksum\fR\fB)\fR;
 \fIdata\fR\fB\&.set_checksum(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fIchksum\fR\fB)\fR
 \fIdata\fR\fB\&.set_checksum(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fIchksum\fR\fB)\fR
@@ -6031,7 +6254,7 @@ Lookup functions\&. Return the data element stored in the specified solvable\&. 
 .RS 4
 .\}
 .nf
-\fBvoid set_sourcepkg(Id\fR \fIsolvid\fR\fB, const char *\fR\fIsourcepkg\fR\fB)\fR;
+\fBvoid set_sourcepkg(Id\fR \fIsolvid\fR\fB, const char *\fR\fIsourcepkg\fR\fB)\fR
 \fI$data\fR\fB\&.set_sourcepkg(\fR\fI$solvid\fR\fB,\fR \fI$sourcepkg\fR\fB)\fR;
 \fIdata\fR\fB\&.set_sourcepkg(\fR\fIsolvid\fR\fB,\fR \fIsourcepkg\fR\fB)\fR
 \fIdata\fR\fB\&.set_sourcepkg(\fR\fIsolvid\fR\fB,\fR \fIsourcepkg\fR\fB)\fR
@@ -6044,7 +6267,7 @@ Lookup functions\&. Return the data element stored in the specified solvable\&. 
 .RS 4
 .\}
 .nf
-\fBvoid set_location(Id\fR \fIsolvid\fR\fB, unsigned int\fR \fImediano\fR\fB, const char *\fR\fIlocation\fR\fB)\fR;
+\fBvoid set_location(Id\fR \fIsolvid\fR\fB, unsigned int\fR \fImediano\fR\fB, const char *\fR\fIlocation\fR\fB)\fR
 \fI$data\fR\fB\&.set_location(\fR\fI$solvid\fR\fB,\fR \fI$mediano\fR\fB,\fR \fI$location\fR\fB)\fR;
 \fIdata\fR\fB\&.set_location(\fR\fIsolvid\fR\fB,\fR \fImediano\fR\fB,\fR \fIlocation\fR\fB)\fR
 \fIdata\fR\fB\&.set_location(\fR\fIsolvid\fR\fB,\fR \fImediano\fR\fB,\fR \fIlocation\fR\fB)\fR
@@ -6057,7 +6280,7 @@ Lookup functions\&. Return the data element stored in the specified solvable\&. 
 .RS 4
 .\}
 .nf
-\fBvoid add_idarray(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, DepId\fR \fIid\fR\fB)\fR;
+\fBvoid add_idarray(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, DepId\fR \fIid\fR\fB)\fR
 \fI$data\fR\fB\->add_idarray(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB,\fR \fI$id\fR\fB)\fR;
 \fIdata\fR\fB\&.add_idarray(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fIid\fR\fB)\fR
 \fIdata\fR\fB\&.add_idarray(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fIid\fR\fB)\fR
@@ -6070,7 +6293,7 @@ Lookup functions\&. Return the data element stored in the specified solvable\&. 
 .RS 4
 .\}
 .nf
-\fBId new_handle()\fR;
+\fBId new_handle()\fR
 my \fI$handle\fR \fB=\fR \fI$data\fR\fB\->new_handle()\fR;
 \fIhandle\fR \fB=\fR \fIdata\fR\fB\&.new_handle()\fR
 \fIhandle\fR \fB=\fR \fIdata\fR\fB\&.new_handle()\fR
@@ -6083,7 +6306,7 @@ my \fI$handle\fR \fB=\fR \fI$data\fR\fB\->new_handle()\fR;
 .RS 4
 .\}
 .nf
-\fBvoid add_flexarray(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, Id\fR \fIhandle\fR\fB)\fR;
+\fBvoid add_flexarray(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB, Id\fR \fIhandle\fR\fB)\fR
 \fI$data\fR\fB\->add_flexarray(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB,\fR \fI$handle\fR\fB)\fR;
 \fIdata\fR\fB\&.add_flexarray(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fIhandle\fR\fB)\fR
 \fIdata\fR\fB\&.add_flexarray(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB,\fR \fIhandle\fR\fB)\fR
@@ -6096,7 +6319,7 @@ my \fI$handle\fR \fB=\fR \fI$data\fR\fB\->new_handle()\fR;
 .RS 4
 .\}
 .nf
-\fBvoid unset(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB)\fR;
+\fBvoid unset(Id\fR \fIsolvid\fR\fB, Id\fR \fIkeyname\fR\fB)\fR
 \fI$data\fR\fB\->unset(\fR\fI$solvid\fR\fB,\fR \fI$keyname\fR\fB)\fR;
 \fIdata\fR\fB\&.unset(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
 \fIdata\fR\fB\&.unset(\fR\fIsolvid\fR\fB,\fR \fIkeyname\fR\fB)\fR
@@ -6146,7 +6369,7 @@ Create a Dataiterator at the position of the datapos object\&.
 .RS 4
 .\}
 .nf
-\fBconst char *lookup_deltalocation(unsigned int *\fR\fIOUTPUT\fR\fB)\fR;
+\fBconst char *lookup_deltalocation(unsigned int *\fR\fIOUTPUT\fR\fB)\fR
 my \fB(\fR\fI$location\fR\fB,\fR \fI$mediano\fR\fB) =\fR \fI$datapos\fR\fB\->lookup_deltalocation()\fR;
 \fIlocation\fR\fB,\fR \fImediano\fR \fB=\fR \fIdatapos\fR\fB\&.lookup_deltalocation()\fR
 \fIlocation\fR\fB,\fR \fImediano\fR \fB=\fR \fIdatapos\fR\fB\&.lookup_deltalocation()\fR
@@ -6161,7 +6384,7 @@ Return a tuple containing the on\-media location and an optional media number fo
 .RS 4
 .\}
 .nf
-\fBconst char *lookup_deltaseq()\fR;
+\fBconst char *lookup_deltaseq()\fR
 my \fI$seq\fR \fB=\fR \fI$datapos\fR\fB\->lookup_deltaseq()\fR;
 \fIseq\fR \fB=\fR \fIdatapos\fR\fB\&.lookup_deltaseq()\fR;
 \fIseq\fR \fB=\fR \fIdatapos\fR\fB\&.lookup_deltaseq()\fR;
@@ -6279,6 +6502,457 @@ my \fI$di\fR \fB=\fR \fI$datapos\fR\fB\->Dataiterator(\fR\fI$keyname\fR\fB,\fR \
 .\}
 .sp
 Iterate over the matching data elements\&. See the Dataiterator class for more information\&.
+.SH "THE ALTERNATIVE CLASS"
+.sp
+An Alternative object describes a branch point in the solving process\&. The solver found more than one good way to fulfill a dependency and chose one\&. It recorded the other possibilities in the alternative object so that they can be presented to the user in the case a different solution is preferable\&.
+.SS "ATTRIBUTES"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSolver *solv;\fR                   /* read only */
+\fI$alternative\fR\fB\->{solv}\fR
+\fIalternative\fR\fB\&.solv\fR
+\fIalternative\fR\fB\&.solv\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Back pointer to solver object\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId type;\fR                        /* read only */
+\fI$alternative\fR\fB\->{type}\fR
+\fIalternative\fR\fB\&.type\fR
+\fIalternative\fR\fB\&.type\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The type of the alternative\&. Alternatives can be created because of rule fulfillment, because of recommended packages, and because of suggested packages (currently unused)\&. See below for a list of valid types\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBRule rule;\fR                      /* read only */
+\fI$alternative\fR\fB\->{rule}\fR
+\fIalternative\fR\fB\&.rule\fR
+\fIalternative\fR\fB\&.rule\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The rule that caused the creation of the alternative (SOLVER_ALTERNATIVE_TYPE_RULE)\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBDep *dep;\fR                       /* read only */
+\fI$ruleinfo\fR\fB\->{dep}\fR
+\fIruleinfo\fR\fB\&.dep\fR
+\fIruleinfo\fR\fB\&.dep\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The dependency that caused the creation of the alternative (SOLVER_ALTERNATIVE_TYPE_RECOMMENDS)\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBDep *depsolvable;\fR               /* read only */
+\fI$ruleinfo\fR\fB\->{depsolvable}\fR
+\fIruleinfo\fR\fB\&.depsolvable\fR
+\fIruleinfo\fR\fB\&.depsolvable\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The package containing the dependency (SOLVER_ALTERNATIVE_TYPE_RECOMMENDS)\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSolvable chosen;\fR                /* read only */
+\fI$alternative\fR\fB\->{chosen}\fR
+\fIalternative\fR\fB\&.chosen\fR
+\fIalternative\fR\fB\&.chosen\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The solvable that the solver chose from the alternative\(cqs package set\&.
+.SS "CONSTANTS"
+.PP
+\fBSOLVER_ALTERNATIVE_TYPE_RULE\fR
+.RS 4
+The alternative was created when fulfilling a rule\&.
+.RE
+.PP
+\fBSOLVER_ALTERNATIVE_TYPE_RECOMMENDS\fR
+.RS 4
+The alternative was created when fulfilling a recommends dependency\&.
+.RE
+.PP
+\fBSOLVER_ALTERNATIVE_TYPE_SUGGESTS\fR
+.RS 4
+The alternative was created when fulfilling a suggests dependency\&.
+.RE
+.SS "METHODS"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSolvable *choices()\fR
+my \fI@choices\fR \fB=\fR \fI$alternative\fR\fB\->choices()\fR;
+\fIchoices\fR \fB=\fR \fIalternative\fR\fB\&.choices\fR
+\fIchoices\fR \fB=\fR \fIalternative\fR\fB\&.choices\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return the set of solvables that the solver could choose from when creating the alternative\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fB<stringification>\fR
+my \fI$str\fR \fB=\fR \fI$alternative\fR\fB\->str\fR;
+\fIstr\fR \fB= str(\fR\fIalternative\fR\fB)\fR
+\fIstr\fR \fB=\fR \fIalternative\fR\fB\&.to_s\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return a string describing the alternative\&.
+.SH "THE DECISION CLASS"
+.sp
+A decision is created when the solver fulfills dependencies\&. It can be either to install a package to satisfy a dependency or to conflict a dependency because it conflicts with another package or its dependencies cannot be met\&. Most decisions are caused by rule processing, but there are some other types like orphaned package handling or weak dependency handling\&.
+.SS "ATTRIBUTES"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSolver *solv;\fR                   /* read only */
+\fI$decision\fR\fB\->{solv}\fR
+\fIdecision\fR\fB\&.solv\fR
+\fIdecision\fR\fB\&.solv\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Back pointer to solver object\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId p;\fR                           /* read only */
+\fI$decision\fR\fB\->{p}\fR
+\fIdecision\fR\fB\&.p\fR
+\fIdecision\fR\fB\&.p\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The decision package id, positive for installs and negative for conflicts\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBint reason;\fR                     /* read only */
+\fI$decision\fR\fB\->{reason}\fR
+\fIdecision\fR\fB\&.reason\fR
+\fIdecision\fR\fB\&.reason\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The reason for the decision\&. See the SOLVER_REASON_ constants\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBint infoid;\fR                     /* read only */
+\fI$decision\fR\fB\->{infoid}\fR
+\fIdecision\fR\fB\&.infoid\fR
+\fIdecision\fR\fB\&.infoid\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Extra info for the decision\&. This is the rule id for decisions caused by rule fulfillment\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSolvable solvable;\fR              /* read only */
+\fI$decision\fR\fB\->{solvable}\fR
+\fIdecision\fR\fB\&.solvable\fR
+\fIdecision\fR\fB\&.solvable\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The decision package object\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBRule rule()\fR                     /* read only */
+\fI$decision\fR\fB\->{rule}\fR
+\fIdecision\fR\fB\&.rule\fR
+\fIdecision\fR\fB\&.rule\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The rule object for decisions that where caused by rule fulfilment\&.
+.SS "METHODS"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBRuleinfo info()\fR
+my \fI$info\fR \fB=\fR \fI$decision\fR\fB\->info()\fR;
+\fIinfo\fR \fB=\fR \fIdecision\fR\fB\&.info()\fR
+\fIinfo\fR \fB=\fR \fIdecision\fR\fB\&.info()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return a Ruleinfo object describing the decision\&. Some reasons like SOLVER_REASON_WEAKDEP are not caused by rules, but can be expressed by a Ruleinfo object\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBRuleinfo *allinfos()\fR
+my \fI@infos\fR \fB=\fR \fI$decision\fR\fB\->allinfos()\fR;
+\fIinfos\fR \fB=\fR \fIdecision\fR\fB\&.allinfos()\fR
+\fIinfos\fR \fB=\fR \fIdecision\fR\fB\&.allinfos()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Same as info(), but all Ruleinfo objects describing the decision are returned\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBconst char *reasonstr()\fR
+my \fIstr\fR \fB=\fR \fI$decision\fR\fB\->reasonstr()\fR
+\fIstr\fR \fB=\fR \fIdecision\fR\fB\&.reasonstr()\fR
+\fIstr\fR \fB=\fR \fIdecision\fR\fB\&.reasonstr()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return a string describing why a decision was done (but without the decision itself)\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fB<stringification>\fR
+my \fI$str\fR \fB=\fR \fI$decison\fR\fB\->str\fR;
+\fIstr\fR \fB= str(\fR\fIdecision\fR\fB)\fR
+\fIstr\fR \fB=\fR \fIdecision\fR\fB\&.to_s\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return a string describing the decision (but without the reason)\&.
+.SH "THE DECISIONSET CLASS"
+.sp
+A decisionset consists of multiple decisions of the same reason and type that can be presented to the user as a single action\&.
+.SS "ATTRIBUTES"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSolver *solv;\fR                   /* read only */
+\fI$decision\fR\fB\->{solv}\fR
+\fIdecision\fR\fB\&.solv\fR
+\fIdecision\fR\fB\&.solv\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Back pointer to solver object\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBId p;\fR                           /* read only */
+\fI$decision\fR\fB\->{p}\fR
+\fIdecision\fR\fB\&.p\fR
+\fIdecision\fR\fB\&.p\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The package id of the first decision, positive for installs and negative for conflicts\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBint reason;\fR                     /* read only */
+\fI$decision\fR\fB\->{reason}\fR
+\fIdecision\fR\fB\&.reason\fR
+\fIdecision\fR\fB\&.reason\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The reason for the decisions in the set\&. See the SOLVER_REASON_ constants\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBint type;\fR                       /* read only */
+\fI$ruleinfo\fR\fB\->{type}\fR
+\fIruleinfo\fR\fB\&.type\fR
+\fIruleinfo\fR\fB\&.type\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The type of the decision info\&. See the constant section of the solver class for the rule type list and the special type list\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBDep *dep;\fR                       /* read only */
+\fI$ruleinfo\fR\fB\->{dep}\fR
+\fIruleinfo\fR\fB\&.dep\fR
+\fIruleinfo\fR\fB\&.dep\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The dependency that caused the decision
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBDep *dep_id;\fR                    /* read only */
+\fI$ruleinfo\fR\fB\->{\fR\fIdep_id\fR\fB}\fR
+\fIruleinfo\fR\fB\&.dep_id\fR
+\fIruleinfo\fR\fB\&.dep_id\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The Id of the dependency that caused the decision\&.
+.SS "METHODS"
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBDecision *decisions()\fR
+my \fI@decisions\fR \fB=\fR \fI$decisionset\fR\fB\->decisions()\fR;
+\fIdecisions\fR \fB=\fR \fIdecisionset\fR\fB\&.decisions()\fR
+\fIdecisions\fR \fB=\fR \fIdecisionset\fR\fB\&.decisions()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return all the decisions of the set\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBSolvable *solvables()\fR
+my \fI@pkgs\fR \fB=\fR \fI$decisionset\fR\fB\->solvables()\fR;
+\fIpkgs\fR \fB=\fR \fIdecisionset\fR\fB\&.solvables()\fR
+\fIpkgs\fR \fB=\fR \fIdecisionset\fR\fB\&.solvables()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return all the packages that were decided in the set\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBconst char *reasonstr()\fR
+my \fIstr\fR \fB=\fR \fI$decision\fR\fB\->reasonstr()\fR;
+\fIstr\fR \fB=\fR \fIdecision\fR\fB\&.reasonstr()\fR
+\fIstr\fR \fB=\fR \fIdecision\fR\fB\&.reasonstr()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return a string describing why the decisions were done (but without the decisions themself)\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fB<stringification>\fR
+my \fI$str\fR \fB=\fR \fI$decison\fR\fB\->str\fR;
+\fIstr\fR \fB= str(\fR\fIdecision\fR\fB)\fR
+\fIstr\fR \fB=\fR \fIdecision\fR\fB\&.to_s\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return a string describing the decisions (but without the reason)\&.
 .SH "AUTHOR"
 .sp
 Michael Schroeder <mls@suse\&.de>

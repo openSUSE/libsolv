@@ -43,6 +43,7 @@ from optparse import OptionParser
 
 #import gc
 #gc.set_debug(gc.DEBUG_LEAK)
+#rpm.setVerbosity(rpm.RPMLOG_DEBUG)
 
 class repo_generic(dict):
     def __init__(self, name, type, attribs = {}):
@@ -787,6 +788,11 @@ while True:
             sys.stdout.write("Please choose a solution: ")
             sys.stdout.flush()
             sol = sys.stdin.readline().strip()
+            if sol == 'p':
+                print('')
+                for decisionset in problem.get_decisionsetlist():
+                    print("%s: %s" % (decisionset, decisionset.reasonstr()))
+                print('')
         if sol == 's':
             continue        # skip problem
         if sol == 'q':
@@ -802,7 +808,6 @@ while True:
                     
 # no problems, show transaction
 trans = solver.transaction()
-del solver
 if trans.isempty():
     print("Nothing to do.")
     sys.exit(0)
@@ -837,6 +842,20 @@ for cl in trans.classify(solv.Transaction.SOLVER_TRANSACTION_SHOW_OBSOLETES | so
     print('')
 print("install size change: %d K" % trans.calc_installsizechange())
 print('')
+
+alternatives = solver.alternatives()
+if alternatives:
+    print('Alternatives:')
+    for a in alternatives:
+        print('')
+        print(a)
+        aidx = 1
+        for ac in a.choices():
+            print("%6d: %s" % (aidx, ac))
+            aidx = aidx + 1
+    print('')
+
+del solver
 
 while True:
     sys.stdout.write("OK to continue (y/n)? ")
@@ -944,7 +963,9 @@ if checkproblems:
 ts.order()
 def runCallback(reason, amount, total, p, d):
     if reason == rpm.RPMCALLBACK_INST_OPEN_FILE:
-        return newpkgsfp[p.id].fileno()
+        f = newpkgsfp[p.id]
+        os.lseek(f.fileno(), 0, os.SEEK_SET)
+        return f.fileno()
     if reason == rpm.RPMCALLBACK_INST_START:
         print("install %s" % p)
     if reason == rpm.RPMCALLBACK_UNINST_START:

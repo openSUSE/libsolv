@@ -18,7 +18,7 @@ ADD_CUSTOM_COMMAND (
     DEPENDS ${CMAKE_SOURCE_DIR}/bindings/solv.i
 )
 
-ADD_DEFINITIONS(-Wno-unused)
+ADD_DEFINITIONS(-Wno-unused -Wno-missing-braces)
 INCLUDE_DIRECTORIES (${TCL_INCLUDE_PATH})
 
 ADD_LIBRARY (bindings_tcl SHARED solv_tcl.c)

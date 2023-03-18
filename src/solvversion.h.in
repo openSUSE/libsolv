@@ -23,6 +23,7 @@ extern const char solv_version[];
 extern int solv_version_major;
 extern int solv_version_minor;
 extern int solv_version_patch;
+extern const char solv_toolversion[];
 
 #cmakedefine LIBSOLV_FEATURE_LINKED_PKGS
 #cmakedefine LIBSOLV_FEATURE_COMPLEX_DEPS
@@ -48,6 +49,6 @@ extern int solv_version_patch;
 #cmakedefine LIBSOLVEXT_FEATURE_ZCHUNK_COMPRESSION
 
 /* see tools/common_write.c for toolversion history */
-#define LIBSOLV_TOOLVERSION "1.1"
+#define LIBSOLV_TOOLVERSION "1.2"
 
 #endif

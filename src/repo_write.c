@@ -29,6 +29,9 @@
 #include "repo_write.h"
 #include "repopage.h"
 
+#undef USE_IDARRAYBLOCK
+#define USE_REL_IDARRAY
+
 /*------------------------------------------------------------------*/
 /* Id map optimizations */
 
@@ -157,6 +160,36 @@ write_blob(Repodata *data, void *blob, int len)
   if (len && fwrite(blob, len, 1, data->fp) != 1)
     {
       data->error = pool_error(data->repo->pool, -1, "write error blob: %s", strerror(errno));
+    }
+}
+
+static void
+write_compressed_blob(Repodata *data, void *blob, int len)
+{
+  unsigned char cpage[65536];
+  if (data->error)
+    return;
+  while (len > 0)
+    {
+      int chunk = len > sizeof(cpage) ? sizeof(cpage) : len;
+      int flag = (chunk == len ? 0x80 : 0x00);
+      int clen = repopagestore_compress_page(blob, chunk, cpage, sizeof(cpage) - 1);
+      if (!clen)
+	{
+	  write_u8(data, flag);
+	  write_u8(data, chunk >> 8);
+	  write_u8(data, chunk);
+	  write_blob(data, blob, chunk);
+	}
+      else
+	{
+	  write_u8(data, flag | 0x40);
+	  write_u8(data, clen >> 8);
+	  write_u8(data, clen);
+	  write_blob(data, cpage, clen);
+	}
+      blob += chunk;
+      len -= chunk;
     }
 }
 
@@ -350,7 +383,6 @@ data_addid64(struct extdata *xd, unsigned int x, unsigned int hx)
     data_addid(xd, (Id)x);
 }
 
-#define USE_REL_IDARRAY
 #ifdef USE_REL_IDARRAY
 
 static int
@@ -368,11 +400,9 @@ data_adddepids(struct extdata *xd, Pool *pool, NeedId *needid, Id *ids, Id marke
   Id lids[64], *sids;
   Id id, old;
 
-  if (!ids)
-    return;
-  if (!*ids)
+  if (!ids || !*ids)
     {
-      data_addid(xd, 0);
+      data_addideof(xd, 0, 1);
       return;
     }
   for (len = 0; len < 64 && ids[len]; len++)
@@ -449,13 +479,41 @@ data_adddepids(struct extdata *xd, Pool *pool, NeedId *needid, Id *ids, Id marke
 
 #else
 
+#ifdef USE_IDARRAYBLOCK
+
+static void
+data_adddepids(struct extdata *xd, Pool *pool, NeedId *needid, Id *ids, Id marker)
+{
+  Id id;
+  Id last = 0, tmp;
+  if (!ids || !*ids)
+    {
+      data_addideof(xd, 0, 1);
+      return;
+    }
+  while ((id = *ids++) != 0)
+    {
+      if (needid)
+        id = needid[NEEDIDOFF(id)].need;
+      tmp = id;
+      if (id < last)
+	id = (last - id) * 2 - 1;	/* [1, 2 * last - 1] odd */
+      else if (id < 2 * last)
+	id = (id - last) * 2;		/* [0, 2 * last - 2] even */
+      last = tmp;
+      data_addideof(xd, id, *ids ? 0 : 1);
+    }
+}
+
+#else
+
 static void
 data_adddepids(struct extdata *xd, Pool *pool, NeedId *needid, Id *ids, Id marker)
 {
   Id id;
   if (!ids || !*ids)
     {
-      data_addid(xd, 0);
+      data_addideof(xd, 0, 1);
       return;
     }
   while ((id = *ids++) != 0)
@@ -465,6 +523,8 @@ data_adddepids(struct extdata *xd, Pool *pool, NeedId *needid, Id *ids, Id marke
       data_addideof(xd, id, *ids ? 0 : 1);
     }
 }
+
+#endif
 
 #endif
 
@@ -845,6 +905,12 @@ collect_data_solvable(struct cbdata *cbdata, Solvable *s, Id *keymap)
   Repo *repo = s->repo;
   Pool *pool = repo->pool;
   struct extdata *xd = cbdata->extdata;
+#ifdef USE_IDARRAYBLOCK
+  struct extdata *xda = xd + cbdata->target->nkeys;	/* idarray block */
+#else
+  struct extdata *xda = xd;
+#endif
+
   NeedId *needid = cbdata->needid;
   Id *idarraydata = repo->idarraydata;
 
@@ -857,21 +923,21 @@ collect_data_solvable(struct cbdata *cbdata, Solvable *s, Id *keymap)
   if (s->vendor && keymap[SOLVABLE_VENDOR])
     data_addid(xd, needid[s->vendor].need);
   if (s->provides && keymap[SOLVABLE_PROVIDES])
-    data_adddepids(xd, pool, needid, idarraydata + s->provides, SOLVABLE_FILEMARKER);
+    data_adddepids(xda, pool, needid, idarraydata + s->provides, SOLVABLE_FILEMARKER);
   if (s->obsoletes && keymap[SOLVABLE_OBSOLETES])
-    data_adddepids(xd, pool, needid, idarraydata + s->obsoletes, 0);
+    data_adddepids(xda, pool, needid, idarraydata + s->obsoletes, 0);
   if (s->conflicts && keymap[SOLVABLE_CONFLICTS])
-    data_adddepids(xd, pool, needid, idarraydata + s->conflicts, 0);
+    data_adddepids(xda, pool, needid, idarraydata + s->conflicts, 0);
   if (s->requires && keymap[SOLVABLE_REQUIRES])
-    data_adddepids(xd, pool, needid, idarraydata + s->requires, SOLVABLE_PREREQMARKER);
+    data_adddepids(xda, pool, needid, idarraydata + s->requires, SOLVABLE_PREREQMARKER);
   if (s->recommends && keymap[SOLVABLE_RECOMMENDS])
-    data_adddepids(xd, pool, needid, idarraydata + s->recommends, 0);
+    data_adddepids(xda, pool, needid, idarraydata + s->recommends, 0);
   if (s->suggests && keymap[SOLVABLE_SUGGESTS])
-    data_adddepids(xd, pool, needid, idarraydata + s->suggests, 0);
+    data_adddepids(xda, pool, needid, idarraydata + s->suggests, 0);
   if (s->supplements && keymap[SOLVABLE_SUPPLEMENTS])
-    data_adddepids(xd, pool, needid, idarraydata + s->supplements, 0);
+    data_adddepids(xda, pool, needid, idarraydata + s->supplements, 0);
   if (s->enhances && keymap[SOLVABLE_ENHANCES])
-    data_adddepids(xd, pool, needid, idarraydata + s->enhances, 0);
+    data_adddepids(xda, pool, needid, idarraydata + s->enhances, 0);
   if (repo->rpmdbid && keymap[RPM_RPMDBID])
     data_addid(xd, repo->rpmdbid[(s - pool->solvables) - repo->start]);
 }
@@ -953,6 +1019,7 @@ static Id verticals[] = {
   SOLVABLE_LEADSIGID,
   SOLVABLE_CHANGELOG_AUTHOR,
   SOLVABLE_CHANGELOG_TEXT,
+  SOLVABLE_SIGNATUREDATA,
   0
 };
 
@@ -1071,6 +1138,7 @@ repowriter_create(Repo *repo)
 Repowriter *
 repowriter_free(Repowriter *writer)
 {
+  solv_free(writer->userdata);
   return solv_free(writer);
 }
 
@@ -1105,6 +1173,17 @@ repowriter_set_solvablerange(Repowriter *writer, int solvablestart, int solvable
 {
   writer->solvablestart = solvablestart;
   writer->solvableend = solvableend;
+}
+
+void
+repowriter_set_userdata(Repowriter *writer, const void *data, int len)
+{
+  writer->userdata = solv_free(writer->userdata);
+  writer->userdatalen = 0;
+  if (len <= 0)
+    return;
+  writer->userdata = solv_memdup(data, len);
+  writer->userdatalen = len;
 }
 
 /*
@@ -1171,6 +1250,9 @@ repowriter_write(Repowriter *writer, FILE *fp)
 
   Id type_constantid = 0;
 
+  /* sanity checks */
+  if (writer->userdatalen < 0 || writer->userdatalen >= 65536)
+    return pool_error(pool, -1, "illegal userdata length: %d", writer->userdatalen);
 
   memset(&cbdata, 0, sizeof(cbdata));
   cbdata.pool = pool;
@@ -1205,13 +1287,13 @@ repowriter_write(Repowriter *writer, FILE *fp)
 	  if (i < SOLVABLE_PROVIDES)
 	    keyd.type = REPOKEY_TYPE_ID;
 	  else if (i < RPM_RPMDBID)
-#ifdef USE_REL_IDARRAY
-	    keyd.type = REPOKEY_TYPE_REL_IDARRAY;
-#else
 	    keyd.type = REPOKEY_TYPE_IDARRAY;
-#endif
 	  else
 	    keyd.type = REPOKEY_TYPE_NUM;
+#ifdef USE_REL_IDARRAY
+	  if (keyd.type == REPOKEY_TYPE_IDARRAY)
+	    keyd.type = REPOKEY_TYPE_REL_IDARRAY;
+#endif
 	  keyd.size = 0;
 	  keyd.storage = KEY_STORAGE_SOLVABLE;
 	  if (writer->keyfilter)
@@ -1221,6 +1303,10 @@ repowriter_write(Repowriter *writer, FILE *fp)
 		continue;
 	      keyd.storage = KEY_STORAGE_SOLVABLE;
 	    }
+#ifdef USE_IDARRAYBLOCK
+	  if (keyd.type == REPOKEY_TYPE_IDARRAY)
+	    keyd.storage = KEY_STORAGE_IDARRAYBLOCK;
+#endif
 	  poolusage = 1;
 	  clonepool = 1;
 	  keymap[keyd.name] = repodata_key2id(&target, &keyd, 1);
@@ -1301,6 +1387,8 @@ repowriter_write(Repowriter *writer, FILE *fp)
 		      keymap[n] = 0;
 		      continue;
 		    }
+		  if (keyd.storage != KEY_STORAGE_VERTICAL_OFFSET)
+		    keyd.storage = KEY_STORAGE_INCORE;		/* do not mess with us */
 		}
 	      if (data->state != REPODATA_STUB)
 	        id = repodata_key2id(&target, &keyd, 1);
@@ -1829,11 +1917,12 @@ for (i = 1; i < target.nkeys; i++)
 
   /* collect all data
    * we use extdata[0] for incore data and extdata[keyid] for vertical data
+   * we use extdata[nkeys] for the idarray_block data
    *
    * this must match the code above that creates the schema data!
    */
 
-  cbdata.extdata = solv_calloc(target.nkeys, sizeof(struct extdata));
+  cbdata.extdata = solv_calloc(target.nkeys + 1, sizeof(struct extdata));
 
   xd = cbdata.extdata;
   cbdata.current_sub = 0;
@@ -1895,11 +1984,20 @@ for (i = 1; i < target.nkeys; i++)
   target.fp = fp;
 
   /* write header */
+  solv_flags = 0;
+  solv_flags |= SOLV_FLAG_PREFIX_POOL;
+  solv_flags |= SOLV_FLAG_SIZE_BYTES;
+  if (writer->userdatalen)
+    solv_flags |= SOLV_FLAG_USERDATA;
+  if (cbdata.extdata[target.nkeys].len)
+    solv_flags |= SOLV_FLAG_IDARRAYBLOCK;
 
   /* write file header */
   write_u32(&target, 'S' << 24 | 'O' << 16 | 'L' << 8 | 'V');
-  write_u32(&target, SOLV_VERSION_8);
-
+  if ((solv_flags & (SOLV_FLAG_USERDATA | SOLV_FLAG_IDARRAYBLOCK)) != 0)
+    write_u32(&target, SOLV_VERSION_9);
+  else
+    write_u32(&target, SOLV_VERSION_8);
 
   /* write counts */
   write_u32(&target, nstrings);
@@ -1908,10 +2006,14 @@ for (i = 1; i < target.nkeys; i++)
   write_u32(&target, anysolvableused ? nsolvables : 0);
   write_u32(&target, target.nkeys);
   write_u32(&target, target.nschemata);
-  solv_flags = 0;
-  solv_flags |= SOLV_FLAG_PREFIX_POOL;
-  solv_flags |= SOLV_FLAG_SIZE_BYTES;
   write_u32(&target, solv_flags);
+
+  /* write userdata */
+  if ((solv_flags & SOLV_FLAG_USERDATA) != 0)
+    {
+      write_u32(&target, writer->userdatalen);
+      write_blob(&target, writer->userdata, writer->userdatalen);
+    }
 
   if (nstrings)
     {
@@ -1951,8 +2053,8 @@ for (i = 1; i < target.nkeys; i++)
     }
   else
     {
-      write_u32(&target, 0);
-      write_u32(&target, 0);
+      write_u32(&target, 0);	/* unpacked size */
+      write_u32(&target, 0);	/* compressed size */
     }
 
   /*
@@ -2004,14 +2106,36 @@ for (i = 1; i < target.nkeys; i++)
   for (i = 1; i < target.nschemata; i++)
     write_idarray(&target, pool, 0, repodata_id2schema(&target, i));
 
+  /* write idarray_block data if not empty */
+  if (cbdata.extdata[target.nkeys].len)
+    {
+      unsigned int cnt = 0;
+      unsigned char *b;
+      unsigned int l;
+	
+      xd = cbdata.extdata + target.nkeys;
+      /* calculate number of entries */
+      for (l = xd->len, b = xd->buf; l--;)
+	{
+	  unsigned char x = *b++;
+	  if ((x & 0x80) == 0)
+	    cnt += (x & 0x40) ? 1 : 2;
+	}
+      write_id(&target, cnt);
+      if (cnt)
+        write_compressed_blob(&target, xd->buf, xd->len);
+      solv_free(xd->buf);
+    }
+
   /*
    * write incore data
    */
+  xd = cbdata.extdata;
   write_id(&target, cbdata.maxdata);
-  write_id(&target, cbdata.extdata[0].len);
-  if (cbdata.extdata[0].len)
-    write_blob(&target, cbdata.extdata[0].buf, cbdata.extdata[0].len);
-  solv_free(cbdata.extdata[0].buf);
+  write_id(&target, xd->len);
+  if (xd->len)
+    write_blob(&target, xd->buf, xd->len);
+  solv_free(xd->buf);
 
   /*
    * write vertical data if we have any

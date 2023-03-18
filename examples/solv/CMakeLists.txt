@@ -18,6 +18,7 @@ repoinfo_system_rpm.c
 repoinfo_type_debian.c
 repoinfo_type_mdk.c
 repoinfo_type_rpmmd.c
+repoinfo_type_plaindir.c
 repoinfo_type_susetags.c
 )
 

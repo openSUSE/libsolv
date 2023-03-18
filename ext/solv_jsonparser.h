@@ -12,6 +12,7 @@
 
 struct solv_jsonparser {
   FILE *fp;
+  int flags;
   int line;
   int depth;
 
@@ -29,6 +30,8 @@ struct solv_jsonparser {
   size_t aspace;
 };
 
+#define JP_FLAG_RAWSTRINGS	1
+
 #define JP_ERROR	-1
 #define JP_END		0
 #define JP_START	1
@@ -45,5 +48,6 @@ void jsonparser_init(struct solv_jsonparser *jp, FILE *fp);
 void jsonparser_free(struct solv_jsonparser *jp);
 int jsonparser_parse(struct solv_jsonparser *jp);
 int jsonparser_skip(struct solv_jsonparser *jp, int type);
+int jsonparser_collect(struct solv_jsonparser *jp, int type, char **jsonp);
 
 #endif /* SOLV_JSONPARSER_H */
