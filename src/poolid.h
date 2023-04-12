@@ -13,6 +13,8 @@
 #ifndef LIBSOLV_POOLID_H
 #define LIBSOLV_POOLID_H
 
+#include <stddef.h>
+
 #include "pooltypes.h"
 #include "hash.h"
 
@@ -30,8 +32,8 @@ typedef struct s_Reldep {
   int flags;		/* operation/relation, see REL_x in pool.h */
 } Reldep;
 
-extern Id pool_str2id(Pool *pool, const char *, int);
-extern Id pool_strn2id(Pool *pool, const char *, unsigned int, int);
+extern Id pool_str2id(Pool *pool, const char *str, int create);
+extern Id pool_strn2id(Pool *pool, const char *str, size_t len, int create);
 extern Id pool_rel2id(Pool *pool, Id, Id, int, int);
 extern const char *pool_id2str(const Pool *pool, Id);
 extern const char *pool_id2rel(const Pool *pool, Id);

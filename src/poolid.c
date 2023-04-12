@@ -38,7 +38,7 @@ pool_str2id(Pool *pool, const char *str, int create)
 }
 
 Id
-pool_strn2id(Pool *pool, const char *str, unsigned int len, int create)
+pool_strn2id(Pool *pool, const char *str, size_t len, int create)
 {
   int oldnstrings = pool->ss.nstrings;
   Id id = stringpool_strn2id(&pool->ss, str, len, create);
