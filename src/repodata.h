@@ -262,6 +262,7 @@ Id repodata_new_handle(Repodata *data);
 void repodata_set_void(Repodata *data, Id solvid, Id keyname);
 void repodata_set_num(Repodata *data, Id solvid, Id keyname, unsigned long long num);
 void repodata_set_id(Repodata *data, Id solvid, Id keyname, Id id);
+void repodata_set_strn(Repodata *data, Id solvid, Id keyname, const char *str, size_t l);
 void repodata_set_str(Repodata *data, Id solvid, Id keyname, const char *str);
 void repodata_set_binary(Repodata *data, Id solvid, Id keyname, void *buf, int len);
 /* create id from string, then set_id */

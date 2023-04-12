@@ -2513,20 +2513,24 @@ repodata_set_void(Repodata *data, Id solvid, Id keyname)
 }
 
 void
-repodata_set_str(Repodata *data, Id solvid, Id keyname, const char *str)
+repodata_set_strn(Repodata *data, Id solvid, Id keyname, const char *str, size_t l)
 {
   Repokey key;
-  int l;
-
-  l = strlen(str) + 1;
   key.name = keyname;
   key.type = REPOKEY_TYPE_STR;
   key.size = 0;
   key.storage = KEY_STORAGE_INCORE;
-  data->attrdata = solv_extend(data->attrdata, data->attrdatalen, l, 1, REPODATA_ATTRDATA_BLOCK);
+  data->attrdata = solv_extend(data->attrdata, data->attrdatalen, l + 1, 1, REPODATA_ATTRDATA_BLOCK);
+  data->attrdata[l] = '\0';
   memcpy(data->attrdata + data->attrdatalen, str, l);
   repodata_set(data, solvid, &key, data->attrdatalen);
-  data->attrdatalen += l;
+  data->attrdatalen += l + 1;
+}
+
+void
+repodata_set_str(Repodata *data, Id solvid, Id keyname, const char *str)
+{
+  repodata_set_strn(data, solvid, keyname, str, strlen(str));
 }
 
 void
@@ -2689,20 +2693,6 @@ repodata_set_poolstrn(Repodata *data, Id solvid, Id keyname, const char *str, in
   else
     id = pool_strn2id(data->repo->pool, str, l, 1);
   repodata_set_id(data, solvid, keyname, id);
-}
-
-static inline void
-repodata_set_strn(Repodata *data, Id solvid, Id keyname, const char *str, int l)
-{
-  if (!str[l])
-    repodata_set_str(data, solvid, keyname, str);
-  else
-    {
-      char *s = solv_strdup(str);
-      s[l] = 0;
-      repodata_set_str(data, solvid, keyname, s);
-      free(s);
-    }
 }
 
 void
