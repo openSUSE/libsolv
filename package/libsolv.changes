@@ -1,4 +1,14 @@
 -------------------------------------------------------------------
+Thu Apr 13 16:03:04 CEST 2023 - mls@suse.de
+
+- handle learnt rules in solver_alternativeinfo()
+- support x86_64_v[234] architecture levels
+- implement decision sorting for package decisionlists
+- add back findutils requires for the libsolv-tools packagse
+  [bsc#1195633]
+- bump version to 0.7.24
+
+-------------------------------------------------------------------
 Tue Dec 13 11:47:50 CET 2022 - mls@suse.de
 
 - fix "keep installed" jobs not disabling "best update" rules

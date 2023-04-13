@@ -1,6 +1,13 @@
 
 This file contains the major changes between libsolv versions:
 
+Version 0.7.24
+- selected bug fixes:
+  * handle learnt rules in solver_alternativeinfo()
+- new features:
+  * support x86_64_v[234] architecture levels
+  * implement decision sorting for package decisionlists
+
 Version 0.7.23
 - selected bug fixes:
   * fix "keep installed" jobs not disabling "best update" rules
