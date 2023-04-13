@@ -153,6 +153,7 @@ Group:          System/Management
 Conflicts:      satsolver-tools-obsolete
 Obsoletes:      satsolver-tools < 0.18
 Provides:       satsolver-tools = 0.18
+Requires:       findutils
 
 %description tools
 libsolv is a library for solving packages and reading repositories.
