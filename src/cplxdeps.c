@@ -405,6 +405,7 @@ pool_add_pos_literals_complex_dep(Pool *pool, Id dep, Queue *q, Map *m, int neg)
 	      Reldep *rd2 = GETRELDEP(pool, rd->evr);
 	      if (rd2->flags == REL_ELSE)
 		{
+	          pool_add_pos_literals_complex_dep(pool, rd2->name, q, m, !neg);
 	          pool_add_pos_literals_complex_dep(pool, rd2->evr, q, m, !neg);
 		  dep = rd2->name;
 		}
