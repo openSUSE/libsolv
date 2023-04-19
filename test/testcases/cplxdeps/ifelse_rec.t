@@ -1,3 +1,4 @@
+feature complex_deps
 repo appstream 0 testtags <inline>
 #>=Pkg: xorg-x11-server-Xorg 1.20.11 18.el9 noarch
 #>=Req: missing-req
