@@ -1672,6 +1672,16 @@ solver_addinfarchrules(Solver *solv, Map *addedmap)
       if (first)
 	continue;		/* not the first in the group */
 
+      if (!bestscore && allowedarchs.count > 1 && pool->implicitobsoleteusescolors)
+	{
+	  for (j = 0; j < allowedarchs.count; j++)
+	    {
+	      a = pool_arch2score(pool, allowedarchs.elements[j]);
+	      if (a && a != 1 && (!bestscore || a < bestscore))
+		bestscore = a;
+	    }
+	}
+
       if (!bestscore)
 	continue;		/* did not find a score for this group */
 
@@ -2578,6 +2588,20 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
     case SOLVER_ERASE:
       if (!installed)
 	break;
+      set = how & SOLVER_SETMASK;
+      if (!(set & (SOLVER_NOAUTOSET | SOLVER_SETARCH)) && pool->implicitobsoleteusescolors && solv->infarchrules != solv->infarchrules_end)
+	{
+	  if (select == SOLVER_SOLVABLE)
+	    set |= SOLVER_SETARCH;
+	  else if ((select == SOLVER_SOLVABLE_NAME || select == SOLVER_SOLVABLE_PROVIDES) && ISRELDEP(what))
+	    {
+	      Reldep *rd = GETRELDEP(pool, what);
+	      if (rd->flags <= 7 && ISRELDEP(rd->name))
+		rd = GETRELDEP(pool, rd->name);
+	      if (rd->flags == REL_ARCH)
+		set |= SOLVER_SETARCH;
+	    }
+	}
       if (select == SOLVER_SOLVABLE_ALL || (select == SOLVER_SOLVABLE_REPO && what == installed->repoid))
 	{
 	  FOR_REPO_SOLVABLES(installed, p, s)
@@ -2587,6 +2611,8 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
 	if (pool->solvables[p].repo == installed)
 	  {
 	    queue_push2(q, DISABLE_UPDATE, p);
+	    if ((set & SOLVER_SETARCH) != 0 && pool->implicitobsoleteusescolors && solv->infarchrules != solv->infarchrules_end)
+	      queue_push2(q, DISABLE_INFARCH, pool->solvables[p].name);		/* allow to break the lock-step */
 #ifdef ENABLE_LINKED_PKGS
 	    if (solv->instbuddy && solv->instbuddy[p - installed->start] > 1)
 	      queue_push2(q, DISABLE_UPDATE, solv->instbuddy[p - installed->start]);
