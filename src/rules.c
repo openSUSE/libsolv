@@ -2367,6 +2367,31 @@ reenablerepopriorule(Solver *solv, Id name)
 #define DISABLE_BLACK	 4
 #define DISABLE_REPOPRIO 5
 
+/* check if installed package p is in lock-step with another installed package */
+static int
+installed_is_in_lockstep(Solver *solv, Id p)
+{
+  Pool *pool = solv->pool;
+  Repo *installed = solv->installed;
+  int rid;
+  Id pp, l;
+  Rule *r;
+
+  if (!installed)
+    return 0;
+  for (rid = solv->infarchrules, r = solv->rules + rid; rid < solv->infarchrules_end; rid++, r++)
+    {
+      if (r->p >= 0)
+	continue;
+      if (pool->solvables[-r->p].repo != installed)
+	continue;
+      FOR_RULELITERALS(l, pp, r)
+	if (l == p)
+	  return 1;
+    }
+  return 0;
+}
+
 static void
 jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
 {
@@ -2612,7 +2637,8 @@ jobtodisablelist(Solver *solv, Id how, Id what, Queue *q)
 	  {
 	    queue_push2(q, DISABLE_UPDATE, p);
 	    if ((set & SOLVER_SETARCH) != 0 && pool->implicitobsoleteusescolors && solv->infarchrules != solv->infarchrules_end)
-	      queue_push2(q, DISABLE_INFARCH, pool->solvables[p].name);		/* allow to break the lock-step */
+	      if (installed_is_in_lockstep(solv, p))
+	        queue_push2(q, DISABLE_INFARCH, pool->solvables[p].name);		/* allow to break the lock-step */
 #ifdef ENABLE_LINKED_PKGS
 	    if (solv->instbuddy && solv->instbuddy[p - installed->start] > 1)
 	      queue_push2(q, DISABLE_UPDATE, solv->instbuddy[p - installed->start]);
