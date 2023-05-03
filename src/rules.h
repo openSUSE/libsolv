@@ -13,9 +13,16 @@
 #ifndef LIBSOLV_RULES_H
 #define LIBSOLV_RULES_H
 
+#include "pooltypes.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+typedef struct s_Solvable Solvable;
+typedef struct s_Map Map;
+typedef struct s_Queue Queue;
+
 
 /* ----------------------------------------------
  * Rule
