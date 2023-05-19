@@ -3449,6 +3449,7 @@ solver_addchoicerules(Solver *solv)
   int lastaddedcnt;
   unsigned int now;
   int isinstalled;
+  int dodowngradecheck = solv->allowdowngrade;
 
   solv->choicerules = solv->nrules;
   if (!pool->installed)
@@ -3457,6 +3458,8 @@ solver_addchoicerules(Solver *solv)
       return;
     }
   now = solv_timems(0);
+  if ((solv->dupinvolvedmap_all || solv->dupinvolvedmap.size) && solv->dup_allowdowngrade)
+    dodowngradecheck = 1;
   queue_init(&q);
   queue_init(&qi);
   queue_init(&qcheck);
@@ -3532,8 +3535,16 @@ solver_addchoicerules(Solver *solv)
 	  /* do extra checking for packages related to installed packages */
 	  for (i = j = 0; i < qi.count; i += 2)
 	    {
+	      int isdowngrade = 0;
 	      p2 = qi.elements[i];
-	      if (solv->updatemap_all || (solv->updatemap.size && MAPTST(&solv->updatemap, p2 - solv->installed->start)))
+	      if (dodowngradecheck)
+		{
+		  p = qi.elements[i + 1];
+		  if (pool->solvables[p2].name == pool->solvables[p].name)
+		    if (pool_evrcmp(pool, pool->solvables[p2].evr, pool->solvables[p].evr, EVRCMP_COMPARE) > 0)
+		      isdowngrade = 1;
+		}
+	      if (isdowngrade || solv->updatemap_all || (solv->updatemap.size && MAPTST(&solv->updatemap, p2 - solv->installed->start)))
 		{
 		  if (solver_choicerulecheck(solv, p2, r, &m, &qcheck))
 		    continue;
