@@ -40,6 +40,15 @@ typedef struct s_Stringpool Stringpool;
 struct s_Pool;
 typedef struct s_Pool Pool;
 
+struct s_Repo;
+typedef struct s_Repo Repo;
+
+struct s_Repodata;
+typedef struct s_Repodata Repodata;
+
+struct s_Solvable;
+typedef struct s_Solvable Solvable;
+
 /* identifier for string values */
 typedef int Id;		/* must be signed!, since negative Id is used in solver rules to denote negation */
 

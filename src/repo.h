@@ -24,7 +24,7 @@
 extern "C" {
 #endif
 
-typedef struct s_Repo {
+struct s_Repo {
   const char *name;		/* name pointer */
   Id repoid;			/* our id */
   void *appdata;		/* application private pointer */
@@ -56,7 +56,7 @@ typedef struct s_Repo {
   int lastmarker;
   Offset lastmarkerpos;
 #endif /* LIBSOLV_INTERNAL */
-} Repo;
+};
 
 extern Repo *repo_create(Pool *pool, const char *name);
 extern void repo_free(Repo *repo, int reuseids);

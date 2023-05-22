@@ -20,8 +20,6 @@
 extern "C" {
 #endif
 
-struct s_Repo;
-
 typedef struct s_KeyValue {
   Id id;
   const char *str;
@@ -106,8 +104,8 @@ typedef struct s_Dataiterator
   int flags;
 
   Pool *pool;
-  struct s_Repo *repo;
-  struct s_Repodata *data;
+  Repo *repo;
+  Repodata *data;
 
   /* data pointers */
   unsigned char *dp;
@@ -165,9 +163,9 @@ typedef struct s_Dataiterator
  * keyname: if non-null, limit search to this keyname
  * match:   if non-null, limit search to this match
  */
-int  dataiterator_init(Dataiterator *di, Pool *pool, struct s_Repo *repo, Id p, Id keyname, const char *match, int flags);
+int  dataiterator_init(Dataiterator *di, Pool *pool, Repo *repo, Id p, Id keyname, const char *match, int flags);
 void dataiterator_init_clone(Dataiterator *di, Dataiterator *from);
-void dataiterator_set_search(Dataiterator *di, struct s_Repo *repo, Id p);
+void dataiterator_set_search(Dataiterator *di, Repo *repo, Id p);
 void dataiterator_set_keyname(Dataiterator *di, Id keyname);
 int  dataiterator_set_match(Dataiterator *di, const char *match, int flags);
 
@@ -181,7 +179,7 @@ void dataiterator_skip_attribute(Dataiterator *di);
 void dataiterator_skip_solvable(Dataiterator *di);
 void dataiterator_skip_repo(Dataiterator *di);
 void dataiterator_jump_to_solvid(Dataiterator *di, Id solvid);
-void dataiterator_jump_to_repo(Dataiterator *di, struct s_Repo *repo);
+void dataiterator_jump_to_repo(Dataiterator *di, Repo *repo);
 void dataiterator_entersub(Dataiterator *di);
 void dataiterator_clonepos(Dataiterator *di, Dataiterator *from);
 void dataiterator_seek(Dataiterator *di, int whence);

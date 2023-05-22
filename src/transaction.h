@@ -21,12 +21,11 @@
 extern "C" {
 #endif
 
-struct s_Pool;
 struct s_DUChanges;
 struct s_TransactionOrderdata;
 
 typedef struct s_Transaction {
-  struct s_Pool *pool;		/* back pointer to pool */
+  Pool *pool;			/* back pointer to pool */
 
   Queue steps;			/* the transaction steps */
 
@@ -93,8 +92,8 @@ typedef struct s_Transaction {
 #define SOLVER_ORDERCYCLE_NORMAL		1
 #define SOLVER_ORDERCYCLE_CRITICAL		2
 
-extern Transaction *transaction_create(struct s_Pool *pool);
-extern Transaction *transaction_create_decisionq(struct s_Pool *pool, Queue *decisionq, Map *multiversionmap);
+extern Transaction *transaction_create(Pool *pool);
+extern Transaction *transaction_create_decisionq(Pool *pool, Queue *decisionq, Map *multiversionmap);
 extern Transaction *transaction_create_clone(Transaction *srctrans);
 extern void transaction_free(Transaction *trans);
 

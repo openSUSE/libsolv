@@ -14,14 +14,12 @@
 #define LIBSOLV_RULES_H
 
 #include "pooltypes.h"
+#include "bitmap.h"
+#include "queue.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-typedef struct s_Solvable Solvable;
-typedef struct s_Map Map;
-typedef struct s_Queue Queue;
 
 
 /* ----------------------------------------------

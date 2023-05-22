@@ -34,7 +34,6 @@ extern "C" {
 #define SIZEOF_SHA384	48
 #define SIZEOF_SHA512	64
 
-struct s_Repo;
 struct s_KeyValue;
 
 typedef struct s_Repokey {
@@ -67,13 +66,13 @@ struct dircache;
 #define REPODATA_FILELIST_FILTERED	1
 #define REPODATA_FILELIST_EXTENSION	2
 
-typedef struct s_Repodata {
+struct s_Repodata {
   Id repodataid;		/* our id */
-  struct s_Repo *repo;		/* back pointer to repo */
+  Repo *repo;			/* back pointer to repo */
 
   int state;			/* available, stub or error */
 
-  void (*loadcallback)(struct s_Repodata *);
+  void (*loadcallback)(Repodata *);
 
   int start;			/* start of solvables this repodata is valid for */
   int end;			/* last solvable + 1 of this repodata */
@@ -140,7 +139,7 @@ typedef struct s_Repodata {
   struct dircache *dircache;
 #endif
 
-} Repodata;
+};
 
 #define SOLVID_META		-1
 #define SOLVID_POS		-2
@@ -149,7 +148,7 @@ typedef struct s_Repodata {
 /*-----
  * management functions
  */
-void repodata_initdata(Repodata *data, struct s_Repo *repo, int localpool);
+void repodata_initdata(Repodata *data, Repo *repo, int localpool);
 void repodata_freedata(Repodata *data);
 
 void repodata_free(Repodata *data);

@@ -36,13 +36,11 @@ extern "C" {
 
 /*----------------------------------------------- */
 
-struct s_Repo;
-struct s_Repodata;
 struct s_Repokey;
 struct s_KeyValue;
 
 typedef struct s_Datapos {
-  struct s_Repo *repo;
+  Repo *repo;
   Id solvid;
   Id repodataid;
   Id schema;
@@ -66,16 +64,16 @@ struct s_Pool_tmpspace {
 struct s_Pool {
   void *appdata;		/* application private pointer */
 
-  struct s_Stringpool ss;
+  Stringpool ss;
 
   Reldep *rels;			/* table of rels: Id -> Reldep */
   int nrels;			/* number of unique rels */
 
-  struct s_Repo **repos;
+  Repo **repos;
   int nrepos;			/* repos allocated */
   int urepos;			/* repos in use */
 
-  struct s_Repo *installed; 	/* packages considered installed */
+  Repo *installed; 	/* packages considered installed */
 
   Solvable *solvables;
   int nsolvables;		/* solvables allocated */
@@ -109,16 +107,16 @@ struct s_Pool {
   Map *considered;
 
   /* callback for REL_NAMESPACE dependencies handled by the application  */
-  Id (*nscallback)(struct s_Pool *, void *data, Id name, Id evr);
+  Id (*nscallback)(Pool *, void *data, Id name, Id evr);
   void *nscallbackdata;
 
   /* debug mask and callback */
   int  debugmask;
-  void (*debugcallback)(struct s_Pool *, void *data, int type, const char *str);
+  void (*debugcallback)(Pool *, void *data, int type, const char *str);
   void *debugcallbackdata;
 
   /* load callback */
-  int (*loadcallback)(struct s_Pool *, struct s_Repodata *, void *);
+  int (*loadcallback)(Pool *, Repodata *, void *);
   void *loadcallbackdata;
 
   /* search position */
@@ -155,7 +153,7 @@ struct s_Pool {
 
   char *rootdir;
 
-  int (*custom_vendorcheck)(struct s_Pool *, Solvable *, Solvable *);
+  int (*custom_vendorcheck)(Pool *, Solvable *, Solvable *);
 
   int addfileprovidesfiltered;	/* 1: only use filtered file list for addfileprovides */
   int addedfileprovides;	/* true: application called addfileprovides */
@@ -251,14 +249,14 @@ extern int  pool_set_flag(Pool *pool, int flag, int value);
 extern int  pool_get_flag(Pool *pool, int flag);
 
 extern void pool_debug(Pool *pool, int type, const char *format, ...) __attribute__((format(printf, 3, 4)));
-extern void pool_setdebugcallback(Pool *pool, void (*debugcallback)(struct s_Pool *, void *data, int type, const char *str), void *debugcallbackdata);
+extern void pool_setdebugcallback(Pool *pool, void (*debugcallback)(Pool *pool, void *data, int type, const char *str), void *debugcallbackdata);
 extern void pool_setdebugmask(Pool *pool, int mask);
-extern void pool_setloadcallback(Pool *pool, int (*cb)(struct s_Pool *, struct s_Repodata *, void *), void *loadcbdata);
-extern void pool_setnamespacecallback(Pool *pool, Id (*cb)(struct s_Pool *, void *, Id, Id), void *nscbdata);
+extern void pool_setloadcallback(Pool *pool, int (*cb)(Pool *, Repodata *, void *), void *loadcbdata);
+extern void pool_setnamespacecallback(Pool *pool, Id (*cb)(Pool *, void *, Id, Id), void *nscbdata);
 extern void pool_flush_namespaceproviders(Pool *pool, Id ns, Id evr);
 
-extern void pool_set_custom_vendorcheck(Pool *pool, int (*vendorcheck)(struct s_Pool *, Solvable *, Solvable *));
-extern int (*pool_get_custom_vendorcheck(Pool *pool))(struct s_Pool *, Solvable *, Solvable *);
+extern void pool_set_custom_vendorcheck(Pool *pool, int (*vendorcheck)(Pool *, Solvable *, Solvable *));
+extern int (*pool_get_custom_vendorcheck(Pool *pool))(Pool *, Solvable *, Solvable *);
 
 extern char *pool_alloctmpspace(Pool *pool, int len);
 extern void  pool_freetmpspace(Pool *pool, const char *space);
@@ -266,7 +264,7 @@ extern char *pool_tmpjoin(Pool *pool, const char *str1, const char *str2, const 
 extern char *pool_tmpappend(Pool *pool, const char *str1, const char *str2, const char *str3);
 extern const char *pool_bin2hex(Pool *pool, const unsigned char *buf, int len);
 
-extern void pool_set_installed(Pool *pool, struct s_Repo *repo);
+extern void pool_set_installed(Pool *pool, Repo *repo);
 
 extern int  pool_error(Pool *pool, int ret, const char *format, ...) __attribute__((format(printf, 3, 4)));
 extern char *pool_errstr(Pool *pool);
@@ -363,7 +361,7 @@ void pool_set_whatprovides(Pool *pool, Id id, Id providers);
  *   key   - search only this key
  *   match - key must match this string
  */
-void pool_search(Pool *pool, Id p, Id key, const char *match, int flags, int (*callback)(void *cbdata, Solvable *s, struct s_Repodata *data, struct s_Repokey *key, struct s_KeyValue *kv), void *cbdata);
+void pool_search(Pool *pool, Id p, Id key, const char *match, int flags, int (*callback)(void *cbdata, Solvable *s, Repodata *data, struct s_Repokey *key, struct s_KeyValue *kv), void *cbdata);
 
 void pool_clear_pos(Pool *pool);
 
