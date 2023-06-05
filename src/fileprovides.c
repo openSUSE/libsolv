@@ -111,6 +111,9 @@ struct addfileprovides_cbdata {
   Map *todo;
   int todo_start;
   int todo_end;
+
+  int addedn;
+  Id *addedids;
 };
 
 /* split filelist dep into basename and dirname */
@@ -286,8 +289,11 @@ repodata_addfileprovides_search(Repodata *data, struct addfileprovides_cbdata *c
 	    {
 	      /* there is at least one entry with that did */
 	      for (i = 0; i < cbd->nfiles; i++)
-		if (cbd->dids[i] == did && !strcmp(cbd->names[i], (const char *)dp))
+		if (cbd->dids[i] == did && !strcmp(cbd->names[i], (const char *)dp)) {
 		  s->provides = repo_addid_dep(s->repo, s->provides, cbd->ids[i], SOLVABLE_FILEMARKER);
+                  cbd->addedids = solv_extend(cbd->addedids, cbd->addedn, 1, sizeof(Id), SEARCHFILES_BLOCK);
+                  cbd->addedids[cbd->addedn++] = cbd->ids[i];
+                }
 	    }
 	  if (!(c & 0x40))
 	    break;
@@ -605,10 +611,12 @@ pool_addfileprovides_queue(Pool *pool, Queue *idq, Queue *idqinst)
       FOR_REPOS(i, repo)
         repo_addfileprovides_search(repo, &cbd, &sf);
       if (idq)
-	queue_insertn(idq, idq->count, sf.nfiles, sf.ids);
+	queue_insertn(idq, idq->count, cbd.addedn, cbd.addedids);
       if (idqinst)
-	queue_insertn(idqinst, idqinst->count, sf.nfiles, sf.ids);
+	queue_insertn(idqinst, idqinst->count, cbd.addedn, cbd.addedids);
       solv_free(sf.ids);
+      solv_free(cbd.addedids);
+      cbd.addedn = 0;
     }
   if (isf.nfiles)
     {
@@ -619,9 +627,10 @@ pool_addfileprovides_queue(Pool *pool, Queue *idq, Queue *idqinst)
       if (installed)
         repo_addfileprovides_search(installed, &cbd, &isf);
       if (installed && idqinst)
-        for (i = 0; i < isf.nfiles; i++)
-	  queue_pushunique(idqinst, isf.ids[i]);
+        for (i = 0; i < cbd.addedn; i++)
+	  queue_pushunique(idqinst, cbd.addedids[i]);
       solv_free(isf.ids);
+      solv_free(cbd.addedids);
     }
   free_dirs_names_array(&cbd);
   solv_free(cbd.dids);

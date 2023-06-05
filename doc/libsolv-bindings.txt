@@ -474,7 +474,7 @@ repositories. This method will scan all dependency for file names and then scan
 all packages for matching files. If a filename has been matched, it will be
 added to the provides list of the corresponding package. The
 addfileprovides_queue variant works the same way but returns an array
-containing all file dependencies. This information can be stored in the
+containing all added file provides. This information can be stored in the
 meta section of the repositories to speed up the next time the
 repository is loaded and addfileprovides is called.
 
