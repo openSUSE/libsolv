@@ -16,6 +16,9 @@
 #
 
 
+%define singlespec_py3 ( 0%{?suse_version} > 1330 )
+%define oldpython python
+%define libname libsolv1
 %define libname libsolv@LIBSOLV_SOVERSION@
 
 %if 0%{?sle_version} >= 120300 || 0%{?suse_version} >= 1330 || !0%{?suse_version}
@@ -90,14 +93,26 @@ BuildRequires:  swig
 %endif
 
 %if %{with python}
-%global python_sitearch %(python -c "from sysconfig import get_path; print(get_path('platlib'))")
-BuildRequires:  python-devel
+%global python2_sitearch %(python -c "from sysconfig import get_path; print(get_path('platlib'))")
+BuildRequires:  %{oldpython}-devel
 BuildRequires:  swig
 %endif
 
 %if %{with python3}
+
+%if %{singlespec_py3}
+%{?sle15allpythons}
+%define python_subpackage_only 1
+%define skip_python2 1
+BuildRequires:  python-rpm-macros
+BuildRequires:  %{python_module devel}
+%python_subpackages
+%else
 %global python3_sitearch %(python3 -c "from sysconfig import get_path; print(get_path('platlib'))")
 BuildRequires:  python3-devel
+%endif
+### ---
+
 BuildRequires:  swig
 %endif
 
@@ -193,12 +208,14 @@ Group:          Development/Languages/Python
 %description -n python-solv
 Python bindings for libsolv.
 
+%if !%{singlespec_py3} || 0%{?sle_version} <= 150300
 %package -n python3-solv
 Summary:        Python3 bindings for the libsolv library
 Group:          Development/Languages/Python
 
 %description -n python3-solv
 Python3 bindings for libsolv.
+%endif
 
 %package -n perl-solv
 Summary:        Perl bindings for the libsolv library
@@ -225,6 +242,21 @@ CMAKE_FLAGS="-DMAGEIA=1"
 %endif
 %if 0%{?suse_version}
 CMAKE_FLAGS="-DSUSE=1"
+%endif
+
+%if %{with python3} && %{singlespec_py3}
+# Build bindings for all python flavors
+pushd bindings
+sed -i 's|ADD_SUBDIRECTORY (python3)||g' CMakeLists.txt
+%{python_expand #
+  cp -rf python3 python%{$python_version_nodots}
+  pushd python%{$python_version_nodots}
+  sed -i 's|/usr/bin/python3|%{__$python}|g' CMakeLists.txt
+  sed -i 's|bindings_python3|bindings_python%{$python_version_nodots}|g' CMakeLists.txt
+  popd
+  echo "ADD_SUBDIRECTORY (python%{$python_version_nodots})" >> CMakeLists.txt
+}
+popd
 %endif
 
 cmake . $CMAKE_FLAGS \
@@ -261,6 +293,10 @@ ln -s repo2solv %{buildroot}/%{_bindir}/repo2solv.sh
 %endif
 %if %{with python3}
 %py3_compile %{buildroot}/%{python3_sitearch}
+%if %{singlespec_py3} && %{defined python_compileall}
+%python_compileall
+%endif
+### ---
 %endif
 %endif
 
@@ -327,18 +363,32 @@ make ARGS=--output-on-failure test
 %endif
 
 %if %{with python}
-%files -n python-solv
+%files -n %{oldpython}-solv
 %defattr(-,root,root)
-%{python_sitearch}/*
+%{python2_sitearch}/*
 %endif
 
 %if %{with python3}
+
+%if %{singlespec_py3} && (0%{?suse_version} > 1500 || 0%{?sle_version} > 150300)
+### --- singlespec
+%files %{python_files solv}
+%defattr(-,root,root)
+%{python_sitearch}/*solv*
+%if 0%{?suse_version}
+%{python_sitearch}/*/*solv*
+%endif
+%else
+### --- Just python3 package, not singlespec
 %files -n python3-solv
 %defattr(-,root,root)
 %{python3_sitearch}/*solv*
 %if 0%{?suse_version}
 %{python3_sitearch}/*/*solv*
 %endif
+%endif
+### ---
+
 %endif
 
 %changelog
