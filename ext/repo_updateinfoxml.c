@@ -113,7 +113,8 @@ struct parsedata {
   Id pkghandle;
   struct solv_xmlparser xmlp;
   struct joindata jd;
-  Id collhandle;
+  Queue collectionpkgids;
+  Queue collectionmodids;
 };
 
 /*
@@ -290,7 +291,8 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
 
     case STATE_COLLECTION:
       {
-        pd->collhandle = repodata_new_handle(pd->data);
+        queue_empty(&pd->collectionpkgids);
+        queue_empty(&pd->collectionmodids);
       }
       break;
 
@@ -371,7 +373,7 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
         if (arch)
           repodata_set_poolstr(pd->data, module_handle, UPDATE_MODULE_ARCH, arch);
         repodata_add_flexarray(pd->data, pd->handle, UPDATE_MODULE, module_handle);
-        repodata_add_flexarray(pd->data, pd->collhandle, UPDATE_MODULE, module_handle);
+        queue_push(&pd->collectionmodids, module_handle);
         break;
       }
 
@@ -436,13 +438,18 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
       break;
 
     case STATE_COLLECTION:
-      repodata_add_flexarray(pd->data, pd->handle, UPDATE_COLLECTIONLIST, pd->collhandle);
-      pd->collhandle = 0;
+      Id collhandle = repodata_new_handle(pd->data);
+      // Add all collection ids to their collection at once to avoid too many moves in repodata_add_array in data->attriddata
+      for (int i = 0; i < pd->collectionpkgids.count; i++)
+        repodata_add_flexarray(pd->data, collhandle, UPDATE_COLLECTION, pd->collectionpkgids.elements[i]);
+      for (int i = 0; i < pd->collectionmodids.count; i++)
+        repodata_add_flexarray(pd->data, collhandle, UPDATE_MODULE, pd->collectionmodids.elements[i]);
+      repodata_add_flexarray(pd->data, pd->handle, UPDATE_COLLECTIONLIST, collhandle);
       break;
 
     case STATE_PACKAGE:
       repodata_add_flexarray(pd->data, pd->handle, UPDATE_COLLECTION, pd->pkghandle);
-      repodata_add_flexarray(pd->data, pd->collhandle, UPDATE_COLLECTION, pd->pkghandle);
+      queue_push(&pd->collectionpkgids, pd->pkghandle);
       pd->pkghandle = 0;
       break;
 
@@ -499,11 +506,15 @@ repo_add_updateinfoxml(Repo *repo, FILE *fp, int flags)
   pd.pool = pool;
   pd.repo = repo;
   pd.data = data;
+  queue_init(&pd.collectionpkgids);
+  queue_init(&pd.collectionmodids);
   solv_xmlparser_init(&pd.xmlp, stateswitches, &pd, startElement, endElement);
   if (solv_xmlparser_parse(&pd.xmlp, fp) != SOLV_XMLPARSER_OK)
     pd.ret = pool_error(pool, -1, "repo_updateinfoxml: %s at line %u:%u", pd.xmlp.errstr, pd.xmlp.line, pd.xmlp.column);
   solv_xmlparser_free(&pd.xmlp);
   join_freemem(&pd.jd);
+  queue_free(&pd.collectionpkgids);
+  queue_free(&pd.collectionmodids);
 
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
