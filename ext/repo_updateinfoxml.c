@@ -113,7 +113,7 @@ struct parsedata {
   Id pkghandle;
   struct solv_xmlparser xmlp;
   struct joindata jd;
-  Id collhandle;
+  Queue collectionq;
 };
 
 /*
@@ -289,9 +289,7 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
       break;
 
     case STATE_COLLECTION:
-      {
-        pd->collhandle = repodata_new_handle(pd->data);
-      }
+      queue_empty(&pd->collectionq);
       break;
 
       /*   <package arch="ppc64" name="imlib-debuginfo" release="6.fc8"
@@ -371,7 +369,7 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
         if (arch)
           repodata_set_poolstr(pd->data, module_handle, UPDATE_MODULE_ARCH, arch);
         repodata_add_flexarray(pd->data, pd->handle, UPDATE_MODULE, module_handle);
-        repodata_add_flexarray(pd->data, pd->collhandle, UPDATE_MODULE, module_handle);
+	queue_push2(&pd->collectionq, UPDATE_MODULE, module_handle);
         break;
       }
 
@@ -436,13 +434,19 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
       break;
 
     case STATE_COLLECTION:
-      repodata_add_flexarray(pd->data, pd->handle, UPDATE_COLLECTIONLIST, pd->collhandle);
-      pd->collhandle = 0;
+      {
+	Id collhandle = repodata_new_handle(pd->data);
+	int i;
+	for (i = 0; i < pd->collectionq.count; i += 2)
+	  repodata_add_flexarray(pd->data, collhandle, pd->collectionq.elements[i], pd->collectionq.elements[i + 1]);
+	repodata_add_flexarray(pd->data, pd->handle, UPDATE_COLLECTIONLIST, collhandle);
+	queue_empty(&pd->collectionq);
+      }
       break;
 
     case STATE_PACKAGE:
       repodata_add_flexarray(pd->data, pd->handle, UPDATE_COLLECTION, pd->pkghandle);
-      repodata_add_flexarray(pd->data, pd->collhandle, UPDATE_COLLECTION, pd->pkghandle);
+      queue_push2(&pd->collectionq, UPDATE_COLLECTION, pd->pkghandle);
       pd->pkghandle = 0;
       break;
 
@@ -499,11 +503,13 @@ repo_add_updateinfoxml(Repo *repo, FILE *fp, int flags)
   pd.pool = pool;
   pd.repo = repo;
   pd.data = data;
+  queue_init(&pd.collectionq);
   solv_xmlparser_init(&pd.xmlp, stateswitches, &pd, startElement, endElement);
   if (solv_xmlparser_parse(&pd.xmlp, fp) != SOLV_XMLPARSER_OK)
     pd.ret = pool_error(pool, -1, "repo_updateinfoxml: %s at line %u:%u", pd.xmlp.errstr, pd.xmlp.line, pd.xmlp.column);
   solv_xmlparser_free(&pd.xmlp);
   join_freemem(&pd.jd);
+  queue_free(&pd.collectionq);
 
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
