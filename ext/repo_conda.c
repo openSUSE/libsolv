@@ -314,8 +314,16 @@ parse_package(struct parsedata *pd, struct solv_jsonparser *jp, char *kfn, char 
   /* if we have a global subdir make sure that it matches */
   if (subdir && pd->subdir && strcmp(subdir, pd->subdir) != 0)
     {
+      /* we used to return an error here, but classic conda
+       * just overwrites the package subdir with the global
+       * subdir */
+#if 0
       pd->error = "subdir mismatch";
       return JP_ERROR;
+#else
+      solv_free(subdir);
+      subdir = solv_strdup(pd->subdir);
+#endif
     }
 
   if (fn || kfn)
