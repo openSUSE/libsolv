@@ -1135,6 +1135,58 @@ queue_prunezeros(Queue *q)
   queue_truncate(q, j);
 }
 
+static int
+replaces_installed_package(Pool *pool, Id p, Map *noupdate)
+{
+  Repo *installed = pool->installed;
+  Solvable *s = pool->solvables + p, *s2;
+  Id p2, pp2;
+  Id obs, *obsp;
+
+  if (s->repo == installed && !(noupdate && MAPTST(noupdate, p - installed->start)))
+    return 1;
+  FOR_PROVIDES(p2, pp2, s->name)
+    {
+      s2 = pool->solvables + p2;
+      if (s2->repo == installed && s2->name == s->name && !(noupdate && MAPTST(noupdate, p - installed->start)))
+	return 1;
+    }
+  if (!s->obsoletes)
+    return 0;
+  obsp = s->repo->idarraydata + s->obsoletes;
+  while ((obs = *obsp++) != 0)
+    {
+      FOR_PROVIDES(p2, pp2, obs)
+	{
+	  s2 = pool->solvables + p2;
+	  if (s2->repo != pool->installed || (noupdate && MAPTST(noupdate, p - installed->start)))
+	    continue;
+	  if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, s2, obs))
+	    continue;
+	  if (pool->obsoleteusescolors && !pool_colormatch(pool, s, s2))
+	    continue;
+	  return 1;
+	}
+    }
+  return 0;
+}
+
+static void
+prune_dq_for_future_installed(Solver *solv, Queue *dq)
+{
+  Pool *pool = solv->pool;
+  int i, j;
+  for (i = j = 0; i < dq->count; i++)
+    {
+      Id p = dq->elements[i];
+      if (replaces_installed_package(pool, p, &solv->noupdate))
+        dq->elements[j++] = p;
+    }
+  if (j)
+    queue_truncate(dq, j);
+}
+
+
 static void
 reorder_dq_for_future_installed(Solver *solv, int level, Queue *dq)
 {
@@ -1314,9 +1366,13 @@ selectandinstall(Solver *solv, int level, Queue *dq, int disablerules, Id ruleid
   if (dq->count > 1)
     policy_filter_unwanted(solv, dq, POLICY_MODE_CHOOSE);
   /* if we're resolving rules and didn't resolve the installed packages yet,
-   * do some special supplements ordering */
+   * do some special pruning and supplements ordering */
   if (dq->count > 1 && solv->do_extra_reordering)
-    reorder_dq_for_future_installed(solv, level, dq);
+    {
+      prune_dq_for_future_installed(solv, dq);
+      if (dq->count > 1)
+	reorder_dq_for_future_installed(solv, level, dq);
+    }
   /* check if the candidates are all connected via yumobs rules */
   if (dq->count > 1 && solv->yumobsrules_end > solv->yumobsrules)
     prune_yumobs(solv, dq, ruleid);
@@ -2980,6 +3036,8 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 			continue;
 		      if (solv->favormap && solv->favormap[p] > solv->favormap[solv->branches.elements[lastsi]])
 		        continue;	/* current selection is more favored */
+		      if (replaces_installed_package(pool, p, &solv->noupdate))
+		        continue;	/* current selection replaces an installed package */
 		      if (!(MAPTST(&solv->recommendsmap, p) || solver_is_supplementing(solv, pool->solvables + p)))
 			{
 			  lasti = lastsi;
@@ -4671,7 +4729,7 @@ pool_job2solvables(Pool *pool, Queue *pkgs, Id how, Id what)
 int
 pool_isemptyupdatejob(Pool *pool, Id how, Id what)
 {
-  Id p, pp, pi, pip;
+  Id p, pp;
   Id select = how & SOLVER_SELECTMASK;
   if ((how & SOLVER_JOBMASK) != SOLVER_UPDATE)
     return 0;
@@ -4684,34 +4742,8 @@ pool_isemptyupdatejob(Pool *pool, Id how, Id what)
       return 0;
   /* hard work */
   FOR_JOB_SELECT(p, pp, select, what)
-    {
-      Solvable *s = pool->solvables + p;
-      FOR_PROVIDES(pi, pip, s->name)
-	{
-	  Solvable *si = pool->solvables + pi;
-	  if (si->repo != pool->installed || si->name != s->name)
-	    continue;
-	  return 0;
-	}
-      if (s->obsoletes)
-	{
-	  Id obs, *obsp = s->repo->idarraydata + s->obsoletes;
-	  while ((obs = *obsp++) != 0)
-	    {
-	      FOR_PROVIDES(pi, pip, obs)
-		{
-		  Solvable *si = pool->solvables + pi;
-		  if (si->repo != pool->installed)
-		    continue;
-		  if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, si, obs))
-		    continue;
-		  if (pool->obsoleteusescolors && !pool_colormatch(pool, s, si))
-		    continue;
-		  return 0;
-		}
-	    }
-	}
-    }
+    if (replaces_installed_package(pool, p, 0))
+      return 0;
   return 1;
 }
 
