@@ -678,29 +678,32 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
       if ((f[i] & (DEP_LESS|DEP_EQUAL|DEP_GREATER)) == 0 && n[i][0] == '(')
 	{
 	  id = pool_parserpmrichdep(pool, n[i]);
-	  if (id)
-	    *ida++ = id;
-	  else
-	    cc--;
-	  continue;
+	  if (!id)
+	    {
+	      cc--;
+	      continue;
+	    }
 	}
+      else
 #endif
-      id = pool_str2id(pool, n[i], 1);
-      if (f[i] & (DEP_LESS|DEP_GREATER|DEP_EQUAL))
 	{
-	  Id evr;
-	  int fl = 0;
-	  if ((f[i] & DEP_LESS) != 0)
-	    fl |= REL_LT;
-	  if ((f[i] & DEP_EQUAL) != 0)
-	    fl |= REL_EQ;
-	  if ((f[i] & DEP_GREATER) != 0)
-	    fl |= REL_GT;
-	  if (v[i][0] == '0' && v[i][1] == ':' && v[i][2])
-	    evr = pool_str2id(pool, v[i] + 2, 1);
-	  else
-	    evr = pool_str2id(pool, v[i], 1);
-	  id = pool_rel2id(pool, id, evr, fl, 1);
+	  id = pool_str2id(pool, n[i], 1);
+	  if (f[i] & (DEP_LESS|DEP_GREATER|DEP_EQUAL))
+	    {
+	      Id evr;
+	      int fl = 0;
+	      if ((f[i] & DEP_LESS) != 0)
+		fl |= REL_LT;
+	      if ((f[i] & DEP_EQUAL) != 0)
+		fl |= REL_EQ;
+	      if ((f[i] & DEP_GREATER) != 0)
+		fl |= REL_GT;
+	      if (v[i][0] == '0' && v[i][1] == ':' && v[i][2])
+		evr = pool_str2id(pool, v[i] + 2, 1);
+	      else
+		evr = pool_str2id(pool, v[i], 1);
+	      id = pool_rel2id(pool, id, evr, fl, 1);
+	    }
 	}
       *ida++ = id;
       if (haspre == 2 && ignq)
