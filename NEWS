@@ -1,6 +1,16 @@
 
 This file contains the major changes between libsolv versions:
 
+Version 0.7.25
+- selected bug fixes:
+  * support complex deps in SOLVABLE_PREREQ_IGNOREINST
+  * fix minimization not prefering installed packages in some cases
+  * reduce memory usage in repo_updateinfoxml
+  * fix lock-step interfering with architecture selection
+  * fix choice rule handing for package downgrades
+  * fix complex dependencies with an "else" part sometimes leading
+    to unsolved dependencies
+
 Version 0.7.24
 - selected bug fixes:
   * handle learnt rules in solver_alternativeinfo()

@@ -1,4 +1,16 @@
 -------------------------------------------------------------------
+Thu Sep 14 14:17:08 CEST 2023 - mls@suse.de
+
+- support complex deps in SOLVABLE_PREREQ_IGNOREINST
+- fix minimization not prefering installed packages in some cases
+- reduce memory usage in repo_updateinfoxml
+- fix lock-step interfering with architecture selection
+- fix choice rule handing for package downgrades
+- fix complex dependencies with an "else" part sometimes leading
+  to unsolved dependencies
+- bump version to 0.7.25
+
+-------------------------------------------------------------------
 Thu Apr 13 16:03:04 CEST 2023 - mls@suse.de
 
 - handle learnt rules in solver_alternativeinfo()
