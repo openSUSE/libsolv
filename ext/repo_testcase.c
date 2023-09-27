@@ -622,7 +622,7 @@ testcase_add_testtags(Repo *repo, FILE *fp, int flags)
 	  /* join back version and release */
 	  if (sp[2] && !(sp[2][0] == '-' && !sp[2][1]))
 	    sp[2][-1] = '-';
-	  s->evr = makeevr(pool, sp[1]);
+	  s->evr = pool_str2id(pool, sp[1], 1);
 	  s->arch = strcmp(sp[3], "-") ? pool_str2id(pool, sp[3], 1) : 0;
 	  continue;
 	default:
