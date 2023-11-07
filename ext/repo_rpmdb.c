@@ -2526,7 +2526,11 @@ rpm_byrpmh(void *rpmstate, Header h)
   if (!h)
     return 0;
 #ifndef RPM5
+# ifdef RPM_MASK_TYPE
+  uh = headerExport(h, NULL);
+# else
   uh = headerUnload(h);
+# endif
 #else
   uh = headerUnload(h, NULL);
 #endif
