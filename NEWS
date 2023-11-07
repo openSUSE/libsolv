@@ -1,6 +1,11 @@
 
 This file contains the major changes between libsolv versions:
 
+Version 0.7.26
+- selected bug fixes:
+  * fix evr roundtrip in testcases
+  * do not use deprecated headerUnload with newer rpm versions
+
 Version 0.7.25
 - selected bug fixes:
   * support complex deps in SOLVABLE_PREREQ_IGNOREINST

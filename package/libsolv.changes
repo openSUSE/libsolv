@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Tue Nov  7 12:45:44 CET 2023 - mls@suse.de
+
+- fix evr roundtrip in testcases
+- do not use deprecated headerUnload with newer rpm versions
+- bump version to 0.7.26
+
+-------------------------------------------------------------------
 Thu Sep 14 14:17:08 CEST 2023 - mls@suse.de
 
 - support complex deps in SOLVABLE_PREREQ_IGNOREINST
