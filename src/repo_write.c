@@ -300,6 +300,8 @@ struct cbdata {
 
   Id lastdirid;		/* last dir id seen in this repodata */
   Id lastdirid_own;	/* last dir id put in own pool */
+
+  Id diridcache[3 * 256];
 };
 
 #define NEEDID_BLOCK 1023
@@ -578,10 +580,17 @@ putinowndirpool_slow(struct cbdata *cbdata, Repodata *data, Dirpool *dp, Id dir)
 static inline Id
 putinowndirpool(struct cbdata *cbdata, Repodata *data, Id dir)
 {
+  Id *cacheent;
   if (dir && dir == cbdata->lastdirid)
     return cbdata->lastdirid_own;
+  cacheent = cbdata->diridcache + (dir & 255);
+  if (dir && cacheent[0] == dir && cacheent[256] == data->repodataid)
+    return cacheent[512];
   cbdata->lastdirid = dir;
   cbdata->lastdirid_own = putinowndirpool_slow(cbdata, data, &data->dirpool, dir);
+  cacheent[0] = dir;
+  cacheent[256] = data->repodataid;
+  cacheent[512] = cbdata->lastdirid_own;
   return cbdata->lastdirid_own;
 }
 
