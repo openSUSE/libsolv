@@ -850,7 +850,7 @@ SOLVER_FLAG_ALLOW_VENDORCHANGE flag.
 
 Boolean Dependencies
 --------------------
-Boolean Dependencies allow to build complex expressions from simple
+Boolean Dependencies allow building complex expressions from simple
 dependencies. Note that depending on the package manager only a subset
 of those may be useful. For example, debian currently only allows
 an "OR" expression.

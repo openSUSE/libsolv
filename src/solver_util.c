@@ -408,7 +408,7 @@ solver_add_obsoleted(Solver *solv, Id p, Queue *q)
  * Call solver_add_obsoleted and intersect the result with the
  * elements in Queue q starting at qstart.
  * Assumes that it's the first call if qstart == q->count.
- * May use auxillary map m for the intersection process, all
+ * May use auxiliary map m for the intersection process, all
  * elements of q starting at qstart must have their bit cleared.
  * (This is also true after the function returns.)
  * (See solver_add_obsoleted for limitations of the package p)
