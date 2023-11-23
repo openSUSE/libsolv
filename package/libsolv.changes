@@ -1,4 +1,12 @@
 -------------------------------------------------------------------
+Thu Nov 23 15:12:55 CET 2023 - mls@suse.de
+
+- add zstd support for the installcheck tool
+- add putinowndirpool cache to make file list handling in
+  repo_write much faster
+- bump version to 0.7.27
+
+-------------------------------------------------------------------
 Tue Nov  7 12:45:44 CET 2023 - mls@suse.de
 
 - fix evr roundtrip in testcases

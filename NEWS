@@ -1,6 +1,12 @@
 
 This file contains the major changes between libsolv versions:
 
+Version 0.7.27
+- selected bug fixes:
+  * add zstd support for the installcheck tool
+  * add putinowndirpool cache to make file list handling in
+    repo_write much faster
+
 Version 0.7.26
 - selected bug fixes:
   * fix evr roundtrip in testcases
