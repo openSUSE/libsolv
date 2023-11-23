@@ -266,6 +266,8 @@ struct extdata {
   int len;
 };
 
+#define DIRIDCACHE_SIZE 1024
+
 struct cbdata {
   Pool *pool;
   Repo *repo;
@@ -301,7 +303,7 @@ struct cbdata {
   Id lastdirid;		/* last dir id seen in this repodata */
   Id lastdirid_own;	/* last dir id put in own pool */
 
-  Id diridcache[3 * 256];
+  Id diridcache[3 * DIRIDCACHE_SIZE];
 };
 
 #define NEEDID_BLOCK 1023
@@ -566,15 +568,29 @@ putinownpool(struct cbdata *cbdata, Repodata *data, Id id)
 static Id
 putinowndirpool_slow(struct cbdata *cbdata, Repodata *data, Dirpool *dp, Id dir)
 {
-  Id compid, parent;
+  Id compid, parent, id;
+  Id *cacheent;
 
   parent = dirpool_parent(dp, dir);
   if (parent)
-    parent = putinowndirpool_slow(cbdata, data, dp, parent);
+    {
+      /* put parent in own pool first */
+      cacheent = cbdata->diridcache + (parent & (DIRIDCACHE_SIZE - 1));
+      if (cacheent[0] == parent && cacheent[DIRIDCACHE_SIZE] == data->repodataid)
+        parent = cacheent[2 * DIRIDCACHE_SIZE];
+      else
+        parent = putinowndirpool_slow(cbdata, data, dp, parent);
+    }
   compid = dirpool_compid(dp, dir);
   if (cbdata->ownspool && compid > 1 && (!cbdata->clonepool || data->localpool))
     compid = putinownpool(cbdata, data, compid);
-  return dirpool_add_dir(cbdata->owndirpool, parent, compid, 1);
+  id = dirpool_add_dir(cbdata->owndirpool, parent, compid, 1);
+  /* cache result */
+  cacheent = cbdata->diridcache + (dir & (DIRIDCACHE_SIZE - 1));
+  cacheent[0] = dir;
+  cacheent[DIRIDCACHE_SIZE] = data->repodataid;
+  cacheent[2 * DIRIDCACHE_SIZE] = id;
+  return id;
 }
 
 static inline Id
@@ -583,14 +599,11 @@ putinowndirpool(struct cbdata *cbdata, Repodata *data, Id dir)
   Id *cacheent;
   if (dir && dir == cbdata->lastdirid)
     return cbdata->lastdirid_own;
-  cacheent = cbdata->diridcache + (dir & 255);
-  if (dir && cacheent[0] == dir && cacheent[256] == data->repodataid)
-    return cacheent[512];
+  cacheent = cbdata->diridcache + (dir & (DIRIDCACHE_SIZE - 1));
+  if (dir && cacheent[0] == dir && cacheent[DIRIDCACHE_SIZE] == data->repodataid)
+    return cacheent[2 * DIRIDCACHE_SIZE];
   cbdata->lastdirid = dir;
   cbdata->lastdirid_own = putinowndirpool_slow(cbdata, data, &data->dirpool, dir);
-  cacheent[0] = dir;
-  cacheent[256] = data->repodataid;
-  cacheent[512] = cbdata->lastdirid_own;
   return cbdata->lastdirid_own;
 }
 
