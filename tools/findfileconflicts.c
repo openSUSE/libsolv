@@ -1,4 +1,8 @@
-/* vim: sw=2 et
+/*
+ * Copyright (c) 2015, SUSE LLC
+ *
+ * This program is licensed under the BSD license, read LICENSE.BSD
+ * for further information
  */
 
 #include <stdio.h>
