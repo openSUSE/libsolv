@@ -52,21 +52,11 @@ usage(char** argv)
 }
 
 #if defined(ENABLE_SUSEREPO) || defined(ENABLE_RPMMD) || defined(ENABLE_DEBIAN) || defined(ENABLE_ARCHREPO)
-static int
+static size_t
 strlen_comp(const char *str)
 {
-  size_t l = strlen(str);
-  if (l > 3 && !strcmp(str + l - 3, ".gz"))
-    return l - 3;
-  if (l > 3 && !strcmp(str + l - 3, ".xz"))
-    return l - 3;
-  if (l > 4 && !strcmp(str + l - 4, ".bz2"))
-    return l - 4;
-  if (l > 4 && !strcmp(str + l - 4, ".zst"))
-    return l - 4;
-  if (l > 5 && !strcmp(str + l - 5, ".lzma"))
-    return l - 5;
-  return l;
+  const char *suf = strrchr(str, '.');
+  return strlen(str) - (suf && solv_xfopen_iscompressed(suf) ? strlen(suf) : 0);
 }
 #endif
 
@@ -105,7 +95,7 @@ main(int argc, char **argv)
       FILE *fp;
       int r;
 #if defined(ENABLE_SUSEREPO) || defined(ENABLE_RPMMD) || defined(ENABLE_DEBIAN) || defined(ENABLE_ARCHREPO)
-      int l;
+      size_t l;
 #endif
 
       if (!strcmp(argv[i], "--withsrc"))
