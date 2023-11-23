@@ -62,7 +62,9 @@ strlen_comp(const char *str)
     return l - 3;
   if (l > 4 && !strcmp(str + l - 4, ".bz2"))
     return l - 4;
-  if (l > 5 && !strcmp(str + l - 4, ".lzma"))
+  if (l > 4 && !strcmp(str + l - 4, ".zst"))
+    return l - 4;
+  if (l > 5 && !strcmp(str + l - 5, ".lzma"))
     return l - 5;
   return l;
 }
