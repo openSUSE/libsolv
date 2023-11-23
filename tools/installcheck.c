@@ -384,17 +384,17 @@ main(int argc, char **argv)
 			case SOLVER_RULE_JOB_UNKNOWN_PACKAGE:
 			case SOLVER_RULE_JOB_UNSUPPORTED:
 			  break;
-			case SOLVER_RULE_RPM:
+			case SOLVER_RULE_PKG:
 			  printf("  some dependency problem\n");
 			  break;
 			case SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP:
 			  printf("  nothing provides requested %s\n", pool_dep2str(pool, dep));
 			  break;
-			case SOLVER_RULE_RPM_NOT_INSTALLABLE:
+			case SOLVER_RULE_PKG_NOT_INSTALLABLE:
 			  s = pool_id2solvable(pool, source);
 			  printf("  package %s is not installable\n", pool_solvable2str(pool, s));
 			  break;
-			case SOLVER_RULE_RPM_NOTHING_PROVIDES_DEP:
+			case SOLVER_RULE_PKG_NOTHING_PROVIDES_DEP:
 			  s = pool_id2solvable(pool, source);
 			  printf("  nothing provides %s needed by %s\n", pool_dep2str(pool, dep), pool_solvable2str(pool, s));
 			  if (ISRELDEP(dep))
@@ -408,26 +408,26 @@ main(int argc, char **argv)
 				}
 			    }
 			  break;
-			case SOLVER_RULE_RPM_SAME_NAME:
+			case SOLVER_RULE_PKG_SAME_NAME:
 			  s = pool_id2solvable(pool, source);
 			  s2 = pool_id2solvable(pool, target);
 			  printf("  cannot install both %s and %s\n", pool_solvable2str(pool, s), pool_solvable2str(pool, s2));
 			  break;
-			case SOLVER_RULE_RPM_PACKAGE_CONFLICT:
+			case SOLVER_RULE_PKG_CONFLICTS:
 			  s = pool_id2solvable(pool, source);
 			  s2 = pool_id2solvable(pool, target);
 			  printf("  package %s conflicts with %s provided by %s\n", pool_solvable2str(pool, s), pool_dep2str(pool, dep), pool_solvable2str(pool, s2));
 			  break;
-			case SOLVER_RULE_RPM_PACKAGE_OBSOLETES:
+			case SOLVER_RULE_PKG_OBSOLETES:
 			  s = pool_id2solvable(pool, source);
 			  s2 = pool_id2solvable(pool, target);
 			  printf("  package %s obsoletes %s provided by %s\n", pool_solvable2str(pool, s), pool_dep2str(pool, dep), pool_solvable2str(pool, s2));
 			  break;
-			case SOLVER_RULE_RPM_PACKAGE_REQUIRES:
+			case SOLVER_RULE_PKG_REQUIRES:
 			  s = pool_id2solvable(pool, source);
 			  printf("  package %s requires %s, but none of the providers can be installed\n", pool_solvable2str(pool, s), pool_dep2str(pool, dep));
 			  break;
-			case SOLVER_RULE_RPM_SELF_CONFLICT:
+			case SOLVER_RULE_PKG_SELF_CONFLICT:
 			  s = pool_id2solvable(pool, source);
 			  printf("  package %s conflicts with %s provided by itself\n", pool_solvable2str(pool, s), pool_dep2str(pool, dep));
 			  break;
