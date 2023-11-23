@@ -1,6 +1,3 @@
-/* vim: sw=2 et cino=>4,n-2,{1s
- */
-
 /*
  * Copyright (c) 2009-2015, SUSE LLC
  *
@@ -346,7 +343,6 @@ main(int argc, char **argv)
       if (problemcount)
 	{
 	  Id problem = 0;
-	  Solvable *s2;
 
 	  status = 1;
 	  printf("can't install %s:\n", pool_solvable2str(pool, s));
@@ -363,40 +359,26 @@ main(int argc, char **argv)
 		  solver_allruleinfos(solv, probr, &rinfo);
 		  for (k = 0; k < rinfo.count; k += 4)
 		    {
-		      Id dep, source, target;
+		      Id type, dep, source, target;
+		      type = rinfo.elements[k];
 		      source = rinfo.elements[k + 1];
 		      target = rinfo.elements[k + 2];
 		      dep = rinfo.elements[k + 3];
-		      switch (rinfo.elements[k])
+
+		      /* special casing */
+		      switch (type)
 			{
 			case SOLVER_RULE_DISTUPGRADE:
-			  break;
-			case SOLVER_RULE_INFARCH:
-			  s = pool_id2solvable(pool, source);
-			  printf("  %s has inferior architecture\n", pool_solvable2str(pool, s));
-			  break;
-			case SOLVER_RULE_UPDATE:
-			  s = pool_id2solvable(pool, source);
-			  printf("  %s can not be updated\n", pool_solvable2str(pool, s));
-			  break;
 			case SOLVER_RULE_JOB:
 			case SOLVER_RULE_JOB_PROVIDED_BY_SYSTEM:
 			case SOLVER_RULE_JOB_UNKNOWN_PACKAGE:
 			case SOLVER_RULE_JOB_UNSUPPORTED:
 			  break;
-			case SOLVER_RULE_PKG:
-			  printf("  some dependency problem\n");
-			  break;
-			case SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP:
-			  printf("  nothing provides requested %s\n", pool_dep2str(pool, dep));
-			  break;
-			case SOLVER_RULE_PKG_NOT_INSTALLABLE:
-			  s = pool_id2solvable(pool, source);
-			  printf("  package %s is not installable\n", pool_solvable2str(pool, s));
+			case SOLVER_RULE_UPDATE:
+			  printf("  %s can not be updated\n", pool_solvid2str(pool, source));
 			  break;
 			case SOLVER_RULE_PKG_NOTHING_PROVIDES_DEP:
-			  s = pool_id2solvable(pool, source);
-			  printf("  nothing provides %s needed by %s\n", pool_dep2str(pool, dep), pool_solvable2str(pool, s));
+			  printf("  %s\n", solver_problemruleinfo2str(solv, type, source, target, dep));
 			  if (ISRELDEP(dep))
 			    {
 			      Reldep *rd = GETRELDEP(pool, dep);
@@ -408,28 +390,8 @@ main(int argc, char **argv)
 				}
 			    }
 			  break;
-			case SOLVER_RULE_PKG_SAME_NAME:
-			  s = pool_id2solvable(pool, source);
-			  s2 = pool_id2solvable(pool, target);
-			  printf("  cannot install both %s and %s\n", pool_solvable2str(pool, s), pool_solvable2str(pool, s2));
-			  break;
-			case SOLVER_RULE_PKG_CONFLICTS:
-			  s = pool_id2solvable(pool, source);
-			  s2 = pool_id2solvable(pool, target);
-			  printf("  package %s conflicts with %s provided by %s\n", pool_solvable2str(pool, s), pool_dep2str(pool, dep), pool_solvable2str(pool, s2));
-			  break;
-			case SOLVER_RULE_PKG_OBSOLETES:
-			  s = pool_id2solvable(pool, source);
-			  s2 = pool_id2solvable(pool, target);
-			  printf("  package %s obsoletes %s provided by %s\n", pool_solvable2str(pool, s), pool_dep2str(pool, dep), pool_solvable2str(pool, s2));
-			  break;
-			case SOLVER_RULE_PKG_REQUIRES:
-			  s = pool_id2solvable(pool, source);
-			  printf("  package %s requires %s, but none of the providers can be installed\n", pool_solvable2str(pool, s), pool_dep2str(pool, dep));
-			  break;
-			case SOLVER_RULE_PKG_SELF_CONFLICT:
-			  s = pool_id2solvable(pool, source);
-			  printf("  package %s conflicts with %s provided by itself\n", pool_solvable2str(pool, s), pool_dep2str(pool, dep));
+			default:
+			  printf("  %s\n", solver_problemruleinfo2str(solv, type, source, target, dep));
 			  break;
 			}
 		    }
