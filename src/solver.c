@@ -4297,7 +4297,7 @@ solver_solve(Solver *solv, Queue *job)
   else
     solv->strictrepopriorules = solv->strictrepopriorules_end = solv->nrules;
 
-  if (1)
+  if (pool->disttype != DISTTYPE_CONDA)
     solver_addchoicerules(solv);
   else
     solv->choicerules = solv->choicerules_end = solv->nrules;
