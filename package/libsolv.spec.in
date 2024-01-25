@@ -35,13 +35,22 @@
 %else
 %bcond_with richdeps
 %endif
+%if 0%{?suse_version} >= 1550 || 0%{?sle_version} >= 150400
+%bcond_without python_singlespec
+%{?sle15allpythons}
+%endif
 # we need at least swig 1.3.40 for the bindings ($typemap support)
 %if 0%{?suse_version} != 1110
+%if %{with python_singlespec}
+%bcond_with python
+%bcond_with python3
+%else
 %bcond_without python3
 %if 0%{?suse_version} < 1550
 %bcond_without python
 %else
 %bcond_with python
+%endif
 %endif
 %bcond_without ruby
 %bcond_without perl
@@ -101,6 +110,11 @@ BuildRequires:  python3-devel
 BuildRequires:  swig
 %endif
 
+%if %{with python_singlespec}
+BuildRequires:  %{python_module devel}
+BuildRequires:  swig
+%endif
+
 %if %{with bz2}
 %if 0%{?suse_version}
 BuildRequires:  libbz2-devel
@@ -115,6 +129,11 @@ BuildRequires:  xz-devel
 
 %if %{with zstd}
 BuildRequires:  libzstd-devel
+%endif
+
+%if %{with python_singlespec}
+%define python_subpackage_only 1
+%python_subpackages
 %endif
 
 %description
@@ -193,12 +212,14 @@ Group:          Development/Languages/Python
 %description -n python-solv
 Python bindings for libsolv.
 
+%if %{with python3}
 %package -n python3-solv
 Summary:        Python3 bindings for the libsolv library
 Group:          Development/Languages/Python
 
 %description -n python3-solv
 Python3 bindings for libsolv.
+%endif
 
 %package -n perl-solv
 Summary:        Perl bindings for the libsolv library
@@ -263,6 +284,15 @@ ln -s repo2solv %{buildroot}/%{_bindir}/repo2solv.sh
 %py3_compile %{buildroot}/%{python3_sitearch}
 %endif
 %endif
+%if %{with python_singlespec}
+%{python_expand 
+pyver=%%python_version
+cmake -U '*PYTHON*' -DENABLE_PYTHON=1 -DPYTHON_VERSION_MAJOR=${pyver%%.*} -DPYTHON_VERSION_MINOR=${pyver#*.}
+make DESTDIR=%{buildroot} -C bindings/python install
+}
+%python_compileall
+%endif
+
 
 %check
 make ARGS=--output-on-failure test
@@ -340,5 +370,15 @@ make ARGS=--output-on-failure test
 %{python3_sitearch}/*/*solv*
 %endif
 %endif
+
+%if %{with python_singlespec}
+%files %{python_files solv}
+%defattr(-,root,root)
+%{python_sitearch}/*
+%if 0%{?suse_version}
+%{python_sitearch}/*/*solv*
+%endif
+%endif
+
 
 %changelog
