@@ -287,7 +287,7 @@ ln -s repo2solv %{buildroot}/%{_bindir}/repo2solv.sh
 %if %{with python_singlespec}
 %{python_expand 
 pyver=%%python_version
-cmake -U '*PYTHON*' -DENABLE_PYTHON=1 -DPYTHON_VERSION_MAJOR=${pyver%%.*} -DPYTHON_VERSION_MINOR=${pyver#*.}
+cmake . -U '*PYTHON*' -DENABLE_PYTHON=1 -DPYTHON_VERSION_MAJOR=${pyver%%.*} -DPYTHON_VERSION_MINOR=${pyver#*.}
 make DESTDIR=%{buildroot} -C bindings/python install
 }
 %python_compileall
