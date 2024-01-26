@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Fri Jan 26 11:19:39 CET 2024 - mls@suse.de
+
+- build for multiple python versions [jsc#PED-6218]
+- bump version to 0.7.28
+
+-------------------------------------------------------------------
 Thu Nov 23 15:12:55 CET 2023 - mls@suse.de
 
 - add zstd support for the installcheck tool
