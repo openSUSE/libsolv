@@ -26,7 +26,7 @@ multiple times to further increase the amount of debug data.
 *-r*::
 Write the output in testcase format instead of human readable text.
 The output can then be used in the result section of the test case.
-If the *-r* option is given twice, the output is formated for
+If the *-r* option is given twice, the output is formatted for
 verbatim inclusion.
 
 *-l* 'PKGSPEC'::

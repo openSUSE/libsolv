@@ -353,7 +353,7 @@ dependencies, but you still want the fast speed that addfileprovides()
 generates.
 
 *POOL_FLAG_NOWHATPROVIDESAUX*::
-Disable the creation of the auxillary whatprovides index. This saves
+Disable the creation of the auxiliary whatprovides index. This saves
 a bit of memory but also makes the whatprovides lookups a bit slower.
 
 *POOL_FLAG_WHATPROVIDESWITHDISABLED*::
@@ -1218,7 +1218,7 @@ Add the metadata of a single rpm package to the repository.
 	repo.add_rpmdb_pubkeys()
 
 Add all pubkeys contained in the rpm database to the repository. Note that
-newer rpm versions also allow to store the pubkeys in some directory instead
+newer rpm versions also allow storing the pubkeys in some directory instead
 of the rpm database.
 
 	Solvable add_pubkey(const char *keyfile, int flags = 0)
@@ -2047,7 +2047,7 @@ packages to the specified versions. See the section about targeted
 updates about more information.
 
 *SOLVER_WEAKENDEPS*::
-Allow to break the dependencies of the matching packages. Handle with care.
+Allow one to break the dependencies of the matching packages. Handle with care.
 
 *SOLVER_MULTIVERSION*::
 Mark the matched packages for multiversion install. If they get to be
@@ -2771,7 +2771,7 @@ job rules (unless the returned rules only consist of those types).
 	decisions = problem.get_decisionlist()
 	decisions = problem.get_decisionlist()
 
-Return a list of decisions prooving the problem. This is somewhat similar to
+Return a list of decisions proving the problem. This is somewhat similar to
 the findallproblemrules(), but the output is in an order that makes it easier
 to understand why the solver could not find a solution.
 
@@ -2868,7 +2868,7 @@ an array of all infos about a rule.
 	decisions = rule.get_decisionlist()
 	decisions = rule.get_decisionlist()
 
-Return a list of decisions prooving a learnt rule.
+Return a list of decisions proving a learnt rule.
 
 	Decision *get_decisionsetlist()
 	my @decisionsets = $rule->get_decisionsetlist();

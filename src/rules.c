@@ -1691,7 +1691,7 @@ solver_addinfarchrules(Solver *solv, Map *addedmap)
 
       if (allowedarchs.count && pool->implicitobsoleteusescolors && installed)
 	{
-	  /* need an extra pass for lockstep checking: we only allow to keep an inferior arch
+	  /* need an extra pass for lockstep checking: we only allow keeping an inferior arch
 	   * if the corresponding installed package is not lock-stepped */
 	  queue_empty(&allowedarchs);
 	  FOR_PROVIDES(p, pp, s->name)

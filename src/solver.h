@@ -155,10 +155,10 @@ struct s_Solver {
    * Solver configuration
    *-------------------------------------------------------------------------------------------------------------*/
 
-  int allowdowngrade;			/* allow to downgrade installed solvable */
-  int allownamechange;			/* allow to change name of installed solvables */
-  int allowarchchange;			/* allow to change architecture of installed solvables */
-  int allowvendorchange;		/* allow to change vendor of installed solvables */
+  int allowdowngrade;			/* allow downgrading installed solvable */
+  int allownamechange;			/* allow changing name of installed solvables */
+  int allowarchchange;			/* allow changing architecture of installed solvables */
+  int allowvendorchange;		/* allow changing vendor of installed solvables */
   int allowuninstall;			/* allow removal of installed solvables */
   int noupdateprovide;			/* true: update packages needs not to provide old package */
   int needupdateprovide;		/* true: update packages must provide old package */
