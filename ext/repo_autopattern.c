@@ -58,7 +58,7 @@ unescape(char *p)
   *q = 0;
 }
 
-static time_t
+static unsigned long long
 datestr2timestamp(const char *date)
 {
   const char *p; 
@@ -69,7 +69,7 @@ datestr2timestamp(const char *date)
   for (p = date; *p >= '0' && *p <= '9'; p++)
     ;   
   if (!*p)
-    return atoi(date);
+    return strtoull(date, 0, 10);
   memset(&tm, 0, sizeof(tm));
   p = strptime(date, "%F%T", &tm);
   if (!p)

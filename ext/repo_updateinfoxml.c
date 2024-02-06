@@ -109,7 +109,7 @@ struct parsedata {
   Repodata *data;
   Id handle;
   Solvable *solvable;
-  time_t buildtime;
+  unsigned long long buildtime;
   Id pkghandle;
   struct solv_xmlparser xmlp;
   struct joindata jd;
@@ -120,7 +120,7 @@ struct parsedata {
  * Convert date strings ("1287746075" or "2010-10-22 13:14:35")
  * to timestamp.
  */
-static time_t
+static unsigned long long
 datestr2timestamp(const char *date)
 {
   const char *p;
@@ -131,7 +131,7 @@ datestr2timestamp(const char *date)
   for (p = date; *p >= '0' && *p <= '9'; p++)
     ;
   if (!*p)
-    return atoi(date);
+    return strtoull(date, 0, 10);
   memset(&tm, 0, sizeof(tm));
   if (!strptime(date, "%F%T", &tm))
     return 0;
@@ -243,7 +243,7 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
 	  repodata_set_str(pd->data, pd->handle, SOLVABLE_PATCHCATEGORY, type);
 	if (status)
 	  repodata_set_poolstr(pd->data, pd->handle, UPDATE_STATUS, status);
-        pd->buildtime = (time_t)0;
+        pd->buildtime = 0;
       }
       break;
 
@@ -253,7 +253,7 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
 	const char *date = solv_xmlparser_find_attr("date", atts);
 	if (date)
 	  {
-	    time_t t = datestr2timestamp(date);
+	    unsigned long long t = datestr2timestamp(date);
 	    if (t && t > pd->buildtime)
               pd->buildtime = t;
 	  }
@@ -395,7 +395,7 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
       if (pd->buildtime)
 	{
 	  repodata_set_num(pd->data, pd->handle, SOLVABLE_BUILDTIME, pd->buildtime);
-	  pd->buildtime = (time_t)0;
+	  pd->buildtime = 0;
 	}
       break;
 
