@@ -1729,7 +1729,7 @@ returnself(matchsolvable)
   SWIGINTERN int loadcallback(Pool *pool, Repodata *data, void *d) {
     XRepodata *xd = new_XRepodata(data->repo, data->repodataid);
     PyObject *args = Py_BuildValue("(O)", SWIG_NewPointerObj(SWIG_as_voidptr(xd), SWIGTYPE_p_XRepodata, SWIG_POINTER_OWN | 0));
-    PyObject *result = PyEval_CallObject((PyObject *)d, args);
+    PyObject *result = PyObject_Call((PyObject *)d, args, NULL);
     int ecode = 0;
     int vresult = 0;
     Py_DECREF(args);
