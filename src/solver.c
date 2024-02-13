@@ -1788,6 +1788,49 @@ prune_to_update_targets(Solver *solv, Id *cp, Queue *q)
   queue_truncate(q, j);
 }
 
+static void
+get_special_updaters(Solver *solv, int i, Rule *rr, Queue *dq)
+{
+  Pool *pool = solv->pool;
+  Repo *installed = solv->installed;
+  int specoff = solv->specialupdaters[i - installed->start];
+  int j, d;
+  Id p;
+
+  /* special multiversion handling, make sure best version is chosen */
+  if (rr->p == i && solv->decisionmap[i] >= 0)
+    queue_push(dq, i);
+  for (d = specoff; (p = pool->whatprovidesdata[d]) != 0; d++)
+    if (solv->decisionmap[p] >= 0)
+      queue_push(dq, p);
+  /* if we have installed packages try to find identical ones to get
+   * repo priorities. see issue #343 */
+  for (j = 0; j < dq->count; j++)
+    {
+      Id p2 = dq->elements[j];
+      if (pool->solvables[p2].repo != installed)
+	continue;
+      for (d = specoff; (p = pool->whatprovidesdata[d]) != 0; d++)
+	{
+	  if (solv->decisionmap[p] >= 0 || pool->solvables[p].repo == installed)
+	    continue;
+	  if (solvable_identical(pool->solvables + p, pool->solvables + p2))
+	    queue_push(dq, p);	/* identical to installed, put it on the list so we have a repo prio */
+	}
+    }
+  if (dq->count && solv->update_targets && solv->update_targets->elements[i - installed->start])
+    prune_to_update_targets(solv, solv->update_targets->elements + solv->update_targets->elements[i - installed->start], dq);
+  if (dq->count)
+    {
+      policy_filter_unwanted(solv, dq, POLICY_MODE_CHOOSE);
+      p = dq->elements[0];
+      if (p != i && solv->decisionmap[p] == 0)
+	dq->count = 1;
+      else
+	dq->count = 0;
+    }
+}
+
 static int
 resolve_installed(Solver *solv, int level, int disablerules, Queue *dq)
 {
@@ -1804,7 +1847,7 @@ resolve_installed(Solver *solv, int level, int disablerules, Queue *dq)
     installedpos = installed->start;
   /* we use two passes if we need to update packages
    * to create a better user experience */
-  for (pass = solv->updatemap.size ? 0 : 1; pass < 2; )
+  for (pass = !solv->updatemap_all && solv->updatemap.size ? 0 : 1; pass < 2; )
     {
       int passlevel = level;
       Id *specialupdaters = solv->specialupdaters;
@@ -1812,7 +1855,6 @@ resolve_installed(Solver *solv, int level, int disablerules, Queue *dq)
       for (i = installedpos, n = installed->start; n < installed->end; i++, n++)
 	{
 	  Rule *r, *rr;
-	  Id d;
 
 	  if (i == installed->end)
 	    i = installed->start;
@@ -1836,48 +1878,20 @@ resolve_installed(Solver *solv, int level, int disablerules, Queue *dq)
 	  /* check if we should update this package to the latest version
 	   * noupdate is set for erase jobs, in that case we want to deinstall
 	   * the installed package and not replace it with a newer version */
-	  if (dq->count)
-	    queue_empty(dq);
 	  if (!MAPTST(&solv->noupdate, i - installed->start) && (solv->decisionmap[i] < 0 || solv->updatemap_all || (solv->updatemap.size && MAPTST(&solv->updatemap, i - installed->start))))
 	    {
-	      if (specialupdaters && (d = specialupdaters[i - installed->start]) != 0)
+	      if (dq->count)
+		queue_empty(dq);
+	      /* find update candidates */
+	      if (specialupdaters && specialupdaters[i - installed->start] != 0)
 		{
-		  int j;
-		  /* special multiversion handling, make sure best version is chosen */
-		  if (rr->p == i && solv->decisionmap[i] >= 0)
-		    queue_push(dq, i);
-		  while ((p = pool->whatprovidesdata[d++]) != 0)
-		    if (solv->decisionmap[p] >= 0)
-		      queue_push(dq, p);
-		  for (j = 0; j < dq->count; j++)
-		    {
-		      Id p2 = dq->elements[j];
-		      if (pool->solvables[p2].repo != installed)
-			continue;
-		      d = specialupdaters[i - installed->start];
-		      while ((p = pool->whatprovidesdata[d++]) != 0)
-			{
-			  if (solv->decisionmap[p] >= 0 || pool->solvables[p].repo == installed)
-			    continue;
-			  if (solvable_identical(pool->solvables + p, pool->solvables + p2))
-		            queue_push(dq, p);	/* identical to installed, put it on the list so we have a repo prio */
-			}
-		    }
-		  if (dq->count && solv->update_targets && solv->update_targets->elements[i - installed->start])
-		    prune_to_update_targets(solv, solv->update_targets->elements + solv->update_targets->elements[i - installed->start], dq);
+		  get_special_updaters(solv, i, rr, dq);
+		  /* if we have an update set rr to the feature rule */
 		  if (dq->count)
 		    {
-		      policy_filter_unwanted(solv, dq, POLICY_MODE_CHOOSE);
-		      p = dq->elements[0];
-		      if (p != i && solv->decisionmap[p] == 0)
-			{
-			  rr = solv->rules + solv->featurerules + (i - solv->installed->start);
-			  if (!rr->p)		/* update rule == feature rule? */
-			    rr = rr - solv->featurerules + solv->updaterules;
-			  dq->count = 1;
-			}
-		      else
-			dq->count = 0;
+		      rr = solv->rules + solv->featurerules + (i - solv->installed->start);
+		      if (!rr->p)		/* update rule == feature rule? */
+			rr = rr - solv->featurerules + solv->updaterules;
 		    }
 		}
 	      else
@@ -1894,24 +1908,25 @@ resolve_installed(Solver *solv, int level, int disablerules, Queue *dq)
 			queue_push(dq, p);
 		    }
 		}
-	    }
-	  if (dq->count && solv->update_targets && solv->update_targets->elements[i - installed->start])
-	    prune_to_update_targets(solv, solv->update_targets->elements + solv->update_targets->elements[i - installed->start], dq);
-	  /* install best version */
-	  if (dq->count)
-	    {
-	      olevel = level;
-	      level = selectandinstall(solv, level, dq, disablerules, rr - solv->rules, SOLVER_REASON_UPDATE_INSTALLED);
-	      if (level <= olevel)
+	      if (dq->count && solv->update_targets && solv->update_targets->elements[i - installed->start])
+		prune_to_update_targets(solv, solv->update_targets->elements + solv->update_targets->elements[i - installed->start], dq);
+	      /* install best version */
+	      if (dq->count)
 		{
-		  if (level < passlevel)
-		    break;	/* trouble */
-		  if (level < olevel)
-		    n = installed->start;	/* redo all */
-		  i--;
-		  n--;
-		  continue;
+		  olevel = level;
+		  level = selectandinstall(solv, level, dq, disablerules, rr - solv->rules, SOLVER_REASON_UPDATE_INSTALLED);
+		  if (level <= olevel)
+		    {
+		      if (level < passlevel)
+			break;	/* trouble */
+		      if (level < olevel)
+			n = installed->start;	/* redo all */
+		      i--;
+		      n--;
+		      continue;
+		    }
 		}
+	      /* check original package even if we installed an update */
 	    }
 	  /* if still undecided keep package */
 	  if (solv->decisionmap[i] == 0)
@@ -1949,7 +1964,7 @@ resolve_installed(Solver *solv, int level, int disablerules, Queue *dq)
 	  if (level < origlevel)
 	    break;		/* ran into trouble */
 	  /* re-run all passes */
-          pass = solv->updatemap.size ? 0 : 1;
+          pass = !solv->updatemap_all && solv->updatemap.size ? 0 : 1;
 	  continue;
 	}
       /* reset installedpos, advance to next pass */
