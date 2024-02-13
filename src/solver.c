@@ -1836,7 +1836,7 @@ resolve_installed(Solver *solv, int level, int disablerules, Queue *dq)
 {
   Pool *pool = solv->pool;
   Repo *installed = solv->installed;
-  int i, n, pass;
+  int i, n, pass, startpass;
   int installedpos = solv->installedpos;
   Solvable *s;
   Id p, pp;
@@ -1845,10 +1845,14 @@ resolve_installed(Solver *solv, int level, int disablerules, Queue *dq)
   POOL_DEBUG(SOLV_DEBUG_SOLVER, "resolving installed packages\n");
   if (!installedpos)
     installedpos = installed->start;
-  /* we use two passes if we need to update packages
-   * to create a better user experience */
-  for (pass = !solv->updatemap_all && solv->updatemap.size ? 0 : 1; pass < 2; )
+  /* we use passes if we need to update packages to create a better user experience:
+   * pass 0: update the packages requested by the user
+   * pass 1: keep the installed packages if we can
+   * pass 2: update the packages that could not be kept */
+  startpass = solv->updatemap_all ? 2 : solv->updatemap.size ? 0 : 1;
+  for (pass = startpass; pass < 3; )
     {
+      int needpass2 = 0;
       int passlevel = level;
       Id *specialupdaters = solv->specialupdaters;
       /* start with installedpos, the position that gave us problems the last time */
@@ -1880,6 +1884,11 @@ resolve_installed(Solver *solv, int level, int disablerules, Queue *dq)
 	   * the installed package and not replace it with a newer version */
 	  if (!MAPTST(&solv->noupdate, i - installed->start) && (solv->decisionmap[i] < 0 || solv->updatemap_all || (solv->updatemap.size && MAPTST(&solv->updatemap, i - installed->start))))
 	    {
+	      if (pass == 1)
+		{
+		  needpass2 = 1;	/* first do the packages we do not want/need to update */
+		  continue;
+		}
 	      if (dq->count)
 		queue_empty(dq);
 	      /* find update candidates */
@@ -1964,12 +1973,14 @@ resolve_installed(Solver *solv, int level, int disablerules, Queue *dq)
 	  if (level < origlevel)
 	    break;		/* ran into trouble */
 	  /* re-run all passes */
-          pass = !solv->updatemap_all && solv->updatemap.size ? 0 : 1;
+	  pass = startpass;
 	  continue;
 	}
       /* reset installedpos, advance to next pass */
       installedpos = installed->start;
       pass++;
+      if (pass == 2 && !needpass2)
+	break;
     }
   solv->installedpos = installedpos;
   return level;
