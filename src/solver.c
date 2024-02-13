@@ -1835,11 +1835,10 @@ resolve_installed(Solver *solv, int level, int disablerules, Queue *dq)
 
 	  /* check if we should update this package to the latest version
 	   * noupdate is set for erase jobs, in that case we want to deinstall
-	   * the installed package and not replace it with a newer version
-	   * rr->p != i is for dup jobs where the installed package cannot be kept */
+	   * the installed package and not replace it with a newer version */
 	  if (dq->count)
 	    queue_empty(dq);
-	  if (!MAPTST(&solv->noupdate, i - installed->start) && (solv->decisionmap[i] < 0 || solv->updatemap_all || (solv->updatemap.size && MAPTST(&solv->updatemap, i - installed->start)) || (rr->p && rr->p != i)))
+	  if (!MAPTST(&solv->noupdate, i - installed->start) && (solv->decisionmap[i] < 0 || solv->updatemap_all || (solv->updatemap.size && MAPTST(&solv->updatemap, i - installed->start))))
 	    {
 	      if (specialupdaters && (d = specialupdaters[i - installed->start]) != 0)
 		{
