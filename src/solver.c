@@ -1891,31 +1891,44 @@ resolve_installed(Solver *solv, int level, int disablerules, Queue *dq)
 		}
 	      if (dq->count)
 		queue_empty(dq);
-	      /* find update candidates */
+	      /* update to best package of the special updaters */
 	      if (specialupdaters && specialupdaters[i - installed->start] != 0)
 		{
 		  get_special_updaters(solv, i, rr, dq);
-		  /* if we have an update set rr to the feature rule */
 		  if (dq->count)
 		    {
-		      rr = solv->rules + solv->featurerules + (i - solv->installed->start);
-		      if (!rr->p)		/* update rule == feature rule? */
-			rr = rr - solv->featurerules + solv->updaterules;
-		    }
-		}
-	      else
-		{
-		  /* update to best package of the update rule */
-		  FOR_RULELITERALS(p, pp, rr)
-		    {
-		      if (solv->decisionmap[p] > 0)
+		      /* use the feature rule as reason */
+		      Rule *rrf = solv->rules + solv->featurerules + (i - solv->installed->start);
+		      if (!rrf->p)
+			rrf = rrf - solv->featurerules + solv->updaterules;
+		      olevel = level;
+		      level = selectandinstall(solv, level, dq, disablerules, rrf - solv->rules, SOLVER_REASON_UPDATE_INSTALLED);
+
+		      if (level <= olevel)
 			{
-			  dq->count = 0;		/* already fulfilled */
-			  break;
+			  if (level < passlevel)
+			    break;	/* trouble */
+			  if (level < olevel)
+			    n = installed->start;	/* redo all */
+			  i--;
+			  n--;
+			  continue;
 			}
-		      if (!solv->decisionmap[p])
-			queue_push(dq, p);
+		      if (dq->count)
+			queue_empty(dq);
 		    }
+		  /* continue with checking the update rule */
+		}
+	      /* update to best package of the update rule */
+	      FOR_RULELITERALS(p, pp, rr)
+		{
+		  if (solv->decisionmap[p] > 0)
+		    {
+		      dq->count = 0;		/* already fulfilled */
+		      break;
+		    }
+		  if (!solv->decisionmap[p])
+		    queue_push(dq, p);
 		}
 	      if (dq->count && solv->update_targets && solv->update_targets->elements[i - installed->start])
 		prune_to_update_targets(solv, solv->update_targets->elements + solv->update_targets->elements[i - installed->start], dq);
