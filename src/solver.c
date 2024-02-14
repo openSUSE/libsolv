@@ -1789,7 +1789,7 @@ prune_to_update_targets(Solver *solv, Id *cp, Queue *q)
 }
 
 static void
-get_special_updaters(Solver *solv, int i, Rule *rr, Queue *dq)
+get_special_updaters(Solver *solv, int i, Queue *dq)
 {
   Pool *pool = solv->pool;
   Repo *installed = solv->installed;
@@ -1894,7 +1894,7 @@ resolve_installed(Solver *solv, int level, int disablerules, Queue *dq)
 	      /* update to best package of the special updaters */
 	      if (specialupdaters && specialupdaters[i - installed->start] != 0)
 		{
-		  get_special_updaters(solv, i, rr, dq);
+		  get_special_updaters(solv, i, dq);
 		  if (dq->count)
 		    {
 		      /* use the feature rule as reason */
