@@ -1798,7 +1798,7 @@ get_special_updaters(Solver *solv, int i, Rule *rr, Queue *dq)
   Id p;
 
   /* special multiversion handling, make sure best version is chosen */
-  if (rr->p == i && solv->decisionmap[i] >= 0)
+  if (solv->decisionmap[i] >= 0)
     queue_push(dq, i);
   for (d = specoff; (p = pool->whatprovidesdata[d]) != 0; d++)
     if (solv->decisionmap[p] >= 0)
