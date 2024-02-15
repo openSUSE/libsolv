@@ -256,6 +256,7 @@ cmake . $CMAKE_FLAGS \
 	-DWITH_LIBXML2=1 \
 	-DENABLE_APPDATA=1 \
 	-DENABLE_COMPS=1 \
+	-DMULTI_SEMANTICS=1 \
 	%{?with_static:-DENABLE_STATIC=1} \
 	%{!?with_shared:-DDISABLE_SHARED=1} \
 	%{?with_perl:-DENABLE_PERL=1} \
