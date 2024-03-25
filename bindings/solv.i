@@ -690,6 +690,11 @@ SWIG_AsValDepId(void *obj, int *val) {
 
 %include "typemaps.i"
 
+#if defined(SWIGTCL)
+%rename("==") *::__eq__;
+%rename("!=") *::__ne__;
+#endif
+
 %typemap(in,numinputs=0,noblock=1) XRule **OUTPUT ($*1_ltype temp) {
   $1 = &temp;
 }
@@ -1389,15 +1394,9 @@ typedef struct {
     return pool_isemptyupdatejob($self->pool, $self->how, $self->what);
   }
 
-#if defined(SWIGTCL)
-  %rename("==") __eq__;
-#endif
   bool __eq__(Job *j) {
     return $self->pool == j->pool && $self->how == j->how && $self->what == j->what;
   }
-#if defined(SWIGTCL)
-  %rename("!=") __ne__;
-#endif
   bool __ne__(Job *j) {
     return !Job___eq__($self, j);
   }
@@ -1644,15 +1643,9 @@ returnself(matchsolvable)
     return solv_chksum_type2str(solv_chksum_get_type($self));
   }
 
-#if defined(SWIGTCL)
-  %rename("==") __eq__;
-#endif
   bool __eq__(Chksum *chk) {
     return solv_chksum_cmp($self, chk);
   }
-#if defined(SWIGTCL)
-  %rename("!=") __ne__;
-#endif
   bool __ne__(Chksum *chk) {
     return !solv_chksum_cmp($self, chk);
   }
@@ -2545,15 +2538,9 @@ returnself(matchsolvable)
     }
   }
 
-#if defined(SWIGTCL)
-  %rename("==") __eq__;
-#endif
   bool __eq__(Repo *repo) {
     return $self == repo;
   }
-#if defined(SWIGTCL)
-  %rename("!=") __ne__;
-#endif
   bool __ne__(Repo *repo) {
     return $self != repo;
   }
@@ -3068,15 +3055,9 @@ returnself(matchsolvable)
   const char *str() {
     return pool_dep2str($self->pool, $self->id);
   }
-#if defined(SWIGTCL)
-  %rename("==") __eq__;
-#endif
   bool __eq__(Dep *s) {
     return $self->pool == s->pool && $self->id == s->id;
   }
-#if defined(SWIGTCL)
-  %rename("!=") __ne__;
-#endif
   bool __ne__(Dep *s) {
     return !Dep___eq__($self, s);
   }
@@ -3329,15 +3310,9 @@ returnself(matchsolvable)
     return solvable_matchesdep($self->pool->solvables + $self->id, keyname, id, marker);
   }
 
-#if defined(SWIGTCL)
-  %rename("==") __eq__;
-#endif
   bool __eq__(XSolvable *s) {
     return $self->pool == s->pool && $self->id == s->id;
   }
-#if defined(SWIGTCL)
-  %rename("!=") __ne__;
-#endif
   bool __ne__(XSolvable *s) {
     return !XSolvable___eq__($self, s);
   }
@@ -4056,15 +4031,9 @@ rb_eval_string(
     return q;
   }
 
-#if defined(SWIGTCL)
-  %rename("==") __eq__;
-#endif
   bool __eq__(XRule *xr) {
     return $self->solv == xr->solv && $self->id == xr->id;
   }
-#if defined(SWIGTCL)
-  %rename("!=") __ne__;
-#endif
   bool __ne__(XRule *xr) {
     return !XRule___eq__($self, xr);
   }
@@ -4228,15 +4197,9 @@ rb_eval_string(
     Repodata *data = repo_id2repodata($self->repo, $self->id);
     repodata_extend_block(data, data->repo->start, data->repo->end - data->repo->start);
   }
-#if defined(SWIGTCL)
-  %rename("==") __eq__;
-#endif
   bool __eq__(XRepodata *xr) {
     return $self->repo == xr->repo && $self->id == xr->id;
   }
-#if defined(SWIGTCL)
-  %rename("!=") __ne__;
-#endif
   bool __ne__(XRepodata *xr) {
     return !XRepodata___eq__($self, xr);
   }
