@@ -960,8 +960,8 @@ SWIGINTERN void appdata_clr_helper(void **appdatap) {
 SWIGINTERN void appdata_set_helper(void **appdatap, void *appdata) {
   *appdatap = appdata;
 }
-SWIGINTERN void *appdata_get_helper(void *appdata) {
-  return appdata;
+SWIGINTERN void *appdata_get_helper(void **appdatap) {
+  return *appdatap;
 }
 %}
 
@@ -979,8 +979,8 @@ SWIGINTERN void appdata_set_helper(void **appdatap, void *appdata) {
   appdata_clr_helper(appdatap);
   *appdatap = appdata;
 }
-SWIGINTERN void *appdata_get_helper(void *appdata) {
-  return appdata;
+SWIGINTERN void *appdata_get_helper(void **appdatap) {
+  return *appdatap;
 }
 %}
 
@@ -1008,8 +1008,9 @@ SWIGINTERN void appdata_set_helper(void **appdatap, void *appdata) {
     myappdata->appdata = appdata;
   }
 }
-SWIGINTERN void *appdata_get_helper(void *appdata) {
-  return appdata ? ((struct myappdata *)appdata)->appdata : 0;
+SWIGINTERN void *appdata_get_helper(void **appdatap) {
+  struct myappdata *myappdata = *(struct myappdata **)appdatap;
+  return myappdata ? myappdata->appdata : 0;
 }
 
 %}
@@ -1043,8 +1044,8 @@ SWIGINTERN void appdata_set_helper(void **appdatap, void *appdata) {
     myappdata->appdata = appdata;
   }
 }
-SWIGINTERN void *appdata_get_helper(void *appdata) {
-  struct myappdata *myappdata = appdata;
+SWIGINTERN void *appdata_get_helper(void **appdatap) {
+  struct myappdata *myappdata = *appdatap;
   if (!myappdata || !myappdata->appdata)
     return 0;
   return myappdata->disowned ? newRV_noinc((SV *)myappdata->appdata) : myappdata->appdata;
@@ -1892,7 +1893,7 @@ returnself(matchsolvable)
     appdata_set_helper(&pool->appdata, appdata);
   }
   SWIGINTERN AppObjectPtr Pool_appdata_get(Pool *pool) {
-    return appdata_get_helper(pool->appdata);
+    return appdata_get_helper(&pool->appdata);
   }
   %}
   void appdata_disown() {
@@ -2288,7 +2289,7 @@ returnself(matchsolvable)
     appdata_set_helper(&repo->appdata, appdata);
   }
   SWIGINTERN AppObjectPtr Repo_appdata_get(Repo *repo) {
-    return appdata_get_helper(repo->appdata);
+    return appdata_get_helper(&repo->appdata);
   }
   %}
 
