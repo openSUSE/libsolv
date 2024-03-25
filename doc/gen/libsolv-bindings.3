@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 01/31/2023
+.\"      Date: 03/25/2024
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "01/31/2023" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "03/25/2024" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -391,7 +391,9 @@ Stringification is done by calling the object\(cqs \(lqstr\(rq method\&.
 .RE
 .\}
 .sp
-There is one exception: you have to use \(lqstringify\(rq for Datamatch objects, as swig reports a clash with the \(lqstr\(rq attribute\&. Some objects also support a \(lq==\(rq method for equality tests, and a \(lq!=\(rq method\&.
+There is one exception: you have to use \(lqstringify\(rq for Datamatch objects, as swig reports a clash with the \(lqstr\(rq attribute\&.
+.sp
+Some classes also support a \(lq==\(rq method for equality tests, and a \(lq!=\(rq method\&.
 .sp
 Swig implements all constants as numeric variables, constants belonging to a libsolv class are prefixed with the class name:
 .sp
@@ -401,6 +403,122 @@ Swig implements all constants as numeric variables, constants belonging to a lib
 .nf
 \fI$pool\fR \fBset_flag\fR \fI$solv::Pool_POOL_FLAG_OBSOLETEUSESCOLORS\fR \fB1\fR
 \fBputs [\fR\fI$solvable\fR \fBlookup_str\fR \fI$solv::SOLVABLE_SUMMARY\fR\fB]\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Iterators also work as expected:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBfor\fR \fIsolvable\fR \fBin\fR \fIpool\fR\fB\&.solvables_iter() do \&.\&.\&.\fR
+.fi
+.if n \{\
+.RE
+.\}
+.SH "LUA SPECIFICS"
+.sp
+Libsolv\(cqs lua bindings can be loaded with the following statement:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBrequire("solv")\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Objects are either created by calling the constructor method for a class or they are returned by calling methods on other objects\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fIpool\fR \fB= solv\&.Pool()\fR
+\fIrepo\fR \fB=\fR \fIpool\fR\fB:add_repo("my_first_repo")\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Note the \(lq:method\(rq syntax that makes lua add the object as first argument\&.
+.sp
+Attributes can be accessed as usual:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fIpool\fR\fB\&.appdata = 42\fR
+\fBprint("appdata is "\&.\&.pool\&.appdata)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Iterators also work as expected:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBfor\fR \fIsolvable\fR \fBin\fR \fIpool\fR\fB\&.solvables do \&.\&.\&.\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Note that some functions return a table instead of an iterator, so you need to use \(lqipairs\(rq for iteration:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBfor\fR \fI_\fR\fB,solvable\fR \fBin ipairs(\fR\fIjob\fR\fB\&.solvables()) do \&.\&.\&.\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Arrays are passed and returned as tables:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fIjobs\fR \fB= {}\fR
+\fIproblems\fR \fB=\fR \fIsolver\fR\fB\&.solve(\fR\fIjobs\fR\fB)\fR
+\fBif #problems != 0 then \&.\&.\&.\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The bindings define a \(lq__tostring\(rq method for many classes:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBprint(\fR\fIdep\fR\fB)\fR
+\fBprint(("Package: %\fR\fIs\fR\fB"):format(\fR\fIsolvable\fR\fB))\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Constants live in the namespace of the class they belong to:
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fIpool\fR\fB:set_flag(Solv\&.Pool\&.POOL_FLAG_OBSOLETEUSESCOLORS, 1)\fR;
 .fi
 .if n \{\
 .RE
@@ -3609,7 +3727,7 @@ Update the matching installed packages to their best version\&. If none of the s
 .PP
 \fBSOLVER_WEAKENDEPS\fR
 .RS 4
-Allow breaking the dependencies of the matching packages\&. Handle with care\&.
+Allow one to break the dependencies of the matching packages\&. Handle with care\&.
 .RE
 .PP
 \fBSOLVER_MULTIVERSION\fR

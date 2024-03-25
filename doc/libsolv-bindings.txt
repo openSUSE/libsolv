@@ -177,7 +177,8 @@ Stringification is done by calling the object's ``str'' method.
 
 There is one exception: you have to use ``stringify'' for Datamatch
 objects, as swig reports a clash with the ``str'' attribute.
-Some objects also support a ``=='' method for equality tests, and a
+
+Some classes also support a ``=='' method for equality tests, and a
 ``!='' method.
 
 Swig implements all constants as numeric variables, constants belonging
@@ -185,6 +186,53 @@ to a libsolv class are prefixed with the class name:
 
 	TCL $pool set_flag $solv::Pool_POOL_FLAG_OBSOLETEUSESCOLORS 1
 	TCL puts [$solvable lookup_str $solv::SOLVABLE_SUMMARY]
+
+Iterators also work as expected:
+
+	for solvable in pool.solvables_iter() do ...
+
+Lua Specifics
+-------------
+Libsolv's lua bindings can be loaded with the following statement:
+
+	require("solv")
+
+Objects are either created by calling the constructor method for a class or they
+are returned by calling methods on other objects.
+
+	pool = solv.Pool()
+	repo = pool:add_repo("my_first_repo")
+
+Note the ``:method'' syntax that makes lua add the object as first argument.
+
+Attributes can be accessed as usual:
+
+	pool.appdata = 42
+	print("appdata is "..pool.appdata)
+
+Iterators also work as expected:
+
+	for solvable in pool.solvables do ...
+
+Note that some functions return a table instead of an iterator, so you
+need to use ``ipairs'' for iteration:
+
+	for _,solvable in ipairs(job.solvables()) do ...
+
+Arrays are passed and returned as tables:
+
+	jobs = {}
+	problems = solver.solve(jobs)
+	if #problems != 0 then ...
+
+The bindings define a ``__tostring'' method for many classes:
+
+	print(dep)
+	print(("Package: %s"):format(solvable))
+
+Constants live in the namespace of the class they belong to:
+
+	pool:set_flag(Solv.Pool.POOL_FLAG_OBSOLETEUSESCOLORS, 1);
 
 
 The Solv Class
