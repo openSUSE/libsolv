@@ -9,6 +9,7 @@ OPTION (ENABLE_PERL "Build the perl bindings?" OFF)
 OPTION (ENABLE_PYTHON "Build the python bindings?" OFF)
 OPTION (ENABLE_RUBY "Build the ruby bindings?" OFF)
 OPTION (ENABLE_TCL "Build the Tcl bindings?" OFF)
+OPTION (ENABLE_LUA "Build the lua bindings?" OFF)
 
 OPTION (USE_VENDORDIRS "Install the bindings in vendor directories?" OFF)
 
@@ -326,6 +327,7 @@ SET (PACKAGE "libsolv")
 SET (VERSION "${LIBSOLV_MAJOR}.${LIBSOLV_MINOR}.${LIBSOLV_PATCH}")
 
 ADD_DEFINITIONS (-D_FILE_OFFSET_BITS=64)
+#ADD_DEFINITIONS (-D_TIME_BITS=64)
 CONFIGURE_FILE (src/solvversion.h.in src/solvversion.h)
 
 SET (CPACK_PACKAGE_DESCRIPTION_SUMMARY "Package dependency solver library")
