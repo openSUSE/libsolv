@@ -187,9 +187,6 @@ to a libsolv class are prefixed with the class name:
 	TCL $pool set_flag $solv::Pool_POOL_FLAG_OBSOLETEUSESCOLORS 1
 	TCL puts [$solvable lookup_str $solv::SOLVABLE_SUMMARY]
 
-Iterators also work as expected:
-
-	for solvable in pool.solvables_iter() do ...
 
 Lua Specifics
 -------------
