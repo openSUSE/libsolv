@@ -906,6 +906,10 @@ SWIG_AsValDepId(void *obj, int *val) {
 #if defined(SWIGPERL) || defined(SWIGTCL) || defined(SWIGLUA)
 %rename("repr") *::__repr__;
 #endif
+#if defined(SWIGRUBY)
+%rename("to_s") *::__str__;
+#endif
+
 
 %typemap(in,numinputs=0,noblock=1) XRule **OUTPUT ($*1_ltype temp) {
   $1 = &temp;
@@ -1909,9 +1913,6 @@ returnself(matchsolvable)
   bool __ne__(Chksum *chk) {
     return !solv_chksum_cmp($self, chk);
   }
-#if defined(SWIGRUBY)
-  %rename("to_s") __str__;
-#endif
 #if defined(SWIGPERL) || defined(SWIGTCL)
   %rename("str") __str__;
 #endif
