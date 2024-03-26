@@ -903,6 +903,9 @@ SWIG_AsValDepId(void *obj, int *val) {
 %rename("==") *::__eq__;
 %rename("!=") *::__ne__;
 #endif
+#if defined(SWIGPERL) || defined(SWIGTCL) || defined(SWIGLUA)
+%rename("repr") *::__repr__;
+#endif
 
 %typemap(in,numinputs=0,noblock=1) XRule **OUTPUT ($*1_ltype temp) {
   $1 = &temp;
@@ -1669,9 +1672,6 @@ typedef struct {
   const char *__str__() {
     return pool_job2str($self->pool, $self->how, $self->what, 0);
   }
-#if defined(SWIGPERL) || defined(SWIGTCL)
-  %rename("repr") __repr__;
-#endif
   const char *__repr__() {
     const char *str = pool_job2str($self->pool, $self->how, $self->what, ~0);
     return pool_tmpjoin($self->pool, "<Job ", str, ">");
@@ -1802,9 +1802,6 @@ returnself(matchsolvable)
   const char *__str__() {
     return pool_selection2str($self->pool, &$self->q, 0);
   }
-#if defined(SWIGPERL) || defined(SWIGTCL)
-  %rename("repr") __repr__;
-#endif
   const char *__repr__() {
     const char *str = pool_selection2str($self->pool, &$self->q, ~0);
     return pool_tmpjoin($self->pool, "<Selection ", str, ">");
@@ -1928,9 +1925,6 @@ returnself(matchsolvable)
     solv_free((void *)h);
     return str;
   }
-#if defined(SWIGPERL) || defined(SWIGTCL)
-  %rename("repr") __repr__;
-#endif
   %newobject __repr__;
   const char *__repr__() {
     const char *h = Chksum___str__($self);
@@ -2851,9 +2845,6 @@ returnself(matchsolvable)
     sprintf(buf, "Repo#%d", $self->repoid);
     return solv_strdup(buf);
   }
-#if defined(SWIGPERL) || defined(SWIGTCL)
-  %rename("repr") __repr__;
-#endif
   %newobject __repr__;
   const char *__repr__() {
     char buf[20];
@@ -3379,9 +3370,6 @@ returnself(matchsolvable)
   const char *__str__() {
     return pool_dep2str($self->pool, $self->id);
   }
-#if defined(SWIGPERL) || defined(SWIGTCL)
-  %rename("repr") __repr__;
-#endif
   %newobject __repr__;
   const char *__repr__() {
     char buf[20];
@@ -3634,9 +3622,6 @@ returnself(matchsolvable)
   const char *__str__() {
     return pool_solvid2str($self->pool, $self->id);
   }
-#if defined(SWIGPERL) || defined(SWIGTCL)
-  %rename("repr") __repr__;
-#endif
   %newobject __repr__;
   const char *__repr__() {
     char buf[20];
@@ -3764,7 +3749,11 @@ returnself(matchsolvable)
     e->rp = rp;
     return e;
   }
+  /* legacy */
   const char *str() {
+    return solver_solutionelementtype2str($self->solv, $self->type, $self->p, $self->rp);
+  }
+  const char *__str__() {
     return solver_solutionelementtype2str($self->solv, $self->type, $self->p, $self->rp);
   }
   %typemap(out) Queue replaceelements Queue2Array(Solutionelement *, 1, new_Solutionelement(arg1->solv, arg1->problemid, arg1->solutionid, id, arg1->p, arg1->rp));
@@ -4349,9 +4338,6 @@ rb_eval_string(
     return $self->id;
   }
 #endif
-#if defined(SWIGPERL) || defined(SWIGTCL)
-  %rename("repr") __repr__;
-#endif
   %newobject __repr__;
   const char *__repr__() {
     char buf[20];
@@ -4514,9 +4500,6 @@ rb_eval_string(
   int __hash__() {
     return $self->id;
   }
-#endif
-#if defined(SWIGPERL) || defined(SWIGTCL)
-  %rename("repr") __repr__;
 #endif
   %newobject __repr__;
   const char *__repr__() {

@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 03/25/2024
+.\"      Date: 03/26/2024
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "03/25/2024" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "03/26/2024" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -5214,10 +5214,10 @@ Create a job that implements the solution element\&. Add this job to the array o
 .RS 4
 .\}
 .nf
-\fBconst char *str()\fR
-my \fI$str\fR \fB=\fR \fI$solutionelement\fR\fB\->str()\fR;
-\fIstr\fR \fB=\fR \fIsolutionelement\fR\fB\&.str()\fR
-\fIstr\fR \fB=\fR \fIsolutionelement\fR\fB\&.str()\fR
+\fB<stringification>\fR
+my \fI$str\fR \fB=\fR \fI$solutionelement\fR\fB\->str\fR;
+\fIstr\fR \fB= str(\fR\fIsolutionelement\fR\fB)\fR
+\fIstr\fR \fB=\fR \fIsolutionelement\fR\fB\&.to_s\fR
 .fi
 .if n \{\
 .RE

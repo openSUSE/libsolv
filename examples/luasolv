@@ -538,7 +538,7 @@ while true do
             print(("  Solution %d:"):format(solution.id))
             local elements = solution:elements(true)
             for _, element in ipairs(elements) do
-                print("  - ".. element:str())
+                print(("  - %s"):format(element))
 	    end
             print('')
 	end

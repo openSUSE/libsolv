@@ -3154,10 +3154,10 @@ of jobs for all elements of type different to SOLVER_SOLUTION_JOB and
 SOLVER_SOLUTION_POOLJOB. For the latter two, a SOLVER_NOOB Job is created,
 you should replace the old job with the new one.
 
-	const char *str()
-	my $str = $solutionelement->str();
-	str = solutionelement.str()
-	str = solutionelement.str()
+	<stringification>
+	my $str = $solutionelement->str;
+	str = str(solutionelement)
+	str = solutionelement.to_s
 
 A string describing the change the solution element consists of.
 
