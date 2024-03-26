@@ -339,6 +339,7 @@ lookup_shared_id(Repodata *data, Id p, Id keyname, Id voidid, int uninternalized
   if (uninternalized)
     {
       KeyValue kv;
+      memset(&kv, 0, sizeof(kv));
       Repokey *key = repodata_lookup_kv_uninternalized(data, p, keyname, &kv);
       if (!key)
         return 0;
