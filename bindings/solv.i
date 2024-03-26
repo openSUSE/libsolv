@@ -909,7 +909,9 @@ SWIG_AsValDepId(void *obj, int *val) {
 #if defined(SWIGRUBY)
 %rename("to_s") *::__str__;
 #endif
-
+#if defined(SWIGPERL) || defined(SWIGTCL)
+%rename("str") __str__;
+#endif
 
 %typemap(in,numinputs=0,noblock=1) XRule **OUTPUT ($*1_ltype temp) {
   $1 = &temp;
@@ -1670,9 +1672,6 @@ typedef struct {
   bool __ne__(Job *j) {
     return !Job___eq__($self, j);
   }
-#if defined(SWIGPERL) || defined(SWIGTCL)
-  %rename("str") __str__;
-#endif
   const char *__str__() {
     return pool_job2str($self->pool, $self->how, $self->what, 0);
   }
@@ -1800,9 +1799,6 @@ returnself(matchsolvable)
     return q;
   }
 
-#if defined(SWIGPERL) || defined(SWIGTCL)
-  %rename("str") __str__;
-#endif
   const char *__str__() {
     return pool_selection2str($self->pool, &$self->q, 0);
   }
@@ -1913,9 +1909,6 @@ returnself(matchsolvable)
   bool __ne__(Chksum *chk) {
     return !solv_chksum_cmp($self, chk);
   }
-#if defined(SWIGPERL) || defined(SWIGTCL)
-  %rename("str") __str__;
-#endif
   %newobject __str__;
   const char *__str__() {
     const char *str;
@@ -2835,9 +2828,6 @@ returnself(matchsolvable)
     return $self->repoid;
   }
 #endif
-#if defined(SWIGPERL) || defined(SWIGTCL)
-  %rename("str") __str__;
-#endif
   %newobject __str__;
   const char *__str__() {
     char buf[20];
@@ -3365,9 +3355,6 @@ returnself(matchsolvable)
     return $self->id;
   }
 #endif
-#if defined(SWIGPERL) || defined(SWIGTCL)
-  %rename("str") __str__;
-#endif
   const char *__str__() {
     return pool_dep2str($self->pool, $self->id);
   }
@@ -3617,9 +3604,6 @@ returnself(matchsolvable)
     return $self->id;
   }
 #endif
-#if defined(SWIGPERL) || defined(SWIGTCL)
-  %rename("str") __str__;
-#endif
   const char *__str__() {
     return pool_solvid2str($self->pool, $self->id);
   }
@@ -3708,9 +3692,6 @@ returnself(matchsolvable)
     prepare_decisionset_queue($self->solv, &q);
     return q;
   }
-#if defined(SWIGPERL) || defined(SWIGTCL)
-  %rename("str") __str__;
-#endif
   const char *__str__() {
     return solver_problem2str($self->solv, $self->id);
   }
@@ -4378,9 +4359,6 @@ rb_eval_string(
   const char *problemstr() {
     return solver_problemruleinfo2str($self->solv, $self->type, $self->source, $self->target, $self->dep_id);
   }
-#if defined(SWIGPERL) || defined(SWIGTCL)
-  %rename("str") __str__;
-#endif
   const char *__str__() {
     return solver_ruleinfo2str($self->solv, $self->type, $self->source, $self->target, $self->dep_id);
   }
@@ -4578,9 +4556,6 @@ rb_eval_string(
         q.elements[i] = -q.elements[i];
     return q;
   }
-#if defined(SWIGPERL) || defined(SWIGTCL)
-  %rename("str") __str__;
-#endif
   const char *__str__() {
     return solver_alternative2str($self->solv, $self->type, $self->type == SOLVER_ALTERNATIVE_TYPE_RULE ? $self->rid : $self->dep_id, $self->from_id);
   }
@@ -4636,9 +4611,6 @@ rb_eval_string(
       return solver_reason2str($self->solv, $self->reason);
     return solver_decisionreason2str($self->solv, $self->p, $self->reason, $self->infoid);
   }
-#if defined(SWIGPERL) || defined(SWIGTCL)
-  %rename("str") __str__;
-#endif
   const char *__str__() {
     Pool *pool = $self->solv->pool;
     if ($self->p == 0 && $self->reason == SOLVER_REASON_UNSOLVABLE)
@@ -4695,9 +4667,6 @@ rb_eval_string(
       return solver_reason2str($self->solv, $self->reason);
     return solver_decisioninfo2str($self->solv, $self->bits, $self->type, $self->source, $self->target, $self->dep_id);
   }
-#if defined(SWIGPERL) || defined(SWIGTCL)
-  %rename("str") __str__;
-#endif
   const char *__str__() {
     Pool *pool = $self->solv->pool;
     Queue q;
