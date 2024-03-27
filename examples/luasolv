@@ -338,7 +338,6 @@ function Repo_rpmmd:load_ext(repodata)
   local filechksum = repodata:lookup_str(solv.SOLVID_META, solv.REPOSITORY_REPOMD_CHECKSUM)
   local f = self:download(filename, true, filechksum)
   if not f then
-print("download failed")
     return false
   end
   if ext == 'FL' then
@@ -458,7 +457,7 @@ if cmd == 'search' then
   os.exit(0)
 end
 
-if not cmdactions[cmd] then die("unknown command '"..cmd.."'") end
+if not cmdactions[cmd] then die(("unknown command '%s'"):format(cmd)) end
 
 pool:addfileprovides()
 pool:createwhatprovides()
