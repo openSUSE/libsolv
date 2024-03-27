@@ -1769,6 +1769,13 @@ The key type of the value that was matched, either as id or string.
 The Id of the value that was matched (only valid for id types),
 either as id or string.
 
+	Dep *dep;				/* read only */
+	$d->{dep}
+	d.dep
+	d.dep
+
+The id of the value that was matched converted to a dependency object.
+
 	const char *str;
 	$d->{str}
 	d.str

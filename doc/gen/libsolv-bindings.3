@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 03/26/2024
+.\"      Date: 03/27/2024
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "03/26/2024" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "03/27/2024" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -3212,6 +3212,21 @@ The key type of the value that was matched, either as id or string\&.
 .\}
 .sp
 The Id of the value that was matched (only valid for id types), either as id or string\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBDep *dep;\fR                               /* read only */
+\fI$d\fR\fB\->{dep}\fR
+\fId\fR\fB\&.dep\fR
+\fId\fR\fB\&.dep\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+The id of the value that was matched converted to a dependency object\&.
 .sp
 .if n \{\
 .RS 4

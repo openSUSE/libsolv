@@ -3025,6 +3025,8 @@ returnself(matchsolvable)
   Id const id;
   const char * const idstr;
   const char * const str;
+  %newobject dep;
+  Dep * const dep;
   BinaryBlob const binary;
   unsigned long long const num;
   unsigned int const num2;
@@ -3056,6 +3058,13 @@ returnself(matchsolvable)
   }
   SWIGINTERN const char * const Datamatch_str_get(Dataiterator *di) {
     return di->kv.str;
+  }
+  SWIGINTERN Dep *Datamatch_dep_get(Dataiterator *di) {
+    if (di->key->type == REPOKEY_TYPE_DIR || di->key->type == REPOKEY_TYPE_DIRSTRARRAY || di->key->type == REPOKEY_TYPE_DIRNUMNUMARRAY)
+      return 0;
+    if (di->data && di->data->localpool)
+      return 0;
+    return new_Dep(di->pool, di->kv.id);
   }
   SWIGINTERN BinaryBlob Datamatch_binary_get(Dataiterator *di) {
     BinaryBlob bl;
