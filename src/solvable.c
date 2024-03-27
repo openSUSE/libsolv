@@ -579,9 +579,15 @@ solvable_set_num(Solvable *s, Id keyname, unsigned long long num)
 }
 
 void
+solvable_set_strn(Solvable *s, Id keyname, const char *str, size_t l)
+{
+  repo_set_strn(s->repo, s - s->repo->pool->solvables, keyname, str, l);
+}
+
+void
 solvable_set_str(Solvable *s, Id keyname, const char *str)
 {
-  repo_set_str(s->repo, s - s->repo->pool->solvables, keyname, str);
+  solvable_set_strn(s, keyname, str, strlen(str));
 }
 
 void
