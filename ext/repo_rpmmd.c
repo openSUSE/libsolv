@@ -609,6 +609,8 @@ fill_cshash_from_new_solvables(struct parsedata *pd)
   KeyValue kv;
   Repokey *key;
 
+  memset(&kv, 0, sizeof(kv));
+
   for (i = pd->first; i < pool->nsolvables; i++)
     {
       if (pool->solvables[i].repo != pd->repo)

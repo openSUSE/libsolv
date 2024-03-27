@@ -1497,6 +1497,7 @@ testcase_solverresult(Solver *solv, int resultflags)
   if ((resultflags & TESTCASE_RESULT_USERINSTALLED) != 0)
     {
       Queue q;
+      queue_init(&q);
       solver_get_userinstalled(solv, &q, 0);
       for (i = 0; i < q.count; i++)
 	{
