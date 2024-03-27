@@ -873,6 +873,12 @@ SWIG_AsValDepId(void *obj, int *val) {
   Tcl_IncrRefCount(objv[1]);
   Tcl_SetObjResult(interp, objv[1]);
 }
+#elif defined(SWIGLUA)
+%typemap(out) void func {
+  lua_pushvalue(L, 1);SWIG_arg++;
+}
+#else
+#warning returnself not implemented for this language
 #endif
 %enddef
 
