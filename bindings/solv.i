@@ -878,6 +878,32 @@ SWIG_AsValDepId(void *obj, int *val) {
 
 
 /**
+ ** meta method renaming
+ **/
+#if defined(SWIGPERL)
+%rename("str") *::__str__;
+#endif
+#if defined(SWIGRUBY)
+%rename("to_s") *::__str__;
+#endif
+#if defined(SWIGTCL)
+%rename("str") *::__str__;
+%rename("==") *::__eq__;
+%rename("!=") *::__ne__;
+#endif
+#if defined(SWIGLUA)
+%rename(__call) *::__next__;
+%rename(__tostring) *::__str__;
+%rename(__index) *::__getitem__;
+%rename(__eq) *::__eq__;
+%rename(__ne) *::__ne__;
+#endif
+#if defined(SWIGPERL) || defined(SWIGTCL) || defined(SWIGLUA)
+%rename("repr") *::__repr__;
+#endif
+
+
+/**
  ** misc stuff
  **/
 
@@ -885,32 +911,10 @@ SWIG_AsValDepId(void *obj, int *val) {
 #if defined(SWIGLUA)
 %runtime "swigerrors.swg";
 %include "typemaps/swigmacros.swg"
-%include "typemaps/valtypes.swg"
-%include "typemaps/inoutlist.swg"
-
-%rename(__call) *::__next__;
-%rename(__tostring) *::__str__;
-%rename(__index) *::__getitem__;
-%rename(__eq) *::__eq__;
-%rename(__ne) *::__ne__;
 
 %typemap(in) void *ign1 {};
 %typemap(in) void *ign2 {};
 %typemap(in,checkfn="lua_isfunction") int lua_function_idx { $1 = $input; };
-#endif
-
-#if defined(SWIGTCL)
-%rename("==") *::__eq__;
-%rename("!=") *::__ne__;
-#endif
-#if defined(SWIGPERL) || defined(SWIGTCL) || defined(SWIGLUA)
-%rename("repr") *::__repr__;
-#endif
-#if defined(SWIGRUBY)
-%rename("to_s") *::__str__;
-#endif
-#if defined(SWIGPERL) || defined(SWIGTCL)
-%rename("str") __str__;
 #endif
 
 %typemap(in,numinputs=0,noblock=1) XRule **OUTPUT ($*1_ltype temp) {
@@ -927,25 +931,19 @@ SWIG_AsValDepId(void *obj, int *val) {
 #endif
 
 #if defined(SWIGLUA)
-%typemap(in,noblock=1,fragment="SWIG_AsValSolvFpPtr") FILE * {
-    {
-      FILE *val;
-      int ecode = SWIG_AsValSolvFpPtr(L, $input, &val);
-      if (!SWIG_IsOK(ecode)) SWIG_fail;
-      $1 = val;
-    }
+%typemap(in,noblock=1,fragment="SWIG_AsValSolvFpPtr") FILE * (FILE *val, int ecode) {
+  ecode = SWIG_AsValSolvFpPtr(L, $input, &val);
+  if (!SWIG_IsOK(ecode)) SWIG_fail_arg("$symname", $argnum, "FILE *");
+  $1 = val;
 }
 %typemap(typecheck,precedence=%checkcode(POINTER),fragment="SWIG_AsValSolvFpPtr") FILE * {
   int res = SWIG_AsValSolvFpPtr(L, $input, NULL);
   $1 = SWIG_CheckState(res);
 }
-%typemap(in,noblock=1,fragment="SWIG_AsValDepId") DepId {
-    {
-      int val;
-      int ecode = SWIG_AsValDepId(L, $input, &val);
-      if (!SWIG_IsOK(ecode)) SWIG_fail;
-      $1 = val;
-    }
+%typemap(in,noblock=1,fragment="SWIG_AsValDepId") DepId (int val, int ecode) {
+  ecode = SWIG_AsValDepId(L, $input, &val);
+  if (!SWIG_IsOK(ecode)) SWIG_fail_arg("$symname", $argnum, "DepId")
+  $1 = val;
 }
 %typemap(typecheck,precedence=%checkcode(INT32),fragment="SWIG_AsValDepId") DepId {
   int res = SWIG_AsValDepId(L, $input, NULL);
