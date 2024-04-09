@@ -487,7 +487,7 @@ solver_get_proof(Solver *solv, Id id, int flags, Queue *q)
       /* sort premise block */
       if (i > 8)
 	solv_sort(q->elements, i / 8, 8 * sizeof(Id), decisionsort_cmp, solv);
-      sort_unit_decisions(solv, q, i, q->count - 8, &seen);
+      sort_unit_decisions(solv, q, i, q->count - i, &seen);
     }
 
   map_free(&seen);
@@ -675,7 +675,7 @@ getdecisionlist(Solver *solv, Map *dm, int flags, Queue *decisionlistq)
 	      Id p2 = iq.elements[i];
 	      if (p2 < 0)
 		MAPSET(dm, -p2);
-	      else if (solv->decisionmap[p2] > 0)
+	      else if (reason == SOLVER_REASON_UNIT_RULE || solv->decisionmap[p2] > 0)
 		MAPSET(dm, p2);
 	    }
 	  break;
@@ -703,6 +703,7 @@ getdecisionlist(Solver *solv, Map *dm, int flags, Queue *decisionlistq)
 		if (decisionlistq->elements[j + 1] != SOLVER_REASON_UNIT_RULE)
 		  break;
 	      sort_unit_decisions(solv, decisionlistq, i, j, dm);
+	      i = j - 8;
 	    }
 	}
     }
