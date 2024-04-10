@@ -3,17 +3,17 @@
 repo system 0 testtags <inline>
 repo available 0 testtags <inline>
 #>=Pkg: foo 1.0.0 0 i586
-#>=Req: a = 1.0.0
-#>=Req: b = 1.0.0
+#>=Req: a = 1.0.0-0
+#>=Req: b = 1.0.0-0
 #>=Pkg: foo 1.1.0 0 i586
-#>=Req: x = 1.0.0
-#>=Req: y = 1.0.0
+#>=Req: x = 1.0.0-0
+#>=Req: y = 1.0.0-0
 #>=Pkg: a 1.0.0 0 i586
-#>=Req: b = 2.0.0
+#>=Req: b = 2.0.0-0
 #>=Pkg: b 1.0.0 0 i586
 #>=Pkg: b 2.0.0 0 i586
 #>=Pkg: x 1.0.0 0 i586
-#>=Req: y = 2.0.0
+#>=Req: y = 2.0.0-0
 #>=Pkg: y 1.0.0 0 i586
 #>=Pkg: y 2.0.0 0 i586
 system i586 * system

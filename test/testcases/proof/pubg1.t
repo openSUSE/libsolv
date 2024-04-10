@@ -13,7 +13,7 @@ repo available 0 testtags <inline>
 #>=Pkg: menu 1.1.0 0 i586
 #>=Req: dropdown >= 2.0.0
 #>=Pkg: menu 1.0.0 0 i586
-#>=Req: dropdown = 1.8.0
+#>=Req: dropdown = 1.8.0-0
 #>=Pkg: dropdown 2.3.0 0 i586
 #>=Req: icons >= 2.0.0
 #>=Pkg: dropdown 2.2.0 0 i586
@@ -23,7 +23,7 @@ repo available 0 testtags <inline>
 #>=Pkg: dropdown 2.0.0 0 i586
 #>=Req: icons >= 2.0.0
 #>=Pkg: dropdown 1.8.0 0 i586
-#>=Req: intl = 3.0.0
+#>=Req: intl = 3.0.0-0
 #>=Pkg: icons 2.0.0 0 i586
 #>=Pkg: icons 1.0.0 0 i586
 #>=Pkg: intl 5.0.0 0 i586
@@ -31,8 +31,8 @@ repo available 0 testtags <inline>
 #>=Pkg: intl 3.0.0 0 i586
 system i586 * system
 job install name menu
-job install name icons = 1.0.0
-job install name intl = 5.0.0
+job install name icons = 1.0.0-0
+job install name intl = 5.0.0-0
 result proof <inline>
 #>proof 77cc0794   0 job a8f3723000d5bf17a40da5be2d55acb7
 #>proof 77cc0794   0: -->  icons-1.0.0-0.i586@available
