@@ -447,17 +447,19 @@ solver_get_proof(Solver *solv, Id id, int flags, Queue *q)
   queue_deleten(q, 0, cnt);
 
   /* switch last two decisions if the unsolvable rule is of type SOLVER_RULE_RPM_SAME_NAME */
-  if (q->count >= 16 && q->elements[q->count - 8 + 3] == SOLVER_RULE_RPM_SAME_NAME && q->elements[q->count - 16] > 0)
+  if (q->count >= 16 && q->elements[q->count - 8 + 4] == SOLVER_RULE_RPM_SAME_NAME && q->elements[q->count - 16] > 0)
     {
-      Rule *r = solv->rules + q->elements[q->count - 8 + 1];
+      Rule *r = solv->rules + q->elements[q->count - 8 + 2];
       /* make sure that the rule is a binary conflict and it matches the installed element */
       if (r->p < 0 && (r->d == 0 || r->d == -1) && r->w2 < 0
-	 && (q->elements[q->count - 16] == -r->p || q->elements[q->count - 16] -r->w2))
+	 && (q->elements[q->count - 16] == -r->p || q->elements[q->count - 16] == -r->w2))
 	{
-	  /* looks good! swap decisions and fixup truelit entries */
+	  /* looks good! swap decisions and fixup truelit/reason entries */
 	  move_decision(q, q->count - 16, q->count - 8);
 	  q->elements[q->count - 16] = -q->elements[q->count - 8];
+	  q->elements[q->count - 16 + 1] = SOLVER_REASON_UNIT_RULE;
 	  q->elements[q->count - 8] = 0;
+	  q->elements[q->count - 8 + 1] = SOLVER_REASON_UNSOLVABLE;
 	}
     }
 
