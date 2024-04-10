@@ -26,6 +26,10 @@ static struct resultflags2str {
   { TESTCASE_RESULT_REASON,             "reason" },
   { TESTCASE_RESULT_CLEANDEPS,          "cleandeps" },
   { TESTCASE_RESULT_JOBS,               "jobs" },
+  { TESTCASE_RESULT_USERINSTALLED,      "userinstalled" },
+  { TESTCASE_RESULT_ORDER,              "order" },
+  { TESTCASE_RESULT_ORDEREDGES,         "orderedges" },
+  { TESTCASE_RESULT_PROOF,              "proof" },
   { 0, 0 }
 };
 
