@@ -489,7 +489,7 @@ solver_get_proof(Solver *solv, Id id, int flags, Queue *q)
       /* sort premise block */
       if (i > 8)
 	solv_sort(q->elements, i / 8, 8 * sizeof(Id), decisionsort_cmp, solv);
-      sort_unit_decisions(solv, q, i, q->count - i, &seen);
+      sort_unit_decisions(solv, q, i, q->count - 8, &seen);
     }
 
   map_free(&seen);
