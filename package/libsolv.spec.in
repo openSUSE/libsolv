@@ -60,8 +60,13 @@
 %bcond_with ruby
 %bcond_with perl
 %endif
+%if 0%{?suse_version} && 0%{?suse_version} < 1600
 %bcond_without static
 %bcond_with shared
+%else
+%bcond_with static
+%bcond_without shared
+%endif
 %bcond_with zypp
 
 Name:           libsolv
