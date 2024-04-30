@@ -1,7 +1,7 @@
 #
 # spec file for package libsolv
 #
-# Copyright (c) 2021 SUSE LLC
+# Copyright (c) 2024 SUSE LLC
 #
 # All modifications and additions to the file contributed by third parties
 # remain the property of their copyright owners, unless otherwise agreed
@@ -153,6 +153,7 @@ so-called satisfiability algorithm for resolving package
 dependencies.
 
 %endif
+
 %package devel
 Summary:        Development files for libsolv, a package solver
 Group:          Development/Libraries/C and C++
@@ -166,6 +167,14 @@ Conflicts:      libsatsolver-devel
 Development files for libsolv, a library for solving packages and
 reading repositories.
 
+%package tools-base
+Summary:        Utilities used by libzypp to manage .solv files
+Group:          System/Management
+Provides:       libsolv-tools:%{_bindir}/repo2solv
+
+%description tools-base
+This subpackage contains utilities used by libzypp to manage solv files.
+
 %package tools
 Summary:        Utilities to work with .solv files
 Group:          System/Management
@@ -173,6 +182,7 @@ Conflicts:      satsolver-tools-obsolete
 Obsoletes:      satsolver-tools < 0.18
 Provides:       satsolver-tools = 0.18
 Requires:       findutils
+Requires:       libsolv-tools-base = %{version}
 
 %description tools
 libsolv is a library for solving packages and reading repositories.
@@ -295,7 +305,6 @@ make DESTDIR=%{buildroot} -C bindings/python install
 %python_compileall
 %endif
 
-
 %check
 make ARGS=--output-on-failure test
 
@@ -311,6 +320,13 @@ make ARGS=--output-on-failure test
 %{_libdir}/libsolvext.so.*
 %endif
 
+%files tools-base
+%defattr(-,root,root)
+%{_bindir}/repo2solv
+%{_bindir}/rpmdb2solv
+%{_mandir}/man1/repo2solv.1*
+%{_mandir}/man1/rpmdb2solv.1*
+
 %files tools
 %defattr(-,root,root)
 %if 0%{?suse_version}
@@ -318,8 +334,22 @@ make ARGS=--output-on-failure test
 %exclude %{_mandir}/man1/helix2solv*
 %endif
 %exclude %{_mandir}/man1/solv.1*
+%exclude %{_mandir}/man1/repo2solv.1*
+%exclude %{_mandir}/man1/rpmdb2solv.1*
 %exclude %{_bindir}/solv
-%{_bindir}/*
+%{_bindir}/appdata2solv
+%{_bindir}/comps2solv
+%{_bindir}/deltainfoxml2solv
+%{_bindir}/dumpsolv
+%{_bindir}/installcheck
+%{_bindir}/mergesolv
+%{_bindir}/repo2solv.sh
+%{_bindir}/repomdxml2solv
+%{_bindir}/rpmmd2solv
+%{_bindir}/rpms2solv
+%{_bindir}/susetags2solv
+%{_bindir}/testsolv
+%{_bindir}/updateinfoxml2solv
 %{_mandir}/man1/*
 
 %files devel
@@ -381,6 +411,5 @@ make ARGS=--output-on-failure test
 %{python_sitearch}/*/*solv*
 %endif
 %endif
-
 
 %changelog
