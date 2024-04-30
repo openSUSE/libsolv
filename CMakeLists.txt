@@ -399,7 +399,7 @@ IF (MSVC)
 ELSE ()
   set (CMAKE_C_FLAGS                "${CMAKE_C_FLAGS} -Wall")
   set (CMAKE_C_FLAGS_RELEASE        "${CMAKE_C_FLAGS} -O3")
-  set (CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS} -g -O3")
+  set (CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_C_FLAGS} -g -O2")
   set (CMAKE_C_FLAGS_DEBUG          "${CMAKE_C_FLAGS} -g3 -O0")
 ENDIF ()
 
