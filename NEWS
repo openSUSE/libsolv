@@ -1,6 +1,14 @@
 
 This file contains the major changes between libsolv versions:
 
+Version 0.7.29
+- selected bug fixes:
+  * improve updating of installed multiversion packages
+  * fix decision introspection going into an endless loop in
+    some cases
+- new features:
+  * added experimental lua bindings
+
 Version 0.7.28
 - selected bug fixes:
   * disable choice rules for Conda
