@@ -337,19 +337,9 @@ make ARGS=--output-on-failure test
 %exclude %{_mandir}/man1/repo2solv.1*
 %exclude %{_mandir}/man1/rpmdb2solv.1*
 %exclude %{_bindir}/solv
-%{_bindir}/appdata2solv
-%{_bindir}/comps2solv
-%{_bindir}/deltainfoxml2solv
-%{_bindir}/dumpsolv
-%{_bindir}/installcheck
-%{_bindir}/mergesolv
-%{_bindir}/repo2solv.sh
-%{_bindir}/repomdxml2solv
-%{_bindir}/rpmmd2solv
-%{_bindir}/rpms2solv
-%{_bindir}/susetags2solv
-%{_bindir}/testsolv
-%{_bindir}/updateinfoxml2solv
+%exclude %{_bindir}/repo2solv
+%exclude %{_bindir}/rpmdb2solv
+%{_bindir}/*
 %{_mandir}/man1/*
 
 %files devel
