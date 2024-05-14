@@ -476,7 +476,7 @@ solv_pgpvrfy(const unsigned char *pub, int publ, const unsigned char *sig, int s
       break;
     case 11:
       hashl = 28;	/* SHA-224 */
-      oid = (unsigned char *)"\023\060\061\060\015\006\011\140\206\110\001\145\003\004\002\004\005\000\004\034";
+      oid = (unsigned char *)"\023\060\055\060\015\006\011\140\206\110\001\145\003\004\002\004\005\000\004\034";
       break;
     default:
       return 0;		/* unsupported hash algo */
