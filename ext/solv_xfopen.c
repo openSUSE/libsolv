@@ -764,7 +764,10 @@ solv_xfopen_fd(const char *fn, int fd, const char *mode)
     return mygzfdopen(fd, simplemode);
 #else
   if (suf && !strcmp(suf, ".gz"))
-    return 0;
+    {
+      errno = ENOTSUP;
+      return 0;
+    }
 #endif
 #ifdef ENABLE_LZMA_COMPRESSION
   if (suf && !strcmp(suf, ".xz"))
@@ -773,9 +776,15 @@ solv_xfopen_fd(const char *fn, int fd, const char *mode)
     return mylzfdopen(fd, simplemode);
 #else
   if (suf && !strcmp(suf, ".xz"))
-    return 0;
+    {
+      errno = ENOTSUP;
+      return 0;
+    }
   if (suf && !strcmp(suf, ".lzma"))
-    return 0;
+    {
+      errno = ENOTSUP;
+      return 0;
+    }
 #endif
 #ifdef ENABLE_BZIP2_COMPRESSION
   if (suf && !strcmp(suf, ".bz2"))
@@ -789,14 +798,20 @@ solv_xfopen_fd(const char *fn, int fd, const char *mode)
     return myzstdfdopen(fd, simplemode);
 #else
   if (suf && !strcmp(suf, ".zst"))
-    return 0;
+    {
+      errno = ENOTSUP;
+      return 0;
+    }
 #endif
 #ifdef ENABLE_ZCHUNK_COMPRESSION
   if (suf && !strcmp(suf, ".zck"))
     return myzchunkfdopen(fd, simplemode);
 #else
   if (suf && !strcmp(suf, ".zck"))
-    return 0;
+    {
+      errno = ENOTSUP;
+      return 0;
+    }
 #endif
   return fdopen(fd, mode);
 }
