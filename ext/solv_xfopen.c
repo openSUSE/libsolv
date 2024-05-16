@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <fcntl.h>
+#include <errno.h>
 
 #ifdef _WIN32
   #include "fmemopen.c"
@@ -660,7 +661,10 @@ solv_xfopen(const char *fn, const char *mode)
   char *suf;
 
   if (!fn)
-    return 0;
+    {
+      errno = EINVAL;
+      return 0;
+    }
   if (!mode)
     mode = "r";
   suf = strrchr(fn, '.');
@@ -669,7 +673,10 @@ solv_xfopen(const char *fn, const char *mode)
     return mygzfopen(fn, mode);
 #else
   if (suf && !strcmp(suf, ".gz"))
-    return 0;
+    {
+      errno = ENOTSUP;
+      return 0;
+    }
 #endif
 #ifdef ENABLE_LZMA_COMPRESSION
   if (suf && !strcmp(suf, ".xz"))
@@ -678,30 +685,45 @@ solv_xfopen(const char *fn, const char *mode)
     return mylzfopen(fn, mode);
 #else
   if (suf && !strcmp(suf, ".xz"))
-    return 0;
+    {
+      errno = ENOTSUP;
+      return 0;
+    }
   if (suf && !strcmp(suf, ".lzma"))
-    return 0;
+    {
+      errno = ENOTSUP;
+      return 0;
+    }
 #endif
 #ifdef ENABLE_BZIP2_COMPRESSION
   if (suf && !strcmp(suf, ".bz2"))
     return mybzfopen(fn, mode);
 #else
   if (suf && !strcmp(suf, ".bz2"))
-    return 0;
+    {
+      errno = ENOTSUP;
+      return 0;
+    }
 #endif
 #ifdef ENABLE_ZSTD_COMPRESSION
   if (suf && !strcmp(suf, ".zst"))
     return myzstdfopen(fn, mode);
 #else
   if (suf && !strcmp(suf, ".zst"))
-    return 0;
+    {
+      errno = ENOTSUP;
+      return 0;
+    }
 #endif
 #ifdef ENABLE_ZCHUNK_COMPRESSION
   if (suf && !strcmp(suf, ".zck"))
     return myzchunkfopen(fn, mode);
 #else
   if (suf && !strcmp(suf, ".zck"))
-    return 0;
+    {
+      errno = ENOTSUP;
+      return 0;
+    }
 #endif
   return fopen(fn, mode);
 }
