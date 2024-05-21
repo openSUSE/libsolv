@@ -4476,7 +4476,7 @@ rb_eval_string(
     r = repo_add_solv(data->repo, fp, flags | REPO_USE_LOADING);
     if (r || data->state == REPODATA_LOADING)
       data->state = oldstate;
-    return r;
+    return r == 0;
   }
   void extend_to_repo() {
     Repodata *data = repo_id2repodata($self->repo, $self->id);
