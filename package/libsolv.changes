@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Fri Jun  7 11:33:19 CEST 2024 - mls@suse.de
+
+- add a conflict to older libsolv-tools to libsolv-tools-base
+
+-------------------------------------------------------------------
 Tue Apr 30 15:15:45 CEST 2024 - mls@suse.de
 
 - improve updating of installed multiversion packages

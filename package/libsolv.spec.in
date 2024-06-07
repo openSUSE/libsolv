@@ -171,7 +171,7 @@ reading repositories.
 Summary:        Utilities used by libzypp to manage .solv files
 Group:          System/Management
 Provides:       libsolv-tools:%{_bindir}/repo2solv
-Conflicts:      libsolv-tools < 0.7.29
+Conflicts:      libsolv-tools < %{version}
 
 %description tools-base
 This subpackage contains utilities used by libzypp to manage solv files.
