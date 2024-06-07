@@ -2,6 +2,9 @@
 Fri Jun  7 11:33:19 CEST 2024 - mls@suse.de
 
 - add a conflict to older libsolv-tools to libsolv-tools-base
+- report unsupported compression in solv_xfopen() with errno
+- fix return value of repodata.add_solv() in the bindings
+- fix SHA-224 oid in solv_pgpvrfy
 
 -------------------------------------------------------------------
 Tue Apr 30 15:15:45 CEST 2024 - mls@suse.de
