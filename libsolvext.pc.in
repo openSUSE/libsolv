@@ -5,5 +5,5 @@ Name: libsolvext
 Description: Library for reading repositories
 Version: @VERSION@
 Requires: libsolv
-Libs: -L${libdir} -lsolvext
+Libs: -L${libdir} -lsolvext @SOLVEXT_LIB_DEPENDENCIES@
 Cflags: -I${includedir}
