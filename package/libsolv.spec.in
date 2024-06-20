@@ -172,6 +172,7 @@ Summary:        Utilities used by libzypp to manage .solv files
 Group:          System/Management
 Provides:       libsolv-tools:%{_bindir}/repo2solv
 Conflicts:      libsolv-tools < %{version}
+Requires:       findutils
 
 %description tools-base
 This subpackage contains utilities used by libzypp to manage solv files.
@@ -182,7 +183,6 @@ Group:          System/Management
 Conflicts:      satsolver-tools-obsolete
 Obsoletes:      satsolver-tools < 0.18
 Provides:       satsolver-tools = 0.18
-Requires:       findutils
 Requires:       libsolv-tools-base = %{version}
 
 %description tools
