@@ -170,6 +170,8 @@ reading repositories.
 %package tools-base
 Summary:        Utilities used by libzypp to manage .solv files
 Group:          System/Management
+# repo2solv calls find(1) :-(
+Requires:       findutils
 Provides:       libsolv-tools:%{_bindir}/repo2solv
 
 %description tools-base
@@ -181,7 +183,6 @@ Group:          System/Management
 Conflicts:      satsolver-tools-obsolete
 Obsoletes:      satsolver-tools < 0.18
 Provides:       satsolver-tools = 0.18
-Requires:       findutils
 Requires:       libsolv-tools-base = %{version}
 
 %description tools
