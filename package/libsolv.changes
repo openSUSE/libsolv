@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Tue Jul  2 11:44:29 UTC 2024 - Dirk Müller <dmueller@suse.com>
+
+- use bash(1) instead of findutils for recursing, reduces
+  dependencies
+
+-------------------------------------------------------------------
 Fri Jun  7 11:33:19 CEST 2024 - mls@suse.de
 
 - add a conflict to older libsolv-tools to libsolv-tools-base

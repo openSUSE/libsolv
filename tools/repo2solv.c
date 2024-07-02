@@ -169,10 +169,10 @@ read_plaindir_repo(Repo *repo, const char *dir)
 	  close(fds[1]);
 	}
       if (recursive)
-	execl("/usr/bin/find", "/usr/bin/find", ".", "-name", ".", "-o", "-name", ".*", "-prune", "-o", "-name", "*.delta.rpm", "-o", "-name", "*.patch.rpm", "-o", "-name", "*.rpm", "-a", "-type", "f", "-print0", (char *)0);
+	execl("/usr/bin/bash", "/usr/bin/bash", "-c", "shopt -s globstar nullglob; printf '%s\\0' **/*.rpm", (char *)0);
       else
-	execl("/usr/bin/find", "/usr/bin/find", ".", "-maxdepth", "1", "-name", ".", "-o", "-name", ".*", "-prune", "-o", "-name", "*.delta.rpm", "-o", "-name", "*.patch.rpm", "-o", "-name", "*.rpm", "-a", "-type", "f", "-print0", (char *)0);
-      perror("/usr/bin/find");
+	execl("/usr/bin/bash", "/usr/bin/bash", "-c", "shopt -s nullglob; printf '%s\\0' *.rpm", (char *)0);
+      perror("/usr/bin/bash");
       _exit(1);
     }
   close(fds[1]);
@@ -196,6 +196,8 @@ read_plaindir_repo(Repo *repo, const char *dir)
       if (c)
 	continue;
       bp = buf;
+      if (strstr(bp, ".patch.rpm") || strstr(bp, ".delta.rpm"))
+	continue;
       rpm = solv_dupjoin(dir, "/", bp[0] == '.' && bp[1] == '/' ? bp + 2 : bp);
       if ((p = repo_add_rpm(repo, rpm, REPO_REUSE_REPODATA|REPO_NO_INTERNALIZE|REPO_NO_LOCATION|(filtered_filelist ? RPM_ADD_FILTERED_FILELIST : 0))) == 0)
 	{
@@ -219,10 +221,8 @@ read_plaindir_repo(Repo *repo, const char *dir)
     }
   if (wstatus)
     {
-      fprintf(stderr, "find: exit status %d\n", (wstatus >> 8) | (wstatus & 255) << 8);
-#if 0
+      fprintf(stderr, "bash: exit status %d\n", (wstatus >> 8) | (wstatus & 255) << 8);
       res = 1;
-#endif
     }
   repo_internalize(repo);
   return res;
