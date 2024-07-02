@@ -1,4 +1,9 @@
 -------------------------------------------------------------------
+Tue Jul  2 10:49:57 UTC 2024 - Dirk Müller <dmueller@suse.com>
+
+- add findutils dependency to libsolv-tools-base
+
+-------------------------------------------------------------------
 Mon Apr 22 19:16:03 UTC 2024 - Dirk Müller <dmueller@suse.com>
 
 - split libsolv-tools into libsolv-tools-base [jsc#PED-8153]
