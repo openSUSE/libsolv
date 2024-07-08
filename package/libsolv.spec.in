@@ -182,7 +182,6 @@ Group:          System/Management
 Conflicts:      satsolver-tools-obsolete
 Obsoletes:      satsolver-tools < 0.18
 Provides:       satsolver-tools = 0.18
-Requires:       findutils
 Requires:       libsolv-tools-base = %{version}
 
 %description tools

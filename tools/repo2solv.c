@@ -119,111 +119,93 @@ autodetect_repotype(Pool *pool, const char *dir)
 
 #ifdef ENABLE_RPMPKG
 
+static int
+plaindir_entry_cmp(const struct dirent **a, const struct dirent **b)
+{
+  return strcmp((*a)->d_name, (*b)->d_name);
+}
+
 int
 read_plaindir_repo(Repo *repo, const char *dir)
 {
   Pool *pool = repo->pool;
   Repodata *data;
-  int c;
-  FILE *fp;
-  int wstatus;
-  int fds[2];
-  pid_t pid;
-  char *buf = 0;
-  char *buf_end = 0;
-  char *bp = 0;
-  char *rpm;
+  Queue todo;
+  Stringpool ss;
+  struct dirent **namelist;
+  int nents, i;
+  Id p, id;
+  size_t namel, dirl = strlen(dir);
   int res = 0;
-  Id p;
+  int isfirst = 1;
 
-  /* run find command */
-  if (pipe(fds))
-    {
-      perror("pipe");
-      exit(1);
-    }
-  while ((pid = fork()) == (pid_t)-1)
-    {
-      if (errno != EAGAIN)
-	{
-	  perror("fork");
-	  exit(1);
-	}
-      sleep(3);
-    }
-  if (pid == 0)
-    {
-      if (chdir(dir))
-	{
-	  perror(dir);
-	  _exit(1);
-	}
-      close(fds[0]);
-      if (fds[1] != 1)
-	{
-	  if (dup2(fds[1], 1) == -1)
-	    {
-	      perror("dup2");
-	      _exit(1);
-	    }
-	  close(fds[1]);
-	}
-      if (recursive)
-	execl("/usr/bin/find", "/usr/bin/find", ".", "-name", ".", "-o", "-name", ".*", "-prune", "-o", "-name", "*.delta.rpm", "-o", "-name", "*.patch.rpm", "-o", "-name", "*.rpm", "-a", "-type", "f", "-print0", (char *)0);
-      else
-	execl("/usr/bin/find", "/usr/bin/find", ".", "-maxdepth", "1", "-name", ".", "-o", "-name", ".*", "-prune", "-o", "-name", "*.delta.rpm", "-o", "-name", "*.patch.rpm", "-o", "-name", "*.rpm", "-a", "-type", "f", "-print0", (char *)0);
-      perror("/usr/bin/find");
-      _exit(1);
-    }
-  close(fds[1]);
-  if ((fp = fdopen(fds[0], "r")) == 0)
-    {
-      perror("fdopen");
-      exit(1);
-    }
   data = repo_add_repodata(repo, 0);
-  bp = buf;
-  while ((c = getc(fp)) != EOF)
-    {
-      if (bp == buf_end)
-	{
-	  size_t len = bp - buf;
-	  buf = solv_realloc(buf, len + 4096);
-	  bp = buf + len;
-	  buf_end = bp + 4096;
-	}
-      *bp++ = c;
-      if (c)
+  queue_init(&todo);
+  stringpool_init_empty(&ss);
+  queue_push(&todo, stringpool_str2id(&ss, dir, 1));
+  while (todo.count) {
+    id = queue_shift(&todo);
+    nents = scandir(stringpool_id2str(&ss, id), &namelist, NULL, plaindir_entry_cmp);
+    if (nents == -1) {
+      perror(stringpool_id2str(&ss, id));
+      if (isfirst)
+	res = 1;	/* return error if we cannot read the passed dir */
+      continue;
+    }
+    isfirst = 0;
+    for (i = 0; i < nents; i++) {
+      struct stat stb;
+      char *path;
+      const char *name = namelist[i]->d_name;
+      int isrpm = 0;
+
+      if (!*name)
 	continue;
-      bp = buf;
-      rpm = solv_dupjoin(dir, "/", bp[0] == '.' && bp[1] == '/' ? bp + 2 : bp);
-      if ((p = repo_add_rpm(repo, rpm, REPO_REUSE_REPODATA|REPO_NO_INTERNALIZE|REPO_NO_LOCATION|(filtered_filelist ? RPM_ADD_FILTERED_FILELIST : 0))) == 0)
-	{
-	  fprintf(stderr, "%s: %s\n", rpm, pool_errstr(pool));
-#if 0
-	  res = 1;
-#endif
-	}
-      else
-	repodata_set_location(data, p, 0, 0, bp[0] == '.' && bp[1] == '/' ? bp + 2 : bp);
-      solv_free(rpm);
-    }
-  solv_free(buf);
-  fclose(fp);
-  while (waitpid(pid, &wstatus, 0) == -1)
-    {
-      if (errno == EINTR)
+      if (*name == '.' && (!name[1] || (name[1] == '.' && !name[2])))
 	continue;
-      perror("waitpid");
-      exit(1);
+      namel = strlen(name);
+      if (namel > 4 && !strcmp(name + namel - 4, ".rpm")) {
+	isrpm = 1;
+	if (namel >= 10 && (!strcmp(name + namel - 10, ".patch.rpm") || !strcmp(name + namel - 10, ".delta.rpm")))
+	  isrpm = 0;
+      }
+      if (!isrpm && !recursive)
+	continue;
+      path = pool_tmpjoin(pool, stringpool_id2str(&ss, id), "/", name);
+      if (lstat(path, &stb)) {
+	perror(path);
+	continue;
+      }
+      if (S_ISLNK(stb.st_mode)) {
+        if (stat(path, &stb)) {
+	  perror(path);
+	  continue;
+	}
+	if (S_ISDIR(stb.st_mode))
+	  continue;	/* ignore symlinks to directories */
+      }
+      if (S_ISDIR(stb.st_mode)) {
+	if (recursive)
+	  queue_push(&todo, stringpool_str2id(&ss, path, 1));
+	continue;
+      }
+      if (!S_ISREG(stb.st_mode))
+	continue;
+      if (!isrpm)
+	continue;
+      if ((p = repo_add_rpm(repo, path, REPO_REUSE_REPODATA|REPO_NO_INTERNALIZE|REPO_NO_LOCATION|(filtered_filelist ? RPM_ADD_FILTERED_FILELIST : 0))) == 0)
+	{
+	  fprintf(stderr, "%s: %s\n", path, pool_errstr(pool));
+	  continue;
+	}
+      repodata_set_location(data, p, 0, 0, path + dirl + 1);
     }
-  if (wstatus)
-    {
-      fprintf(stderr, "find: exit status %d\n", (wstatus >> 8) | (wstatus & 255) << 8);
-#if 0
-      res = 1;
-#endif
-    }
+    for (i = 0; i < nents; i++)
+      free(namelist[i]);
+    free(namelist);
+  }
+  queue_free(&todo);
+  stringpool_free(&ss);
   repo_internalize(repo);
   return res;
 }
