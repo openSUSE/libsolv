@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 03/27/2024
+.\"      Date: 07/09/2024
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "03/27/2024" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "07/09/2024" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -4099,6 +4099,11 @@ Resolve installed packages before resolving the given jobs\&. Setting this flag 
 \fBSOLVER_FLAG_FOCUS_BEST\fR
 .RS 4
 First resolve the given jobs, then the dependencies of the resulting packages, then resolve all already installed packages\&. This will result in more packages being updated as when the flag is not used\&.
+.RE
+.PP
+\fBSOLVER_FLAG_FOCUS_NEW\fR
+.RS 4
+First resolve the given jobs, then the dependencies of the resulting packages ignoreing the ones provided by currently installed packages\&. After that resolve all already installed packages\&. This is similar to SOLVER_FLAG_FOCUS_BEST but less aggressive in updating packages\&.
 .RE
 .PP
 \fBSOLVER_FLAG_INSTALL_ALSO_UPDATES\fR

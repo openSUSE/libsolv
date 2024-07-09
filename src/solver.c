@@ -1576,6 +1576,8 @@ solver_get_flag(Solver *solv, int flag)
     return solv->break_orphans;
   case SOLVER_FLAG_FOCUS_INSTALLED:
     return solv->focus_installed;
+  case SOLVER_FLAG_FOCUS_NEW:
+    return solv->focus_new;
   case SOLVER_FLAG_FOCUS_BEST:
     return solv->focus_best;
   case SOLVER_FLAG_YUM_OBSOLETES:
@@ -1663,6 +1665,9 @@ solver_set_flag(Solver *solv, int flag, int value)
     break;
   case SOLVER_FLAG_FOCUS_INSTALLED:
     solv->focus_installed = value;
+    break;
+  case SOLVER_FLAG_FOCUS_NEW:
+    solv->focus_new = value;
     break;
   case SOLVER_FLAG_FOCUS_BEST:
     solv->focus_best = value;
@@ -2071,7 +2076,7 @@ resolve_dependencies(Solver *solv, int level, int disablerules, Queue *dq)
   Rule *r;
   int origlevel = level;
   Id p, *dp;
-  int focusbest = solv->focus_best && solv->do_extra_reordering;
+  int focusbest = (solv->focus_new || solv->focus_best) && solv->do_extra_reordering;
   Repo *installed = solv->installed;
 
   /*
@@ -2112,6 +2117,18 @@ resolve_dependencies(Solver *solv, int level, int disablerules, Queue *dq)
 		  break;
 	      if (!p)
 		continue;		/* sorry */
+	    }
+	  if (!solv->focus_best)
+	    {
+	      /* check that no positive literal is already installed */
+	      if (r->p > 1 && pool->solvables[r->p].repo == installed)
+		continue;
+	      dp = pool->whatprovidesdata + r->d;
+	      while ((p = *dp++) != 0)
+		if (p > 1 && pool->solvables[p].repo == installed)
+		  break;
+	      if (p)
+		continue;
 	    }
 	}
       if (dq->count)
@@ -2898,8 +2915,8 @@ solver_run_sat(Solver *solv, int disablerules, int doweak)
 	  systemlevel = level + 1;
 	}
 
-      /* resolve job dependencies in the focus_best case */
-      if (level < systemlevel && solv->focus_best && !solv->focus_installed && solv->installed && solv->installed->nsolvables && !solv->installed->disabled)
+      /* resolve job dependencies in the focus_new/best case */
+      if (level < systemlevel && (solv->focus_new || solv->focus_best) && !solv->focus_installed && solv->installed && solv->installed->nsolvables && !solv->installed->disabled)
 	{
 	  solv->do_extra_reordering = 1;
 	  olevel = level;

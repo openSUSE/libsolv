@@ -2450,6 +2450,13 @@ resulting packages, then resolve all already installed
 packages. This will result in more packages being updated
 as when the flag is not used.
 
+*SOLVER_FLAG_FOCUS_NEW*::
+First resolve the given jobs, then the dependencies of the
+resulting packages ignoreing the ones provided by currently
+installed packages. After that resolve all already installed
+packages. This is similar to SOLVER_FLAG_FOCUS_BEST but less
+aggressive in updating packages.
+
 *SOLVER_FLAG_INSTALL_ALSO_UPDATES*::
 Update the package if a job is already fulfilled by an installed
 package.

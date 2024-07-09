@@ -173,6 +173,7 @@ struct s_Solver {
   int noautotarget;			/* true: do not assume targeted for up/dup jobs that contain no installed solvable */
   int focus_installed;			/* true: resolve update rules first */
   int focus_best;			/* true: resolve job dependencies first */
+  int focus_new;			/* true: resolve job dependencies first but ignore dependencies met by installed packages  */
   int do_yum_obsoletes;			/* true: add special yumobs rules */
   int urpmreorder;			/* true: do special urpm package reordering */
   int strongrecommends;			/* true: create weak rules for recommends */
@@ -337,6 +338,7 @@ typedef struct s_Solver Solver;
 #define SOLVER_FLAG_INSTALL_ALSO_UPDATES	26
 #define SOLVER_FLAG_ONLY_NAMESPACE_RECOMMENDED	27
 #define SOLVER_FLAG_STRICT_REPO_PRIORITY	28
+#define SOLVER_FLAG_FOCUS_NEW			29
 
 #define GET_USERINSTALLED_NAMES			(1 << 0)	/* package names instead of ids */
 #define GET_USERINSTALLED_INVERTED		(1 << 1)	/* autoinstalled */

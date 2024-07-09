@@ -139,6 +139,7 @@ static struct solverflags2str {
   { SOLVER_FLAG_INSTALL_ALSO_UPDATES,       "installalsoupdates", 0 },
   { SOLVER_FLAG_ONLY_NAMESPACE_RECOMMENDED, "onlynamespacerecommended", 0 },
   { SOLVER_FLAG_STRICT_REPO_PRIORITY,       "strictrepopriority", 0 },
+  { SOLVER_FLAG_FOCUS_NEW,                  "focusnew", 0 },
   { 0, 0, 0 }
 };
 
