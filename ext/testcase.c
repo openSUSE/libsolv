@@ -1256,7 +1256,7 @@ static int
 dump_genid(Pool *pool, Strqueue *sq, Id id, int cnt)
 {
   struct oplist *op;
-  char cntbuf[20];
+  char cntbuf[26];
   const char *s;
 
   if (ISRELDEP(id))
