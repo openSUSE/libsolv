@@ -1,6 +1,14 @@
 
 This file contains the major changes between libsolv versions:
 
+Version 0.7.30
+- selected bug fixes:
+  * removed dependency on external find program in the repo2solv
+    tool
+  * bindings: fix return value of repodata.add_solv()
+- new features:
+  * new SOLVER_FLAG_FOCUS_NEW flag
+
 Version 0.7.29
 - selected bug fixes:
   * improve updating of installed multiversion packages
