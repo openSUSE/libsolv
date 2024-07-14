@@ -30,6 +30,7 @@ extern const char solv_toolversion[];
 #cmakedefine LIBSOLV_FEATURE_MULTI_SEMANTICS
 #cmakedefine LIBSOLV_FEATURE_CONDA
 
+#cmakedefine LIBSOLVEXT_FEATURE_PCRE2
 #cmakedefine LIBSOLVEXT_FEATURE_RPMPKG
 #cmakedefine LIBSOLVEXT_FEATURE_RPMDB
 #cmakedefine LIBSOLVEXT_FEATURE_RPMDB_BYRPMHEADER
