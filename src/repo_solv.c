@@ -546,9 +546,7 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
   int numkeys, numschemata;
 
   Offset sizeid;
-  Offset *str;			       /* map Id -> Offset into string space */
   char *strsp;			       /* repo string space */
-  char *sp;			       /* pointer into string space */
   Id *idmap;			       /* map of repo Ids to pool Ids */
   Id id, type;
   Hashval hashmask, h, hh;
@@ -668,6 +666,8 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
   /*******  Part 1: string IDs  *****************************************/
 
   sizeid = read_u32(&data);	       /* size of string space */
+  if (sizeid >= 0xf0000000)
+    return pool_error(pool, SOLV_ERROR_CORRUPT, "bad string size");
 
   /*
    * read strings and Ids
@@ -682,22 +682,16 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
   if (!(flags & REPO_LOCALPOOL))
     {
       spool = &pool->ss;
-      /* alloc max needed string buffer and string pointers, will shrink again later */
-#if 0
-      spool->stringspace = solv_realloc(spool->stringspace, spool->sstrings + sizeid + 1);
-      spool->strings = solv_realloc2(spool->strings, spool->nstrings + numid, sizeof(Offset));
-#else
-      spool->sstrings += sizeid + 1;
-      spool->nstrings += numid;
-      stringpool_shrink(spool);		/* we misuse stringpool_shrink so that the correct BLOCK factor is used */
-      spool->sstrings -= sizeid + 1;
-      spool->nstrings -= numid;
-#endif
+      /* reserve max needed string buffer and offsets, will shrink again later */
+      /* we use sizeid + 1 because we add a terminating zero */
+      stringpool_reserve(spool, numid, sizeid + 1);
     }
   else
     {
       data.localpool = 1;
       spool = &data.spool;
+      /* the local pool is unlikely to get changed, so we do not use blocking and
+       * do not create a hash (see comment in stringpool_strn2id()) */
       spool->stringspace = solv_malloc(7 + sizeid + 1);
       spool->strings = solv_malloc2(numid < 2 ?  2 : numid, sizeof(Offset));
       strcpy(spool->stringspace, "<NULL>");
@@ -761,12 +755,12 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
 	}
     }
   strsp[sizeid] = 0;		       /* make string space \0 terminated */
-  sp = strsp;
 
   /* now merge */
-  str = spool->strings;			/* array of offsets into strsp, indexed by Id */
   if ((flags & REPO_LOCALPOOL) != 0)
     {
+      Offset *str = spool->strings;			/* array of offsets into strsp, indexed by Id */
+      char *sp = strsp;
       /* no shared pool, thus no idmap and no unification needed */
       idmap = 0;
       spool->nstrings = numid < 2 ? 2 : numid;	/* make sure we have at least id 0 and 1 */
@@ -790,69 +784,15 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
     }
   else
     {
-      Offset oldsstrings = spool->sstrings;
-
-      /* alloc id map for name and rel Ids. this maps ids in the solv files
+      /* alloc id map for name and rel Ids. this maps ids in the solv file
        * to the ids in our pool */
       idmap = solv_calloc(numid + numrel, sizeof(Id));
-      stringpool_resize_hash(spool, numid);
-      hashtbl = spool->stringhashtbl;
-      hashmask = spool->stringhashmask;
-#if 0
-      POOL_DEBUG(SOLV_DEBUG_STATS, "read %d strings\n", numid);
-      POOL_DEBUG(SOLV_DEBUG_STATS, "string hash buckets: %d\n", hashmask + 1);
-#endif
-      /*
-       * run over strings and merge with pool.
-       * we could use stringpool_str2id, but this is faster.
-       * also populate id map (maps solv Id -> pool Id)
-       */
-      for (i = 1; i < numid; i++)
+      if (!stringpool_integrate(spool, numid, sizeid, idmap))
 	{
-	  if (sp >= strsp + sizeid)
-	    {
-	      solv_free(idmap);
-	      spool->nstrings = oldnstrings;
-	      spool->sstrings = oldsstrings;
-	      stringpool_freehash(spool);
-	      repodata_freedata(&data);
-	      return pool_error(pool, SOLV_ERROR_OVERFLOW, "not enough strings %d %d", i, numid);
-	    }
-	  if (!*sp)			       /* empty string */
-	    {
-	      idmap[i] = ID_EMPTY;
-	      sp++;
-	      continue;
-	    }
-
-	  /* find hash slot */
-	  h = strhash(sp) & hashmask;
-	  hh = HASHCHAIN_START;
-	  for (;;)
-	    {
-	      id = hashtbl[h];
-	      if (!id)
-		break;
-	      if (!strcmp(spool->stringspace + spool->strings[id], sp))
-		break;		/* already in pool */
-	      h = HASHCHAIN_NEXT(h, hh, hashmask);
-	    }
-
-	  /* length == offset to next string */
-	  l = strlen(sp) + 1;
-	  if (!id)	       /* end of hash chain -> new string */
-	    {
-	      id = spool->nstrings++;
-	      hashtbl[h] = id;
-	      str[id] = spool->sstrings;	/* save offset */
-	      if (sp != spool->stringspace + spool->sstrings)
-		memmove(spool->stringspace + spool->sstrings, sp, l);
-	      spool->sstrings += l;
-	    }
-	  idmap[i] = id;       /* repo relative -> pool relative */
-	  sp += l;	       /* next string */
+	  solv_free(idmap);
+	  repodata_freedata(&data);
+	  return pool_error(pool, SOLV_ERROR_OVERFLOW, "not enough strings");
 	}
-      stringpool_shrink(spool);		/* vacuum */
     }
 
 

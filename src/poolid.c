@@ -92,7 +92,7 @@ pool_rel2id(Pool *pool, Id name, Id evr, int flags, int create)
 
   /* extend hashtable if needed */
   hashmask = pool->relhashmask;
-  if ((Hashval)pool->nrels * 2 > hashmask)
+  if ((Hashval)pool->nrels * 2 >= hashmask)
     {
       pool_resize_rels_hash(pool, REL_BLOCK);
       hashmask = pool->relhashmask;
