@@ -558,6 +558,27 @@ addsolvableedges(struct orderdata *od, Solvable *s)
 	    }
 	}
     }
+  if (s->repo != installed && solvable_lookup_idarray(s, SOLVABLE_ORDERWITHREQUIRES, &depq) && depq.count)
+    {
+      for (i = 0; i < depq.count; i++)
+	{
+	  Id req = depq.elements[i];
+	  FOR_PROVIDES(p2, pp2, req)
+	    {
+	      if (p == p2)
+		continue;
+	      s2 = pool->solvables + p2;
+	      if (!s2->repo || s2->repo == installed)
+		continue;
+	      if (!MAPTST(&trans->transactsmap, p2))
+		continue;		/* not in transaction */
+#if 0
+	      printf("add orderwithrequires inst->inst edge (%s -> %s -> %s)\n", pool_solvid2str(pool, p), pool_dep2str(pool, req), pool_solvid2str(pool, p2));
+#endif
+	      addedge(od, p, p2, TYPE_REQ);
+	    }
+	}
+    }
   queue_free(&ignoreinst);
   queue_free(&depq);
 }

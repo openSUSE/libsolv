@@ -15,20 +15,21 @@ extern int repo_add_rpmdb(Repo *repo, Repo *ref, int flags);
 extern int repo_add_rpmdb_reffp(Repo *repo, FILE *reffp, int flags);
 extern Id repo_add_rpm(Repo *repo, const char *rpm, int flags);
 
-#define RPMDB_REPORT_PROGRESS	(1 << 8)
-#define RPM_ADD_WITH_PKGID	(1 << 9)
-#define RPM_ADD_NO_FILELIST	(1 << 10)
-#define RPM_ADD_NO_RPMLIBREQS	(1 << 11)
-#define RPM_ADD_WITH_SHA1SUM	(1 << 12)
-#define RPM_ADD_WITH_SHA256SUM	(1 << 13)
-#define RPM_ADD_TRIGGERS	(1 << 14)
-#define RPM_ADD_WITH_HDRID	(1 << 15)
-#define RPM_ADD_WITH_LEADSIGID	(1 << 16)
-#define RPM_ADD_WITH_CHANGELOG	(1 << 17)
-#define RPM_ADD_FILTERED_FILELIST (1 << 18)
-#define RPMDB_KEEP_GPG_PUBKEY   (1 << 19)
+#define RPMDB_REPORT_PROGRESS		(1 << 8)
+#define RPM_ADD_WITH_PKGID		(1 << 9)
+#define RPM_ADD_NO_FILELIST		(1 << 10)
+#define RPM_ADD_NO_RPMLIBREQS		(1 << 11)
+#define RPM_ADD_WITH_SHA1SUM		(1 << 12)
+#define RPM_ADD_WITH_SHA256SUM		(1 << 13)
+#define RPM_ADD_TRIGGERS		(1 << 14)
+#define RPM_ADD_WITH_HDRID		(1 << 15)
+#define RPM_ADD_WITH_LEADSIGID		(1 << 16)
+#define RPM_ADD_WITH_CHANGELOG		(1 << 17)
+#define RPM_ADD_FILTERED_FILELIST	(1 << 18)
+#define RPMDB_KEEP_GPG_PUBKEY		(1 << 19)
+#define RPM_ADD_WITH_ORDERWITHREQUIRES	(1 << 20)
 
-#define RPMDB_EMPTY_REFREPO	(1 << 30)	/* internal */
+#define RPMDB_EMPTY_REFREPO		(1 << 30)	/* internal */
 
 #define RPM_ITERATE_FILELIST_ONLYDIRS	(1 << 0)
 #define RPM_ITERATE_FILELIST_WITHMD5	(1 << 1)
