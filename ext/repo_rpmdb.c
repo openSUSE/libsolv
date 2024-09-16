@@ -524,6 +524,30 @@ static char *headtoevr(RpmHead *h)
   return evr;
 }
 
+static const char *headtoarch_nodup(RpmHead *h)
+{
+  const char *arch;
+  if (!headstring(h, TAG_SOURCERPM) && (headexists(h, TAG_SOURCEPACKAGE) || headissourceheuristic(h)))
+    return headexists(h, TAG_NOSOURCE) || headexists(h, TAG_NOPATCH) ? "nosrc" : "src";
+  arch = headstring(h, TAG_ARCH);
+  return arch ? arch : "noarch";
+}
+
+static char *headtocanon(RpmHead *h)
+{
+  const char *name, *arch;
+  char *evr, *r;
+
+  name = headstring(h, TAG_NAME);
+  if (!name)
+    name = "";
+  arch = headtoarch_nodup(h);
+  evr = headtoevr(h);
+  r = solv_malloc(strlen(name) + 1 + strlen(evr ? evr : "") + 1 + strlen(arch) + 1);
+  sprintf(r, "%s-%s.%s", name, evr ? evr : "", arch);
+  solv_free(evr);
+  return r;
+}
 
 static void
 setutf8string(Repodata *repodata, Id handle, Id tag, const char *str)
@@ -604,7 +628,7 @@ makedeps(Pool *pool, Repo *repo, RpmHead *rpmhead, int tagn, int tagv, int tagf,
   f = headint32array(rpmhead, tagf, &fc);
   if (!v || !f || nc != vc || nc != fc)
     {
-      char *pkgname = rpm_query(rpmhead, 0);
+      char *pkgname = headtocanon(rpmhead);
       pool_error(pool, 0, "bad dependency entries for %s: %d %d %d", pkgname ? pkgname : "<NULL>", nc, vc, fc);
       solv_free(pkgname);
       solv_free(n);
@@ -2356,53 +2380,28 @@ rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *
 char *
 rpm_query(void *rpmhandle, Id what)
 {
-  const char *name, *arch, *sourcerpm;
-  char *evr, *r;
-  int l;
-
   RpmHead *rpmhead = rpmhandle;
-  r = 0;
+  int tag = 0;
+
   switch (what)
     {
     case 0:	/* return canonical name of rpm */
-      name = headstring(rpmhead, TAG_NAME);
-      if (!name)
-	name = "";
-      sourcerpm = headstring(rpmhead, TAG_SOURCERPM);
-      if (sourcerpm || !(headexists(rpmhead, TAG_SOURCEPACKAGE) || headissourceheuristic(rpmhead)))
-	arch = headstring(rpmhead, TAG_ARCH);
-      else
-	{
-	  if (headexists(rpmhead, TAG_NOSOURCE) || headexists(rpmhead, TAG_NOPATCH))
-	    arch = "nosrc";
-	  else
-	    arch = "src";
-	}
-      if (!arch)
-	arch = "noarch";
-      evr = headtoevr(rpmhead);
-      l = strlen(name) + 1 + strlen(evr ? evr : "") + 1 + strlen(arch) + 1;
-      r = solv_malloc(l);
-      sprintf(r, "%s-%s.%s", name, evr ? evr : "", arch);
-      solv_free(evr);
-      break;
+      return headtocanon(rpmhead);
     case SOLVABLE_NAME:
-      name = headstring(rpmhead, TAG_NAME);
-      r = solv_strdup(name);
+      tag = TAG_NAME;
       break;
+    case SOLVABLE_ARCH:
+      return solv_strdup(headtoarch_nodup(rpmhead));
+    case SOLVABLE_EVR:
+      return headtoevr(rpmhead);
     case SOLVABLE_SUMMARY:
-      name = headstring(rpmhead, TAG_SUMMARY);
-      r = solv_strdup(name);
+      tag = TAG_SUMMARY;
       break;
     case SOLVABLE_DESCRIPTION:
-      name = headstring(rpmhead, TAG_DESCRIPTION);
-      r = solv_strdup(name);
-      break;
-    case SOLVABLE_EVR:
-      r = headtoevr(rpmhead);
+      tag = TAG_DESCRIPTION;
       break;
     }
-  return r;
+  return tag ? solv_strdup(headstring(rpmhead, tag)) : 0;
 }
 
 unsigned long long
@@ -2429,6 +2428,29 @@ rpm_query_num(void *rpmhandle, Id what, unsigned long long notfound)
     }
   return notfound;
 }
+
+void
+rpm_query_idarray(void *rpmhandle, Id what, Pool *pool, Queue *q, int flags)
+{
+  RpmHead *rpmhead = rpmhandle;
+  queue_empty(q);
+  switch(what)
+    {
+    case SOLVABLE_PROVIDES:
+      makedeps(pool, NULL, rpmhead, TAG_PROVIDENAME, TAG_PROVIDEVERSION, TAG_PROVIDEFLAGS, flags, q);
+      return;
+    case SOLVABLE_REQUIRES:
+      makedeps(pool, NULL, rpmhead, TAG_REQUIRENAME, TAG_REQUIREVERSION, TAG_REQUIREFLAGS, flags, q);
+      return;
+    case SOLVABLE_CONFLICTS:
+      makedeps(pool, NULL, rpmhead, TAG_CONFLICTNAME, TAG_CONFLICTVERSION, TAG_CONFLICTFLAGS, flags, q);
+      return;
+    case SOLVABLE_ORDERWITHREQUIRES:
+      makedeps(pool, NULL, rpmhead, TAG_ORDERNAME, TAG_ORDERVERSION, TAG_ORDERFLAGS, flags, q);
+      return;
+    }
+}
+
 
 #ifdef ENABLE_RPMDB
 

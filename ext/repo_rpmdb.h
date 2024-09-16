@@ -64,5 +64,6 @@ struct filelistinfo {
 
 extern char *rpm_query(void *rpmhandle, Id what);
 extern unsigned long long rpm_query_num(void *rpmhandle, Id what, unsigned long long notfound);
+extern void rpm_query_idarray(void *rpmhandle, Id what, Pool *pool, Queue *q, int flags);
 extern void rpm_iterate_filelist(void *rpmhandle, int flags, void (*cb)(void *, const char *, struct filelistinfo *), void *cbdata);
 extern Id   repo_add_rpm_handle(Repo *repo, void *rpmhandle, int flags);

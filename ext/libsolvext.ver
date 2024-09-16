@@ -51,6 +51,7 @@ SOLV_1.0 {
 		rpm_installedrpmdbids;
 		rpm_iterate_filelist;
 		rpm_query;
+		rpm_query_idarray;
 		rpm_query_num;
 		rpm_stat_database;
 		rpm_state_create;
