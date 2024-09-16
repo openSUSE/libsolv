@@ -401,6 +401,19 @@ writedeps(Repo *repo, FILE *fp, const char *tag, Id key, Solvable *s, Offset off
 }
 
 static void
+writedeps_q(Repo *repo, FILE *fp, const char *tag, Id key, Solvable *s, Queue *q)
+{
+  Pool *pool = repo->pool;
+  int i;
+  if (!solvable_lookup_idarray(s, key, q) || !q->count)
+    return;
+  fprintf(fp, "+%s\n", tag);
+  for (i = 0; i < q->count; i++)
+    fprintf(fp, "%s\n", testcase_dep2str(pool, q->elements[i]));
+  fprintf(fp, "-%s\n", tag);
+}
+
+static void
 writefilelist(Repo *repo, FILE *fp, const char *tag, Solvable *s)
 {
   Pool *pool = repo->pool;
@@ -459,22 +472,9 @@ testcase_write_testtags(Repo *repo, FILE *fp)
       writedeps(repo, fp, "Sup:", SOLVABLE_SUPPLEMENTS, s, s->supplements);
       writedeps(repo, fp, "Sug:", SOLVABLE_SUGGESTS, s, s->suggests);
       writedeps(repo, fp, "Enh:", SOLVABLE_ENHANCES, s, s->enhances);
-      if (solvable_lookup_idarray(s, SOLVABLE_PREREQ_IGNOREINST, &q))
-	{
-	  int i;
-	  fprintf(fp, "+Ipr:\n");
-	  for (i = 0; i < q.count; i++)
-	    fprintf(fp, "%s\n", testcase_dep2str(pool, q.elements[i]));
-	  fprintf(fp, "-Ipr:\n");
-	}
-      if (solvable_lookup_idarray(s, SOLVABLE_CONSTRAINS, &q))
-	{
-	  int i;
-	  fprintf(fp, "+Cns:\n");
-	  for (i = 0; i < q.count; i++)
-	    fprintf(fp, "%s\n", testcase_dep2str(pool, q.elements[i]));
-	  fprintf(fp, "-Cns:\n");
-	}
+      writedeps_q(repo, fp, "Ipr:", SOLVABLE_PREREQ_IGNOREINST, s, &q);
+      writedeps_q(repo, fp, "Cns:", SOLVABLE_CONSTRAINS, s, &q);
+      writedeps_q(repo, fp, "Owr:", SOLVABLE_ORDERWITHREQUIRES, s, &q);
       if (s->vendor)
 	fprintf(fp, "=Vnd: %s\n", pool_id2str(pool, s->vendor));
       if (solvable_lookup_idarray(s, SOLVABLE_BUILDFLAVOR, &q))
@@ -720,6 +720,9 @@ testcase_add_testtags(Repo *repo, FILE *fp, int flags)
 	  }
 	case 'C' << 16 | 'n' << 8 | 's':
 	  repodata_add_idarray(data, s - pool->solvables, SOLVABLE_CONSTRAINS, testcase_str2dep(pool, line + 6));
+	  break;
+	case 'O' << 16 | 'w' << 8 | 'r':
+	  repodata_add_idarray(data, s - pool->solvables, SOLVABLE_ORDERWITHREQUIRES, testcase_str2dep(pool, line + 6));
 	  break;
 	case 'F' << 16 | 'l' << 8 | 'v':
 	  repodata_add_poolstr_array(data, s - pool->solvables, SOLVABLE_BUILDFLAVOR, line + 6);
