@@ -163,6 +163,8 @@ struct s_Pool {
   Offset whatprovidesauxoff;
   Id *whatprovidesauxdata;
   Offset whatprovidesauxdataoff;
+  Id *nonstd_ids;		/* needed file provides not matching the standard filelist filter */
+  int nonstd_nids;
 
   int whatprovideswithdisabled;
 #endif

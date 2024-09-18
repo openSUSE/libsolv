@@ -125,6 +125,7 @@ pool_free(Pool *pool)
   solv_free(pool->languagecache);
   solv_free(pool->errstr);
   solv_free(pool->rootdir);
+  solv_free(pool->nonstd_ids);
   solv_free(pool);
 }
 
@@ -573,7 +574,24 @@ pool_createwhatprovides(Pool *pool)
     POOL_DEBUG(SOLV_DEBUG_STATS, "whatprovidesaux memory used: %d K id array, %d K data\n", pool->whatprovidesauxoff / (int)(1024/sizeof(Id)), pool->whatprovidesauxdataoff / (int)(1024/sizeof(Id)));
 
   queue_empty(&pool->lazywhatprovidesq);
-  if ((!pool->addedfileprovides && pool->disttype == DISTTYPE_RPM) || pool->addedfileprovides == 1)
+  if (pool->addedfileprovides == 1)
+    {
+      /* lazyly add file provides for nonstd */
+      for (i = 0; i < pool->nonstd_nids; i++)
+	{
+	  Id id = pool->nonstd_ids[i];
+	  const char *str = pool->ss.stringspace + pool->ss.strings[id];
+	  if (str[0] != '/')		/* just in case, all entries should start with '/' */
+	    continue;
+	  /* setup lazy adding, but remember old value */
+	  if (pool->whatprovides[id] > 1)
+	    queue_push2(&pool->lazywhatprovidesq, id, pool->whatprovides[id]);
+	  pool->whatprovides[id] = 0;
+	  if (pool->whatprovidesaux)
+	    pool->whatprovidesaux[id] = 0;	/* sorry */
+	}
+    }
+  else if (!pool->addedfileprovides && pool->disttype == DISTTYPE_RPM)
     {
       if (!pool->addedfileprovides)
 	POOL_DEBUG(SOLV_DEBUG_STATS, "WARNING: pool_addfileprovides was not called, this may result in slow operation\n");
@@ -592,8 +610,9 @@ pool_createwhatprovides(Pool *pool)
 	  if (pool->whatprovidesaux)
 	    pool->whatprovidesaux[i] = 0;	/* sorry */
 	}
-      POOL_DEBUG(SOLV_DEBUG_STATS, "lazywhatprovidesq size: %d entries\n", pool->lazywhatprovidesq.count / 2);
     }
+  if (pool->lazywhatprovidesq.count)
+    POOL_DEBUG(SOLV_DEBUG_STATS, "lazywhatprovidesq size: %d entries\n", pool->lazywhatprovidesq.count / 2);
 
   POOL_DEBUG(SOLV_DEBUG_STATS, "createwhatprovides took %d ms\n", solv_timems(now));
 }

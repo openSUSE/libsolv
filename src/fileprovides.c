@@ -26,10 +26,28 @@
 struct searchfiles {
   Id *ids;
   int nfiles;
+  Id *nonstd_ids;
+  int nonstd_nfiles;
   Map seen;
 };
 
 #define SEARCHFILES_BLOCK 127
+
+static int
+finalize_nonstd_ids_cmp(const void *pa, const void *pb, void *dp) 
+{
+  Id a = *(Id *)pa;
+  Id b = *(Id *)pb;
+  return a - b; 
+}
+
+static void
+finalize_nonstd_ids(Pool *pool)
+{
+  pool->nonstd_ids = solv_realloc2(pool->nonstd_ids, pool->nonstd_nids, sizeof(Id));
+  if (pool->nonstd_nids > 1)
+    solv_sort(pool->nonstd_ids, pool->nonstd_nids, sizeof(Id), finalize_nonstd_ids_cmp, 0);
+}
 
 static void
 pool_addfileprovides_dep(Pool *pool, Id *ida, struct searchfiles *sf, struct searchfiles *isf)
@@ -91,7 +109,12 @@ pool_addfileprovides_dep(Pool *pool, Id *ida, struct searchfiles *sf, struct sea
       if (*s != '/')
 	continue;
       if (csf != isf && pool->addedfileprovides == 1 && !repodata_filelistfilter_matches(0, s))
-	continue;	/* skip non-standard locations csf == isf: installed case */
+	{
+	  /* skip non-standard locations. csf == isf: installed case */
+	  csf->nonstd_ids = solv_extend(csf->nonstd_ids, csf->nonstd_nfiles, 1, sizeof(Id), SEARCHFILES_BLOCK);
+	  csf->nonstd_ids[csf->nonstd_nfiles++] = dep;
+	  continue;	/* skip non-standard locations csf == isf: installed case */
+	}
       csf->ids = solv_extend(csf->ids, csf->nfiles, 1, sizeof(Id), SEARCHFILES_BLOCK);
       csf->ids[csf->nfiles++] = dep;
     }
@@ -566,7 +589,8 @@ pool_addfileprovides_queue(Pool *pool, Queue *idq, Queue *idqinst)
   memset(&isf, 0, sizeof(isf));
   map_init(&isf.seen, pool->ss.nstrings + pool->nrels);
   pool->addedfileprovides = pool->addfileprovidesfiltered ? 1 : 2;
-
+  pool->nonstd_ids = solv_free(pool->nonstd_ids);
+  pool->nonstd_nids = 0;
   if (idq)
     queue_empty(idq);
   if (idqinst)
@@ -609,6 +633,13 @@ pool_addfileprovides_queue(Pool *pool, Queue *idq, Queue *idqinst)
       if (idqinst)
 	queue_insertn(idqinst, idqinst->count, sf.nfiles, sf.ids);
       solv_free(sf.ids);
+    }
+  if (sf.nonstd_nfiles)
+    {
+      POOL_DEBUG(SOLV_DEBUG_STATS, "found %d non-standard file dependencies\n", sf.nonstd_nfiles);
+      pool->nonstd_ids = sf.nonstd_ids;
+      pool->nonstd_nids= sf.nonstd_nfiles;
+      finalize_nonstd_ids(pool);
     }
   if (isf.nfiles)
     {
