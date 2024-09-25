@@ -20,6 +20,18 @@
 #include "poolid_private.h"
 #include "util.h"
 
+static inline void
+grow_whatprovides(Pool *pool, Id id)
+{
+  if ((id & WHATPROVIDES_BLOCK) == 0)
+    {
+      /* grow whatprovides array */
+      pool->whatprovides = solv_realloc(pool->whatprovides, (id + (WHATPROVIDES_BLOCK + 1)) * sizeof(Offset));
+      memset(pool->whatprovides + id, 0, (WHATPROVIDES_BLOCK + 1) * sizeof(Offset));
+    }
+  if (pool->addedfileprovides == 1)
+    pool->whatprovides[id] = 1;
+}
 
 /* intern string into pool, return id */
 
@@ -28,12 +40,8 @@ pool_str2id(Pool *pool, const char *str, int create)
 {
   int oldnstrings = pool->ss.nstrings;
   Id id = stringpool_str2id(&pool->ss, str, create);
-  if (create && pool->whatprovides && oldnstrings != pool->ss.nstrings && (id & WHATPROVIDES_BLOCK) == 0)
-    {
-      /* grow whatprovides array */
-      pool->whatprovides = solv_realloc(pool->whatprovides, (id + (WHATPROVIDES_BLOCK + 1)) * sizeof(Offset));
-      memset(pool->whatprovides + id, 0, (WHATPROVIDES_BLOCK + 1) * sizeof(Offset));
-    }
+  if (create && pool->whatprovides && oldnstrings != pool->ss.nstrings)
+    grow_whatprovides(pool, id);
   return id;
 }
 
@@ -42,12 +50,8 @@ pool_strn2id(Pool *pool, const char *str, unsigned int len, int create)
 {
   int oldnstrings = pool->ss.nstrings;
   Id id = stringpool_strn2id(&pool->ss, str, len, create);
-  if (create && pool->whatprovides && oldnstrings != pool->ss.nstrings && (id & WHATPROVIDES_BLOCK) == 0)
-    {
-      /* grow whatprovides array */
-      pool->whatprovides = solv_realloc(pool->whatprovides, (id + (WHATPROVIDES_BLOCK + 1)) * sizeof(Offset));
-      memset(pool->whatprovides + id, 0, (WHATPROVIDES_BLOCK + 1) * sizeof(Offset));
-    }
+  if (create && pool->whatprovides && oldnstrings != pool->ss.nstrings)
+    grow_whatprovides(pool, id);
   return id;
 }
 
