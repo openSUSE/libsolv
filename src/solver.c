@@ -1148,7 +1148,7 @@ replaces_installed_package(Pool *pool, Id p, Map *noupdate)
   FOR_PROVIDES(p2, pp2, s->name)
     {
       s2 = pool->solvables + p2;
-      if (s2->repo == installed && s2->name == s->name && !(noupdate && MAPTST(noupdate, p - installed->start)))
+      if (s2->repo == installed && s2->name == s->name && !(noupdate && MAPTST(noupdate, p2 - installed->start)))
 	return 1;
     }
   if (!s->obsoletes)
@@ -1159,7 +1159,7 @@ replaces_installed_package(Pool *pool, Id p, Map *noupdate)
       FOR_PROVIDES(p2, pp2, obs)
 	{
 	  s2 = pool->solvables + p2;
-	  if (s2->repo != pool->installed || (noupdate && MAPTST(noupdate, p - installed->start)))
+	  if (s2->repo != pool->installed || (noupdate && MAPTST(noupdate, p2 - installed->start)))
 	    continue;
 	  if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, s2, obs))
 	    continue;
