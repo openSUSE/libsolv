@@ -1,4 +1,14 @@
 -------------------------------------------------------------------
+Tue Nov 12 10:54:33 CET 2024 - mls@suse.de
+
+- fix replaces_installed_package using the wrong solvable id
+  when checking the noupdate map
+- make POOL_FLAG_ADDFILEPROVIDESFILTERED behaviour more standard
+- add rpm_query_idarray query function
+- support rpm's "orderwithrequires" dependency
+- bump version to 0.7.31
+
+-------------------------------------------------------------------
 Thu Jul 11 13:19:18 CEST 2024 - mls@suse.de
 
 - removed dependency on external find program in the repo2solv tool

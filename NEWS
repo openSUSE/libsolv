@@ -1,6 +1,15 @@
 
 This file contains the major changes between libsolv versions:
 
+Version 0.7.31
+- selected bug fixes:
+  * fix replaces_installed_package using the wrong solvable id
+    when checking the noupdate map
+  * make POOL_FLAG_ADDFILEPROVIDESFILTERED behaviour more standard
+- new features:
+  * add rpm_query_idarray query function
+  * support rpm's "orderwithrequires" dependency
+
 Version 0.7.30
 - selected bug fixes:
   * removed dependency on external find program in the repo2solv
