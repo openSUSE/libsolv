@@ -9,5 +9,5 @@
 
 extern Id repo_add_arch_pkg(Repo *repo, const char *fn, int flags);
 extern Id repo_add_arch_repo(Repo *repo, FILE *fp, int flags);
-extern Id repo_add_arch_local(Repo *repo, const char *dir, int flags);
+extern int repo_add_arch_local(Repo *repo, const char *dir, int flags);
 
