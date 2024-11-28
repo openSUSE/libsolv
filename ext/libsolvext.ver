@@ -3,6 +3,8 @@ SOLV_1.0 {
 		pool_deb_get_autoinstalled;
 		pool_findfileconflicts;
 		pool_parserpmrichdep;
+		repo_add_apk_pkg;
+		repo_add_apk_repo;
 		repo_add_appdata;
 		repo_add_appdata_dir;
 		repo_add_arch_local;

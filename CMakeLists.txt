@@ -24,9 +24,10 @@ OPTION (ENABLE_RPMMD "Build with rpmmd repository support?" OFF)
 OPTION (ENABLE_SUSEREPO "Build with suse repository support?" OFF)
 OPTION (ENABLE_COMPS "Build with fedora comps support?" OFF)
 OPTION (ENABLE_HELIXREPO "Build with helix repository support?" OFF)
-OPTION (ENABLE_DEBIAN "Build with debian database/repository support?" OFF)
+OPTION (ENABLE_DEBIAN "Build with debian package/repository support?" OFF)
 OPTION (ENABLE_MDKREPO "Build with mandriva/mageia repository support?" OFF)
 OPTION (ENABLE_ARCHREPO "Build with archlinux repository support?" OFF)
+OPTION (ENABLE_APK "Build with apk package/repository support?" OFF)
 OPTION (ENABLE_CUDFREPO "Build with cudf repository support?" OFF)
 OPTION (ENABLE_HAIKU "Build with Haiku package support?" OFF)
 OPTION (ENABLE_CONDA "Build with conda dependency support?" OFF)
@@ -314,6 +315,7 @@ FOREACH (VAR
   ENABLE_HELIXREPO ENABLE_MDKREPO ENABLE_ARCHREPO ENABLE_DEBIAN ENABLE_HAIKU
   ENABLE_ZLIB_COMPRESSION ENABLE_LZMA_COMPRESSION ENABLE_BZIP2_COMPRESSION
   ENABLE_ZSTD_COMPRESSION ENABLE_ZCHUNK_COMPRESSION ENABLE_PGPVRFY ENABLE_APPDATA
+  ENABLE_APK
   WITH_SYSTEM_ZCHUNK)
   IF(${VAR})
     ADD_DEFINITIONS (-D${VAR}=1)

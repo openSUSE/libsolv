@@ -22,7 +22,7 @@
 
 #ifndef WITHOUT_COOKIEOPEN
 
-static FILE *cookieopen(void *cookie, const char *mode,
+FILE *solv_cookieopen(void *cookie, const char *mode,
 	ssize_t (*cread)(void *, char *, size_t),
 	ssize_t (*cwrite)(void *, const char *, size_t),
 	int (*cclose)(void *))
@@ -86,13 +86,13 @@ static int cookie_gzclose(void *cookie)
 static inline FILE *mygzfopen(const char *fn, const char *mode)
 {
   gzFile gzf = gzopen(fn, mode);
-  return cookieopen(gzf, mode, cookie_gzread, cookie_gzwrite, cookie_gzclose);
+  return solv_cookieopen(gzf, mode, cookie_gzread, cookie_gzwrite, cookie_gzclose);
 }
 
 static inline FILE *mygzfdopen(int fd, const char *mode)
 {
   gzFile gzf = gzdopen(fd, mode);
-  return cookieopen(gzf, mode, cookie_gzread, cookie_gzwrite, cookie_gzclose);
+  return solv_cookieopen(gzf, mode, cookie_gzread, cookie_gzwrite, cookie_gzclose);
 }
 
 #endif
@@ -123,13 +123,13 @@ static int cookie_bzclose(void *cookie)
 static inline FILE *mybzfopen(const char *fn, const char *mode)
 {
   BZFILE *bzf = BZ2_bzopen(fn, mode);
-  return cookieopen(bzf, mode, cookie_bzread, cookie_bzwrite, cookie_bzclose);
+  return solv_cookieopen(bzf, mode, cookie_bzread, cookie_bzwrite, cookie_bzclose);
 }
 
 static inline FILE *mybzfdopen(int fd, const char *mode)
 {
   BZFILE *bzf = BZ2_bzdopen(fd, mode);
-  return cookieopen(bzf, mode, cookie_bzread, cookie_bzwrite, cookie_bzclose);
+  return solv_cookieopen(bzf, mode, cookie_bzread, cookie_bzwrite, cookie_bzclose);
 }
 
 #endif
@@ -305,25 +305,25 @@ static ssize_t lzwrite(void *cookie, const char *buf, size_t len)
 static inline FILE *myxzfopen(const char *fn, const char *mode)
 {
   LZFILE *lzf = lzopen(fn, mode, -1, 1);
-  return cookieopen(lzf, mode, lzread, lzwrite, lzclose);
+  return solv_cookieopen(lzf, mode, lzread, lzwrite, lzclose);
 }
 
 static inline FILE *myxzfdopen(int fd, const char *mode)
 {
   LZFILE *lzf = lzopen(0, mode, fd, 1);
-  return cookieopen(lzf, mode, lzread, lzwrite, lzclose);
+  return solv_cookieopen(lzf, mode, lzread, lzwrite, lzclose);
 }
 
 static inline FILE *mylzfopen(const char *fn, const char *mode)
 {
   LZFILE *lzf = lzopen(fn, mode, -1, 0);
-  return cookieopen(lzf, mode, lzread, lzwrite, lzclose);
+  return solv_cookieopen(lzf, mode, lzread, lzwrite, lzclose);
 }
 
 static inline FILE *mylzfdopen(int fd, const char *mode)
 {
   LZFILE *lzf = lzopen(0, mode, fd, 0);
-  return cookieopen(lzf, mode, lzread, lzwrite, lzclose);
+  return solv_cookieopen(lzf, mode, lzread, lzwrite, lzclose);
 }
 
 #endif /* ENABLE_LZMA_COMPRESSION */
@@ -507,13 +507,13 @@ static ssize_t zstdwrite(void *cookie, const char *buf, size_t len)
 static inline FILE *myzstdfopen(const char *fn, const char *mode)
 {
   ZSTDFILE *zstdfile = zstdopen(fn, mode, -1);
-  return cookieopen(zstdfile, mode, zstdread, zstdwrite, zstdclose);
+  return solv_cookieopen(zstdfile, mode, zstdread, zstdwrite, zstdclose);
 }
 
 static inline FILE *myzstdfdopen(int fd, const char *mode)
 {
   ZSTDFILE *zstdfile = zstdopen(0, mode, fd);
-  return cookieopen(zstdfile, mode, zstdread, zstdwrite, zstdclose);
+  return solv_cookieopen(zstdfile, mode, zstdread, zstdwrite, zstdclose);
 }
 
 #endif
@@ -587,7 +587,7 @@ static void *zchunkopen(const char *path, const char *mode, int fd)
 	  return 0;
 	}
     }
-  return cookieopen(f, mode, cookie_zckread, cookie_zckwrite, cookie_zckclose);
+  return solv_cookieopen(f, mode, cookie_zckread, cookie_zckwrite, cookie_zckclose);
 }
 
 #else
@@ -627,7 +627,7 @@ static void *zchunkopen(const char *path, const char *mode, int fd)
 	  fclose(fp);
 	}
     }
-  return cookieopen(f, mode, (ssize_t (*)(void *, char *, size_t))solv_zchunk_read, 0, (int (*)(void *))solv_zchunk_close);
+  return solv_cookieopen(f, mode, (ssize_t (*)(void *, char *, size_t))solv_zchunk_read, 0, (int (*)(void *))solv_zchunk_close);
 }
 
 #endif
@@ -924,7 +924,7 @@ solv_xfopen_buf(const char *fn, char **bufp, size_t *buflp, const char *mode)
       (*bc->bufp)[0] = 0;
       *bc->buflp = 0;
     }
-  fp = cookieopen(bc, mode, cookie_bufread, cookie_bufwrite, cookie_bufclose);
+  fp = solv_cookieopen(bc, mode, cookie_bufread, cookie_bufwrite, cookie_bufclose);
   if (!strcmp(mode, "rf"))	/* auto-free */
     bc->freemem = *bufp;
   if (!fp)
@@ -948,7 +948,7 @@ solv_fmemopen(const char *buf, size_t bufl, const char *mode)
   bc->bufl_int = bufl;
   bc->bufp = &bc->buf_int;
   bc->buflp = &bc->bufl_int;
-  fp = cookieopen(bc, mode, cookie_bufread, cookie_bufwrite, cookie_bufclose);
+  fp = solv_cookieopen(bc, mode, cookie_bufread, cookie_bufwrite, cookie_bufclose);
   if (!strcmp(mode, "rf"))	/* auto-free */
     bc->freemem = bc->buf_int;
   if (!fp)

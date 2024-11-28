@@ -14,4 +14,6 @@ extern FILE *solv_xfopen_buf(const char *fn, char **bufp, size_t *buflp, const c
 extern int   solv_xfopen_iscompressed(const char *fn);
 extern FILE *solv_fmemopen(const char *buf, size_t bufl, const char *mode);
 
+FILE *solv_cookieopen(void *cookie, const char *mode, ssize_t (*cread)(void *, char *, size_t), ssize_t (*cwrite)(void *, const char *, size_t), int (*cclose)(void *));	/* internal */
+
 #endif

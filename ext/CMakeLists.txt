@@ -74,6 +74,13 @@ IF (ENABLE_DEBIAN)
 	repo_deb.h)
 ENDIF (ENABLE_DEBIAN)
 
+IF (ENABLE_APK)
+    SET (libsolvext_SRCS ${libsolvext_SRCS}
+	repo_apk.c)
+    SET (libsolvext_HEADERS ${libsolvext_HEADERS}
+	repo_apk.h)
+ENDIF (ENABLE_APK)
+
 IF (ENABLE_HELIXREPO)
     SET (libsolvext_SRCS ${libsolvext_SRCS}
 	repo_helix.c)
@@ -144,10 +151,10 @@ IF (ENABLE_ZCHUNK_COMPRESSION)
 	solv_zchunk.c)
 ENDIF (ENABLE_ZCHUNK_COMPRESSION)
 
-IF (ENABLE_ARCHREPO)
+IF (ENABLE_ARCHREPO OR ENABLE_APK)
     SET (libsolvext_SRCS ${libsolvext_SRCS}
 	tarhead.c)
-ENDIF (ENABLE_ARCHREPO)
+ENDIF (ENABLE_ARCHREPO OR ENABLE_APK)
 
 IF (NOT MSVC)
 SET (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")

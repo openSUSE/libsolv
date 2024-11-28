@@ -87,6 +87,13 @@ TARGET_LINK_LIBRARIES (archrepo2solv toolstuff libsolvext libsolv ${SYSTEM_LIBRA
 SET (tools_list ${tools_list} archpkgs2solv archrepo2solv)
 ENDIF (ENABLE_ARCHREPO)
 
+IF (ENABLE_APK)
+ADD_EXECUTABLE (apk2solv apk2solv.c)
+TARGET_LINK_LIBRARIES (apk2solv toolstuff libsolvext libsolv ${SYSTEM_LIBRARIES})
+
+SET (tools_list ${tools_list} apk2solv)
+ENDIF (ENABLE_APK)
+
 IF (ENABLE_CUDFREPO)
 ADD_EXECUTABLE (cudftest cudftest.c)
 TARGET_LINK_LIBRARIES (cudftest libsolvext libsolv ${SYSTEM_LIBRARIES})

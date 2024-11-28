@@ -24,6 +24,7 @@ Supported package formats:
   - deb
   - arch linux
   - haiku
+  - apk 
 
 Supported repository formats:
 
@@ -33,6 +34,7 @@ Supported repository formats:
   - arch linux
   - red carpet helix format
   - haiku
+  - apk 
 
 Build instructions
 ==================
