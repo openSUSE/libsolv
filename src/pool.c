@@ -153,6 +153,7 @@ pool_setdisttype(Pool *pool, int disttype)
   switch(disttype)
     {
     case DISTTYPE_RPM:
+    case DISTTYPE_APK:
       pool->noarchid = ARCH_NOARCH;
       break;
     case DISTTYPE_DEB:

@@ -20,7 +20,9 @@
 #ifdef ENABLE_CONDA
 #include "conda.h"
 #endif
-
+#ifdef MULTI_SEMANTICS
+#include "apk.h"
+#endif
 
 #if defined(DEBIAN) || defined(MULTI_SEMANTICS)
 
@@ -326,6 +328,7 @@ solv_vercmp(const char *s1, const char *q1, const char *s2, const char *q2)
 #if defined(MULTI_SEMANTICS)
 # define solv_vercmp (*(pool->disttype == DISTTYPE_DEB ? &solv_vercmp_deb : \
                         pool->disttype == DISTTYPE_HAIKU ? &solv_vercmp_haiku : \
+                        pool->disttype == DISTTYPE_APK ? &solv_vercmp_apk : \
                         &solv_ver##cmp_rpm))
 #elif defined(DEBIAN)
 # define solv_vercmp solv_vercmp_deb
@@ -351,6 +354,10 @@ pool_evrcmp_str(const Pool *pool, const char *evr1, const char *evr2, int mode)
 #ifdef ENABLE_CONDA
   if (pool->disttype == DISTTYPE_CONDA)
     return pool_evrcmp_conda(pool, evr1, evr2, mode);
+#endif
+#ifdef MULTI_SEMANTICS
+  if (pool->disttype == DISTTYPE_APK)
+    return pool_evrcmp_apk(pool, evr1, evr2, mode);
 #endif
 
 #if 0
@@ -520,6 +527,15 @@ pool_evrmatch(const Pool *pool, Id evrid, const char *epoch, const char *version
     {
       if (!r1)
 	return -1;
+#ifdef MULTI_SEMANTICS
+      if (pool->disttype == DISTTYPE_APK)
+	{
+	  if (r1[1] == 'r')
+	    r1++;
+	  if (release[0] == 'r')
+	    release++;
+	}
+#endif
       r = solv_vercmp(r1 + 1, s1, release, release + strlen(release));
       if (r)
 	return r;

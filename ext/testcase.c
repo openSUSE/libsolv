@@ -172,6 +172,7 @@ static struct disttype2str {
   { DISTTYPE_ARCH, "arch" },
   { DISTTYPE_HAIKU, "haiku" },
   { DISTTYPE_CONDA, "conda" },
+  { DISTTYPE_APK, "apk" },
   { 0, 0 }
 };
 

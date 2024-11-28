@@ -175,6 +175,7 @@ struct s_Pool {
 #define DISTTYPE_ARCH   2
 #define DISTTYPE_HAIKU  3
 #define DISTTYPE_CONDA  4
+#define DISTTYPE_APK	5
 
 #define SOLV_FATAL			(1<<0)
 #define SOLV_ERROR			(1<<1)

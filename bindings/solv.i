@@ -1950,6 +1950,7 @@ returnself(matchsolvable)
   static const int DISTTYPE_ARCH = DISTTYPE_ARCH;
   static const int DISTTYPE_HAIKU = DISTTYPE_HAIKU;
   static const int DISTTYPE_CONDA = DISTTYPE_CONDA;
+  static const int DISTTYPE_APK = DISTTYPE_APK;
 
   Pool() {
     Pool *pool = pool_create();

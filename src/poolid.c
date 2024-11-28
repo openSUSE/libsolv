@@ -163,6 +163,19 @@ static const char *rels[] = {
   " <=> "
 };
 
+#if defined(MULTI_SEMANTICS)
+static const char *rels_nospace[] = {
+  "!",
+  ">",
+  "=",
+  ">=",
+  "<",
+  "<>",
+  "<=",
+  "<=>"
+};
+#endif
+
 
 /* get operator for RelId */
 const char *
@@ -172,6 +185,11 @@ pool_id2rel(const Pool *pool, Id id)
   if (!ISRELDEP(id))
     return "";
   rd = GETRELDEP(pool, id);
+
+#if defined(MULTI_SEMANTICS)
+  if (pool->disttype == DISTTYPE_APK && rd->flags >= 1 && rd->flags <= 7)
+    return rels_nospace[rd->flags];
+#endif
 
   switch (rd->flags)
     {
@@ -306,6 +324,10 @@ dep2strcpy(const Pool *pool, char *p, Id id, int oldrel)
 	}
       strcpy(p, pool_id2rel(pool, id));
       p += strlen(p);
+#if defined(MULTI_SEMANTICS)
+      if (pool->disttype == DISTTYPE_APK && (rd->flags == 2 || rd->flags == 3 || rd->flags == 6) && !ISRELDEP(rd->evr) && pool->ss.stringspace[pool->ss.strings[rd->evr]] == '~')
+        p--;
+#endif
       id = rd->evr;
       oldrel = rd->flags;
     }
