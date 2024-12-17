@@ -28,11 +28,13 @@
 
 struct zstream {
   int fd;
+  FILE *fp;
   int eof;
   z_stream zs;
   unsigned char buf[65536];
   void (*readcb)(void *, const void *, int);
   void *readcb_data;
+  int doall;
 };
 
 static struct zstream *
@@ -59,6 +61,40 @@ apkz_close(void *cookie)
   return 0;
 }
 
+static inline ssize_t
+apkz_fillbuf(struct zstream *zstream)
+{
+  ssize_t rr;
+  if (zstream->fp)
+    {
+      rr = fread(zstream->buf, 1, sizeof(zstream->buf), zstream->fp);
+      if (rr <= 0 && ferror(zstream->fp))
+	rr = -1;
+    }
+  else
+    rr = read(zstream->fd, zstream->buf, sizeof(zstream->buf));
+  if (rr >= 0)
+    {
+      zstream->zs.avail_in = rr;
+      zstream->zs.next_in = zstream->buf;
+    }
+  return rr;
+}
+
+static int
+apkz_reset(struct zstream *zstream)
+{
+  zstream->eof = 0;
+  if (zstream->zs.avail_in == 0)
+    {
+      ssize_t rr = apkz_fillbuf(zstream);
+      if (rr <= 0)
+	return rr < 0 ? -1 : 0;
+    }
+  inflateReset(&zstream->zs);
+  return 1;
+}
+
 static ssize_t
 apkz_read(void *cookie, char *buf, size_t len)
 {
@@ -76,13 +112,11 @@ apkz_read(void *cookie, char *buf, size_t len)
     {
       if (zstream->zs.avail_in == 0)
 	{
-	  ssize_t rr = read(zstream->fd, zstream->buf, sizeof(zstream->buf));
+	  ssize_t rr = apkz_fillbuf(zstream);
 	  if (rr < 0)
 	    return rr;
 	  if (rr == 0)
-	      eof = 1;
-	  zstream->zs.avail_in = rr;
-	  zstream->zs.next_in = zstream->buf;
+	    eof = 1;
 	}
       old_avail_in = zstream->zs.avail_in;
       r = inflate(&zstream->zs, Z_NO_FLUSH);
@@ -96,6 +130,8 @@ apkz_read(void *cookie, char *buf, size_t len)
 
       if (r == Z_STREAM_END)
 	{
+	  if (zstream->doall && apkz_reset(zstream) > 0)
+	    continue;
 	  zstream->eof = 1;
 	  return len - zstream->zs.avail_out;
 	}
@@ -106,22 +142,6 @@ apkz_read(void *cookie, char *buf, size_t len)
       if (eof)
 	return -1;
     }
-}
-
-static int
-apkz_reset(struct zstream *zstream)
-{
-  zstream->eof = 0;
-  if (zstream->zs.avail_in == 0)
-    {
-      ssize_t rr = read(zstream->fd, zstream->buf, sizeof(zstream->buf));
-      if (rr <= 0)
-	return rr < 0 ? -1 : 0;
-      zstream->zs.avail_in = rr;
-      zstream->zs.next_in = zstream->buf;
-    }
-  inflateReset(&zstream->zs);
-  return 1;
 }
 
 static void
@@ -209,11 +229,12 @@ repo_add_apk_pkg(Repo *repo, const char *fn, int flags)
       close(fd);
       return 0;
     }
-  if ((fp = solv_cookieopen(zstream, "r", apkz_read, 0, apkz_close)) == 0) {
-    pool_error(pool, -1, "%s: %s", fn, strerror(errno));
-    apkz_close(zstream);
-    return 0;
-  }
+  if ((fp = solv_cookieopen(zstream, "r", apkz_read, 0, apkz_close)) == 0)
+    {
+      pool_error(pool, -1, "%s: %s", fn, strerror(errno));
+      apkz_close(zstream);
+      return 0;
+    }
 
   /* skip signatures */
   while (getc(fp) != EOF)
@@ -464,15 +485,41 @@ apk_process_index(Repo *repo, Repodata *data, struct tarhead *th)
   solv_free(line);
 }
 
-Id
+int
 repo_add_apk_repo(Repo *repo, FILE *fp, int flags)
 {
   struct tarhead th;
   Repodata *data;
+  int c;
+  int close_fp = 0;
 
   data = repo_add_repodata(repo, flags);
 
+  /* peek into first byte to find out if this is a compressed file */
+  c = fgetc(fp);
+  if (c == EOF)
+    return -1;
+  ungetc(c, fp);
+
+  if (c == 0x1f)
+    {
+      struct zstream *zstream;
+      /* gzip compressed, setup decompression */
+      zstream = apkz_open(-1);
+      if (!zstream)
+	return -1;
+      zstream->fp = fp;
+      zstream->doall = 1;
+      if ((fp = solv_cookieopen(zstream, "r", apkz_read, 0, apkz_close)) == 0)
+	{
+	  apkz_close(zstream);
+	  return -1;
+        }
+      close_fp = 1;
+    }
+
   tarhead_init(&th, fp);
+  
   if ((flags & APK_ADD_INDEX) != 0)
     apk_process_index(repo, data, &th);
   else
@@ -486,6 +533,8 @@ repo_add_apk_repo(Repo *repo, FILE *fp, int flags)
 	}
     }
   tarhead_free(&th);
+  if (close_fp)
+    fclose(fp);
   return 0;
 }
 

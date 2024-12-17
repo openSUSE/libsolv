@@ -10,5 +10,5 @@
 #define APK_ADD_WITH_HDRID		(1 << 10)
 
 extern Id repo_add_apk_pkg(Repo *repo, const char *fn, int flags);
-extern Id repo_add_apk_repo(Repo *repo, FILE *fp, int flags);
+extern int repo_add_apk_repo(Repo *repo, FILE *fp, int flags);
 
