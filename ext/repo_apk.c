@@ -498,7 +498,7 @@ repo_add_apk_repo(Repo *repo, FILE *fp, int flags)
   /* peek into first byte to find out if this is a compressed file */
   c = fgetc(fp);
   if (c == EOF)
-    return -1;
+    return (flags & APK_ADD_INDEX) != 0 ? 0 : -1;	/* an empty file is allowed for the v2 index */
   ungetc(c, fp);
 
   if (c == 0x1f)
