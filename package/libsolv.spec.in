@@ -1,7 +1,7 @@
 #
 # spec file for package libsolv
 #
-# Copyright (c) 2024 SUSE LLC
+# Copyright (c) 2025 SUSE LLC
 #
 # All modifications and additions to the file contributed by third parties
 # remain the property of their copyright owners, unless otherwise agreed
@@ -72,7 +72,7 @@ License:        BSD-3-Clause
 Group:          Development/Libraries/C and C++
 URL:            https://github.com/openSUSE/libsolv
 Source:         libsolv-%{version}.tar.bz2
-BuildRequires:  cmake
+BuildRequires:  cmake >= 3.10
 BuildRequires:  gcc-c++
 BuildRequires:  libxml2-devel
 BuildRequires:  rpm-devel

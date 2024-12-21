@@ -1,6 +1,6 @@
-PROJECT (libsolv C)
+CMAKE_MINIMUM_REQUIRED (VERSION 3.10)
 
-CMAKE_MINIMUM_REQUIRED (VERSION 2.8.5)
+PROJECT (libsolv C)
 
 OPTION (ENABLE_STATIC "Build a static version of the libraries?" OFF)
 OPTION (DISABLE_SHARED "Do not build a shared version of the libraries?" OFF)
@@ -276,7 +276,6 @@ CHECK_FUNCTION_EXISTS (fopencookie HAVE_FOPENCOOKIE)
 CHECK_FUNCTION_EXISTS (funopen HAVE_FUNOPEN)
 TEST_BIG_ENDIAN (WORDS_BIGENDIAN)
 
-IF (${CMAKE_MAJOR_VERSION} GREATER 2)
 INCLUDE (CMakePushCheckState)
 INCLUDE (CheckCCompilerFlag)
 MACRO (check_linker_flag FLAG VAR)
@@ -287,10 +286,6 @@ MACRO (check_linker_flag FLAG VAR)
 ENDMACRO (check_linker_flag)
 check_linker_flag("-Wl,--as-needed" HAVE_LINKER_AS_NEEDED)
 check_linker_flag("-Wl,--version-script=${CMAKE_SOURCE_DIR}/src/libsolv.ver" HAVE_LINKER_VERSION_SCRIPT)
-ELSE (${CMAKE_MAJOR_VERSION} GREATER 2)
-SET (HAVE_LINKER_AS_NEEDED 1)
-SET (HAVE_LINKER_VERSION_SCRIPT 1)
-ENDIF (${CMAKE_MAJOR_VERSION} GREATER 2)
 
 # should create config.h with #cmakedefine instead...
 FOREACH (VAR HAVE_STRCHRNUL HAVE_FOPENCOOKIE HAVE_FUNOPEN WORDS_BIGENDIAN
