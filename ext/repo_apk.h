@@ -5,7 +5,7 @@
  * for further information
  */
 
-#define APK_ADD_INDEX			(1 << 8)
+#define APK_ADD_INSTALLED_DB		(1 << 8)
 #define APK_ADD_WITH_PKGID		(1 << 9)
 #define APK_ADD_WITH_HDRID		(1 << 10)
 

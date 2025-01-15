@@ -129,7 +129,7 @@ main(int argc, char **argv)
   if (isrepo)
     {
       if (islocaldb)
-	flags |= APK_ADD_INDEX;
+	flags |= APK_ADD_INSTALLED_DB;
       if (!npkgs)
 	{
 	  if (repo_add_apk_repo(repo, stdin, REPO_REUSE_REPODATA|REPO_NO_INTERNALIZE|flags) != 0)

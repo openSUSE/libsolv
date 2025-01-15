@@ -325,7 +325,7 @@ add_apkv3_idx(Repo *repo, Repodata *data, FILE *fp, int flags, int adbchar)
 {
   FILE *cfp;
   int r;
-  if (!(cfp = open_apkv3(repo->pool, -1, fp, (flags & APK_ADD_INDEX ? "installed db" : "package index"), adbchar)))
+  if (!(cfp = open_apkv3(repo->pool, -1, fp, (flags & APK_ADD_INSTALLED_DB ? "installed database" : "package index"), adbchar)))
     return -1;
   r = apkv3_add_idx(repo, data, cfp, flags);
   fclose(cfp);
@@ -699,7 +699,7 @@ repo_add_apk_repo(Repo *repo, FILE *fp, int flags)
   /* peek into first byte to find out if this is a compressed file */
   c = fgetc(fp);
   if (c == EOF)
-    return (flags & APK_ADD_INDEX) != 0 ? 0 : -1;	/* an empty file is allowed for the v2 index */
+    return (flags & APK_ADD_INSTALLED_DB) != 0 ? 0 : -1;	/* an empty file is allowed for the v2 db */
   ungetc(c, fp);
 
   if (c == 'A')
@@ -708,7 +708,7 @@ repo_add_apk_repo(Repo *repo, FILE *fp, int flags)
 	return -1;
      if (first[0] == 'A' && first[1] == 'D' && first[2] == 'B')
        return add_apkv3_idx(repo, data, fp, flags, first[3]);
-     if ((flags & APK_ADD_INDEX) == 0)
+     if ((flags & APK_ADD_INSTALLED_DB) == 0)
       return -1;	/* not a tar file */
     }
 
@@ -737,7 +737,7 @@ repo_add_apk_repo(Repo *repo, FILE *fp, int flags)
       th.end = 4;
     }
   
-  if ((flags & APK_ADD_INDEX) != 0)
+  if ((flags & APK_ADD_INSTALLED_DB) != 0)
     apk_process_index(repo, data, &th, flags);
   else
     {

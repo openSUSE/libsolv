@@ -389,11 +389,11 @@ apkv3_add_idx(Repo *repo, Repodata *data, FILE *fp, int flags)
   const unsigned char *adb;
   size_t adblen;
   unsigned int v, cnt, idx;
-  int idb = flags & APK_ADD_INDEX ? 1 : 0;
+  int idb = flags & APK_ADD_INSTALLED_DB ? 1 : 0;
 
   if (fread(buf, 4, 1, fp) != 1 || memcmp(buf, (idb ? "idb" : "indx") , 4))
     {
-      pool_error(pool, -1, (idb ?  "not an apkv3 installed database" : "not an apkv3 index"));
+      pool_error(pool, -1, (idb ?  "not an apkv3 installed database" : "not an apkv3 package index"));
       return -1;
     }
 
