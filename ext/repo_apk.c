@@ -15,7 +15,7 @@
 #include <fcntl.h>
 
 #include <zlib.h>
-
+#include <zstd.h>
 
 #include "pool.h"
 #include "repo.h"
@@ -24,7 +24,9 @@
 #include "solv_xfopen.h"
 #include "tarhead.h"
 #include "repo_apk.h"
+#include "repo_apkv3.h"
 
+/* zlib decompression */
 
 struct zstream {
   int fd;
@@ -38,13 +40,13 @@ struct zstream {
 };
 
 static struct zstream *
-apkz_open(int fd)
+apkz_open(int fd, int raw)
 {
   struct zstream *zstream = solv_calloc(1, sizeof(*zstream));
   zstream->fd = fd;
-  if (inflateInit2(&zstream->zs, 15 + 32) != Z_OK)	/* 32: enable gzip */
+  if (inflateInit2(&zstream->zs, raw ? -15 : 15 + 32) != Z_OK)	/* 32: enable gzip */
     {
-      solv_free(&zstream->zs);
+      solv_free(zstream);
       return 0;
     }
   return zstream;
@@ -144,6 +146,195 @@ apkz_read(void *cookie, char *buf, size_t len)
     }
 }
 
+/* zstd decompression */
+
+struct zstdstream {
+  int fd;
+  FILE *fp;
+  int eof;
+  ZSTD_DCtx *ctx;
+  ZSTD_inBuffer in;
+  unsigned char buf[65536];
+};
+
+static struct zstdstream *
+apkzstd_open(int fd)
+{
+  struct zstdstream *zstdstream = solv_calloc(1, sizeof(*zstdstream));
+  zstdstream->fd = fd;
+  zstdstream->in.src = zstdstream->buf;
+  zstdstream->in.size = zstdstream->in.pos = 0;
+  if (!(zstdstream->ctx =  ZSTD_createDCtx()))
+    {
+      solv_free(zstdstream);
+      return 0;
+    }
+  return zstdstream;
+}
+
+static int
+apkzstd_close(void *cookie)
+{
+  struct zstdstream *zstdstream = cookie;
+  ZSTD_freeDCtx(zstdstream->ctx);
+  if (zstdstream->fd != -1)
+    close(zstdstream->fd);
+  solv_free(zstdstream);
+  return 0;
+}
+
+static inline ssize_t
+apkzstd_fillbuf(struct zstdstream *zstdstream)
+{
+  ssize_t rr;
+  if (zstdstream->fp)
+    {
+      rr = fread(zstdstream->buf, 1, sizeof(zstdstream->buf), zstdstream->fp);
+      if (rr <= 0 && ferror(zstdstream->fp))
+	rr = -1;
+    }
+  else
+    rr = read(zstdstream->fd, zstdstream->buf, sizeof(zstdstream->buf));
+  if (rr >= 0)
+    {
+      zstdstream->in.pos = 0;
+      zstdstream->in.size = rr;
+    }
+  return rr;
+}
+
+static ssize_t
+apkzstd_read(void *cookie, char *buf, size_t len)
+{
+  struct zstdstream *zstdstream = cookie;
+  ZSTD_outBuffer out;
+  int eof = 0;
+  size_t r;
+
+  if (!zstdstream)
+    return -1;
+  if (zstdstream->eof)
+    return 0;
+  out.dst = buf;
+  out.pos = 0;
+  out.size = len;
+  for (;;)
+    {
+      if (zstdstream->in.pos >= zstdstream->in.size)
+	{
+	  ssize_t rr = apkzstd_fillbuf(zstdstream);
+	  if (rr < 0)
+	    return rr;
+	  if (rr == 0)
+	    eof = 1;
+	}
+      r = ZSTD_decompressStream(zstdstream->ctx, &out, &zstdstream->in);
+      if (ZSTD_isError(r))
+	return -1;
+      if (out.pos == out.size || eof)
+	return out.pos;
+    }
+}
+
+
+/* apkv3 handling */
+
+static FILE *
+open_apkv3_error(Pool *pool, int fd, const char *fn, const char *msg)
+{
+  pool_error(pool, -1, "%s: %s", fn, msg);
+  if (fd != -1)
+    close(fd);
+  return 0;
+}
+
+static FILE *
+open_apkv3(Pool *pool, int fd, FILE *fp, const char *fn, int adbchar)
+{
+  unsigned char comp[2];
+  char buf[4];
+  FILE *cfp;
+
+  comp[0] = comp[1] = 0;
+  if (adbchar == 'c')
+    {
+      ssize_t r;
+      if (fp)
+	r = fread(comp, 2, 1, fp) == 1 ? 2 : feof(fp) ? 0 : -1;
+      else
+	r = read(fd, comp, 2);
+      if (r != 2)
+	return open_apkv3_error(pool, fd, fn, "compression header read error");
+    }
+  else if (adbchar == 'd')
+    comp[0] = 1;
+  else if (adbchar != '.')
+    return open_apkv3_error(pool, fd, fn, "not an apkv3 file");
+  if (comp[0] == 0)
+    cfp = fp ? fp : fdopen(fd, "r");
+  else if (comp[0] == 1)
+    {
+      struct zstream *zstream = apkz_open(fd, 1);
+      if (!zstream)
+	return open_apkv3_error(pool, fd, fn, "zstream setup error");
+      if (fp)
+	zstream->fp = fp;
+      if ((cfp = solv_cookieopen(zstream, "r", apkz_read, 0, apkz_close)) == 0)
+        return open_apkv3_error(pool, fd, fn, "zstream cookie setup error");
+    }
+  else if (comp[0] == 2)
+    {
+      struct zstdstream *zstdstream = apkzstd_open(fd);
+      if (!zstdstream)
+	return open_apkv3_error(pool, fd, fn, "zstdstream setup error");
+      if (fp)
+	zstdstream->fp = fp;
+      if ((cfp = solv_cookieopen(zstdstream, "r", apkzstd_read, 0, apkzstd_close)) == 0)
+	return open_apkv3_error(pool, fd, fn, "zstdstream cookie setup error");
+    }
+  else
+    return open_apkv3_error(pool, fd, fn, "unsupported apkv3 compression");
+
+  if (adbchar != '.')
+    {
+      if (fread(buf, 4, 1, cfp) != 1 || buf[0] != 'A' || buf[1] != 'D' || buf[2] != 'B' || buf[3] != '.')
+	{
+	  pool_error(pool, -1, "%s: not an apkv3 file", fn);
+	  if (cfp != fp)
+	    fclose(cfp);
+	  return 0;
+	}
+    }
+  return cfp;
+}
+
+static Id
+add_apkv3_pkg(Repo *repo, Repodata *data, const char *fn, int flags, int fd, int adbchar)
+{
+  FILE *fp;
+  Id p;
+  if (!(fp = open_apkv3(repo->pool, fd, 0, fn, adbchar)))
+    return 0;
+  p = apkv3_add_pkg(repo, data, fn, fp, flags);
+  fclose(fp);
+  return p;
+}
+
+static int
+add_apkv3_idx(Repo *repo, Repodata *data, FILE *fp, int flags, int adbchar)
+{
+  FILE *cfp;
+  int r;
+  if (!(cfp = open_apkv3(repo->pool, -1, fp, (flags & APK_ADD_INDEX ? "installed db" : "package index"), adbchar)))
+    return -1;
+  r = apkv3_add_idx(repo, data, cfp, flags);
+  fclose(cfp);
+  return r;
+}
+
+
+/* apkv2 handling */
+
 static void
 add_deps(Repo *repo, Solvable *s, Id what, char *p)
 {
@@ -215,6 +406,7 @@ repo_add_apk_pkg(Repo *repo, const char *fn, int flags)
   char *line = 0;
   size_t l, line_alloc = 0;
   int haveorigin = 0;
+  char first[4];
 
   data = repo_add_repodata(repo, flags);
   if ((fd = open(flags & REPO_USE_ROOTDIR ? pool_prepend_rootdir_tmp(pool, fn) : fn, O_RDONLY)) == -1)
@@ -222,7 +414,15 @@ repo_add_apk_pkg(Repo *repo, const char *fn, int flags)
       pool_error(pool, -1, "%s: %s", fn, strerror(errno));
       return 0;
     }
-  zstream = apkz_open(fd);
+  if (read(fd, first, 4) == 4 && first[0] == 'A' && first[1] == 'D' && first[2] == 'B')
+    return add_apkv3_pkg(repo, data, fn, flags, fd, first[3]);
+  if (lseek(fd, 0, SEEK_SET)) 
+    {
+      pool_error(pool, -1, "%s: lseek: %s", fn, strerror(errno));
+      close(fd);
+      return 0;
+    }
+  zstream = apkz_open(fd, 0);
   if (!zstream)
     {
       pool_error(pool, -1, "%s: %s", fn, strerror(errno));
@@ -245,7 +445,7 @@ repo_add_apk_pkg(Repo *repo, const char *fn, int flags)
       fclose(fp);
       return 0;
     }
-  if (flags & APK_ADD_WITH_HDRID)
+  if ((flags & APK_ADD_WITH_HDRID) != 0)
     {
       q1chk = solv_chksum_create(REPOKEY_TYPE_SHA1);
       zstream->readcb_data = q1chk;
@@ -297,7 +497,7 @@ repo_add_apk_pkg(Repo *repo, const char *fn, int flags)
 	  else if (!strncmp(line, "arch = ", 7))
 	    s->arch = pool_str2id(pool, line + 7, 1);
 	  else if (!strncmp(line, "license = ", 10))
-	    repodata_add_poolstr_array(data, s - pool->solvables, SOLVABLE_LICENSE, line + 10);
+	    repodata_set_poolstr(data, s - pool->solvables, SOLVABLE_LICENSE, line + 10);
 	  else if (!strncmp(line, "origin = ", 9))
 	    {
 	      if (s->name && !strcmp(line + 9,  pool_id2str(pool, s->name)))
@@ -403,7 +603,7 @@ apk_add_hdrid(Repodata *data, Id p, char *idstr)
 }
 
 static void
-apk_process_index(Repo *repo, Repodata *data, struct tarhead *th)
+apk_process_index(Repo *repo, Repodata *data, struct tarhead *th, int flags)
 {
   Pool *pool = repo->pool;
   Solvable *s = 0;
@@ -464,7 +664,7 @@ apk_process_index(Repo *repo, Repodata *data, struct tarhead *th)
       else if (line[0] == 'A')
 	s->arch = pool_str2id(pool, line + 2, 1);
       else if (line[0] == 'L')
-	repodata_add_poolstr_array(data, s - pool->solvables, SOLVABLE_LICENSE, line + 2);
+	repodata_set_poolstr(data, s - pool->solvables, SOLVABLE_LICENSE, line + 2);
       else if (line[0] == 'o')
 	{
 	  if (s->name && !strcmp(line + 2,  pool_id2str(pool, s->name)))
@@ -479,7 +679,7 @@ apk_process_index(Repo *repo, Repodata *data, struct tarhead *th)
 	add_deps(repo, s, SOLVABLE_PROVIDES, line + 2);
       else if (line[0] == 'i')
 	add_deps(repo, s, SOLVABLE_SUPPLEMENTS, line + 2);
-      else if (line[0] == 'C')
+      else if (line[0] == 'C' && (flags & APK_ADD_WITH_HDRID) != 0)
 	apk_add_hdrid(data, s - pool->solvables, line + 2);
     }
   solv_free(line);
@@ -488,6 +688,7 @@ apk_process_index(Repo *repo, Repodata *data, struct tarhead *th)
 int
 repo_add_apk_repo(Repo *repo, FILE *fp, int flags)
 {
+  char first[4];
   struct tarhead th;
   Repodata *data;
   int c;
@@ -501,11 +702,21 @@ repo_add_apk_repo(Repo *repo, FILE *fp, int flags)
     return (flags & APK_ADD_INDEX) != 0 ? 0 : -1;	/* an empty file is allowed for the v2 index */
   ungetc(c, fp);
 
+  if (c == 'A')
+    {
+     if (fread(first, 4, 1, fp) != 1)
+	return -1;
+     if (first[0] == 'A' && first[1] == 'D' && first[2] == 'B')
+       return add_apkv3_idx(repo, data, fp, flags, first[3]);
+     if ((flags & APK_ADD_INDEX) == 0)
+      return -1;	/* not a tar file */
+    }
+
   if (c == 0x1f)
     {
       struct zstream *zstream;
       /* gzip compressed, setup decompression */
-      zstream = apkz_open(-1);
+      zstream = apkz_open(-1, 0);
       if (!zstream)
 	return -1;
       zstream->fp = fp;
@@ -519,9 +730,15 @@ repo_add_apk_repo(Repo *repo, FILE *fp, int flags)
     }
 
   tarhead_init(&th, fp);
+  if (c == 'A')
+    {
+      /* initialize input buffer with 4 bytes we already read */
+      memcpy(th.blk, first, 4);
+      th.end = 4;
+    }
   
   if ((flags & APK_ADD_INDEX) != 0)
-    apk_process_index(repo, data, &th);
+    apk_process_index(repo, data, &th, flags);
   else
     {
       while (tarhead_next(&th) > 0)
@@ -529,7 +746,7 @@ repo_add_apk_repo(Repo *repo, FILE *fp, int flags)
 	  if (th.type != 1 || strcmp(th.path, "APKINDEX") != 0)
 	    tarhead_skip(&th);
 	  else
-	    apk_process_index(repo, data, &th);
+	    apk_process_index(repo, data, &th, flags);
 	}
     }
   tarhead_free(&th);

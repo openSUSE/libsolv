@@ -76,7 +76,7 @@ ENDIF (ENABLE_DEBIAN)
 
 IF (ENABLE_APK)
     SET (libsolvext_SRCS ${libsolvext_SRCS}
-	repo_apk.c)
+	repo_apk.c repo_apkv3.c)
     SET (libsolvext_HEADERS ${libsolvext_HEADERS}
 	repo_apk.h)
 ENDIF (ENABLE_APK)
