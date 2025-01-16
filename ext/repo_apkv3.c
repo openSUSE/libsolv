@@ -29,39 +29,14 @@
 
 #define ADB_MAX_SIZE		0x10000000
 
+
+/* low level */
+
 static inline unsigned int
 adb_u32(const unsigned char *p)
 {
   return p[0] | p[1] << 8 | p[2] << 16 | p[3] << 24;
 }
-
-static int
-adb_read_blk_header(FILE *fp, unsigned long long *sizep)
-{
-  unsigned char buf[12];
-  unsigned int size;
-  unsigned long long lsize;
-  if (fread(buf, 4, 1, fp) != 1)
-    return -1;
-  size = buf[0] | buf[1] << 8 | buf[2] << 16 | (buf[3] & 0x3f) << 24;
-  if ((buf[3] & 0xc0) != 0xc0)
-    {
-      if (size < 4)
-	return -1;
-      *sizep = size - 4;
-      return (buf[3] & 0xc0) >> 3;
-    }
-  if (fread(buf, 12, 1, fp) != 1)
-    return -1;
-  lsize = adb_u32(buf + 4);
-  lsize |= (unsigned long long)adb_u32(buf + 8) << 32;
-  if (lsize < 16)
-    return -1;
-  *sizep = lsize - 16;
-  return size;
-}
-
-/* low level */
 
 static const unsigned char *
 adb_blob(const unsigned char *adb, size_t adblen, unsigned int v, size_t *bloblp)
@@ -317,6 +292,34 @@ add_add_idb_pkg(Pool *pool, Repo *repo, Repodata *data, const unsigned char *adb
   return adb_add_pkg_info(pool, repo, data, adb, adblen, adb_idx(adb, v, cnt, 1), flags);
 }
 
+/* file reading */
+
+static int
+adb_read_blk_header(FILE *fp, unsigned long long *sizep)
+{
+  unsigned char buf[12];
+  unsigned int size;
+  unsigned long long lsize;
+  if (fread(buf, 4, 1, fp) != 1)
+    return -1;
+  size = buf[0] | buf[1] << 8 | buf[2] << 16 | (buf[3] & 0x3f) << 24;
+  if ((buf[3] & 0xc0) != 0xc0)
+    {
+      if (size < 4)
+	return -1;
+      *sizep = size - 4;
+      return (buf[3] & 0xc0) >> 6;
+    }
+  if (fread(buf, 12, 1, fp) != 1)
+    return -1;
+  lsize = adb_u32(buf + 4);
+  lsize |= (unsigned long long)adb_u32(buf + 8) << 32;
+  if (lsize < 16)
+    return -1;
+  *sizep = lsize - 16;
+  return size;
+}
+
 static const unsigned char *
 adb_read_adb_blk(Pool *pool, FILE *fp, const char *fn, size_t *adblenp)
 {
@@ -391,7 +394,7 @@ apkv3_add_idx(Repo *repo, Repodata *data, FILE *fp, int flags)
   unsigned int v, cnt, idx;
   int idb = flags & APK_ADD_INSTALLED_DB ? 1 : 0;
 
-  if (fread(buf, 4, 1, fp) != 1 || memcmp(buf, (idb ? "idb" : "indx") , 4))
+  if (fread(buf, 4, 1, fp) != 1 || memcmp(buf, (idb ? "idb" : "indx") , 4) != 0)
     {
       pool_error(pool, -1, (idb ?  "not an apkv3 installed database" : "not an apkv3 package index"));
       return -1;
