@@ -338,6 +338,7 @@ adb_read_adb_blk(Pool *pool, FILE *fp, const char *fn, size_t *adblenp)
   adb = solv_malloc((size_t)size);
   if (fread(adb, (size_t)size, 1, fp) != 1)
     {
+      solv_free(adb);
       pool_error(pool, -1, "%s: adb block read error", fn);
       return 0;
     }
@@ -353,7 +354,7 @@ apkv3_add_pkg(Repo *repo, Repodata *data, const char *fn, FILE *fp, int flags)
   const unsigned char *adb;
   size_t adblen;
   unsigned int v, cnt;
-  Id p;
+  Id p = 0;
 
   if (fread(buf, 4, 1, fp) != 1 || buf[0] != 'p' || buf[1] != 'c' || buf[2] != 'k' || buf[3] != 'g')
     {
@@ -361,17 +362,12 @@ apkv3_add_pkg(Repo *repo, Repodata *data, const char *fn, FILE *fp, int flags)
       return 0;
     }
 
-  adb = adb_read_adb_blk(pool, fp, fn, &adblen);
-  if (!adb)
+  if (!(adb = adb_read_adb_blk(pool, fp, fn, &adblen)))
     return 0;
 
   v = adb_u32(adb + 4);
-  if (!(cnt = adb_arr(adb, adblen, v)))
-    {
-      solv_free((void *)adb);
-      return 0;
-    }
-  p = adb_add_pkg_info(pool, repo, data, adb, adblen, adb_idx(adb, v, cnt, 1), flags);
+  if ((cnt = adb_arr(adb, adblen, v)) != 0)
+    p = adb_add_pkg_info(pool, repo, data, adb, adblen, adb_idx(adb, v, cnt, 1), flags);
   if (p && (flags & APK_ADD_WITH_PKGID) != 0)
     {
       unsigned char pkgid[16];
@@ -400,25 +396,22 @@ apkv3_add_idx(Repo *repo, Repodata *data, FILE *fp, int flags)
       return -1;
     }
 
-  adb = adb_read_adb_blk(pool, fp, idb ? "installed database" : "index", &adblen);
-  if (!adb)
+  if (!(adb = adb_read_adb_blk(pool, fp, idb ? "installed database" : "index", &adblen)))
     return -1;
 
   v = adb_u32(adb + 4);
-  if (!(cnt = adb_arr(adb, adblen, v)))
-    {
-      solv_free((void *)adb);
-      return -1;
-    }
-  v = adb_idx(adb, v, cnt, idb ? 1 : 2);
   if ((cnt = adb_arr(adb, adblen, v)) != 0)
     {
-      for (idx = 1; idx < cnt; idx++)
+      v = adb_idx(adb, v, cnt, idb ? 1 : 2);
+      if ((cnt = adb_arr(adb, adblen, v)) != 0)
 	{
-	  if (idb)
-            add_add_idb_pkg(pool, repo, data, adb, adblen, adb_idx(adb, v, cnt, idx), flags);
-	  else
-            adb_add_pkg_info(pool, repo, data, adb, adblen, adb_idx(adb, v, cnt, idx), flags);
+	  for (idx = 1; idx < cnt; idx++)
+	    {
+	      if (idb)
+		add_add_idb_pkg(pool, repo, data, adb, adblen, adb_idx(adb, v, cnt, idx), flags);
+	      else
+		adb_add_pkg_info(pool, repo, data, adb, adblen, adb_idx(adb, v, cnt, idx), flags);
+	    }
 	}
     }
   solv_free((void *)adb);
