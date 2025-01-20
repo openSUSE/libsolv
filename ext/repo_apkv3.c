@@ -161,14 +161,16 @@ adb_get_dep(const unsigned char *adb, size_t adblen, unsigned int v, Pool *pool,
 {
   unsigned int cnt;
   Id id, evr;
-  unsigned long long match;;
+  unsigned long long match;
   if (!(cnt = adb_arr(adb, adblen, v)))
     return 0;
   id = adb_poolid(adb, adblen, adb_idx(adb, v, cnt, 1), pool);
   if (!id)
     return 0;
   evr = cnt > 2 ? adb_poolid(adb, adblen, adb_idx(adb, v, cnt, 2), pool) : 0;
-  match = cnt > 3 ? adb_num(adb, adblen, adb_idx(adb, v, cnt, 3), &match) : 1;
+  match = 1;
+  if (cnt > 3 && !adb_num(adb, adblen, adb_idx(adb, v, cnt, 3), &match))
+    return 0;
   if (match & 16)
     {
       if (!whatp || *whatp != SOLVABLE_REQUIRES)
@@ -189,7 +191,7 @@ adb_get_dep(const unsigned char *adb, size_t adblen, unsigned int v, Pool *pool,
 	  /* fuzzy match, prepend ~ to evr */
 	  char *space = pool_alloctmpspace(pool, strlen(pool_id2str(pool, evr)) + 2);
 	  space[0] = '~';
-	  strcpy(space, pool_id2str(pool, evr));
+	  strcpy(space + 1, pool_id2str(pool, evr));
 	  evr = pool_str2id(pool, space, 1);
 	  pool_freetmpspace(pool, space);
 	}
@@ -248,6 +250,7 @@ adb_add_pkg_info(Pool *pool, Repo *repo, Repodata *data, const unsigned char *ad
   s = pool_id2solvable(pool, repo_add_solvable(repo));
   s->name = name;
   s->evr = adb_poolid(adb, adblen, adb_idx(adb, v, cnt, 2), pool);
+  adb_setstr(adb, adblen, adb_idx(adb, v, cnt, 4), data, s - pool->solvables, SOLVABLE_SUMMARY);
   adb_setstr(adb, adblen, adb_idx(adb, v, cnt, 4), data, s - pool->solvables, SOLVABLE_DESCRIPTION);
   s->arch = adb_poolid(adb, adblen, adb_idx(adb, v, cnt, 5), pool);
   license = adb_poolid(adb, adblen, adb_idx(adb, v, cnt, 6), pool);
