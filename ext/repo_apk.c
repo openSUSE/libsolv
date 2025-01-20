@@ -661,6 +661,8 @@ apk_process_index(Repo *repo, Repodata *data, struct tarhead *th, int flags)
 	repodata_set_num(data, s - pool->solvables, SOLVABLE_BUILDTIME, strtoull(line + 2, 0, 10));
       else if (line[0] == 'I')
 	repodata_set_num(data, s - pool->solvables, SOLVABLE_INSTALLSIZE, strtoull(line + 2, 0, 10));
+      else if (line[0] == 'S')
+	repodata_set_num(data, s - pool->solvables, SOLVABLE_DOWNLOADSIZE, strtoull(line + 2, 0, 10));
       else if (line[0] == 'A')
 	s->arch = pool_str2id(pool, line + 2, 1);
       else if (line[0] == 'L')
