@@ -7,8 +7,8 @@
 
 #include "solvversion.h"
 
-const char solv_version[] = LIBSOLV_VERSION_STRING;
-int solv_version_major = LIBSOLV_VERSION_MAJOR;
-int solv_version_minor = LIBSOLV_VERSION_MINOR;
-int solv_version_patch = LIBSOLV_VERSION_PATCH;
-const char solv_toolversion[] = LIBSOLV_TOOLVERSION;
+SOLV_API const char solv_version[] = LIBSOLV_VERSION_STRING;
+SOLV_API int solv_version_major = LIBSOLV_VERSION_MAJOR;
+SOLV_API int solv_version_minor = LIBSOLV_VERSION_MINOR;
+SOLV_API int solv_version_patch = LIBSOLV_VERSION_PATCH;
+SOLV_API const char solv_toolversion[] = LIBSOLV_TOOLVERSION;
