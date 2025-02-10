@@ -976,7 +976,9 @@ SWIG_AsValDepId(void *obj, int *val) {
 
 /* argh, swig undefs bool for perl */
 #ifndef bool
+#if !defined __STDC_VERSION__ || __STDC_VERSION__ < 202311L
 typedef int bool;
+#endif
 #endif
 
 #include "pool.h"
