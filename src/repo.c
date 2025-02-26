@@ -1423,7 +1423,7 @@ repo_set_num(Repo *repo, Id p, Id keyname, unsigned long long num)
 }
 
 void
-repo_set_str(Repo *repo, Id p, Id keyname, const char *str)
+repo_set_strn(Repo *repo, Id p, Id keyname, const char *str, size_t l)
 {
   Repodata *data;
   if (p >= 0)
@@ -1434,12 +1434,18 @@ repo_set_str(Repo *repo, Id p, Id keyname, const char *str)
 	case SOLVABLE_ARCH:
 	case SOLVABLE_EVR:
 	case SOLVABLE_VENDOR:
-	  repo_set_id(repo, p, keyname, pool_str2id(repo->pool, str, 1));
+	  repo_set_id(repo, p, keyname, pool_strn2id(repo->pool, str, l, 1));
 	  return;
 	}
     }
   data = repo_last_repodata(repo);
-  repodata_set_str(data, p, keyname, str);
+  repodata_set_strn(data, p, keyname, str, l);
+}
+
+void
+repo_set_str(Repo *repo, Id p, Id keyname, const char *str)
+{
+  repo_set_strn(repo, p, keyname, str, strlen(str));
 }
 
 void
