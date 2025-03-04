@@ -72,7 +72,7 @@ License:        BSD-3-Clause
 Group:          Development/Libraries/C and C++
 URL:            https://github.com/openSUSE/libsolv
 Source:         libsolv-%{version}.tar.bz2
-BuildRequires:  cmake
+BuildRequires:  cmake >= 3.5
 BuildRequires:  gcc-c++
 BuildRequires:  libxml2-devel
 BuildRequires:  rpm-devel

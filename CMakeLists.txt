@@ -1,6 +1,6 @@
-PROJECT (libsolv C)
+CMAKE_MINIMUM_REQUIRED (VERSION 3.5)
 
-CMAKE_MINIMUM_REQUIRED (VERSION 2.8.5)
+PROJECT (libsolv C)
 
 OPTION (ENABLE_STATIC "Build a static version of the libraries?" OFF)
 OPTION (DISABLE_SHARED "Do not build a shared version of the libraries?" OFF)
