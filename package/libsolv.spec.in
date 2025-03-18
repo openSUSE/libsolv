@@ -208,6 +208,7 @@ Applications demoing the libsolv library.
 %package -n ruby-solv
 Summary:        Ruby bindings for the libsolv library
 Group:          Development/Languages/Ruby
+Provides:       ruby-solv-ruby-%{rb_ver}
 
 %description -n ruby-solv
 Ruby bindings for libsolv.
