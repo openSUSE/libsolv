@@ -39,7 +39,7 @@ Supported repository formats:
 Build instructions
 ==================
 
-Requires: cmake 2.8.5 or later
+Requires: cmake 3.5 or later
 
     mkdir build
     cd build
