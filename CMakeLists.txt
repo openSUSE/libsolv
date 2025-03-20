@@ -43,6 +43,9 @@ OPTION (WITH_SYSTEM_ZCHUNK "Use system zchunk library?" OFF)
 OPTION (WITH_LIBXML2  "Build with libxml2 instead of libexpat?" OFF)
 OPTION (WITHOUT_COOKIEOPEN "Disable the use of stdio cookie opens?" OFF)
 
+OPTION (ENABLE_STATIC_TOOLS "Link the tools against the static version of the libraries?" OFF)
+OPTION (ENABLE_STATIC_BINDINGS "Link the bindings against the static version of the libraries?" OFF)
+
 include (GNUInstallDirs)
 message (STATUS "Libraries will be installed in ${CMAKE_INSTALL_FULL_LIBDIR}")
 message (STATUS "Header files will be installed in ${CMAKE_INSTALL_FULL_INCLUDEDIR}")
