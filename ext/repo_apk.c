@@ -26,6 +26,17 @@
 #include "repo_apk.h"
 #include "repo_apkv3.h"
 
+static inline ssize_t
+apk_fillbuf(unsigned char *buf, size_t count, int fd, FILE *fp)
+{
+  if (fp)
+    {
+      ssize_t rr = fread(buf, 1, count, fp);
+      return rr <= 0 && ferror(fp) ? -1 : rr;
+    }
+  return read(fd, buf, count);
+}
+
 /* zlib decompression */
 
 struct zstream {
@@ -40,10 +51,11 @@ struct zstream {
 };
 
 static struct zstream *
-apkz_open(int fd, int raw)
+apkz_open(int fd, FILE *fp, int raw)
 {
   struct zstream *zstream = solv_calloc(1, sizeof(*zstream));
   zstream->fd = fd;
+  zstream->fp = fp;
   if (inflateInit2(&zstream->zs, raw ? -15 : 15 + 32) != Z_OK)	/* 32: enable gzip */
     {
       solv_free(zstream);
@@ -66,15 +78,7 @@ apkz_close(void *cookie)
 static inline ssize_t
 apkz_fillbuf(struct zstream *zstream)
 {
-  ssize_t rr;
-  if (zstream->fp)
-    {
-      rr = fread(zstream->buf, 1, sizeof(zstream->buf), zstream->fp);
-      if (rr <= 0 && ferror(zstream->fp))
-	rr = -1;
-    }
-  else
-    rr = read(zstream->fd, zstream->buf, sizeof(zstream->buf));
+  ssize_t rr = apk_fillbuf(zstream->buf, sizeof(zstream->buf), zstream->fd, zstream->fp);
   if (rr >= 0)
     {
       zstream->zs.avail_in = rr;
@@ -158,10 +162,11 @@ struct zstdstream {
 };
 
 static struct zstdstream *
-apkzstd_open(int fd)
+apkzstd_open(int fd, FILE *fp)
 {
   struct zstdstream *zstdstream = solv_calloc(1, sizeof(*zstdstream));
   zstdstream->fd = fd;
+  zstdstream->fp = fp;
   zstdstream->in.src = zstdstream->buf;
   zstdstream->in.size = zstdstream->in.pos = 0;
   if (!(zstdstream->ctx =  ZSTD_createDCtx()))
@@ -186,15 +191,7 @@ apkzstd_close(void *cookie)
 static inline ssize_t
 apkzstd_fillbuf(struct zstdstream *zstdstream)
 {
-  ssize_t rr;
-  if (zstdstream->fp)
-    {
-      rr = fread(zstdstream->buf, 1, sizeof(zstdstream->buf), zstdstream->fp);
-      if (rr <= 0 && ferror(zstdstream->fp))
-	rr = -1;
-    }
-  else
-    rr = read(zstdstream->fd, zstdstream->buf, sizeof(zstdstream->buf));
+  ssize_t rr = apk_fillbuf(zstdstream->buf, sizeof(zstdstream->buf), zstdstream->fd, zstdstream->fp);
   if (rr >= 0)
     {
       zstdstream->in.pos = 0;
@@ -274,21 +271,17 @@ open_apkv3(Pool *pool, int fd, FILE *fp, const char *fn, int adbchar)
     cfp = fp ? fp : fdopen(fd, "r");
   else if (comp[0] == 1)
     {
-      struct zstream *zstream = apkz_open(fd, 1);
+      struct zstream *zstream = apkz_open(fd, fp, 1);
       if (!zstream)
 	return open_apkv3_error(pool, fd, fn, "zstream setup error");
-      if (fp)
-	zstream->fp = fp;
       if ((cfp = solv_cookieopen(zstream, "r", apkz_read, 0, apkz_close)) == 0)
         return open_apkv3_error(pool, fd, fn, "zstream cookie setup error");
     }
   else if (comp[0] == 2)
     {
-      struct zstdstream *zstdstream = apkzstd_open(fd);
+      struct zstdstream *zstdstream = apkzstd_open(fd, fp);
       if (!zstdstream)
 	return open_apkv3_error(pool, fd, fn, "zstdstream setup error");
-      if (fp)
-	zstdstream->fp = fp;
       if ((cfp = solv_cookieopen(zstdstream, "r", apkzstd_read, 0, apkzstd_close)) == 0)
 	return open_apkv3_error(pool, fd, fn, "zstdstream cookie setup error");
     }
@@ -422,7 +415,7 @@ repo_add_apk_pkg(Repo *repo, const char *fn, int flags)
       close(fd);
       return 0;
     }
-  zstream = apkz_open(fd, 0);
+  zstream = apkz_open(fd, NULL, 0);
   if (!zstream)
     {
       pool_error(pool, -1, "%s: %s", fn, strerror(errno));
@@ -718,10 +711,9 @@ repo_add_apk_repo(Repo *repo, FILE *fp, int flags)
     {
       struct zstream *zstream;
       /* gzip compressed, setup decompression */
-      zstream = apkz_open(-1, 0);
+      zstream = apkz_open(-1, fp, 0);
       if (!zstream)
 	return -1;
-      zstream->fp = fp;
       zstream->doall = 1;
       if ((fp = solv_cookieopen(zstream, "r", apkz_read, 0, apkz_close)) == 0)
 	{
