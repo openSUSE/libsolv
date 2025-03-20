@@ -557,7 +557,9 @@ apk_add_hdrid(Repodata *data, Id p, char *idstr)
   size_t l = strlen(idstr);
   unsigned char chksum[33], *cp = chksum;
 
-  if (((l == 30 || l == 46) && idstr[0] == 'Q' && idstr[1] == '1') || (idstr[1] == '2' && l == 46))
+  if (idstr[0] != 'Q')
+    return;
+  if ((idstr[1] == '1' && (l == 30 || l == 46)) || (idstr[1] == '2' && l == 46))
     {
       int xpos = idstr[1] == '2' ? 43 : 27;
       int i, v;
