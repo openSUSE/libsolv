@@ -15,8 +15,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <errno.h>
-#include <fcntl.h>
 
 #include "pool.h"
 #include "repo.h"
@@ -282,13 +280,26 @@ adb_add_pkg_info(Pool *pool, Repo *repo, Repodata *data, const unsigned char *ad
 static Id
 add_add_idb_pkg(Pool *pool, Repo *repo, Repodata *data, const unsigned char *adb, size_t adblen, unsigned int v, int flags)
 {
-  unsigned int cnt;
+  unsigned int cnt, type_size;
   size_t blobl;
   const unsigned char *blob = adb_blob(adb, adblen, v, &blobl);
-  if (blobl < 4 + 2 + 4 || blobl >= ADB_MAX_SIZE || (blob[3] & 0xf0) != 0)
+  if (blobl < 12 || blobl >= ADB_MAX_SIZE)
     return 0;
-  adb = (unsigned char *)blob + 4;
-  adblen = blobl - 4;
+  type_size = adb_u32(blob);
+  if ((type_size & 0xc0000000) == 0 && blobl == type_size + 4)
+    {
+      adb = (unsigned char *)blob + 4;
+      adblen = blobl - 4;
+    }
+  else if (type_size == 0xc0000000)
+    {
+      if (blobl < 16 + 8 || adb_u32(blob + 8) != (unsigned int)(blobl - 16) || adb_u32(blob + 12) != 0)
+	return 0;
+      adb = (unsigned char *)blob + 16;
+      adblen = blobl - 16;
+    }
+  else
+    return 0;
   v = adb_u32(adb + 4);
   if (!(cnt = adb_arr(adb, adblen, v)))
     return 0;
@@ -330,19 +341,19 @@ adb_read_adb_blk(Pool *pool, FILE *fp, const char *fn, size_t *adblenp)
   unsigned long long size;
   if (adb_read_blk_header(fp, &size) != 0)
     {
-      pool_error(pool, -1, "%s: missing adb block", fn);
+      pool_error(pool, 0, "%s: missing adb block", fn);
       return 0;
     }
   if (size > ADB_MAX_SIZE)
     {
-      pool_error(pool, -1, "%s: oversized adb block", fn);
+      pool_error(pool, 0, "%s: oversized adb block", fn);
       return 0;
     }
   adb = solv_malloc((size_t)size);
   if (fread(adb, (size_t)size, 1, fp) != 1)
     {
       solv_free(adb);
-      pool_error(pool, -1, "%s: adb block read error", fn);
+      pool_error(pool, 0, "%s: adb block read error", fn);
       return 0;
     }
   *adblenp = (size_t)size;
@@ -360,10 +371,7 @@ apkv3_add_pkg(Repo *repo, Repodata *data, const char *fn, FILE *fp, int flags)
   Id p = 0;
 
   if (fread(buf, 4, 1, fp) != 1 || buf[0] != 'p' || buf[1] != 'c' || buf[2] != 'k' || buf[3] != 'g')
-    {
-      pool_error(pool, -1, "%s: not an apkv3 package", fn);
-      return 0;
-    }
+    return pool_error(pool, 0, "%s: not an apkv3 package", fn);
 
   if (!(adb = adb_read_adb_blk(pool, fp, fn, &adblen)))
     return 0;
@@ -394,10 +402,7 @@ apkv3_add_idx(Repo *repo, Repodata *data, FILE *fp, int flags)
   int idb = flags & APK_ADD_INSTALLED_DB ? 1 : 0;
 
   if (fread(buf, 4, 1, fp) != 1 || memcmp(buf, (idb ? "idb" : "indx") , 4) != 0)
-    {
-      pool_error(pool, -1, (idb ?  "not an apkv3 installed database" : "not an apkv3 package index"));
-      return -1;
-    }
+    return pool_error(pool, -1, (idb ?  "not an apkv3 installed database" : "not an apkv3 package index"));
 
   if (!(adb = adb_read_adb_blk(pool, fp, idb ? "installed database" : "index", &adblen)))
     return -1;
