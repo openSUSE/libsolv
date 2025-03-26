@@ -61,7 +61,6 @@ ENDIF (NOT PKGCONFIG_INSTALL_DIR)
 
 # where to look first for cmake modules, before ${CMAKE_ROOT}/Modules/ is checked
 SET (CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/modules)
-INSTALL( FILES ${CMAKE_MODULE_PATH}/FindLibSolv.cmake DESTINATION ${CMAKE_INSTALL_PREFIX}/share/cmake/Modules )
 
 # for shared libraries on windows (DLLs), we just export all symbols for now
 SET(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
@@ -438,6 +437,32 @@ ENDIF (ENABLE_RPMDB)
 IF (ENABLE_HAIKU)
 SET (SYSTEM_LIBRARIES ${HAIKU_SYSTEM_LIBRARIES} ${SYSTEM_LIBRARIES})
 ENDIF (ENABLE_HAIKU)
+
+# For static libs we need to remember the link dependencies as well
+IF (ENABLE_STATIC)
+  foreach( _lib_dep_path ${SYSTEM_LIBRARIES})
+    get_filename_component( _lib_dep_dir ${_lib_dep_path} PATH )
+    get_filename_component( _lib_dep ${_lib_dep_path} NAME_WE )
+
+    string( REGEX REPLACE "^lib" "" _lib_dep ${_lib_dep} )
+
+    set( _newDirEntry  "-L${_lib_dep_dir}")
+    set( _newFileEntry "-l${_lib_dep}" )
+
+    list (FIND SOLVEXT_LIB_DEPENDENCIES_LIST ${_newDirEntry} _index)
+    if (${_index} LESS_EQUAL -1)
+      list( APPEND SOLVEXT_LIB_DEPENDENCIES_LIST ${_newDirEntry} )
+    endif()
+
+    list (FIND SOLVEXT_LIB_DEPENDENCIES_LIST ${_newFileEntry} _index)
+    if (${_index} LESS_EQUAL -1)
+      list( APPEND SOLVEXT_LIB_DEPENDENCIES_LIST ${_newFileEntry} )
+    endif()
+
+  endforeach()
+  list(JOIN SOLVEXT_LIB_DEPENDENCIES_LIST " " SOLVEXT_LIB_DEPENDENCIES )
+ENDIF()
+
 IF (HAVE_LINKER_AS_NEEDED)
 SET (SYSTEM_LIBRARIES "-Wl,--as-needed" ${SYSTEM_LIBRARIES})
 ENDIF (HAVE_LINKER_AS_NEEDED)
@@ -452,6 +477,11 @@ ADD_SUBDIRECTORY (examples)
 ADD_SUBDIRECTORY (doc)
 
 MESSAGE (STATUS "Version: ${VERSION}")
+
+# FindLibsolv
+SET( LIBSOLV_EXT_DEPS "set(LIBSOLV_EXT_LIBRARY_DEPS ${SOLVEXT_LIB_DEPENDENCIES} )" )
+CONFIGURE_FILE (${CMAKE_MODULE_PATH}/FindLibSolv.cmake.in ${CMAKE_BINARY_DIR}/cmake/modules/FindLibSolv.cmake @ONLY)
+INSTALL( FILES ${CMAKE_BINARY_DIR}/cmake/modules/FindLibSolv.cmake DESTINATION ${CMAKE_INSTALL_PREFIX}/share/cmake/Modules )
 
 ####################################################################
 # RPM SPEC                                                         #

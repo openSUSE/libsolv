@@ -167,6 +167,26 @@ Group:          Development/Libraries/C and C++
 %if %{with shared}
 Requires:       %{libname} = %version
 %endif
+
+%if %{with static}
+Requires:  libxml2-devel
+Requires:  zlib-devel
+%if %{with bz2}
+%if 0%{?suse_version}
+Requires:  libbz2-devel
+%else
+Requires:  bzip2-devel
+%endif
+
+%endif
+%if %{with xz}
+Requires:  xz-devel
+%endif
+
+%if %{with zstd}
+Requires:  libzstd-devel
+%endif
+%endif
 Requires:       rpm-devel
 Conflicts:      libsatsolver-devel
 
