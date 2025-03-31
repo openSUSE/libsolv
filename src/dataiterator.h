@@ -61,8 +61,10 @@ typedef struct s_KeyValue {
 #define SEARCH_CHECKSUMS		(1<<18)
 
 /* internal */
+#ifdef LIBSOLV_INTERNAL
 #define SEARCH_SUBSCHEMA		(1<<30)
 #define SEARCH_THISSOLVID		(1<<31)
+#endif
 
 /* obsolete */
 #define SEARCH_COMPLETE_FILELIST	0		/* ignored, this is the default */
