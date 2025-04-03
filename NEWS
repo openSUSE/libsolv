@@ -1,6 +1,13 @@
 
 This file contains the major changes between libsolv versions:
 
+Version 0.7.32
+- build both static and dynamic libraries on new suse distros
+- require cmake >= 3.5
+- new features:
+  * support the apk package and repository format (both v2 and v3)
+  * new dataiterator_final_{repo,solvable} functions
+
 Version 0.7.31
 - selected bug fixes:
   * fix replaces_installed_package using the wrong solvable id

@@ -1,4 +1,12 @@
 -------------------------------------------------------------------
+Thu Apr  3 13:07:20 CEST 2025 - mls@suse.de
+
+- build both static and dynamic libraries on new suse distros
+- support the apk package and repository format (both v2 and v3)
+- new dataiterator_final_{repo,solvable} functions
+- bump version to 0.7.32
+
+-------------------------------------------------------------------
 Wed Jan 15 09:16:51 UTC 2025 - Bernhard Wiedemann <bwiedemann@suse.com>
 
 - Provide a symbol specific for the ruby-version
