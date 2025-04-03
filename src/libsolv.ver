@@ -2,6 +2,8 @@ SOLV_1.0 {
 	global:
 		dataiterator_clonepos;
 		dataiterator_entersub;
+		dataiterator_final_repo;
+		dataiterator_final_solvable;
 		dataiterator_free;
 		dataiterator_init;
 		dataiterator_init_clone;

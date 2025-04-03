@@ -2144,6 +2144,19 @@ dataiterator_skip_repo(Dataiterator *di)
 }
 
 void
+dataiterator_final_solvable(Dataiterator *di)
+{
+  di->flags |= SEARCH_THISSOLVID;
+  di->repoid = 0;
+}
+
+void
+dataiterator_final_repo(Dataiterator *di)
+{
+  di->repoid = 0;
+}
+
+void
 dataiterator_jump_to_solvid(Dataiterator *di, Id solvid)
 {
   di->nparents = 0;
