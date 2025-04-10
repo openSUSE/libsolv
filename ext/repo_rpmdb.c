@@ -1090,44 +1090,43 @@ addchangelog(Repodata *data, Id handle, RpmHead *rpmhead)
 }
 
 static void
-set_description_author(Repodata *data, Id handle, char *str)
+set_description_author(Repodata *data, Id handle, const char *str)
 {
-  char *aut, *p;
+  const char *aut;
   for (aut = str; (aut = strchr(aut, '\n')) != 0; aut++)
     if (!strncmp(aut, "\nAuthors:\n--------\n", 19))
       break;
   if (aut)
     {
       /* oh my, found SUSE special author section */
-      int l = aut - str;
-      str = solv_strdup(str);
-      aut = str + l;
-      str[l] = 0;
-      while (l > 0 && str[l - 1] == '\n')
-	str[--l] = 0;
+      size_t l = aut - str;
+      char *p, *ap, *s = solv_strdup(str);
+      p = s + l + 19;	/* author block starts here */
+      s[l] = 0;
+      while (l > 0 && s[l - 1] == '\n')
+	s[--l] = 0;
       if (l)
-	setutf8string(data, handle, SOLVABLE_DESCRIPTION, str);
-      p = aut + 19;
-      aut = str;	/* copy over */
+	setutf8string(data, handle, SOLVABLE_DESCRIPTION, s);
       while (*p == ' ' || *p == '\n')
 	p++;
+      ap = s;	/* copy over */
       while (*p)
 	{
 	  if (*p == '\n')
 	    {
-	      *aut++ = *p++;
+	      *ap++ = *p++;
 	      while (*p == ' ')
 		p++;
 	      continue;
 	    }
-	  *aut++ = *p++;
+	  *ap++ = *p++;
 	}
-      while (aut != str && aut[-1] == '\n')
-	aut--;
-      *aut = 0;
-      if (*str)
-	setutf8string(data, handle, SOLVABLE_AUTHORS, str);
-      free(str);
+      while (ap != s && ap[-1] == '\n')
+	ap--;
+      *ap = 0;
+      if (*s)
+	setutf8string(data, handle, SOLVABLE_AUTHORS, s);
+      free(s);
     }
   else if (*str)
     setutf8string(data, handle, SOLVABLE_DESCRIPTION, str);
@@ -1198,7 +1197,7 @@ rpmhead2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhe
   if (data)
     {
       Id handle;
-      char *str;
+      const char *str;
       unsigned int u32;
       unsigned long long u64;
 
@@ -1231,6 +1230,14 @@ rpmhead2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhe
 	  chksum = headbinary(rpmhead, TAG_SIGMD5, &chksumsize);
 	  if (chksum && chksumsize == 16)
 	    repodata_set_bin_checksum(data, handle, SOLVABLE_PKGID, REPOKEY_TYPE_MD5, chksum);
+	  else
+	    {
+	      unsigned char md5[16];
+	      str = headstring(rpmhead, TAG_SHA256HEADER);
+	      /* truncate sh256 to md5 */
+	      if (str && strlen(str) == 64 && solv_hex2bin(&str, md5, 16) == 16)
+		repodata_set_bin_checksum(data, handle, SOLVABLE_PKGID, REPOKEY_TYPE_MD5, md5);
+	    }
 	}
       if ((flags & RPM_ADD_WITH_HDRID) != 0)
 	{
@@ -2022,8 +2029,8 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
     {
       if (!headfromfp(&state, rpm, fp, lead + 96, sigcnt, sigdsize, sigpad, chksumh, leadsigchksumh))
 	{
-      solv_chksum_free(leadsigchksumh, 0);
-      solv_chksum_free(chksumh, 0);
+	  solv_chksum_free(leadsigchksumh, 0);
+	  solv_chksum_free(chksumh, 0);
 	  fclose(fp);
 	  return 0;
 	}
@@ -2036,6 +2043,12 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
 	    {
 	      pkgidtype = REPOKEY_TYPE_MD5;
 	      memcpy(pkgid, chksum, 16);
+	    }
+	  else
+	    {
+	      const char *str = headstring(state.rpmhead, TAG_SHA256HEADER);
+	      if (str && strlen(str) == 64 && solv_hex2bin(&str, pkgid, 16) == 16)
+	        pkgidtype = REPOKEY_TYPE_MD5;
 	    }
 	}
       if ((flags & RPM_ADD_WITH_HDRID) != 0)
