@@ -1148,8 +1148,11 @@ replaces_installed_package(Pool *pool, Id p, Map *noupdate)
   FOR_PROVIDES(p2, pp2, s->name)
     {
       s2 = pool->solvables + p2;
-      if (s2->repo == installed && s2->name == s->name && !(noupdate && MAPTST(noupdate, p2 - installed->start)))
-	return 1;
+      if (s2->name != s->name || s2->repo != installed || (noupdate && MAPTST(noupdate, p2 - installed->start)))
+	continue;
+      if (pool->implicitobsoleteusescolors && !pool_colormatch(pool, s, s2))
+	continue;
+      return 1;
     }
   if (!s->obsoletes)
     return 0;
@@ -1159,7 +1162,7 @@ replaces_installed_package(Pool *pool, Id p, Map *noupdate)
       FOR_PROVIDES(p2, pp2, obs)
 	{
 	  s2 = pool->solvables + p2;
-	  if (s2->repo != pool->installed || (noupdate && MAPTST(noupdate, p2 - installed->start)))
+	  if (s2->repo != installed || (noupdate && MAPTST(noupdate, p2 - installed->start)))
 	    continue;
 	  if (!pool->obsoleteusesprovides && !pool_match_nevr(pool, s2, obs))
 	    continue;
@@ -3354,8 +3357,11 @@ add_update_target(Solver *solv, Id p, Id how)
       FOR_PROVIDES(pi, pip, s->name)
 	{
 	  Solvable *si = pool->solvables + pi;
-	  if (si->repo == installed && si->name == s->name && pi != p)
-	    queue_push2(solv->update_targets, pi, p);
+	  if (si->repo != installed || si->name != s->name || pi == p)
+	    continue;
+	  if (pool->implicitobsoleteusescolors && !pool_colormatch(pool, s, si))
+	    continue;
+	  queue_push2(solv->update_targets, pi, p);
 	}
       return;
     }
@@ -3365,6 +3371,8 @@ add_update_target(Solver *solv, Id p, Id how)
     {
       Solvable *si = pool->solvables + pi;
       if (si->repo != installed || si->name != s->name)
+	continue;
+      if (pool->implicitobsoleteusescolors && !pool_colormatch(pool, s, si))
 	continue;
       if (how & SOLVER_FORCEBEST)
 	{
