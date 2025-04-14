@@ -8,6 +8,15 @@
 #ifndef SOLV_XFOPEN_H
 #define SOLV_XFOPEN_H
 
+#include <stddef.h>
+
+#ifdef _WIN32
+  #include <BaseTsd.h>
+  typedef SSIZE_T ssize_t;
+#else
+  #include <unistd.h>
+#endif
+
 extern FILE *solv_xfopen(const char *fn, const char *mode);
 extern FILE *solv_xfopen_fd(const char *fn, int fd, const char *mode);
 extern FILE *solv_xfopen_buf(const char *fn, char **bufp, size_t *buflp, const char *mode);
