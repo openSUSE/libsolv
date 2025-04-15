@@ -1,0 +1,76 @@
+'\" t
+.\"     Title: apk2solv
+.\"    Author: [see the "Author" section]
+.\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
+.\"      Date: 04/15/2025
+.\"    Manual: LIBSOLV
+.\"    Source: libsolv
+.\"  Language: English
+.\"
+.TH "APK2SOLV" "1" "04/15/2025" "libsolv" "LIBSOLV"
+.\" -----------------------------------------------------------------
+.\" * Define some portability stuff
+.\" -----------------------------------------------------------------
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.\" http://bugs.debian.org/507673
+.\" http://lists.gnu.org/archive/html/groff/2009-02/msg00013.html
+.\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.ie \n(.g .ds Aq \(aq
+.el       .ds Aq '
+.\" -----------------------------------------------------------------
+.\" * set default formatting
+.\" -----------------------------------------------------------------
+.\" disable hyphenation
+.nh
+.\" disable justification (adjust text to left margin only)
+.ad l
+.\" -----------------------------------------------------------------
+.\" * MAIN CONTENT STARTS HERE *
+.\" -----------------------------------------------------------------
+.SH "NAME"
+apk2solv \- convert one or more apk package files into a solv file
+.SH "SYNOPSIS"
+.sp
+\fBapk2solv\fR [\fIOPTIONS\fR] \fIPKG1\&.apk\fR \&...
+.SH "DESCRIPTION"
+.sp
+The apk2solv tool converts the meta data from one or more Apk packages into the solv file written to standard output\&.
+.PP
+\fB\-m\fR \fIMANIFESTFILE\fR
+.RS 4
+Read the rpm file names from the specified
+\fIMANIFESTFILE\fR\&. You can use
+\fB\-\fR
+to read the manifest from standard input\&.
+.RE
+.PP
+\fB\-0\fR
+.RS 4
+Use a null byte as line terminator for manifest files instead of a newline\&. This is useful if the file names can contain newlines\&. See also the
+\fB\-print0\fR
+option in
+\fBfind\fR\&.
+.RE
+.PP
+\fB\-C\fR
+.RS 4
+Add the apk checksum to the meta data\&.
+.RE
+.PP
+\fB\-r\fR
+.RS 4
+Enable repository metadata mode\&. The specified file is not an apk package, but a file containing repository metadata (e\&.g\&.
+\fIAPKINDEX\&.tar\&.gz\fR)\&.
+.RE
+.PP
+\fB\-l\fR
+.RS 4
+Enable local database mode\&. The specified file is not an apk package, but a database file containing information about the installed packages (e\&.g\&.
+\fI/lib/apk/db/installed\fR)\&.
+.RE
+.SH "SEE ALSO"
+.sp
+apk(8)
+.SH "AUTHOR"
+.sp
+Michael Schroeder <mls@suse\&.de>
