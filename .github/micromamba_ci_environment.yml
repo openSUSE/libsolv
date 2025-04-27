@@ -1,0 +1,8 @@
+name: ci_environment
+channels:
+  - conda-forge
+dependencies:
+  - c-compiler
+  - ninja
+  - cmake
+  - zlib

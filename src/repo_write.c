@@ -188,7 +188,7 @@ write_compressed_blob(Repodata *data, void *blob, int len)
 	  write_u8(data, clen);
 	  write_blob(data, cpage, clen);
 	}
-      blob += chunk;
+      blob = (char*) blob + chunk;
       len -= chunk;
     }
 }
