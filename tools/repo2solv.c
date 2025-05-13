@@ -5,6 +5,7 @@
  * for further information
  */
 
+#include <getopt.h>
 #include <sys/types.h>
 #include <stdio.h>
 #include <stdlib.h>
