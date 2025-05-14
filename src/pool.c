@@ -594,8 +594,7 @@ pool_createwhatprovides(Pool *pool)
     }
   else if (!pool->addedfileprovides && pool->disttype == DISTTYPE_RPM)
     {
-      if (!pool->addedfileprovides)
-	POOL_DEBUG(SOLV_DEBUG_STATS, "WARNING: pool_addfileprovides was not called, this may result in slow operation\n");
+      POOL_DEBUG(SOLV_DEBUG_STATS, "WARNING: pool_addfileprovides was not called, this may result in slow operation\n");
       /* lazyly add file provides */
       for (i = 1; i < num; i++)
 	{
