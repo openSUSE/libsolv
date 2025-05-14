@@ -607,7 +607,7 @@ getdecisionlist(Solver *solv, Map *dm, int flags, Queue *decisionlistq)
       info = solv->decisionq_why.elements[ii];
       if (info > 0)
 	reason = SOLVER_REASON_UNIT_RULE;
-      else if (info <= 0)
+      else
 	{
 	  info = -info;
 	  reason = solv->decisionmap[vv];
