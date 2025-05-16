@@ -1472,9 +1472,10 @@ transaction_check_order(Transaction *trans)
       p = trans->steps.elements[i];
       s = pool->solvables + p;
       if (s->repo != pool->installed)
+      {
 	lastins = p;
-      if (s->repo != pool->installed)
 	MAPSET(&ins, p);
+      }
       if (havescripts(pool, p, 0))
 	{
 	  MAPZERO(&seen);

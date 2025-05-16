@@ -3206,7 +3206,7 @@ solver_ruleclass(Solver *solv, Id rid)
 {
   if (rid <= 0)
     return SOLVER_RULE_UNKNOWN;
-  if (rid > 0 && rid < solv->pkgrules_end)
+  if (rid < solv->pkgrules_end)
     return SOLVER_RULE_PKG;
   if (rid >= solv->jobrules && rid < solv->jobrules_end)
     return SOLVER_RULE_JOB;
