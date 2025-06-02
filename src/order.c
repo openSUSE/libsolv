@@ -407,10 +407,11 @@ addsolvableedges(struct orderdata *od, Solvable *s)
 		  if (s->repo != installed)
 		    continue;	/* no inst->uninst edges, please! */
 
-		  /* uninst -> uninst edge. Those make trouble. Only add if we must */
-		  if (trans->transaction_installed[p - installed->start] && !havescripts(pool, p, &ignoreinst))
+		  /* uninst -> uninst edge. Those can make trouble, as uninst elements are often bound to
+		   * inst elements which use the opposite order. */
+		  if (trans->transaction_installed[p2 - installed->start] && trans->transaction_installed[p - installed->start] && !havescripts(pool, p, &ignoreinst))
 		    {
-		      /* p is obsoleted by another package and has no scripts */
+		      /* both p and p2 are bound to inst elements and p has no scripts */
 		      /* we assume that the obsoleter is good enough to replace p */
 		      continue;
 		    }
