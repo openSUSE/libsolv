@@ -545,7 +545,7 @@ testcase_add_testtags(Repo *repo, FILE *fp, int flags)
   Repodata *data;
   Solvable *s;
   char *sp[5];
-  unsigned int t;
+  unsigned int ti;
   int intag;
   char *filelist = 0;
   int afilelist = 0;
@@ -640,14 +640,14 @@ testcase_add_testtags(Repo *repo, FILE *fp, int flags)
 	  s->vendor = pool_str2id(pool, line + 6, 1);
 	  break;
 	case 'T' << 16 | 'i' << 8 | 'm':
-	  t = atoi(line + 6);
-	  if (t)
-	    repodata_set_num(data, s - pool->solvables, SOLVABLE_BUILDTIME, t);
+	  ti = strtoull(line + 6, 0, 10);
+	  if (ti)
+	    repodata_set_num(data, s - pool->solvables, SOLVABLE_BUILDTIME, ti);
 	  break;
 	case 'I' << 16 | 't' << 8 | 'm':
-	  t = atoi(line + 6);
-	  if (t)
-	    repodata_set_num(data, s - pool->solvables, SOLVABLE_INSTALLTIME, t);
+	  ti = strtoull(line + 6, 0, 10);
+	  if (ti)
+	    repodata_set_num(data, s - pool->solvables, SOLVABLE_INSTALLTIME, ti);
 	  break;
 	case 'R' << 16 | 'e' << 8 | 'q':
 	  s->requires = adddep(repo, s->requires, line + 6, -SOLVABLE_PREREQMARKER);

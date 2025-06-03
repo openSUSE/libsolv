@@ -925,9 +925,9 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	    continue;
           case CTAG('=', 'T', 'i', 'm'):
 	    {
-	      unsigned int t = atoi(line + 6);
-	      if (t)
-		repodata_set_num(data, handle, SOLVABLE_BUILDTIME, t);
+	      unsigned int ti = strtoull(line + 6, 0, 10);
+	      if (ti)
+		repodata_set_num(data, handle, SOLVABLE_BUILDTIME, ti);
 	    }
 	    continue;
           case CTAG('=', 'K', 'w', 'd'):
@@ -1052,7 +1052,7 @@ repo_add_susetags(Repo *repo, FILE *fp, Id defvendor, const char *language, int 
 	    if (split(line + 6, sp, 3) == 2)
 	      {
 		/* we ignore the start value */
-		unsigned int end = (unsigned int)atoi(sp[1]);
+		unsigned int end = strtoull(sp[1], 0, 10);
 		if (end)
 		  repodata_set_num(data, handle, SOLVABLE_HEADEREND, end);
 	      }

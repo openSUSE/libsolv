@@ -77,6 +77,9 @@ support also extension suseinfo format
   <kewwords>
     <k>...</k>
   </keywords>
+  <tags>
+    <updates cpeid="cpe://o:opensuse_project:opensuse:11">openSUSE 11.0</updates>
+  </tags>
 </suseinfo>
 
 */
@@ -147,7 +150,7 @@ struct parsedata {
 
   struct solv_xmlparser xmlp;
 
-  int timestamp;
+  unsigned int timestamp;
   /* handles for collection
      structures */
   /* repo updates */
@@ -252,7 +255,7 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
   switch (state)
     {
     case STATE_REPOMD:
-      if (pd->timestamp > 0)
+      if (pd->timestamp)
         repodata_set_num(pd->data, SOLVID_META, REPOSITORY_TIMESTAMP, pd->timestamp);
       break;
     case STATE_DATA:
@@ -278,7 +281,7 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
          * of all resources to save it as the time
          * the metadata was generated
          */
-        int timestamp = atoi(content);
+        unsigned int timestamp = strtoull(content, 0, 10);
 	if (timestamp)
           repodata_set_num(pd->data, pd->rdhandle, REPOSITORY_REPOMD_TIMESTAMP, timestamp);
         if (timestamp > pd->timestamp)
@@ -287,8 +290,8 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
       }
     case STATE_EXPIRE:
       {
-        int expire = atoi(content);
-	if (expire > 0)
+	unsigned int expire = strtoull(content, 0, 10);
+	if (expire)
 	  repodata_set_num(pd->data, SOLVID_META, REPOSITORY_EXPIRE, expire);
         break;
       }

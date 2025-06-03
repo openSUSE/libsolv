@@ -826,10 +826,10 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
       break;
     case STATE_TIME:
       {
-        unsigned int t;
+        unsigned int ti;
         str = solv_xmlparser_find_attr("build", atts);
-        if (str && (t = atoi(str)) != 0)
-          repodata_set_num(pd->data, handle, SOLVABLE_BUILDTIME, t);
+        if (str && (ti = strtoull(str, 0, 10)) != 0)
+          repodata_set_num(pd->data, handle, SOLVABLE_BUILDTIME, ti);
 	break;
       }
     case STATE_SIZE:
@@ -842,7 +842,7 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
       {
         unsigned int end;
         str = solv_xmlparser_find_attr("end", atts);
-	if (str && (end = atoi(str)) != 0)
+	if (str && (end = strtoull(str, 0, 10)) != 0)
 	  repodata_set_num(pd->data, handle, SOLVABLE_HEADEREND, end);
 	break;
       }
