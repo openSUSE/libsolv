@@ -94,6 +94,7 @@ enum state {
   STATE_SUGGESTS,
   STATE_ENHANCES,
   STATE_FRESHENS,
+  STATE_ORDERWITHREQUIRES,
   STATE_SOURCERPM,
   STATE_HEADERRANGE,
   STATE_BUILDHOST,
@@ -107,6 +108,7 @@ enum state {
   STATE_SUGGESTSENTRY,
   STATE_ENHANCESENTRY,
   STATE_FRESHENSENTRY,
+  STATE_ORDERWITHREQUIRESENTRY,
 
   STATE_FILE,
 
@@ -195,6 +197,7 @@ static struct solv_xmlparser_element stateswitches[] = {
   { STATE_SOLVABLE,    "rpm:suggests",    STATE_SUGGESTS,     0 },
   { STATE_SOLVABLE,    "rpm:enhances",    STATE_ENHANCES,     0 },
   { STATE_SOLVABLE,    "rpm:freshens",    STATE_FRESHENS,     0 },
+  { STATE_SOLVABLE,    "rpm:orderwithrequires", STATE_ORDERWITHREQUIRES, 0 },
   { STATE_SOLVABLE,    "rpm:sourcerpm",   STATE_SOURCERPM,    1 },
   { STATE_SOLVABLE,    "rpm:header-range", STATE_HEADERRANGE, 0 },
   { STATE_SOLVABLE,    "rpm:buildhost",   STATE_BUILDHOST,    1 },
@@ -214,6 +217,7 @@ static struct solv_xmlparser_element stateswitches[] = {
   { STATE_SUGGESTS,    "rpm:entry",       STATE_SUGGESTSENTRY, 0 },
   { STATE_ENHANCES,    "rpm:entry",       STATE_ENHANCESENTRY, 0 },
   { STATE_FRESHENS,    "rpm:entry",       STATE_FRESHENSENTRY, 0 },
+  { STATE_ORDERWITHREQUIRES, "rpm:entry", STATE_ORDERWITHREQUIRESENTRY, 0 },
 
   { STATE_INCLUDES,    "item",            STATE_INCLUDESENTRY, 0 },
   { STATE_EXTENDS,     "item",            STATE_EXTENDSENTRY,  0 },
@@ -229,6 +233,7 @@ struct parsedata {
   char *kind;
   Solvable *solvable;
   Offset freshens;
+  Offset orderwithrequires;
 
   struct solv_xmlparser xmlp;
   struct joindata jd;
@@ -670,6 +675,8 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
          one.
       */
       pd->extending = 0;
+      pd->freshens = 0;
+      pd->orderwithrequires = 0;
       if ((pkgid = solv_xmlparser_find_attr("pkgid", atts)) != NULL)
         {
 	  unsigned char chk[256];
@@ -704,7 +711,6 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
 	  handle = repo_add_solvable(pd->repo);
 	  if (!pd->first)
 	    pd->first = handle;
-          pd->freshens = 0;
         }
       pd->handle = handle;
       pd->solvable = pool_id2solvable(pool, handle);
@@ -778,6 +784,12 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
       break;
     case STATE_FRESHENSENTRY:
       pd->freshens = adddep(pool, pd, pd->freshens, atts, 0);
+      break;
+    case STATE_ORDERWITHREQUIRES:
+      pd->orderwithrequires = 0;
+      break;
+    case STATE_ORDERWITHREQUIRESENTRY:
+      pd->orderwithrequires = adddep(pool, pd, pd->orderwithrequires, atts, 0);
       break;
     case STATE_EULA:
     case STATE_SUMMARY:
@@ -931,6 +943,12 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
   switch (state)
     {
     case STATE_SOLVABLE:
+      if (pd->orderwithrequires)
+	{
+	  while (repo->idarraydata[pd->orderwithrequires])
+	    repodata_add_idarray(pd->data, s - pool->solvables, SOLVABLE_ORDERWITHREQUIRES, repo->idarraydata[pd->orderwithrequires++]);
+	  pd->orderwithrequires = 0;
+	}
       if (pd->extending)
 	{
 	  pd->solvable = 0;
