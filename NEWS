@@ -1,6 +1,14 @@
 
 This file contains the major changes between libsolv versions:
 
+Version 0.7.33
+- selected bug fixes:
+  * improve transaction ordering by allowing more uninst->uninst
+    edges
+  * implement color filtering when adding update targets
+- new features:
+  * support orderwithrequires dependencies in susedata.xml
+
 Version 0.7.32
 - build both static and dynamic libraries on new suse distros
 - require cmake >= 3.5

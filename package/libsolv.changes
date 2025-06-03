@@ -1,4 +1,13 @@
 -------------------------------------------------------------------
+Tue Jun  3 13:25:39 CEST 2025 - mls@suse.de
+
+- improve transaction ordering by allowing more uninst->uninst
+  edges [bsc#1243457]
+- implement color filtering when adding update targets
+- support orderwithrequires dependencies in susedata.xml
+- bump version to 0.7.33
+
+-------------------------------------------------------------------
 Thu Apr  3 13:07:20 CEST 2025 - mls@suse.de
 
 - build both static and dynamic libraries on new suse distros
