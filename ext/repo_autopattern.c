@@ -404,16 +404,18 @@ repo_add_autopattern(Repo *repo, int flags)
       while ((prv = *prvp++) != 0)            /* go through all provides */
 	{
 	  Id evr = 0;
+	  int flags = 0;
 	  if (ISRELDEP(prv))
 	    {
 	      Reldep *rd = GETRELDEP(pool, prv);
-	      if (rd->flags != REL_EQ)
-	        continue;
 	      prv = rd->name;
 	      evr = rd->evr;
+	      flags = rd->flags;
 	    }
 	  pn = pool_id2str(pool, prv);
 	  if (strncmp("product-", pn, 8) != 0)
+	    continue;
+	  if (flags && flags != REL_EQ && strncmp(pn, "product-obsoletes(", 18) != 0)
 	    continue;
 	  newname = 0;
 	  if (evr)
@@ -451,6 +453,18 @@ repo_add_autopattern(Repo *repo, int flags)
 	      type[strlen(type) - 1] = 0;	/* closing ) */
 	      repodata_add_poolstr_array(data, s2 - pool->solvables, PRODUCT_URL_TYPE, type);
 	      repodata_add_poolstr_array(data, s2 - pool->solvables, PRODUCT_URL, newname);
+	    }
+	  else if (!strncmp(pn, "product-obsoletes(", 18) && pn[18] && pn[19])
+	    {
+	      if (newname)
+		pool_freetmpspace(pool, newname);
+	      newname = pool_tmpjoin(pool, "product:", pn + 18, 0);
+	      newname[strlen(newname) - 1] = 0;	/* closing ) */
+	      unescape(newname);
+	      Id obs = pool_str2id(pool, newname, 1);
+	      if (flags && evr)
+		obs = pool_rel2id(pool, obs, evr, flags, 1);
+	      s2->obsoletes = repo_addid_dep(s2->repo, s2->obsoletes, obs, 0);
 	    }
 	}
     }
