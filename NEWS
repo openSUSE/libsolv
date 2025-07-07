@@ -1,6 +1,11 @@
 
 This file contains the major changes between libsolv versions:
 
+Version 0.7.34
+- new features:
+  * support product-obsoletes() provides in the product autopackage
+    generation code
+
 Version 0.7.33
 - selected bug fixes:
   * improve transaction ordering by allowing more uninst->uninst

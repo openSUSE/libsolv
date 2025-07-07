@@ -1,4 +1,11 @@
 -------------------------------------------------------------------
+Mon Jul  7 13:48:58 CEST 2025 - mls@suse.de
+
+- add support for product-obsoletes() provides in the product
+  autopackage generation code
+- bump version to 0.7.34
+
+-------------------------------------------------------------------
 Tue Jun  3 13:25:39 CEST 2025 - mls@suse.de
 
 - improve transaction ordering by allowing more uninst->uninst
