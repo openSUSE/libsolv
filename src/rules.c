@@ -3951,12 +3951,17 @@ solver_addbestrules(Solver *solv, int havebestinstalljobs, int haslockjob)
 	  if (solv->allowuninstall || solv->allowuninstall_all || (solv->allowuninstallmap.size && MAPTST(&solv->allowuninstallmap, p - installed->start)))
 	    {
 	      /* package is flagged both for allowuninstall and best, add negative rules */
+	      int rid;
 	      d = q.count == 1 ? q.elements[0] : -pool_queuetowhatprovides(pool, &q);
 	      for (i = 0; i < q.count; i++)
 		MAPSET(&m, q.elements[i]);
-	      r = solv->rules + solv->featurerules + (p - installed->start);
+	      rid = solv->featurerules + (p - installed->start);
+	      r = solv->rules + rid;
 	      if (!r->p)	/* identical to update rule? */
-		r = solv->rules + solv->updaterules + (p - installed->start);
+		{
+		  rid = solv->updaterules + (p - installed->start);
+		  r = solv->rules + rid;
+		}
 	      FOR_RULELITERALS(p2, pp2, r)
 		{
 		  if (MAPTST(&m, p2))
@@ -3966,6 +3971,8 @@ solver_addbestrules(Solver *solv, int havebestinstalljobs, int haslockjob)
 		  else
 		    solver_addrule(solv, -p2, 0, -d);
 		  queue_push(&infoq, p);
+		  /* recalculate r as solver_addrule may have reallocated the rules area */
+		  r = solv->rules + rid;
 		}
 	      for (i = 0; i < q.count; i++)
 		MAPCLR(&m, q.elements[i]);
