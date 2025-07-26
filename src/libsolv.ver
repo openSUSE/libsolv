@@ -91,6 +91,7 @@ SOLV_1.0 {
 		pool_lookup_str;
 		pool_lookup_void;
 		pool_match_dep;
+		pool_dep_fulfilled_in_map;
 		pool_match_nevr_rel;
 		pool_prepend_rootdir;
 		pool_prepend_rootdir_tmp;
