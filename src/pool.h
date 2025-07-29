@@ -357,6 +357,7 @@ void pool_whatmatchesdep(Pool *pool, Id keyname, Id dep, Queue *q, int marker);
 void pool_whatcontainsdep(Pool *pool, Id keyname, Id dep, Queue *q, int marker);
 void pool_whatmatchessolvable(Pool *pool, Id keyname, Id solvid, Queue *q, int marker);
 void pool_set_whatprovides(Pool *pool, Id id, Id providers);
+void pool_add_new_provider(Pool *pool, Id id, Id p);
 
 
 /* search the pool. the following filters are available:
