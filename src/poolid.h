@@ -41,7 +41,9 @@ extern const char *pool_dep2str(Pool *pool, Id); /* might alloc tmpspace */
 extern void pool_shrink_strings(Pool *pool);
 extern void pool_shrink_rels(Pool *pool);
 extern void pool_freeidhashes(Pool *pool);
-extern void pool_resize_rels_hash(Pool *pool, int numnew);
+
+extern void pool_resize_rels_hash(Pool *pool, int numnew);	/* internal */
+extern void pool_init_rels(Pool *pool);				/* internal */
 
 #ifdef __cplusplus
 }

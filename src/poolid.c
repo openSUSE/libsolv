@@ -20,6 +20,8 @@
 #include "poolid_private.h"
 #include "util.h"
 
+#define REL_BLOCK		1023	/* hashtable for relations */
+
 static inline void
 grow_whatprovides(Pool *pool, Id id)
 {
@@ -63,6 +65,15 @@ pool_strn2id(Pool *pool, const char *str, unsigned int len, int create)
   if (create && pool->whatprovides && oldnstrings != pool->ss.nstrings)
     grow_whatprovides(pool, id);
   return id;
+}
+
+void
+pool_init_rels(Pool *pool)
+{
+  /* alloc space for RelDep 0 */
+  pool->rels = solv_extend_resize(0, 1, sizeof(Reldep), REL_BLOCK);
+  pool->nrels = 1;
+  memset(pool->rels, 0, sizeof(Reldep));
 }
 
 void

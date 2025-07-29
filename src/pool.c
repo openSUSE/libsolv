@@ -22,7 +22,6 @@
 #include "poolvendor.h"
 #include "repo.h"
 #include "poolid.h"
-#include "poolid_private.h"
 #include "poolarch.h"
 #include "util.h"
 #include "bitmap.h"
@@ -45,11 +44,7 @@ pool_create(void)
   pool = (Pool *)solv_calloc(1, sizeof(*pool));
 
   stringpool_init(&pool->ss, initpool_data);
-
-  /* alloc space for RelDep 0 */
-  pool->rels = solv_extend_resize(0, 1, sizeof(Reldep), REL_BLOCK);
-  pool->nrels = 1;
-  memset(pool->rels, 0, sizeof(Reldep));
+  pool_init_rels(pool);
 
   /* alloc space for Solvable 0 and system solvable */
   pool->solvables = solv_extend_resize(0, 2, sizeof(Solvable), SOLVABLE_BLOCK);
