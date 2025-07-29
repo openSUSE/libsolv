@@ -279,7 +279,7 @@ pool_createwhatprovides(Pool *pool)
 	      whatprovides[id]--;
 	    }
 	  else
-	    auxid = 1;
+	    auxid = 1;		/* we have multiple provides for this name */
 	  if (whatprovidesauxdata)
 	    whatprovidesauxdata[whatprovides[id]] = auxid;
 	}
@@ -898,7 +898,7 @@ pool_addrelproviders(Pool *pool, Id d)
 	  Solvable *s = pool->solvables + p;
 	  if (ppaux)
 	    {
-	      pid = *ppaux++;
+	      pid = *ppaux++;	/* the id that provided the name, 1 if there are multiple providers */
 	      if (pid && pid != 1)
 		{
 #if 0
@@ -907,7 +907,7 @@ pool_addrelproviders(Pool *pool, Id d)
 		  if (!ISRELDEP(pid))
 		    {
 		      if (pid != name)
-			continue;		/* wrong provides name */
+			continue;		/* wrong provides name (should not happen) */
 		      if (pool->disttype == DISTTYPE_DEB)
 			continue;		/* unversioned provides can never match versioned deps */
 		    }
