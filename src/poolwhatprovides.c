@@ -514,7 +514,7 @@ pool_addstdproviders(Pool *pool, Id d)
 }
 
 
-static inline int
+static int
 pool_is_kind(Pool *pool, Id name, Id kind)
 {
   const char *n;
