@@ -1634,8 +1634,9 @@ testcase_solverresult(Solver *solv, int resultflags)
 	    continue;
 	  id = solv->job.elements[i + 1];
 	  s = testcase_dep2str(pool, id);
-	  strqueue_push(&sq, pool_tmpjoin(pool, "genid dep ", s, 0));
-	  if ((id2 = testcase_str2dep(pool, s)) != id)
+	  s = pool_tmpjoin(pool, "genid dep ", s, 0);
+	  strqueue_push(&sq, s);
+	  if ((id2 = testcase_str2dep(pool, s + 10)) != id)
 	    {
 	      s = pool_tmpjoin(pool, "genid roundtrip error: ", testcase_dep2str(pool, id2), 0);
 	      strqueue_push(&sq, s);
