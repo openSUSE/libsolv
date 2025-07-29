@@ -33,6 +33,16 @@ grow_whatprovides(Pool *pool, Id id)
     pool->whatprovides[id] = 1;
 }
 
+static inline void
+grow_whatprovides_rel(Pool *pool, Id id)
+{
+  if ((id & WHATPROVIDES_BLOCK) == 0)
+    {
+      pool->whatprovides_rel = solv_realloc2(pool->whatprovides_rel, id + (WHATPROVIDES_BLOCK + 1), sizeof(Offset));
+      memset(pool->whatprovides_rel + id, 0, (WHATPROVIDES_BLOCK + 1) * sizeof(Offset));
+    }
+}
+
 /* intern string into pool, return id */
 
 Id
@@ -129,11 +139,8 @@ pool_rel2id(Pool *pool, Id name, Id evr, int flags, int create)
   ran->flags = flags;
 
   /* extend whatprovides_rel if needed */
-  if (pool->whatprovides_rel && (id & WHATPROVIDES_BLOCK) == 0)
-    {
-      pool->whatprovides_rel = solv_realloc2(pool->whatprovides_rel, id + (WHATPROVIDES_BLOCK + 1), sizeof(Offset));
-      memset(pool->whatprovides_rel + id, 0, (WHATPROVIDES_BLOCK + 1) * sizeof(Offset));
-    }
+  if (pool->whatprovides_rel)
+    grow_whatprovides_rel(pool, id);
   return MAKERELDEP(id);
 }
 
