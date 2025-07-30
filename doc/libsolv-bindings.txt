@@ -2405,6 +2405,14 @@ splits.
 *SOLVER_FLAG_IGNORE_RECOMMENDED*::
 Do not process optional (aka weak) dependencies.
 
+*SOLVER_FLAG_STRONG_RECOMMENDS*::
+Make the solver backtrack to satisfy Recommends dependencies (e.g.,
+update packages, choose different alternatives, etc.). With this
+flag, Recommends function like Requires, which can be broken.
+You can use this feature to allow the solver to install weak
+dependencies, even if it requires updating currently installed
+packages.
+
 *SOLVER_FLAG_ADD_ALREADY_RECOMMENDED*::
 Install recommended or supplemented packages even if they have no
 connection to the current transaction. You can use this feature

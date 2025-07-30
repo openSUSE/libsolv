@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 07/09/2024
+.\"      Date: 07/29/2025
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "07/09/2024" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "07/29/2025" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -4059,6 +4059,11 @@ Make the solver aware of special provides of the form \(lq<packagename>:<path>\(
 \fBSOLVER_FLAG_IGNORE_RECOMMENDED\fR
 .RS 4
 Do not process optional (aka weak) dependencies\&.
+.RE
+.PP
+\fBSOLVER_FLAG_STRONG_RECOMMENDS\fR
+.RS 4
+Make the solver backtrack to satisfy Recommends dependencies (e\&.g\&., update packages, choose different alternatives, etc\&.)\&. With this flag, Recommends function like Requires, which can be broken\&. You can use this feature to allow the solver to install weak dependencies, even if it requires updating currently installed packages\&.
 .RE
 .PP
 \fBSOLVER_FLAG_ADD_ALREADY_RECOMMENDED\fR
