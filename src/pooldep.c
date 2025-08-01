@@ -346,7 +346,7 @@ pool_whatmatchessolvable(Pool *pool, Id keyname, Id solvid, Queue *q, int marker
 }
 
 static int
-pool_dep_fulfilled_in_map_cplx(Pool *pool, const Map *map, Reldep *rd)
+pool_satisfieddep_map_cplx(Pool *pool, const Map *map, Reldep *rd)
 {
   if (rd->flags == REL_COND)
     {
@@ -355,14 +355,14 @@ pool_dep_fulfilled_in_map_cplx(Pool *pool, const Map *map, Reldep *rd)
 	  Reldep *rd2 = GETRELDEP(pool, rd->evr);
 	  if (rd2->flags == REL_ELSE)
 	    {
-	      if (pool_dep_fulfilled_in_map(pool, map, rd2->name))
-		return pool_dep_fulfilled_in_map(pool, map, rd->name);
-	      return pool_dep_fulfilled_in_map(pool, map, rd2->evr);
+	      if (pool_satisfieddep_map(pool, map, rd2->name))
+		return pool_satisfieddep_map(pool, map, rd->name);
+	      return pool_satisfieddep_map(pool, map, rd2->evr);
 	    }
 	}
-      if (pool_dep_fulfilled_in_map(pool, map, rd->name))
+      if (pool_satisfieddep_map(pool, map, rd->name))
 	return 1;
-      return !pool_dep_fulfilled_in_map(pool, map, rd->evr);
+      return !pool_satisfieddep_map(pool, map, rd->evr);
     }
   if (rd->flags == REL_UNLESS)
     {
@@ -371,32 +371,32 @@ pool_dep_fulfilled_in_map_cplx(Pool *pool, const Map *map, Reldep *rd)
 	  Reldep *rd2 = GETRELDEP(pool, rd->evr);
 	  if (rd2->flags == REL_ELSE)
 	    {
-	      if (!pool_dep_fulfilled_in_map(pool, map, rd2->name))
-		return pool_dep_fulfilled_in_map(pool, map, rd->name);
-	      return pool_dep_fulfilled_in_map(pool, map, rd2->evr);
+	      if (!pool_satisfieddep_map(pool, map, rd2->name))
+		return pool_satisfieddep_map(pool, map, rd->name);
+	      return pool_satisfieddep_map(pool, map, rd2->evr);
 	    }
 	}
-      if (!pool_dep_fulfilled_in_map(pool, map, rd->name))
+      if (!pool_satisfieddep_map(pool, map, rd->name))
 	return 0;
-      return !pool_dep_fulfilled_in_map(pool, map, rd->evr);
+      return !pool_satisfieddep_map(pool, map, rd->evr);
     }
   if (rd->flags == REL_AND)
     {
-      if (!pool_dep_fulfilled_in_map(pool, map, rd->name))
+      if (!pool_satisfieddep_map(pool, map, rd->name))
 	return 0;
-      return pool_dep_fulfilled_in_map(pool, map, rd->evr);
+      return pool_satisfieddep_map(pool, map, rd->evr);
     }
   if (rd->flags == REL_OR)
     {
-      if (pool_dep_fulfilled_in_map(pool, map, rd->name))
+      if (pool_satisfieddep_map(pool, map, rd->name))
 	return 1;
-      return pool_dep_fulfilled_in_map(pool, map, rd->evr);
+      return pool_satisfieddep_map(pool, map, rd->evr);
     }
   return 0;
 }
 
 int
-pool_dep_fulfilled_in_map(Pool *pool, const Map *map, Id dep)
+pool_satisfieddep_map(Pool *pool, const Map *map, Id dep)
 {
   Id p, pp;
 
@@ -404,7 +404,7 @@ pool_dep_fulfilled_in_map(Pool *pool, const Map *map, Id dep)
     Reldep *rd = GETRELDEP(pool, dep);
     if (rd->flags == REL_COND || rd->flags == REL_UNLESS ||
         rd->flags == REL_AND || rd->flags == REL_OR)
-      return pool_dep_fulfilled_in_map_cplx(pool, map, rd);
+      return pool_satisfieddep_map_cplx(pool, map, rd);
     if (rd->flags == REL_NAMESPACE && rd->name == NAMESPACE_SPLITPROVIDES)
       return 0;
   }

@@ -562,10 +562,10 @@ by the ``evr'' parts must overlap.
 Like pool_match_dep, but the provider is the "self-provides" dependency
 of the Solvable _s_, i.e. the dependency ``s->name = s->evr''.
 
-        int pool_dep_fulfilled_in_map(Pool *pool, const Map *map, Id dep);
+        int pool_satisfieddep_map(Pool *pool, const Map *map, Id dep);
 
-Returns ``1'' if the dependency _dep_ is provided by at least one package
-from _map_, otherwise ``0'' is returned.
+Returns ``1'' if the dependency _dep_ is satisfied by the packages specified
+in _map_, otherwise ``0'' is returned.
 
 Whatprovides Index
 ------------------

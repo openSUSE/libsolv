@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Pool
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 03/25/2024
+.\"      Date: 08/01/2025
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-POOL" "3" "03/25/2024" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-POOL" "3" "08/01/2025" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -878,6 +878,18 @@ Returns \(lq1\(rq if the dependency \fId1\fR (the provider) is matched by the de
 .\}
 .sp
 Like pool_match_dep, but the provider is the "self\-provides" dependency of the Solvable \fIs\fR, i\&.e\&. the dependency \(lqs→name = s→evr\(rq\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBint pool_satisfieddep_map(Pool *\fR\fIpool\fR\fB, const Map *\fR\fImap\fR\fB, Id\fR \fIdep\fR\fB)\fR;
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Returns \(lq1\(rq if the dependency \fIdep\fR is satisfied by the packages specified in \fImap\fR, otherwise \(lq0\(rq is returned\&.
 .SH "WHATPROVIDES INDEX"
 .sp
 .if n \{\

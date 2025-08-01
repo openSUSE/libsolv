@@ -91,12 +91,12 @@ SOLV_1.0 {
 		pool_lookup_str;
 		pool_lookup_void;
 		pool_match_dep;
-		pool_dep_fulfilled_in_map;
 		pool_match_nevr_rel;
 		pool_prepend_rootdir;
 		pool_prepend_rootdir_tmp;
 		pool_queuetowhatprovides;
 		pool_rel2id;
+		pool_satisfieddep_map;
 		pool_search;
 		pool_selection2str;
 		pool_set_custom_vendorcheck;
