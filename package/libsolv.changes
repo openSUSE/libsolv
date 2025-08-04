@@ -1,4 +1,13 @@
 -------------------------------------------------------------------
+Mon Aug  4 10:46:17 CEST 2025 - mls@suse.de
+
+- fixed rare crash in the handling of allowuninstall in combination
+  with forcebest updates
+- new pool_satisfieddep_map feature to test if a set of packages
+  satisfies a dependency
+- bump version to 0.7.35
+
+-------------------------------------------------------------------
 Mon Jul  7 13:48:58 CEST 2025 - mls@suse.de
 
 - add support for product-obsoletes() provides in the product

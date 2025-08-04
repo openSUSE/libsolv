@@ -1,6 +1,14 @@
 
 This file contains the major changes between libsolv versions:
 
+Version 0.7.35
+- selected bug fixes:
+  * fixed rare crash in the handling of allowuninstall in combination
+    with forcebest updates
+- new features:
+  * new pool_satisfieddep_map feature to test if a set of packages
+    satisfies a dependency
+
 Version 0.7.34
 - new features:
   * support product-obsoletes() provides in the product autopackage
