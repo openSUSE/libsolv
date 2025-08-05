@@ -23,6 +23,8 @@
 #include "tarhead.h"
 #include "repo_arch.h"
 
+#define MAX_ENTRY_SIZE        0x1000000
+
 static Offset
 adddep(Repo *repo, Offset olddeps, char *line)
 {
@@ -98,7 +100,7 @@ repo_add_arch_pkg(Repo *repo, const char *fn, int flags)
   tarhead_init(&th, fp);
   while (tarhead_next(&th) > 0)
     {
-      if (th.type != 1 || strcmp(th.path, ".PKGINFO") != 0)
+      if (th.type != 1 || strcmp(th.path, ".PKGINFO") != 0 || th.length > MAX_ENTRY_SIZE)
 	{
           tarhead_skip(&th);
 	  continue;
@@ -467,7 +469,7 @@ repo_add_arch_repo(Repo *repo, FILE *fp, int flags)
   while (tarhead_next(&th) > 0)
     {
       char *bn;
-      if (th.type != 1)
+      if (th.type != 1 || th.length > MAX_ENTRY_SIZE)
 	{
           tarhead_skip(&th);
 	  continue;
