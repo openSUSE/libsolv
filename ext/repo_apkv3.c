@@ -27,6 +27,9 @@
 
 #define ADB_MAX_SIZE		0x10000000
 
+#define MAX_STR_SIZE		0x1000000
+#define MAX_ARR_CNT		0x1000000
+
 
 /* low level */
 
@@ -93,7 +96,7 @@ adb_arr(const unsigned char *adb, size_t adblen, unsigned int v)
   if (v + 4 > adblen)
     return 0;
   cnt = adb_u32(adb + v);
-  if (cnt == 0 || cnt >= 0x1000000 || v + 4 * cnt > adblen)
+  if (cnt == 0 || cnt >= MAX_ARR_CNT || v + 4 * cnt > adblen)
     return 0;
   return cnt;
 }
@@ -114,7 +117,7 @@ adb_poolid(const unsigned char *adb, size_t adblen, unsigned int v, Pool *pool)
 {
   size_t blobl;
   const unsigned char *blob = adb_blob(adb, adblen, v, &blobl);
-  return blob && blobl < 0x1000000 ? pool_strn2id(pool, (const char *)blob, (unsigned int)blobl, 1) : 0;
+  return blob && blobl < MAX_STR_SIZE ? pool_strn2id(pool, (const char *)blob, (unsigned int)blobl, 1) : 0;
 }
 
 static void
@@ -122,7 +125,7 @@ adb_setstr(const unsigned char *adb, size_t adblen, unsigned int v, Repodata *da
 {
   size_t blobl;
   const unsigned char *blob = adb_blob(adb, adblen, v, &blobl);
-  if (blob && blobl < 0x1000000)
+  if (blob && blobl < MAX_STR_SIZE)
     {
       char *space = pool_alloctmpspace(data->repo->pool, blobl + 1);
       memcpy(space, blob, blobl);
