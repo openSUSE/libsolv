@@ -54,7 +54,7 @@ adb_blob(const unsigned char *adb, size_t adblen, unsigned int v, size_t *bloblp
       blobl |= adb[v++] << 16;
       blobl |= adb[v++] << 24;
     }
-  if (v + blobl > adblen)
+  if (blobl > adblen || v + blobl > adblen)
     return 0;
   *bloblp = blobl;
   return adb + v;
