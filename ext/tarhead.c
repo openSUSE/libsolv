@@ -12,6 +12,8 @@
 #include "util.h"
 #include "tarhead.h"
 
+#define MAX_LINE_SIZE 0x1000000
+
 static long long parsenum(unsigned char *p, int cnt)
 {
   long long x = 0;
@@ -232,7 +234,14 @@ size_t tarhead_gets(struct tarhead *th, char **linep , size_t *allocsizep)
       size_t fsize = lsize - size;
       if (fsize < 2)
 	{
+	  if (lsize >= MAX_LINE_SIZE)
+	    {
+	      th->eof = 1;
+	      return 0;
+	    }
 	  line = *linep = solv_realloc(line, lsize += 1024);
+	  if (allocsizep)
+	    *allocsizep = lsize;
 	  fsize = lsize - size;
 	}
       for (i = th->off; i < th->end && fsize > 1;)
