@@ -26,6 +26,8 @@
 #include "repo_apk.h"
 #include "repo_apkv3.h"
 
+#define MAX_ENTRY_SIZE        0x1000000
+
 static inline ssize_t
 apk_fillbuf(unsigned char *buf, size_t count, int fd, FILE *fp)
 {
@@ -453,7 +455,7 @@ repo_add_apk_pkg(Repo *repo, const char *fn, int flags)
 	  tarhead_skip(&th);
 	  continue;
 	}
-      if (th.length > 10 * 1024 * 1024)
+      if (th.length >= MAX_ENTRY_SIZE)
 	{
 	  pool_error(pool, -1, "%s: oversized .PKGINFO", fn);
 	  break;
