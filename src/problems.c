@@ -1271,10 +1271,13 @@ findproblemrule_internal(Solver *solv, Id idx, Id *reqrp, Id *conrp, Id *sysrp, 
 /*
  * find problem rule
  *
- * search for a rule that describes the problem to the
- * user. Actually a pretty hopeless task that may leave the user
+ * search for a rule that describes the problem to the user.
+ * Actually a pretty hopeless task that may leave the user
  * puzzled. To get all of the needed information use
  * solver_findallproblemrules() instead.
+ *
+ * Also note that solver_get_decisionlist() can be used to get
+ * a "proof" for the problem.
  */
 
 Id
@@ -1351,6 +1354,9 @@ findallproblemrules_internal(Solver *solv, Id idx, Queue *rules, Map *rseen)
  * return all rules that lead to the problem. This gives the user
  * all of the information to understand the problem, but the result
  * can be a large number of rules.
+ * 
+ * Also note that solver_get_decisionlist() can be used to get
+ * a "proof" for the problem.
  */
 
 void
