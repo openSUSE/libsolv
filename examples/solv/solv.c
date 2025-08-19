@@ -159,11 +159,6 @@ doshowproof(Solver *solv, Id id, int flags, Queue *lq)
         printf("unsolvable: ");
       else
         printf("%s %s: ", v < 0 ? "conflicted" : "installed", pool_solvidset2str(pool, &qp));
-      if (type == 0)
-        {
-          printf("%s\n", solver_reason2str(solv, reason));
-          continue;
-        }
       if (type == SOLVER_RULE_LEARNT && lq)
         {
           for (j = 0; j < lq->count; j++)
@@ -175,7 +170,10 @@ doshowproof(Solver *solv, Id id, int flags, Queue *lq)
               continue;
             }
         }
-      printf("%s\n", solver_decisioninfo2str(solv, bits, type, from, to, dep));
+      if (type == 0)		/* for SOLVER_REASON_PREMISE */
+        printf("%s\n", solver_reason2str(solv, reason));
+      else
+        printf("%s\n", solver_decisioninfo2str(solv, bits, type, from, to, dep));
     }
   queue_free(&qp);
   queue_free(&q);
