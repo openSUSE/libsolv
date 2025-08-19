@@ -737,10 +737,10 @@ solver_get_decisionlist(Solver *solv, Id id, int flags, Queue *decisionlistq)
   Pool *pool = solv->pool;
   Map dm;
   if ((flags & SOLVER_DECISIONLIST_TYPEMASK) != SOLVER_DECISIONLIST_SOLVABLE)
-  {
-    solver_get_proof(solv, id, flags, decisionlistq);
-    return;
-  }
+    {
+      solver_get_proof(solv, id, flags, decisionlistq);
+      return;
+    }
   map_init(&dm, pool->nsolvables);
   MAPSET(&dm, id);
   getdecisionlist(solv, &dm, flags, decisionlistq);
