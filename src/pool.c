@@ -468,15 +468,20 @@ pool_id2langid(Pool *pool, Id id, const char *lang, int create)
 char *
 pool_alloctmpspace(Pool *pool, int len)
 {
-  int n = pool->tmpspace.n;
   if (!len)
     return 0;
+
+  pthread_mutex_lock(&pool->tmpspace.lock);
+  int n = pool->tmpspace.n;
+  pool->tmpspace.n = (n + 1) % POOL_TMPSPACEBUF;
+  pthread_mutex_unlock(&pool->tmpspace.lock);
+
   if (len > pool->tmpspace.len[n])
     {
       pool->tmpspace.buf[n] = solv_realloc(pool->tmpspace.buf[n], len + 32);
       pool->tmpspace.len[n] = len + 32;
     }
-  pool->tmpspace.n = (n + 1) % POOL_TMPSPACEBUF;
+
   return pool->tmpspace.buf[n];
 }
 
