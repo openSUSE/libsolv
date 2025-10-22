@@ -154,26 +154,14 @@ solv_setcloexec(int fd, int state)
   #endif
 }
 
-/* bsd's qsort_r has different arguments, so we define our
+#if defined(HAVE_QSORT_R) || defined(HAVE___QSORT_R)
+#if (defined(__APPLE__) || defined(__DragonFly__)) && defined(HAVE_QSORT_R)
+
+/* MacOS and DragonFly have qsort_r with different arguments, so we define our
    own version in case we need to do some clever mapping
 
    see also: http://sources.redhat.com/ml/libc-alpha/2008-12/msg00003.html
  */
-#if (defined(__GLIBC__) || defined(__NEWLIB__)) && (defined(HAVE_QSORT_R) || defined(HAVE___QSORT_R))
-
-void
-solv_sort(void *base, size_t nmemb, size_t size, int (*compar)(const void *, const void *, void *), void *compard)
-{
-# if defined(HAVE_QSORT_R)
-  qsort_r(base, nmemb, size, compar, compard);
-# else
-  /* backported for SLE10-SP2 */
-  __qsort_r(base, nmemb, size, compar, compard);
-# endif
-
-}
-
-#elif defined(HAVE_QSORT_R) /* not glibc, but has qsort_r() */
 
 struct solv_sort_data {
   int (*compar)(const void *, const void *, void *);
@@ -196,6 +184,21 @@ solv_sort(void *base, size_t nmemb, size_t size, int (*compar)(const void *, con
   qsort_r(base, nmemb, size, &d, solv_sort_helper);
 }
 
+#else
+
+void
+solv_sort(void *base, size_t nmemb, size_t size, int (*compar)(const void *, const void *, void *), void *compard)
+{
+# if defined(HAVE_QSORT_R)
+  qsort_r(base, nmemb, size, compar, compard);
+# else
+  /* backported for SLE10-SP2 */
+  __qsort_r(base, nmemb, size, compar, compard);
+# endif
+
+}
+
+#endif
 #else /* not glibc and no qsort_r() */
 /* use own version of qsort if none available */
 #include "qsort_r.c"
