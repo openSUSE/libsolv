@@ -1,7 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#ifdef HAVE_GETOPT_H  
 #include <getopt.h>
+#endif
 
 #include "pool.h"
 #include "repo.h"

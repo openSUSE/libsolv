@@ -9,7 +9,9 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#ifdef HAVE_GETOPT_H  
 #include <getopt.h>
+#endif
 
 static int with_attr;
 static int dump_json;

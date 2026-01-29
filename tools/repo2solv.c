@@ -5,7 +5,9 @@
  * for further information
  */
 
+#ifdef HAVE_GETOPT_H  
 #include <getopt.h>
+#endif
 #include <sys/types.h>
 #include <stdio.h>
 #include <stdlib.h>

@@ -2,6 +2,8 @@
 # CMakeLists.txt for tools
 #
 
+check_include_file(getopt.h HAVE_GETOPT_H)
+
 ADD_LIBRARY (toolstuff STATIC common_write.c)
 
 IF (ENABLE_STATIC AND NOT DISABLE_SHARED AND ENABLE_STATIC_TOOLS)
