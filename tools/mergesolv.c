@@ -16,7 +16,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#ifdef HAVE_GETOPT_H  
 #include <getopt.h>
+#endif
 
 #include "pool.h"
 #include "repo_solv.h"
