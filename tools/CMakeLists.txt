@@ -19,7 +19,7 @@ ENDIF (WIN32)
 SET (tools_list testsolv mergesolv dumpsolv installcheck testsolv)
 
 ADD_EXECUTABLE (dumpsolv dumpsolv.c )
-TARGET_LINK_LIBRARIES (dumpsolv ${LIBSOLV_TOOLS_LIBRARY})
+TARGET_LINK_LIBRARIES (dumpsolv ${LIBSOLV_TOOLS_LIBRARY} ${SYSTEM_LIBRARIES})
 
 IF (ENABLE_RPMDB)
 ADD_EXECUTABLE (rpmdb2solv rpmdb2solv.c)
