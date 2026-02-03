@@ -114,8 +114,8 @@ curlfopen(struct repoinfo *cinfo, const char *file, int uncompress, const unsign
       const char *path = cinfo->path && strcmp(cinfo->path, "/") != 0 ? cinfo->path : "";
       int l = strlen(baseurl);
       int pl = strlen(path);
-      const char *sep = l && baseurl[l - 1] == '/' ? "" : "/";
-      const char *psep = pl && cinfo->path[pl - 1] == '/' ? "" : "/";
+      const char *sep = !l || baseurl[l - 1] == '/' ? "" : "/";
+      const char *psep = !pl || cinfo->path[pl - 1] == '/' ? "" : "/";
       snprintf(url, sizeof(url), "%s%s%s%s%s", baseurl, sep, path, psep, file);
     }
   fd = opentmpfile();
