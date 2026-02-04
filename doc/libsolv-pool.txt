@@ -650,7 +650,10 @@ Utility functions
 
 Allocate space on the pool's temporary space area. This space has a limited
 lifetime, it will be automatically freed after a fixed amount (currently
-16) of other pool_alloctmpspace() calls are done.
+500) of other pool_alloctmpspace() calls are done.
+The function is not completely thread-safe, but it mitigates the problem by
+locking and using sufficiently large temporary space. That allows reading
+from pool from several tens of concurrent threads.
 
 	void pool_freetmpspace(Pool *pool, const char *space);
 
