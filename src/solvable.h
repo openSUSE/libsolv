@@ -82,6 +82,7 @@ unsigned int solvable_lookup_count(Solvable *s, Id keyname);	/* internal */
 /* setter functions */
 void solvable_set_id(Solvable *s, Id keyname, Id id);
 void solvable_set_num(Solvable *s, Id keyname, unsigned long long num);
+void solvable_set_strn(Solvable *s, Id keyname, const char *str, size_t l);
 void solvable_set_str(Solvable *s, Id keyname, const char *str);
 void solvable_set_poolstr(Solvable *s, Id keyname, const char *str);
 void solvable_add_poolstr_array(Solvable *s, Id keyname, const char *str);
