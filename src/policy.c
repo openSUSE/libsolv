@@ -833,38 +833,6 @@ move_installed_to_front(Pool *pool, Queue *plist)
     }
 }
 
-#ifdef ENABLE_CONDA
-static int
-pool_featurecountcmp(Pool *pool, Solvable *s1, Solvable *s2)
-{
-  unsigned int cnt1, cnt2;
-  cnt1 = solvable_lookup_count(s1, SOLVABLE_TRACK_FEATURES);
-  cnt2 = solvable_lookup_count(s2, SOLVABLE_TRACK_FEATURES);
-  return cnt1 == cnt2 ? 0 : cnt1 > cnt2 ? -1 : 1;
-}
-
-static int
-pool_buildversioncmp(Pool *pool, Solvable *s1, Solvable *s2)
-{
-  const char *bv1, *bv2;
-  bv1 = solvable_lookup_str(s1, SOLVABLE_BUILDVERSION);
-  bv2 = solvable_lookup_str(s2, SOLVABLE_BUILDVERSION);
-  if (!bv1 && !bv2)
-    return 0;
-  return pool_evrcmp_str(pool, bv1 ? bv1 : "" , bv2 ? bv2 : "", EVRCMP_COMPARE);
-}
-
-static int
-pool_buildflavorcmp(Pool *pool, Solvable *s1, Solvable *s2)
-{
-  const char *f1 = solvable_lookup_str(s1, SOLVABLE_BUILDFLAVOR);
-  const char *f2 = solvable_lookup_str(s2, SOLVABLE_BUILDFLAVOR);
-  if (!f1 && !f2)
-    return 0;
-  return pool_evrcmp_str(pool, f1 ? f1 : "" , f2 ? f2 : "", EVRCMP_COMPARE);
-}
-#endif
-
 /*
  * prune_to_best_version
  *
@@ -874,6 +842,11 @@ pool_buildflavorcmp(Pool *pool, Solvable *s1, Solvable *s2)
 void
 prune_to_best_version(Pool *pool, Queue *plist)
 {
+#ifdef ENABLE_CONDA
+  if (pool->disttype == DISTTYPE_CONDA)
+     return prune_to_best_version_conda(pool, plist);
+#endif
+
   int i, j, r;
   Solvable *s, *best;
 
@@ -909,30 +882,16 @@ prune_to_best_version(Pool *pool, Queue *plist)
         }
      
       r = 0; 
-#ifdef ENABLE_CONDA
-      if (pool->disttype == DISTTYPE_CONDA)
-        r = pool_featurecountcmp(pool, best, s);
-#endif
       if (r == 0)
         r = best->evr != s->evr ? pool_evrcmp(pool, best->evr, s->evr, EVRCMP_COMPARE) : 0;
 #ifdef ENABLE_LINKED_PKGS
       if (r == 0 && has_package_link(pool, s))
         r = pool_link_evrcmp(pool, best, s);
 #endif
-#ifdef ENABLE_CONDA
-      if (pool->disttype == DISTTYPE_CONDA)
-	{
-	  if (r == 0)
-	    r = (best->repo ? best->repo->subpriority : 0) - (s->repo ? s->repo->subpriority : 0);
-	  if (r == 0)
-	    r = pool_buildversioncmp(pool, best, s);
-	  if (r == 0)
-	    r = pool_buildflavorcmp(pool, best, s);
-	}
-#endif
       if (r < 0)
 	best = s;
     }
+
   plist->elements[j++] = best - pool->solvables;	/* finish last group */
   plist->count = j;
 
@@ -947,6 +906,323 @@ prune_to_best_version(Pool *pool, Queue *plist)
     }
 }
 
+#ifdef ENABLE_CONDA
+static int
+pool_featurecountcmp(Pool *pool, Solvable *s1, Solvable *s2)
+{
+  unsigned int cnt1, cnt2;
+  cnt1 = solvable_lookup_count(s1, SOLVABLE_TRACK_FEATURES);
+  cnt2 = solvable_lookup_count(s2, SOLVABLE_TRACK_FEATURES);
+  return cnt1 == cnt2 ? 0 : cnt1 > cnt2 ? -1 : 1;
+}
+
+static int
+pool_buildversioncmp(Pool *pool, Solvable *s1, Solvable *s2)
+{
+  const char *bv1, *bv2;
+  bv1 = solvable_lookup_str(s1, SOLVABLE_BUILDVERSION);
+  bv2 = solvable_lookup_str(s2, SOLVABLE_BUILDVERSION);
+  if (!bv1 && !bv2)
+    return 0;
+  return pool_evrcmp_str(pool, bv1 ? bv1 : "" , bv2 ? bv2 : "", EVRCMP_COMPARE);
+}
+
+static int
+pool_buildflavorcmp(Pool *pool, Solvable *s1, Solvable *s2)
+{
+  const char *f1 = solvable_lookup_str(s1, SOLVABLE_BUILDFLAVOR);
+  const char *f2 = solvable_lookup_str(s2, SOLVABLE_BUILDFLAVOR);
+  if (!f1 && !f2)
+    return 0;
+  return pool_evrcmp_str(pool, f1 ? f1 : "" , f2 ? f2 : "", EVRCMP_COMPARE);
+}
+
+void intersect_selection(Pool* pool, Id dep, Queue* prev)
+{
+  Queue tmp;
+  int i = 0, j = 0, isectidx = 0;
+
+  queue_init(&tmp);
+
+  Id* pp, p;
+  pp = pool_whatprovides_ptr(pool, dep);
+  while ((p = *pp++) != 0)
+    queue_push(&tmp, p);
+
+  // set intersection, assuming sorted arrays
+  while (i < prev->count && j < tmp.count) 
+    if (prev->elements[i] < tmp.elements[j])
+      i++;
+    else if (tmp.elements[j] < prev->elements[i])
+      j++;
+    else
+      {
+        if (isectidx != i)
+          prev->elements[isectidx] = prev->elements[i];
+        i++, j++, isectidx++;
+      }
+
+  prev->count = isectidx;
+  queue_free(&tmp);
+}
+
+int check_deps_unequal(Pool* pool, Queue* q1, Queue* q2, Id name)
+{
+  Id dep;
+  int i, j;
+  int found = 0;
+  for (i = 0; i < q1->count; ++i)
+  {
+    dep = q1->elements[i];
+    if (ISRELDEP(dep) && GETRELDEP(pool, dep)->name == name)
+    {
+      for (j = 0; j < q2->count; ++j)
+      {
+        if (q2->elements[j] == dep)
+        {
+          found = 1;
+          break;
+        }
+      }
+      if (!found)
+        return 1;
+
+      found = 0;
+    }
+  }
+  return 0;
+}
+
+Id best_matching(Pool* pool, Queue* q, Id name, int* all_have_trackfeatures)
+{
+  int first = 1;
+  Id dep, p, *pp;
+
+  Queue selection;
+  queue_init(&selection);
+
+  for (int i = 0; i < q->count; ++i)
+  {
+    dep = q->elements[i];
+    if (!ISRELDEP(dep) || GETRELDEP(pool, dep)->name != name) continue;
+
+    if (first)
+    {
+      pp = pool_whatprovides_ptr(pool, dep);
+      while ((p = *pp++) != 0)
+        queue_push(&selection, p);
+      first = 0;
+    }
+    else
+      intersect_selection(pool, dep, &selection);
+  }
+
+  if (selection.count == 0)
+    return 0;
+
+  Solvable *stmp, *best = pool_id2solvable(pool, selection.elements[0]);
+  int cmp;
+
+  *all_have_trackfeatures = 1;
+  for (int i = 0; i < selection.count; ++i)
+    if (solvable_lookup_count(pool_id2solvable(pool, selection.elements[i]),
+                              SOLVABLE_TRACK_FEATURES) == 0)
+      {
+        *all_have_trackfeatures = 0;
+        break;
+      }
+  
+  for (int i = 0; i < selection.count; ++i)
+  {
+    stmp = pool_id2solvable(pool, selection.elements[i]);
+    cmp = pool_evrcmp(pool, best->evr, stmp->evr, 0);
+    if (cmp < 0) best = stmp;
+  }
+
+  return best->evr;
+}
+
+int conda_compare_dependencies(Pool *pool, Solvable *s1, Solvable *s2)
+{
+  int i, j, has_seen;
+  Queue q1, q2, seen;
+
+  queue_init(&q1);
+  queue_init(&q2);
+  queue_init(&seen);
+
+  solvable_lookup_deparray(s1, SOLVABLE_REQUIRES, &q1, -1);
+  solvable_lookup_deparray(s2, SOLVABLE_REQUIRES, &q2, -1);
+
+  int comparison_result = 0;
+
+  for (i = 0; i < q1.count; ++i)
+  {
+    Id x1 = q1.elements[i];
+    has_seen = 0;
+
+    if (!ISRELDEP(x1))
+      continue;
+
+    Reldep* rd1 = GETRELDEP(pool, x1);
+    for (j = 0; j < seen.count && has_seen == 0; ++j)
+      if (seen.elements[j] == rd1->name)
+        has_seen = 1;
+
+    if (has_seen)
+      continue;
+
+    // first make sure that deps are different between a & b
+    int deps_unequal = check_deps_unequal(pool, &q1, &q2, rd1->name);
+    if (!deps_unequal)
+      {
+        queue_push(&seen, rd1->name);
+        continue;
+      }
+
+    int aht_1, aht_2; // all have track features check
+    Id b1 = best_matching(pool, &q1, rd1->name, &aht_1);
+    Id b2 = best_matching(pool, &q2, rd1->name, &aht_2);
+
+    // one of both or both is not solvable...
+    // ignoring this case for now
+    if (b1 == 0 || b2 == 0)
+      continue;
+
+    // if one has deps with track features, and the other does not, 
+    // downweight the one with track features
+    if (aht_1 != aht_2)
+      comparison_result += (aht_1 - aht_2) * 100;
+
+    comparison_result += pool_evrcmp(pool, b2, b1, 0);
+  }
+
+  queue_free(&q1);
+  queue_free(&q2);
+  queue_free(&seen);
+
+  return comparison_result;
+}
+
+static int
+sort_by_best_dependencies(const void *ap, const void *bp, void *dp)
+{
+  Pool* pool = (Pool*) dp;
+
+  Id a = *(Id *)ap;
+  Id b = *(Id *)bp;
+  Solvable *sa, *sb;
+
+  sa = pool->solvables + a;
+  sb = pool->solvables + b;
+
+  int res = conda_compare_dependencies(pool, sa, sb);
+  if (res == 0)
+  {
+    // no differences, select later build
+    Repodata* ra = repo_last_repodata(sa->repo);
+    Repodata* rb = repo_last_repodata(sb->repo);
+
+    unsigned long long bta = repodata_lookup_num(ra, a, SOLVABLE_BUILDTIME, 0ull);
+    unsigned long long btb = repodata_lookup_num(rb, b, SOLVABLE_BUILDTIME, 0ull);
+
+    res = (btb > bta) ? 1 : -1;
+    POOL_DEBUG(SOLV_DEBUG_POLICY, "Fallback to timestamp comparison: %llu vs %llu: [%d]\n", bta, btb, res);
+  }
+
+  POOL_DEBUG(SOLV_DEBUG_POLICY, "Selecting variant [%c] of (a) %s vs (b) %s (score: %d)\n",
+             (res < 0 ? 'a' : 'b'), pool_solvable2str(pool, sa), pool_solvable2str(pool, sb), res);
+
+  return res; 
+}
+
+/*
+ * prune_to_best_version_conda
+ *
+ * sort list of packages (given through plist) by name and evr
+ * return result through plist
+ */
+void
+prune_to_best_version_conda(Pool *pool, Queue *plist)
+{
+  int i, j, r;
+  Solvable *s, *best;
+
+  if (plist->count < 2)         /* no need to prune for a single entry */
+    return;
+  POOL_DEBUG(SOLV_DEBUG_POLICY, "prune_to_best_version_conda %d\n", plist->count);
+
+  /* sort by name first, prefer installed */
+  solv_sort(plist->elements, plist->count, sizeof(Id), prune_to_best_version_sortcmp, pool);
+
+  /* now find best 'per name' */
+  best = 0;
+  for (i = j = 0; i < plist->count; i++)
+    {
+      s = pool->solvables + plist->elements[i];
+
+      POOL_DEBUG(SOLV_DEBUG_POLICY, "- %s [%d]%s\n",
+                 pool_solvable2str(pool, s), plist->elements[i], 
+                 (pool->installed && s->repo == pool->installed) ? "I" : "");
+
+      if (!best)                /* if no best yet, the current is best */
+        {
+          best = s;
+          continue;
+        }
+
+      /* name switch: finish group, re-init */
+      if (best->name != s->name)   /* new name */
+        {
+          plist->elements[j++] = best - pool->solvables; /* move old best to front */
+          best = s;             /* take current as new best */
+          continue;
+        }
+     
+      r = 0; 
+      r = pool_featurecountcmp(pool, best, s);
+      if (r == 0)
+        r = best->evr != s->evr ? pool_evrcmp(pool, best->evr, s->evr, EVRCMP_COMPARE) : 0;
+      if (r == 0)
+        r = (best->repo ? best->repo->subpriority : 0) - (s->repo ? s->repo->subpriority : 0);
+      if (r == 0)
+        r = pool_buildversioncmp(pool, best, s);
+      // this can be removed as this comparison doesn't effect anything
+      if (r == 0)
+        r = pool_buildflavorcmp(pool, best, s);
+      if (r < 0)
+        best = s;
+    }
+
+  Queue q;
+  queue_init(&q);
+  for (i = 0; i < plist->count; i++)
+    {
+      s = pool->solvables + plist->elements[i];
+      r = pool_featurecountcmp(pool, best, s);
+      if (r == 0)
+        r = best->evr != s->evr ? pool_evrcmp(pool, best->evr, s->evr, EVRCMP_COMPARE) : 0;
+      if (r == 0)
+        r = (best->repo ? best->repo->subpriority : 0) - (s->repo ? s->repo->subpriority : 0);
+      if (r == 0)
+        r = pool_buildversioncmp(pool, best, s);
+      if (r == 0)
+        queue_push(&q, s - pool->solvables);
+    }
+
+  if (q.count > 1)
+    {
+      // order by first-level deps
+      solv_sort(q.elements, q.count, sizeof(Id), sort_by_best_dependencies, pool);
+    }
+
+  for (i = 0; i < q.count; ++i)
+    plist->elements[i] = q.elements[i];
+  plist->count = q.count;
+
+  queue_free(&q);
+}
+#endif  // ENABLE_CONDA
 
 static int
 sort_by_name_evr_sortcmp(const void *ap, const void *bp, void *dp)
