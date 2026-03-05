@@ -19,6 +19,60 @@
 #include "poolvendor.h"
 #include "util.h"
 
+static Id
+fix_dep(Repo *repo, Id id)
+{
+  Pool *pool = repo->pool;
+  char buf[1024], *p, *dep;
+  Id idp;
+
+  if (ISRELDEP(id))
+    {
+      Reldep *rd = GETRELDEP(pool, id);
+      if (rd->flags == REL_AND || rd->flags == REL_OR)
+	{
+	  Id n1 = fix_dep(repo, rd->name);
+	  Id n2 = fix_dep(repo, rd->evr);
+	  if (n1 != rd->name || n2 != rd->evr)
+	    return pool_rel2id(pool, n1, n2, rd->flags, 1);
+	}
+      return id;
+    }
+  dep = (char *)pool_id2str(pool, id);
+  if (!strncmp(dep, "system:modalias(", 16))
+    dep += 7;
+  if (!strncmp(dep, "modalias(", 9) && dep[9] && dep[10] && strlen(dep) < sizeof(buf))
+    {
+      strcpy(buf, dep);
+      p = strchr(buf + 9, ':');
+      if (p && p != buf + 9 && strchr(p + 1, ':'))
+	{
+	  *p++ = 0;
+	  idp = pool_str2id(pool, buf + 9, 1);
+	  p[strlen(p) - 1] = 0;
+	  id = pool_str2id(pool, p, 1);
+	  id = pool_rel2id(pool, NAMESPACE_MODALIAS, id, REL_NAMESPACE, 1);
+	  return pool_rel2id(pool, idp, id, REL_AND, 1);
+	}
+      else
+	{
+	  p = buf + 9;
+	  p[strlen(p) - 1] = 0;
+	  id = pool_str2id(pool, p, 1);
+	  return pool_rel2id(pool, NAMESPACE_MODALIAS, id, REL_NAMESPACE, 1);
+	}
+    }
+  if (!strncmp(dep, "filesystem(", 11) && strlen(dep) < sizeof(buf))
+    {
+      strcpy(buf, dep + 11);
+      if ((p = strrchr(buf, ')')) != 0)
+	*p = 0;
+      id = pool_str2id(pool, buf, 1);
+      return pool_rel2id(pool, NAMESPACE_FILESYSTEM, id, REL_NAMESPACE, 1);
+    }
+  return id;
+}
+
 Offset
 repo_fix_supplements(Repo *repo, Offset provides, Offset supplements, Offset freshens)
 {
@@ -101,36 +155,11 @@ repo_fix_supplements(Repo *repo, Offset provides, Offset supplements, Offset fre
     {
       for (i = supplements; repo->idarraydata[i]; i++)
 	{
-	  id = repo->idarraydata[i];
+	  repo->idarraydata[i] = id = fix_dep(repo, repo->idarraydata[i]);
 	  if (ISRELDEP(id))
 	    continue;
 	  dep = (char *)pool_id2str(pool, id);
-	  if (!strncmp(dep, "system:modalias(", 16))
-	    dep += 7;
-	  if (!strncmp(dep, "modalias(", 9) && dep[9] && dep[10] && strlen(dep) < sizeof(buf))
-	    {
-	      strcpy(buf, dep);
-	      p = strchr(buf + 9, ':');
-	      if (p && p != buf + 9 && strchr(p + 1, ':'))
-		{
-		  *p++ = 0;
-		  idp = pool_str2id(pool, buf + 9, 1);
-		  p[strlen(p) - 1] = 0;
-		  id = pool_str2id(pool, p, 1);
-		  id = pool_rel2id(pool, NAMESPACE_MODALIAS, id, REL_NAMESPACE, 1);
-		  id = pool_rel2id(pool, idp, id, REL_AND, 1);
-		}
-	      else
-		{
-		  p = buf + 9;
-		  p[strlen(p) - 1] = 0;
-		  id = pool_str2id(pool, p, 1);
-		  id = pool_rel2id(pool, NAMESPACE_MODALIAS, id, REL_NAMESPACE, 1);
-		}
-	      if (id)
-		repo->idarraydata[i] = id;
-	    }
-	  else if (!strncmp(dep, "packageand(", 11) && strlen(dep) < sizeof(buf))
+	  if (!strncmp(dep, "packageand(", 11) && strlen(dep) < sizeof(buf))
 	    {
 	      strcpy(buf, dep);
 	      id = 0;
@@ -168,15 +197,6 @@ repo_fix_supplements(Repo *repo, Offset provides, Offset supplements, Offset fre
 		}
 	      if (id)
 		repo->idarraydata[i] = id;
-	    }
-	  else if (!strncmp(dep, "filesystem(", 11) && strlen(dep) < sizeof(buf))
-	    {
-	      strcpy(buf, dep + 11);
-	      if ((p = strrchr(buf, ')')) != 0)
-		*p = 0;
-	      id = pool_str2id(pool, buf, 1);
-	      id = pool_rel2id(pool, NAMESPACE_FILESYSTEM, id, REL_NAMESPACE, 1);
-	      repo->idarraydata[i] = id;
 	    }
 	}
     }
