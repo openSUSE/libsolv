@@ -69,7 +69,7 @@ map_and(Map *t, const Map *s)
   end = ti + (t->size < s->size ? t->size : s->size);
   while (ti < end)
     *ti++ &= *si++;
-  end = ti + t->size;
+  end = t->map + t->size;
   while (ti < end)
     *ti++ = 0;
 }
