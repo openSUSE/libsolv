@@ -1,0 +1,153 @@
+From: Jonathan Wright <jonathan@almalinux.org>
+Date: Fri Jun 6 16:47:14 2025 -0500
+Subject: Rebase patch to libsolv-0.7.32
+
+From 49859c1ad32487de6adb65eedf4b81f021e1b0e8 Mon Sep 17 00:00:00 2001
+From: Jaroslav Rohel <jrohel@redhat.com>
+Date: Fri, 25 Oct 2019 14:33:22 +0200
+Subject: [PATCH] Add support for computing hashes using OpenSSL
+
+It adds WITH_OPENSSL build option.
+If it is ON, OpenSSL will be used instead of internal implementation
+of computing hashes (MD5, SHA1, SHA224, SHA256, SHA384, SHA512).
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 5ba5ed5..16750ae 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -42,6 +42,7 @@ OPTION (ENABLE_ZCHUNK_COMPRESSION "Build with zchunk compression support?" OFF)
+ OPTION (WITH_SYSTEM_ZCHUNK "Use system zchunk library?" OFF)
+ OPTION (WITH_LIBXML2  "Build with libxml2 instead of libexpat?" OFF)
+ OPTION (WITHOUT_COOKIEOPEN "Disable the use of stdio cookie opens?" OFF)
++OPTION (WITH_OPENSSL "Use OpenSSL instead of internal implementation of hashes?" OFF)
+
+ OPTION (ENABLE_STATIC_TOOLS "Link the tools against the static version of the libraries?" OFF)
+ OPTION (ENABLE_STATIC_BINDINGS "Link the bindings against the static version of the libraries?" OFF)
+@@ -173,6 +174,11 @@ INCLUDE_DIRECTORIES (${EXPAT_INCLUDE_DIRS})
+ ENDIF (WITH_LIBXML2 )
+ ENDIF (ENABLE_RPMMD OR ENABLE_SUSEREPO OR ENABLE_APPDATA OR ENABLE_COMPS OR ENABLE_HELIXREPO OR ENABLE_MDKREPO)
+
++IF (WITH_OPENSSL)
++FIND_PACKAGE (OpenSSL REQUIRED)
++INCLUDE_DIRECTORIES (${OPENSSL_INCLUDE_DIR})
++ENDIF(WITH_OPENSSL)
++
+ IF (ENABLE_ZLIB_COMPRESSION)
+ FIND_PACKAGE (ZLIB REQUIRED)
+ INCLUDE_DIRECTORIES (${ZLIB_INCLUDE_DIRS})
+@@ -292,8 +298,8 @@ check_linker_flag("-Wl,--version-script=${CMAKE_SOURCE_DIR}/src/libsolv.ver" HAV
+
+ # should create config.h with #cmakedefine instead...
+ FOREACH (VAR HAVE_STRCHRNUL HAVE_FOPENCOOKIE HAVE_FUNOPEN WORDS_BIGENDIAN
+-  HAVE_RPM_DB_H HAVE_RPMDBNEXTITERATORHEADERBLOB HAVE_RPMDBFSTAT
+-  WITH_LIBXML2 WITHOUT_COOKIEOPEN)
++  HAVE_RPM_DB_H HAVE_PGPDIGGETPARAMS HAVE_RPMDBNEXTITERATORHEADERBLOB HAVE_RPMDBFSTAT
++  WITH_LIBXML2 WITHOUT_COOKIEOPEN WITH_OPENSSL)
+   IF(${VAR})
+     ADD_DEFINITIONS (-D${VAR}=1)
+     SET (SWIG_FLAGS ${SWIG_FLAGS} -D${VAR})
+@@ -432,6 +438,9 @@ ENDIF (ENABLE_ZSTD_COMPRESSION)
+ IF (WITH_SYSTEM_ZCHUNK)
+ SET (SYSTEM_LIBRARIES ${SYSTEM_LIBRARIES} ${ZCHUNK_LIBRARIES})
+ ENDIF (WITH_SYSTEM_ZCHUNK)
++IF (WITH_OPENSSL)
++SET (SYSTEM_LIBRARIES ${SYSTEM_LIBRARIES} ${OPENSSL_CRYPTO_LIBRARY})
++ENDIF (WITH_OPENSSL)
+ IF (ENABLE_RPMDB)
+ SET (SYSTEM_LIBRARIES ${RPMDB_LIBRARY} ${SYSTEM_LIBRARIES})
+ ENDIF (ENABLE_RPMDB)
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 25ad09b..4265dfb 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -18,7 +18,7 @@ SET (libsolv_SRCS
+     solver.c solverdebug.c repo_solv.c repo_write.c evr.c pool.c
+     queue.c repo.c repodata.c repopage.c util.c policy.c solvable.c
+     transaction.c order.c rules.c problems.c linkedpkg.c cplxdeps.c
+-    chksum.c md5.c sha1.c sha2.c solvversion.c selection.c
++    chksum.c solvversion.c selection.c
+     fileprovides.c diskusage.c suse.c solver_util.c cleandeps.c
+     userinstalled.c filelistfilter.c decision.c)
+
+@@ -47,6 +47,10 @@ IF (WIN32)
+     LIST (APPEND libsolv_SRCS ${WIN32_COMPAT_SOURCES})
+ ENDIF (WIN32)
+
++IF (NOT WITH_OPENSSL)
++  SET (libsolv_SRCS ${libsolv_SRCS} md5.c sha1.c sha2.c)
++ENDIF (NOT WITH_OPENSSL)
++
+ IF (HAVE_LINKER_VERSION_SCRIPT)
+ SET (CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${LINK_FLAGS} -Wl,--version-script=${CMAKE_SOURCE_DIR}/src/libsolv.ver")
+ ENDIF (HAVE_LINKER_VERSION_SCRIPT)
+@@ -55,6 +59,9 @@ IF (DISABLE_SHARED)
+     ADD_LIBRARY (libsolv STATIC ${libsolv_SRCS})
+ ELSE (DISABLE_SHARED)
+     ADD_LIBRARY (libsolv SHARED ${libsolv_SRCS})
++    IF (WITH_OPENSSL)
++        TARGET_LINK_LIBRARIES (libsolv ${OPENSSL_CRYPTO_LIBRARY})
++    ENDIF (WITH_OPENSSL)
+ ENDIF (DISABLE_SHARED)
+
+ IF (WIN32)
+diff --git a/src/chksum.c b/src/chksum.c
+index 1f8ab47..9189b74 100644
+--- a/src/chksum.c
++++ b/src/chksum.c
+@@ -15,10 +15,42 @@
+ #include "util.h"
+ #include "chksum.h"
+
++#ifdef WITH_OPENSSL
++
++#include <openssl/md5.h>
++#include <openssl/sha.h>
++
++typedef SHA_CTX SHA1_CTX;
++typedef SHA256_CTX SHA224_CTX;
++typedef SHA512_CTX SHA384_CTX;
++
++#define solv_MD5_Init(ctx) MD5_Init(ctx)
++#define solv_MD5_Update(ctx, data, len) MD5_Update(ctx, data, len)
++#define solv_MD5_Final(md, ctx) MD5_Final(md, ctx)
++#define solv_SHA1_Init(ctx) SHA1_Init(ctx)
++#define solv_SHA1_Update(ctx, data, len) SHA1_Update(ctx, data, len)
++#define solv_SHA1_Final(ctx, md) SHA1_Final(md, ctx)
++#define solv_SHA224_Init(ctx) SHA224_Init(ctx)
++#define solv_SHA224_Update(ctx, data, len) SHA224_Update(ctx, data, len)
++#define solv_SHA224_Final(md, ctx) SHA224_Final(md, ctx)
++#define solv_SHA256_Init(ctx) SHA256_Init(ctx)
++#define solv_SHA256_Update(ctx, data, len) SHA256_Update(ctx, data, len)
++#define solv_SHA256_Final(md, ctx) SHA256_Final(md, ctx)
++#define solv_SHA384_Init(ctx) SHA384_Init(ctx)
++#define solv_SHA384_Update(ctx, data, len) SHA384_Update(ctx, data, len)
++#define solv_SHA384_Final(md, ctx) SHA384_Final(md, ctx)
++#define solv_SHA512_Init(ctx) SHA512_Init(ctx)
++#define solv_SHA512_Update(ctx, data, len) SHA512_Update(ctx, data, len)
++#define solv_SHA512_Final(md, ctx) SHA512_Final(md, ctx)
++
++#else
++
+ #include "md5.h"
+ #include "sha1.h"
+ #include "sha2.h"
+
++#endif
++
+ #ifdef _WIN32
+   #include "strfncs.h"
+ #endif
+diff --git a/tools/CMakeLists.txt b/tools/CMakeLists.txt
+index 4b3548a..c405743 100644
+--- a/tools/CMakeLists.txt
++++ b/tools/CMakeLists.txt
+@@ -19,7 +19,7 @@ ENDIF (WIN32)
+ SET (tools_list testsolv mergesolv dumpsolv installcheck testsolv)
+
+ ADD_EXECUTABLE (dumpsolv dumpsolv.c )
+-TARGET_LINK_LIBRARIES (dumpsolv ${LIBSOLV_TOOLS_LIBRARY})
++TARGET_LINK_LIBRARIES (dumpsolv ${LIBSOLV_TOOLS_LIBRARY} ${SYSTEM_LIBRARIES})
+
+ IF (ENABLE_RPMDB)
+ ADD_EXECUTABLE (rpmdb2solv rpmdb2solv.c)
+ 
