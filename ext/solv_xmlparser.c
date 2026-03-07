@@ -252,12 +252,17 @@ free_parser(struct solv_xmlparser *xmlp)
 static xmlParserCtxtPtr
 create_parser_ctx(struct solv_xmlparser *xmlp, char *buf, int l)
 {
+  xmlParserCtxtPtr parser;
   xmlSAXHandler sax;
   memset(&sax, 0, sizeof(sax));
   sax.startElement = start_element;
   sax.endElement = end_element;
   sax.characters = character_data;
-  return xmlCreatePushParserCtxt(&sax, xmlp, buf, l, NULL);
+  parser = xmlCreatePushParserCtxt(&sax, xmlp, buf, l, NULL);
+  if (parser) {
+    xmlCtxtSetOptions(parser, XML_PARSE_NO_XXE);
+  }
+  return parser;
 }
 
 static inline int
