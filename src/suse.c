@@ -244,6 +244,32 @@ repo_rewrite_suse_deps(Solvable *s, Offset freshens)
     s->conflicts = repo_fix_conflicts(s->repo, s->conflicts);
 }
 
+Id
+pool_rewrite_suse_dep(Pool *pool, Id keyname, Id id)
+{
+  /* hack: use a synthetic repo. As this is only for testing it
+   * should not be a problem */
+  Repo repo;
+  Id idarraydata[5];
+  memset(&repo, 0, sizeof(repo));
+  idarraydata[0] = 0;
+  idarraydata[1] = id;
+  idarraydata[2] = 0;
+  idarraydata[3] = 0;
+  idarraydata[4] = 0;
+  repo.pool = pool;
+  repo.idarraydata = idarraydata;
+  repo.idarraysize = 4;
+  repo.lastoff = 3;
+  if (keyname == SOLVABLE_PROVIDES)
+    return idarraydata[repo_fix_supplements(&repo, 1, 3, 0)];
+  if (keyname == SOLVABLE_SUPPLEMENTS)
+    return idarraydata[repo_fix_supplements(&repo, 0, 1, 0)];
+  if (keyname == SOLVABLE_CONFLICTS)
+    return idarraydata[repo_fix_conflicts(&repo, 1)];
+  return 0;
+}
+
 /**********************************************************************************/
 
 static inline Id

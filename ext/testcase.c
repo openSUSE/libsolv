@@ -2585,6 +2585,15 @@ testcase_read(Pool *pool, FILE *fp, const char *testcase, Queue *job, char **res
 	    id = 0;
 	  else if (!strcmp(pieces[1], "dep"))
 	    id = testcase_str2dep(pool, pieces[2]);
+	  else if (!strcmp(pieces[1], "susedep"))
+	    {
+	      if (ngenid < 1)
+		{
+		  pool_error(pool, 0, "testcase_read: genid: out of stack");
+		  break;
+		}
+	      id = pool_rewrite_suse_dep(pool, pool_str2id(pool, pieces[2], -1), genid[--ngenid]);
+	    }
 	  else
 	    {
 	      pool_error(pool, 0, "testcase_read: genid: unknown command '%s'", pieces[1]);

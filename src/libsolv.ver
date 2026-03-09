@@ -96,6 +96,7 @@ SOLV_1.0 {
 		pool_prepend_rootdir_tmp;
 		pool_queuetowhatprovides;
 		pool_rel2id;
+		pool_rewrite_suse_dep;
 		pool_satisfieddep_map;
 		pool_search;
 		pool_selection2str;

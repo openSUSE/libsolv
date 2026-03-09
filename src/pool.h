@@ -424,6 +424,7 @@ void pool_add_fileconflicts_deps(Pool *pool, Queue *conflicts);
 /* weird suse stuff */
 void pool_trivial_installable_multiversionmap(Pool *pool, Map *installedmap, Queue *pkgs, Queue *res, Map *multiversionmap);
 void pool_trivial_installable(Pool *pool, Map *installedmap, Queue *pkgs, Queue *res);
+Id pool_rewrite_suse_dep(Pool *pool, Id keyname, Id id);
 
 #ifdef __cplusplus
 }
