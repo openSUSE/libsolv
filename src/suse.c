@@ -63,6 +63,24 @@ fix_namespace_dep(Pool *pool, Id id)
       id = pool_strn2id(pool, dep + 11, depl - 12, 1);
       id = pool_rel2id(pool, NAMESPACE_FILESYSTEM, id, REL_NAMESPACE, 1);
     }
+  if (!strncmp(dep, "language(", 9) && dep[9] && dep[10] && dep[9] != ';')
+    {
+      const char *p2;
+      depl = strlen(dep);
+      if (dep[depl - 1] != ')')
+	return id;
+      id = 0;
+      for (p2 = dep + 9; p2 < dep + depl - 1; p2 = p + 1)
+	{
+	  Id idl;
+	  p = strchr(p2, ';');
+	  if (!p)
+	    p = dep + depl - 1;
+	  idl = pool_strn2id(pool, p2, p - p2, 1);
+	  idl = pool_rel2id(pool, NAMESPACE_LANGUAGE, idl, REL_NAMESPACE, 1);
+	  id = id ? pool_rel2id(pool, id, idl, REL_OR, 1) : idl;
+	}
+    }
   return id;
 }
 
@@ -158,7 +176,7 @@ repo_fix_supplements(Repo *repo, Offset provides, Offset supplements, Offset fre
 	      continue;
 	    }
 	  dep = pool_id2str(pool, id);
-	  if (!strncmp(dep, "modalias(", 9) || !strncmp(dep, "filesystem(", 11))
+	  if (!strncmp(dep, "modalias(", 9) || !strncmp(dep, "filesystem(", 11) || !strncmp(dep, "language(", 9))
 	    repo->idarraydata[i] = fix_namespace_dep(pool, id);
 	  else if (!strncmp(dep, "packageand(", 11) && strlen(dep) < sizeof(buf))
 	    {

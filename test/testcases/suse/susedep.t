@@ -100,4 +100,26 @@ result genid <inline>
 #>genid  8: genid op |
 #>genid  9: genid op &
 #>genid dep foo & (namespace:language(de) | namespace:language(en))
+nextjob
+
+genid dep language(de)
+genid susedep solvable:supplements
+result genid <inline>
+#>genid  1: genid lit namespace:language
+#>genid  2: genid lit de
+#>genid  3: genid op <NAMESPACE>
+#>genid dep namespace:language(de)
+nextjob
+
+genid dep language(de;en)
+genid susedep solvable:supplements
+result genid <inline>
+#>genid  1: genid lit namespace:language
+#>genid  2: genid lit de
+#>genid  3: genid op <NAMESPACE>
+#>genid  4: genid lit namespace:language
+#>genid  5: genid lit en
+#>genid  6: genid op <NAMESPACE>
+#>genid  7: genid op |
+#>genid dep namespace:language(de) | namespace:language(en)
 
