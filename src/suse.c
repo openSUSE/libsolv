@@ -19,12 +19,60 @@
 #include "poolvendor.h"
 #include "util.h"
 
+/* use a REL_NAMESPACE dep for modalias/filesystem dependencies */
+static Id
+fix_namespace_dep(Pool *pool, Id id)
+{
+  const char *dep, *p;
+  size_t depl;
+  if (ISRELDEP(id)) {
+    Reldep *rd = GETRELDEP(pool, id);
+    if (rd->flags == REL_AND || rd->flags == REL_OR || rd->flags == REL_COND || rd->flags == REL_UNLESS || rd->flags == REL_ELSE)
+      {
+	Id name = fix_namespace_dep(pool, rd->name);
+	Id evr = fix_namespace_dep(pool, rd->evr);
+	return name == rd->name && evr == rd->evr ? id : pool_rel2id(pool, name, evr, rd->flags, 1);
+      }
+    return id;
+  }
+  dep = pool_id2str(pool, id);
+  if (!strncmp(dep, "modalias(", 9) && dep[9] && dep[10])
+    {
+      Id pkgid = 0;
+      depl = strlen(dep);
+      if (dep[depl - 1] != ')')
+	return id;
+      p = strchr(dep + 9, ':');
+      if (p && p != dep + 9 && strchr(p + 1, ':'))
+	{
+	  pkgid = pool_strn2id(pool, dep + 9, p - (dep + 9), 1);
+	  p++;
+	}
+      else
+	p = dep + 9;
+      id = pool_strn2id(pool, p, dep + depl - 1 - p, 1);
+      id = pool_rel2id(pool, NAMESPACE_MODALIAS, id, REL_NAMESPACE, 1);
+      if (pkgid)
+        id = pool_rel2id(pool, pkgid, id, REL_AND, 1);
+    }
+  if (!strncmp(dep, "filesystem(", 11) && dep[11] && dep[12])
+    {
+      depl = strlen(dep);
+      if (dep[depl - 1] != ')')
+	return id;
+      id = pool_strn2id(pool, dep + 11, depl - 12, 1);
+      id = pool_rel2id(pool, NAMESPACE_FILESYSTEM, id, REL_NAMESPACE, 1);
+    }
+  return id;
+}
+
 Offset
 repo_fix_supplements(Repo *repo, Offset provides, Offset supplements, Offset freshens)
 {
   Pool *pool = repo->pool;
   Id id, idp, idl;
-  char buf[1024], *p, *dep;
+  char buf[1024], *p, *bp;
+  const char *dep;
   int i, l;
 
   if (provides)
@@ -34,41 +82,41 @@ repo_fix_supplements(Repo *repo, Offset provides, Offset supplements, Offset fre
 	  id = repo->idarraydata[i];
 	  if (ISRELDEP(id))
 	    continue;
-	  dep = (char *)pool_id2str(pool, id);
+	  dep = pool_id2str(pool, id);
 	  if (!strncmp(dep, "locale(", 7) && strlen(dep) < sizeof(buf) - 2)
 	    {
 	      idp = 0;
 	      strcpy(buf + 2, dep);
-	      dep = buf + 2 + 7;
-	      if ((p = strchr(dep, ':')) != 0 && p != dep)
+	      bp = buf + 2 + 7;
+	      if ((p = strchr(bp, ':')) != 0 && p != bp)
 		{
 		  *p++ = 0;
-		  idp = pool_str2id(pool, dep, 1);
-		  dep = p;
+		  idp = pool_str2id(pool, bp, 1);
+		  bp = p;
 		}
 	      id = 0;
-	      while ((p = strchr(dep, ';')) != 0)
+	      while ((p = strchr(bp, ';')) != 0)
 		{
-		  if (p == dep)
+		  if (p == bp)
 		    {
-		      dep = p + 1;
+		      bp = p + 1;
 		      continue;
 		    }
 		  *p++ = 0;
-		  idl = pool_str2id(pool, dep, 1);
+		  idl = pool_str2id(pool, bp, 1);
 		  idl = pool_rel2id(pool, NAMESPACE_LANGUAGE, idl, REL_NAMESPACE, 1);
 		  if (id)
 		    id = pool_rel2id(pool, id, idl, REL_OR, 1);
 		  else
 		    id = idl;
-		  dep = p;
+		  bp = p;
 		}
-	      if (dep[0] && dep[1])
+	      if (bp[0] && bp[1])
 		{
-	 	  for (p = dep; *p && *p != ')'; p++)
+	 	  for (p = bp; *p && *p != ')'; p++)
 		    ;
 		  *p = 0;
-		  idl = pool_str2id(pool, dep, 1);
+		  idl = pool_str2id(pool, bp, 1);
 		  idl = pool_rel2id(pool, NAMESPACE_LANGUAGE, idl, REL_NAMESPACE, 1);
 		  if (id)
 		    id = pool_rel2id(pool, id, idl, REL_OR, 1);
@@ -103,64 +151,46 @@ repo_fix_supplements(Repo *repo, Offset provides, Offset supplements, Offset fre
 	{
 	  id = repo->idarraydata[i];
 	  if (ISRELDEP(id))
-	    continue;
-	  dep = (char *)pool_id2str(pool, id);
-	  if (!strncmp(dep, "system:modalias(", 16))
-	    dep += 7;
-	  if (!strncmp(dep, "modalias(", 9) && dep[9] && dep[10] && strlen(dep) < sizeof(buf))
 	    {
-	      strcpy(buf, dep);
-	      p = strchr(buf + 9, ':');
-	      if (p && p != buf + 9 && strchr(p + 1, ':'))
-		{
-		  *p++ = 0;
-		  idp = pool_str2id(pool, buf + 9, 1);
-		  p[strlen(p) - 1] = 0;
-		  id = pool_str2id(pool, p, 1);
-		  id = pool_rel2id(pool, NAMESPACE_MODALIAS, id, REL_NAMESPACE, 1);
-		  id = pool_rel2id(pool, idp, id, REL_AND, 1);
-		}
-	      else
-		{
-		  p = buf + 9;
-		  p[strlen(p) - 1] = 0;
-		  id = pool_str2id(pool, p, 1);
-		  id = pool_rel2id(pool, NAMESPACE_MODALIAS, id, REL_NAMESPACE, 1);
-		}
-	      if (id)
-		repo->idarraydata[i] = id;
+	      Reldep *rd = GETRELDEP(pool, id);
+	      if (rd->flags == REL_AND || rd->flags == REL_OR || rd->flags == REL_COND || rd->flags == REL_UNLESS  || rd->flags == REL_ELSE)
+		repo->idarraydata[i] = fix_namespace_dep(pool, id);
+	      continue;
 	    }
+	  dep = pool_id2str(pool, id);
+	  if (!strncmp(dep, "modalias(", 9) || !strncmp(dep, "filesystem(", 11))
+	    repo->idarraydata[i] = fix_namespace_dep(pool, id);
 	  else if (!strncmp(dep, "packageand(", 11) && strlen(dep) < sizeof(buf))
 	    {
 	      strcpy(buf, dep);
 	      id = 0;
-	      dep = buf + 11;
-	      while ((p = strchr(dep, ':')) != 0)
+	      bp = buf + 11;
+	      while ((p = strchr(bp, ':')) != 0)
 		{
-		  if (p == dep)
+		  if (p == bp)
 		    {
-		      dep = p + 1;
+		      bp = p + 1;
 		      continue;
 		    }
 		  /* argh, allow pattern: prefix. sigh */
-		  if (p - dep == 7 && !strncmp(dep, "pattern", 7))
+		  if (p - bp == 7 && !strncmp(bp, "pattern", 7))
 		    {
 		      p = strchr(p + 1, ':');
 		      if (!p)
 			break;
 		    }
 		  *p++ = 0;
-		  idp = pool_str2id(pool, dep, 1);
+		  idp = pool_str2id(pool, bp, 1);
 		  if (id)
 		    id = pool_rel2id(pool, id, idp, REL_AND, 1);
 		  else
 		    id = idp;
-		  dep = p;
+		  bp = p;
 		}
-	      if (dep[0] && dep[1])
+	      if (bp[0] && bp[1])
 		{
-		  dep[strlen(dep) - 1] = 0;
-		  idp = pool_str2id(pool, dep, 1);
+		  bp[strlen(bp) - 1] = 0;
+		  idp = pool_str2id(pool, bp, 1);
 		  if (id)
 		    id = pool_rel2id(pool, id, idp, REL_AND, 1);
 		  else
@@ -168,15 +198,6 @@ repo_fix_supplements(Repo *repo, Offset provides, Offset supplements, Offset fre
 		}
 	      if (id)
 		repo->idarraydata[i] = id;
-	    }
-	  else if (!strncmp(dep, "filesystem(", 11) && strlen(dep) < sizeof(buf))
-	    {
-	      strcpy(buf, dep + 11);
-	      if ((p = strrchr(buf, ')')) != 0)
-		*p = 0;
-	      id = pool_str2id(pool, buf, 1);
-	      id = pool_rel2id(pool, NAMESPACE_FILESYSTEM, id, REL_NAMESPACE, 1);
-	      repo->idarraydata[i] = id;
 	    }
 	}
     }
