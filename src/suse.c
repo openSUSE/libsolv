@@ -19,67 +19,84 @@
 #include "poolvendor.h"
 #include "util.h"
 
-/* use a REL_NAMESPACE dep for modalias/filesystem dependencies */
+/* use a REL_NAMESPACE dep for modalias/filesystem/language dependencies */
 static Id
-fix_namespace_dep(Pool *pool, Id id)
+fix_namespace_dep_norel(Pool *pool, Id id)
 {
-  const char *dep, *p;
+  char buf[1024], *p, *bp;
+  const char *dep;
   size_t depl;
-  if (ISRELDEP(id)) {
-    Reldep *rd = GETRELDEP(pool, id);
-    if (rd->flags == REL_AND || rd->flags == REL_OR || rd->flags == REL_COND || rd->flags == REL_UNLESS || rd->flags == REL_ELSE)
-      {
-	Id name = fix_namespace_dep(pool, rd->name);
-	Id evr = fix_namespace_dep(pool, rd->evr);
-	return name == rd->name && evr == rd->evr ? id : pool_rel2id(pool, name, evr, rd->flags, 1);
-      }
-    return id;
-  }
+
   dep = pool_id2str(pool, id);
   if (!strncmp(dep, "modalias(", 9) && dep[9] && dep[10])
     {
       Id pkgid = 0;
       depl = strlen(dep);
-      if (dep[depl - 1] != ')')
+      if (dep[depl - 1] != ')' || depl >= sizeof(buf))
 	return id;
-      p = strchr(dep + 9, ':');
+      strcpy(buf, dep);		/* need to make a copy for str2id */
+      bp = buf;
+      bp[depl - 1] = 0;		/* get rid of trailing ')' */
+      p = strchr(bp + 9, ':');
       if (p && p != dep + 9 && strchr(p + 1, ':'))
 	{
-	  pkgid = pool_strn2id(pool, dep + 9, p - (dep + 9), 1);
+	  pkgid = pool_strn2id(pool, bp + 9, p - (bp + 9), 1);
 	  p++;
 	}
       else
-	p = dep + 9;
-      id = pool_strn2id(pool, p, dep + depl - 1 - p, 1);
+	p = bp + 9;
+      id = pool_str2id(pool, p, 1);
       id = pool_rel2id(pool, NAMESPACE_MODALIAS, id, REL_NAMESPACE, 1);
       if (pkgid)
         id = pool_rel2id(pool, pkgid, id, REL_AND, 1);
     }
-  if (!strncmp(dep, "filesystem(", 11) && dep[11] && dep[12])
+  else if (!strncmp(dep, "filesystem(", 11) && dep[11] && dep[12])
     {
       depl = strlen(dep);
-      if (dep[depl - 1] != ')')
+      if (dep[depl - 1] != ')' || depl >= sizeof(buf))
 	return id;
-      id = pool_strn2id(pool, dep + 11, depl - 12, 1);
+      strcpy(buf, dep);		/* need to make a copy for str2id */
+      bp = buf;
+      bp[depl - 1] = 0;		/* get rid of trailing ')' */
+      id = pool_str2id(pool, bp + 11, 1);
       id = pool_rel2id(pool, NAMESPACE_FILESYSTEM, id, REL_NAMESPACE, 1);
     }
-  if (!strncmp(dep, "language(", 9) && dep[9] && dep[10] && dep[9] != ';')
+  else if (!strncmp(dep, "language(", 9) && dep[9] && dep[10] && dep[9] != ';')
     {
-      const char *p2;
+      char *p2;
       depl = strlen(dep);
-      if (dep[depl - 1] != ')')
+      if (dep[depl - 1] != ')' || depl >= sizeof(buf))
 	return id;
+      strcpy(buf, dep);		/* need to make a copy for str2id */
+      bp = buf;
+      bp[depl - 1] = 0;		/* get rid of trailing ')' */
       id = 0;
-      for (p2 = dep + 9; p2 < dep + depl - 1; p2 = p + 1)
+      for (p2 = bp + 9; *p2; p2 = *p ? p + 1 : p)
 	{
 	  Id idl;
 	  p = strchr(p2, ';');
 	  if (!p)
-	    p = dep + depl - 1;
+	    p = p2 + strlen(p2);
 	  idl = pool_strn2id(pool, p2, p - p2, 1);
 	  idl = pool_rel2id(pool, NAMESPACE_LANGUAGE, idl, REL_NAMESPACE, 1);
 	  id = id ? pool_rel2id(pool, id, idl, REL_OR, 1) : idl;
 	}
+    }
+  return id;
+}
+
+static Id
+fix_namespace_dep(Pool *pool, Id id)
+{
+  Reldep *rd;
+  if (!ISRELDEP(id))
+    return fix_namespace_dep_norel(pool, id);
+  rd = GETRELDEP(pool, id);
+  if (rd->flags == REL_AND || rd->flags == REL_OR || rd->flags == REL_COND || rd->flags == REL_UNLESS || rd->flags == REL_ELSE)
+    {
+      Id name = fix_namespace_dep(pool, rd->name);
+      Id evr = fix_namespace_dep(pool, rd->evr);
+      return name == rd->name && evr == rd->evr ? id : pool_rel2id(pool, name, evr, rd->flags, 1);
     }
   return id;
 }
@@ -177,7 +194,7 @@ repo_fix_supplements(Repo *repo, Offset provides, Offset supplements, Offset fre
 	    }
 	  dep = pool_id2str(pool, id);
 	  if (!strncmp(dep, "modalias(", 9) || !strncmp(dep, "filesystem(", 11) || !strncmp(dep, "language(", 9))
-	    repo->idarraydata[i] = fix_namespace_dep(pool, id);
+	    repo->idarraydata[i] = fix_namespace_dep_norel(pool, id);
 	  else if (!strncmp(dep, "packageand(", 11) && strlen(dep) < sizeof(buf))
 	    {
 	      strcpy(buf, dep);
