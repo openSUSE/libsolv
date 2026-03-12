@@ -1,6 +1,15 @@
 
 This file contains the major changes between libsolv versions:
 
+Version 0.7.36
+- selected bug fixes:
+  * respect the "default" attribute in environment optionlist in
+    the comps parser
+  * support suse namespace deps in boolean dependencies
+- new features:
+  * support for the Elbrus2000 (e2k) architecture
+  * support language() suse namespace rewriting
+
 Version 0.7.35
 - selected bug fixes:
   * fixed rare crash in the handling of allowuninstall in combination

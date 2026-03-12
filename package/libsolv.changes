@@ -1,4 +1,14 @@
 -------------------------------------------------------------------
+Thu Mar 12 10:11:18 CET 2026 - Michael Schroeder <mls@suse.de>
+
+- respect the "default" attribute in environment optionlist in
+  the comps parser
+- support suse namespace deps in boolean dependencies [bsc#1258193]
+- support for the Elbrus2000 (e2k) architecture
+- support language() suse namespace rewriting
+- bump version to 0.7.36
+
+-------------------------------------------------------------------
 Mon Aug  4 10:46:17 CEST 2025 - mls@suse.de
 
 - fixed rare crash in the handling of allowuninstall in combination
