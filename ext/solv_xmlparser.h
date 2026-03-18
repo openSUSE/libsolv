@@ -29,6 +29,7 @@ struct solv_xmlparser {
   void (*endelement)(struct solv_xmlparser *xmlp, int state, char *content);
 
   Id *elementhelper;
+  unsigned int elementhashmask;
   void *parser;
   void *attsdata;
 };
