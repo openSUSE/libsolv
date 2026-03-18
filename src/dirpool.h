@@ -9,6 +9,7 @@
 
 
 #include "pooltypes.h"
+#include "hash.h"
 #include "util.h"
 
 #ifdef __cplusplus
@@ -19,6 +20,8 @@ typedef struct s_Dirpool {
   Id *dirs;
   int ndirs;
   Id *dirtraverse;
+  Hashtable dirhashtbl;		/* (parent, comp) -> dirid hash, built on demand */
+  Hashval dirhashmask;
 } Dirpool;
 
 void dirpool_init(Dirpool *dp);
@@ -70,6 +73,9 @@ dirpool_free_dirtraverse(Dirpool *dp)
 {
   solv_free(dp->dirtraverse);
   dp->dirtraverse = 0;
+  solv_free(dp->dirhashtbl);
+  dp->dirhashtbl = 0;
+  dp->dirhashmask = 0;
 }
 
 static inline Id
