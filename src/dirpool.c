@@ -75,6 +75,7 @@ dirpool_free(Dirpool *dp)
 {
   solv_free(dp->dirs);
   solv_free(dp->dirtraverse);
+  solv_free(dp->dirhashtbl);
 }
 
 void
@@ -96,10 +97,44 @@ dirpool_make_dirtraverse(Dirpool *dp)
   dp->dirtraverse = dirtraverse;
 }
 
+/* Build or rebuild the (parent, comp) -> dirid hash table.
+ * This replaces the old O(B*C) dirtraverse linked-list scan
+ * with O(1) amortized lookup in dirpool_add_dir. */
+static void
+dirpool_resize_hash(Dirpool *dp, int numnew)
+{
+  Hashval hashmask, h, hh;
+  Hashtable ht;
+  Id i, d, parent;
+
+  hashmask = mkmask(dp->ndirs + numnew);
+  if (dp->dirhashtbl && hashmask <= dp->dirhashmask)
+    return;
+  dp->dirhashmask = hashmask;
+  solv_free(dp->dirhashtbl);
+  ht = dp->dirhashtbl = (Hashtable)solv_calloc(hashmask + 1, sizeof(Id));
+  for (i = 2; i < dp->ndirs; i++)
+    {
+      if (dp->dirs[i] <= 0)
+	continue;
+      /* walk back to block header to find parent */
+      for (d = i; dp->dirs[--d] > 0; )
+	;
+      parent = -dp->dirs[d];
+      h = relhash(parent, dp->dirs[i], 0) & hashmask;
+      hh = HASHCHAIN_START;
+      while (ht[h])
+	h = HASHCHAIN_NEXT(h, hh, hashmask);
+      ht[h] = i;
+    }
+}
+
 Id
 dirpool_add_dir(Dirpool *dp, Id parent, Id comp, int create)
 {
-  Id did, d, ds;
+  Id did, d;
+  Hashval h, hh, hashmask;
+  Hashtable ht;
 
   if (!dp->ndirs)
     {
@@ -114,28 +149,39 @@ dirpool_add_dir(Dirpool *dp, Id parent, Id comp, int create)
     return 0;
   if (parent == 0 && comp == 1)
     return 1;
-  if (!dp->dirtraverse)
-    dirpool_make_dirtraverse(dp);
-  /* check all entries with this parent if we
-   * already have this component */
-  ds = dp->dirtraverse[parent];
-  while (ds)
+
+  /* grow hash table if load factor exceeds 50% */
+  if ((Hashval)dp->ndirs * 2 > dp->dirhashmask)
+    dirpool_resize_hash(dp, DIR_BLOCK);
+
+  ht = dp->dirhashtbl;
+  hashmask = dp->dirhashmask;
+
+  /* probe for existing (parent, comp) entry */
+  h = relhash(parent, comp, 0) & hashmask;
+  hh = HASHCHAIN_START;
+  while ((did = ht[h]) != 0)
     {
-      /* ds: first component in this block
-       * ds-1: parent link */
-      for (d = ds--; d < dp->ndirs; d++)
+      if (dp->dirs[did] == comp)
 	{
-	  if (dp->dirs[d] == comp)
-	    return d;
-	  if (dp->dirs[d] <= 0)	/* reached end of this block */
-	    break;
+	  /* comp matches, verify parent by walking back to
+	   * the block header (short sequential scan) */
+	  d = did;
+	  while (dp->dirs[--d] > 0)
+	    ;
+	  if (-dp->dirs[d] == parent)
+	    return did;
 	}
-      if (ds)
-        ds = dp->dirtraverse[ds];
+      h = HASHCHAIN_NEXT(h, hh, hashmask);
     }
+
   if (!create)
     return 0;
-  /* a new one, find last parent */
+
+  if (!dp->dirtraverse)
+    dirpool_make_dirtraverse(dp);
+
+  /* find last parent block */
   for (did = dp->ndirs - 1; did > 0; did--)
     if (dp->dirs[did] <= 0)
       break;
@@ -154,5 +200,10 @@ dirpool_add_dir(Dirpool *dp, Id parent, Id comp, int create)
   dp->dirtraverse = solv_extend(dp->dirtraverse, dp->ndirs, 1, sizeof(Id), DIR_BLOCK);
   dp->dirs[dp->ndirs] = comp;
   dp->dirtraverse[dp->ndirs] = 0;
+
+  /* insert new entry into hash table (h still points at
+   * the empty slot from the failed probe above) */
+  ht[h] = dp->ndirs;
+
   return dp->ndirs++;
 }
