@@ -97,34 +97,39 @@ dirpool_make_dirtraverse(Dirpool *dp)
   dp->dirtraverse = dirtraverse;
 }
 
+static inline Hashval
+dirpool_hash_parent_comp(Id parent, Id comp)
+{
+  return parent + 7 * comp;
+}
+
 /* Build or rebuild the (parent, comp) -> dirid hash table.
  * This replaces the old O(B*C) dirtraverse linked-list scan
  * with O(1) amortized lookup in dirpool_add_dir. */
 static void
 dirpool_resize_hash(Dirpool *dp, int numnew)
 {
-  Hashval hashmask, h, hh;
+  Hashval hm, h, hh;
   Hashtable ht;
-  Id i, d, parent;
+  Id i, parent = 0;
 
-  hashmask = mkmask(dp->ndirs + numnew);
-  if (dp->dirhashtbl && hashmask <= dp->dirhashmask)
+  hm = mkmask(dp->ndirs + numnew);
+  if (dp->dirhashtbl && hm <= dp->dirhashmask)
     return;
-  dp->dirhashmask = hashmask;
+  dp->dirhashmask = hm;
   solv_free(dp->dirhashtbl);
-  ht = dp->dirhashtbl = (Hashtable)solv_calloc(hashmask + 1, sizeof(Id));
+  ht = dp->dirhashtbl = (Hashtable)solv_calloc(hm + 1, sizeof(Id));
   for (i = 2; i < dp->ndirs; i++)
     {
       if (dp->dirs[i] <= 0)
-	continue;
-      /* walk back to block header to find parent */
-      for (d = i; dp->dirs[--d] > 0; )
-	;
-      parent = -dp->dirs[d];
-      h = relhash(parent, dp->dirs[i], 0) & hashmask;
+	{
+	  parent = -dp->dirs[i];
+	  continue;
+	}
+      h = dirpool_hash_parent_comp(parent, dp->dirs[i]) & hm;
       hh = HASHCHAIN_START;
       while (ht[h])
-	h = HASHCHAIN_NEXT(h, hh, hashmask);
+	h = HASHCHAIN_NEXT(h, hh, hm);
       ht[h] = i;
     }
 }
@@ -132,8 +137,8 @@ dirpool_resize_hash(Dirpool *dp, int numnew)
 Id
 dirpool_add_dir(Dirpool *dp, Id parent, Id comp, int create)
 {
-  Id did, d;
-  Hashval h, hh, hashmask;
+  Id did;
+  Hashval h, hh, hm;
   Hashtable ht;
 
   if (!dp->ndirs)
@@ -151,14 +156,14 @@ dirpool_add_dir(Dirpool *dp, Id parent, Id comp, int create)
     return 1;
 
   /* grow hash table if load factor exceeds 50% */
-  if ((Hashval)dp->ndirs * 2 > dp->dirhashmask)
+  if ((Hashval)dp->ndirs * 2 >= dp->dirhashmask)
     dirpool_resize_hash(dp, DIR_BLOCK);
 
   ht = dp->dirhashtbl;
-  hashmask = dp->dirhashmask;
+  hm = dp->dirhashmask;
 
   /* probe for existing (parent, comp) entry */
-  h = relhash(parent, comp, 0) & hashmask;
+  h = dirpool_hash_parent_comp(parent, comp) & hm;
   hh = HASHCHAIN_START;
   while ((did = ht[h]) != 0)
     {
@@ -166,20 +171,17 @@ dirpool_add_dir(Dirpool *dp, Id parent, Id comp, int create)
 	{
 	  /* comp matches, verify parent by walking back to
 	   * the block header (short sequential scan) */
-	  d = did;
+	  Id d = did;
 	  while (dp->dirs[--d] > 0)
 	    ;
 	  if (-dp->dirs[d] == parent)
 	    return did;
 	}
-      h = HASHCHAIN_NEXT(h, hh, hashmask);
+      h = HASHCHAIN_NEXT(h, hh, hm);
     }
 
   if (!create)
     return 0;
-
-  if (!dp->dirtraverse)
-    dirpool_make_dirtraverse(dp);
 
   /* find last parent block */
   for (did = dp->ndirs - 1; did > 0; did--)
@@ -189,17 +191,24 @@ dirpool_add_dir(Dirpool *dp, Id parent, Id comp, int create)
     {
       /* make room for parent entry */
       dp->dirs = solv_extend(dp->dirs, dp->ndirs, 1, sizeof(Id), DIR_BLOCK);
-      dp->dirtraverse = solv_extend(dp->dirtraverse, dp->ndirs, 1, sizeof(Id), DIR_BLOCK);
       /* new parent block, link in */
       dp->dirs[dp->ndirs] = -parent;
-      dp->dirtraverse[dp->ndirs] = dp->dirtraverse[parent];
-      dp->dirtraverse[parent] = ++dp->ndirs;
+      if (dp->dirtraverse)
+	{
+	  dp->dirtraverse = solv_extend(dp->dirtraverse, dp->ndirs, 1, sizeof(Id), DIR_BLOCK);
+	  dp->dirtraverse[dp->ndirs] = dp->dirtraverse[parent];
+	  dp->dirtraverse[parent] = dp->ndirs;
+	}
+      dp->ndirs++;
     }
   /* make room for new entry */
   dp->dirs = solv_extend(dp->dirs, dp->ndirs, 1, sizeof(Id), DIR_BLOCK);
-  dp->dirtraverse = solv_extend(dp->dirtraverse, dp->ndirs, 1, sizeof(Id), DIR_BLOCK);
   dp->dirs[dp->ndirs] = comp;
-  dp->dirtraverse[dp->ndirs] = 0;
+  if (dp->dirtraverse)
+    {
+      dp->dirtraverse = solv_extend(dp->dirtraverse, dp->ndirs, 1, sizeof(Id), DIR_BLOCK);
+      dp->dirtraverse[dp->ndirs] = 0;
+    }
 
   /* insert new entry into hash table (h still points at
    * the empty slot from the failed probe above) */
