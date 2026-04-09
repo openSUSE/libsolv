@@ -95,6 +95,12 @@ static const xmlChar **fixup_atts(struct solv_xmlparser *xmlp, const xmlChar **a
 }
 #endif
 
+static inline Hashval
+hash_state_name(int state, const char *name)
+{
+  return strhash_cont(name, (Hashval)state * 37);
+}
+
 #ifdef WITH_LIBXML2
 static void
 start_element(void *userData, const xmlChar *name, const xmlChar **atts)
@@ -118,33 +124,38 @@ start_element(void *userData, const char *name, const char **atts)
     }
 
   /* open-addressing hash lookup keyed on (oldstate, name) */
-  h = strhash_cont((const char *)name, (Hashval)oldstate * 37) & hm;
+  h = hash_state_name(oldstate, (const char *)name) & hm;
   hh = HASHCHAIN_START;
-  while (elementhelper[h])
+  while ((el = elementhelper[h] ? &elements[elementhelper[h] - 1] : 0) != 0)
     {
-      el = &elements[elementhelper[h] - 1];
-      if (el->fromstate == oldstate && !strcmp(el->element, name))
-        {
-          queue_push(&xmlp->elementq, xmlp->state);
-          xmlp->state = el->tostate;
-          xmlp->docontent = el->docontent;
-          xmlp->lcontent = 0;
-#ifdef WITH_LIBXML2
-          if (!atts)
-            {
-              static const char *nullattr;
-              atts = (const xmlChar **)&nullattr;
-            }
-          else if (xmlp->state != oldstate)
-            atts = fixup_atts(xmlp, atts);
-#endif
-          if (xmlp->state != oldstate)
-            xmlp->startelement(xmlp, xmlp->state, el->element, (const char **)atts);
-          return;
-        }
+      if (el->fromstate == oldstate && !strcmp(el->element, (const char *)name))
+	break;
       h = HASHCHAIN_NEXT(h, hh, hm);
     }
-  xmlp->unknowncnt++;
+  if (!el)
+    {
+#if 0
+      fprintf(stderr, "into unknown: %s\n", name);
+#endif
+      xmlp->unknowncnt++;
+      return;
+    }
+
+  queue_push(&xmlp->elementq, xmlp->state);
+  xmlp->state = el->tostate;
+  xmlp->docontent = el->docontent;
+  xmlp->lcontent = 0;
+#ifdef WITH_LIBXML2
+  if (!atts)
+    {
+      static const char *nullattr;
+      atts = (const xmlChar **)&nullattr;
+    }
+  else if (xmlp->state != oldstate)
+    atts = fixup_atts(xmlp, atts);
+#endif
+  if (xmlp->state != oldstate)
+    xmlp->startelement(xmlp, xmlp->state, el->element, (const char **)atts);
 }
 
 #ifdef WITH_LIBXML2
@@ -182,7 +193,7 @@ solv_xmlparser_init(struct solv_xmlparser *xmlp,
   int i, nelements;
   struct solv_xmlparser_element *el;
   Id *elementhelper;
-  Hashval hashmask, h, hh;
+  Hashval hm, h, hh;
 
   memset(xmlp, 0, sizeof(*xmlp));
   nelements = 0;
@@ -191,18 +202,18 @@ solv_xmlparser_init(struct solv_xmlparser *xmlp,
 
   xmlp->elements = elements;
   xmlp->nelements = nelements;
-  hashmask = mkmask(nelements);
-  elementhelper = solv_calloc(hashmask + 1, sizeof(Id));
+  hm = mkmask(nelements);
+  elementhelper = solv_calloc(hm + 1, sizeof(Id));
   for (i = 0; i < nelements; i++)
     {
-      h = strhash_cont(elements[i].element, (Hashval)elements[i].fromstate * 37) & hashmask;
+      h = hash_state_name(elements[i].fromstate, elements[i].element) & hm;
       hh = HASHCHAIN_START;
       while (elementhelper[h])
-        h = HASHCHAIN_NEXT(h, hh, hashmask);
+        h = HASHCHAIN_NEXT(h, hh, hm);
       elementhelper[h] = i + 1;
     }
   xmlp->elementhelper = elementhelper;
-  xmlp->elementhashmask = hashmask;
+  xmlp->elementhashmask = hm;
   queue_init(&xmlp->elementq);
   xmlp->acontent = 256;
   xmlp->content = solv_malloc(xmlp->acontent);
