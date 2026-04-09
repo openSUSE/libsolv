@@ -288,8 +288,8 @@ langtag(struct parsedata *pd, Id tag, const char *language)
 static Id
 makeevr_parts(Pool *pool, struct parsedata *pd, const char *e, const char *v, const char *r)
 {
-  const char *p;
   char *buf, *bp;
+  size_t el, vl, rl, needed;
 
   /* discard trivial epoch ("" or "0") */
   if (e && (!*e || !strcmp(e, "0")))
@@ -298,25 +298,38 @@ makeevr_parts(Pool *pool, struct parsedata *pd, const char *e, const char *v, co
   /* if version looks like "N:...", keep epoch as "0" to avoid ambiguity */
   if (v && !e)
     {
-      for (p = v; *p >= '0' && *p <= '9'; p++);
+      const char *p;
+      for (p = v; *p >= '0' && *p <= '9'; p++)
+	;
       if (p > v && *p == ':')
         e = "0";
     }
 
   /* assemble "epoch:version-release" */
-  int needed = (e ? strlen(e) + 1 : 0) + (v ? strlen(v) : 0) + (r ? strlen(r) + 1 : 0) + 1;
+  el = e ? strlen(e) : 0;
+  vl = v ? strlen(v) : 0;
+  rl = r ? strlen(r) : 0;
+  needed = (e ? el + 1 : 0) + vl + (r ? rl + 1 : 0) + 1;
   bp = buf = solv_xmlparser_contentspace(&pd->xmlp, needed);
   if (e)
-    bp += sprintf(bp, "%s:", e);
-  if (v)
-    bp += sprintf(bp, "%s", v);
+    {
+      memcpy(bp, e, el);
+      bp += el;
+      *bp++ = ':';
+    }
+  if (vl)
+    {
+      memcpy(bp, v, vl);
+      bp += vl;
+    }
   if (r)
-    bp += sprintf(bp, "-%s", r);
+    {
+      *bp++ = '-';
+      memcpy(bp, r, rl);
+      bp += rl;
+    }
   *bp = 0;
-
-  if (!*buf)
-    return 0;
-  return pool_str2id(pool, buf, 1);
+  return *buf ? pool_str2id(pool, buf, 1) : 0;
 }
 
 /*
@@ -327,8 +340,7 @@ makeevr_parts(Pool *pool, struct parsedata *pd, const char *e, const char *v, co
 static Id
 makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
 {
-  const char *e, *v, *r;
-  e = v = r = 0;
+  const char *e = 0, *v = 0, *r = 0;
   for (; *atts; atts += 2)
     {
       if (!strcmp(*atts, "epoch"))
