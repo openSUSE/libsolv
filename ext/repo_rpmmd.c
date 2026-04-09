@@ -281,18 +281,53 @@ langtag(struct parsedata *pd, Id tag, const char *language)
 }
 
 /*
+ * makeevr_parts
+ * build evr Id from pre-parsed epoch, ver, rel strings
+ */
+
+static Id
+makeevr_parts(Pool *pool, struct parsedata *pd, const char *e, const char *v, const char *r)
+{
+  const char *p;
+  char *buf, *bp;
+
+  /* discard trivial epoch ("" or "0") */
+  if (e && (!*e || !strcmp(e, "0")))
+    e = 0;
+
+  /* if version looks like "N:...", keep epoch as "0" to avoid ambiguity */
+  if (v && !e)
+    {
+      for (p = v; *p >= '0' && *p <= '9'; p++);
+      if (p > v && *p == ':')
+        e = "0";
+    }
+
+  /* assemble "epoch:version-release" */
+  int needed = (e ? strlen(e) + 1 : 0) + (v ? strlen(v) : 0) + (r ? strlen(r) + 1 : 0) + 1;
+  bp = buf = solv_xmlparser_contentspace(&pd->xmlp, needed);
+  if (e)
+    bp += sprintf(bp, "%s:", e);
+  if (v)
+    bp += sprintf(bp, "%s", v);
+  if (r)
+    bp += sprintf(bp, "-%s", r);
+  *bp = 0;
+
+  if (!*buf)
+    return 0;
+  return pool_str2id(pool, buf, 1);
+}
+
+/*
  * makeevr_atts
  * parse 'epoch', 'ver' and 'rel', return evr Id
- *
  */
 
 static Id
 makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
 {
-  const char *e, *v, *r, *v2;
-  char *c, *space;
-  int l;
-
+  const char *e, *v, *r;
   e = v = r = 0;
   for (; *atts; atts += 2)
     {
@@ -303,47 +338,7 @@ makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
       else if (!strcmp(*atts, "rel"))
 	r = atts[1];
     }
-  if (e && (!*e || !strcmp(e, "0")))
-    e = 0;
-  if (v && !e)
-    {
-      for (v2 = v; *v2 >= '0' && *v2 <= '9'; v2++)
-        ;
-      if (v2 > v && *v2 == ':')
-	e = "0";
-    }
-  l = 1;
-  if (e)
-    l += strlen(e) + 1;
-  if (v)
-    l += strlen(v);
-  if (r)
-    l += strlen(r) + 1;
-  c = space = solv_xmlparser_contentspace(&pd->xmlp, l);
-  if (e)
-    {
-      strcpy(c, e);
-      c += strlen(c);
-      *c++ = ':';
-    }
-  if (v)
-    {
-      strcpy(c, v);
-      c += strlen(c);
-    }
-  if (r)
-    {
-      *c++ = '-';
-      strcpy(c, r);
-      c += strlen(c);
-    }
-  *c = 0;
-  if (!*space)
-    return 0;
-#if 0
-  fprintf(stderr, "evr: %s\n", space);
-#endif
-  return pool_str2id(pool, space, 1);
+  return makeevr_parts(pool, pd, e, v, r);
 }
 
 
