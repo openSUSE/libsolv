@@ -124,7 +124,7 @@ repo_add_mdk(Repo *repo, FILE *fp, int flags)
       else if (!strncmp(buf + 1, "requires@", 9))
 	s->requires = parse_deps(s, buf + 10, SOLVABLE_PREREQMARKER);
       else if (!strncmp(buf + 1, "recommends@", 11))
-	s->recommends = parse_deps(s, buf + 10, 0);
+	s->recommends = parse_deps(s, buf + 12, 0);
       else if (!strncmp(buf + 1, "suggests@", 9))
 	s->suggests = parse_deps(s, buf + 10, 0);
       else if (!strncmp(buf + 1, "obsoletes@", 10))
