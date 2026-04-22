@@ -371,6 +371,7 @@ control2solvable(Solvable *s, Repodata *data, char *control)
   char checksum[64 * 2 + 1];
   Id checksumtype = 0;
   Id newtype;
+  size_t qlen;
 
   p = control;
   while (*p)
@@ -484,13 +485,13 @@ control2solvable(Solvable *s, Repodata *data, char *control)
 	  break;
 	case 'S' << 8 | 'H':
 	  newtype = solv_chksum_str2type(tag);
-	  if (!newtype || solv_chksum_len(newtype) * 2 != strlen(q))
+	  qlen = strlen(q);
+	  if (!newtype || solv_chksum_len(newtype) * 2 != qlen || qlen + 1 > sizeof(checksum))
 	    break;
-	  if (!checksumtype || (newtype == REPOKEY_TYPE_SHA1 && checksumtype != REPOKEY_TYPE_SHA256) || newtype == REPOKEY_TYPE_SHA256)
-	    {
-	      strcpy(checksum, q);
-	      checksumtype = newtype;
-	    }
+	  if (checksumtype && solv_chksum_len(checksumtype) * 2 >= qlen)
+	    break;	/* new checksum is not longer */
+	  strcpy(checksum, q);
+	  checksumtype = newtype;
 	  break;
 	case 'S' << 8 | 'O':
 	  if (!strcasecmp(tag, "source"))
