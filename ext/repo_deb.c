@@ -368,7 +368,7 @@ control2solvable(Solvable *s, Repodata *data, char *control)
   char *p, *q, *end, *tag;
   int x, l;
   int havesource = 0;
-  char checksum[32 * 2 + 1];
+  char checksum[64 * 2 + 1];
   Id checksumtype = 0;
   Id newtype;
 
