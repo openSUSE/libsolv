@@ -1,6 +1,13 @@
 
 This file contains the major changes between libsolv versions:
 
+Version 0.7.37
+- selected bug fixes:
+  * fix parsing of sha512 checksums in debian repositories
+  * improve speed of dirpool_add_dir makeing parsing of
+    filelists.xml twice as fast
+  * fix parsing of recommands in the old Mandriva synthesis format
+
 Version 0.7.36
 - selected bug fixes:
   * respect the "default" attribute in environment optionlist in

@@ -1,4 +1,13 @@
 -------------------------------------------------------------------
+Thu Apr 23 11:22:49 CEST 2026 - Michael Schroeder <mls@suse.de>
+
+- fix parsing of sha512 checksums in debian repositories
+- improve speed of dirpool_add_dir makeing parsing of filelists.xml
+  twice as fast
+- fix parsing of recommands in the old Mandriva synthesis format
+- bump version to 0.7.37
+
+-------------------------------------------------------------------
 Thu Mar 12 10:11:18 CET 2026 - Michael Schroeder <mls@suse.de>
 
 - respect the "default" attribute in environment optionlist in
