@@ -287,9 +287,8 @@ repodata_str2dir(Repodata *data, const char *dir, int create)
   dirs = dir;
   if (data->dircache)
     {
-      int l;
       struct dircache *dircache = data->dircache;
-      l = strlen(dir);
+      size_t l = strlen(dir);
       while (l > 0)
 	{
 	  if (l < DIRCACHE_SIZE && dircache->ids[l] && !memcmp(dircache->str + l * (l - 1) / 2, dir, l))
@@ -325,7 +324,7 @@ repodata_str2dir(Repodata *data, const char *dir, int create)
 	data->dircache = solv_calloc(1, sizeof(struct dircache));
       if (data->dircache)
 	{
-	  int l = dire - dirs;
+	  size_t l = dire - dirs;
 	  if (l < DIRCACHE_SIZE)
 	    {
 	      data->dircache->ids[l] = parent;
