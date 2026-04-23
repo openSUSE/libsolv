@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <limits.h>
 
 #include "repo_solv.h"
 #include "util.h"
@@ -1018,6 +1019,18 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
 
   maxsize = read_id(&data, 0);
   allsize = read_id(&data, 0);
+  if (maxsize < 0 || allsize < 0)
+    {
+      data.error = pool_error(pool, SOLV_ERROR_CORRUPT, "negative data size in solv header");
+      id = 0;
+      goto data_error;
+    }
+  if (maxsize > INT_MAX - 5)
+    {
+      data.error = pool_error(pool, SOLV_ERROR_OVERFLOW, "data size overflow in solv header");
+      id = 0;
+      goto data_error;
+    }
   maxsize += 5;	/* so we can read the next schema of an array */
   if (maxsize > allsize)
     maxsize = allsize;
@@ -1343,6 +1356,7 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
     }
   solv_free(buf);
 
+data_error:
   if (data.error)
     {
       /* free solvables */
