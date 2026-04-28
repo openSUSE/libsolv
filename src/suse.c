@@ -107,7 +107,7 @@ repo_fix_supplements(Repo *repo, Offset provides, Offset supplements, Offset fre
   Pool *pool = repo->pool;
   Id id, idp, idl;
   char buf[1024], *p, *bp;
-  const char *dep;
+  const char *dep, *colon;
   int i, l;
 
   if (provides)
@@ -163,10 +163,10 @@ repo_fix_supplements(Repo *repo, Offset provides, Offset supplements, Offset fre
 	      if (id)
 		supplements = repo_addid_dep(repo, supplements, id, 0);
 	    }
-	  else if ((p = strchr(dep, ':')) != 0 && p != dep && p[1] == '/' && strlen(dep) < sizeof(buf))
+	  else if ((colon = strchr(dep, ':')) != 0 && colon != dep && colon[1] == '/' && strlen(dep) < sizeof(buf))
 	    {
 	      strcpy(buf, dep);
-	      p = buf + (p - dep);
+	      p = buf + (colon - dep);
 	      *p++ = 0;
 	      idp = pool_str2id(pool, buf, 1);
 	      /* strip trailing slashes */

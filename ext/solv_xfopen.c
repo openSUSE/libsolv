@@ -658,7 +658,7 @@ static inline FILE *myzchunkfdopen(int fd, const char *mode)
 FILE *
 solv_xfopen(const char *fn, const char *mode)
 {
-  char *suf;
+  const char *suf;
 
   if (!fn)
     {
@@ -732,7 +732,7 @@ FILE *
 solv_xfopen_fd(const char *fn, int fd, const char *mode)
 {
   const char *simplemode = mode;
-  char *suf;
+  const char *suf;
 
   suf = fn ? strrchr(fn, '.') : 0;
   if (!mode)
