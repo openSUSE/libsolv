@@ -900,14 +900,19 @@ selection_name_arch_rel(Pool *pool, Queue *selection, const char *name, int flag
 {
   int ret, rflags = 0, noprune;
   char *r = 0, *rname = 0;
+  const char *relop;
 
   /* try to split off an relation part */
   if ((flags & SELECTION_REL) != 0)
     {
-      if ((r = strpbrk(name, "<=>")) != 0)
+      if ((relop = (char *)strpbrk(name, "<=>")) == 0)
+        {
+          r = 0;
+        }
+      else
 	{
 	  rname = solv_strdup(name);
-	  r = rname + (r - name);
+	  r = rname + (relop - name);
 	  if ((r = splitrel(rname, r, &rflags)) == 0)
 	    rname = solv_free(rname);
 	}
@@ -1145,6 +1150,7 @@ static int
 selection_canon(Pool *pool, Queue *selection, const char *name, int flags)
 {
   char *rname, *r, *r2;
+  const char *delimiter;
   Id archid = 0;
   int ret;
 
@@ -1172,10 +1178,10 @@ selection_canon(Pool *pool, Queue *selection, const char *name, int flags)
 #endif
   if (pool->disttype == DISTTYPE_DEB)
     {
-      if ((r = strchr(name, '_')) == 0)
+      if ((delimiter = strchr(name, '_')) == 0)
 	return 0;
       rname = solv_strdup(name);	/* so we can modify it */
-      r = rname + (r - name);
+      r = rname + (delimiter - name);
       *r++ = 0;
       if ((ret = selection_name(pool, selection, rname, flags)) == 0)
 	{
@@ -1195,10 +1201,10 @@ selection_canon(Pool *pool, Queue *selection, const char *name, int flags)
 
   if (pool->disttype == DISTTYPE_HAIKU)
     {
-      if ((r = strchr(name, '-')) == 0)
+      if ((delimiter = strchr(name, '-')) == 0)
 	return 0;
       rname = solv_strdup(name);	/* so we can modify it */
-      r = rname + (r - name);
+      r = rname + (delimiter - name);
       *r++ = 0;
       if ((ret = selection_name(pool, selection, rname, flags)) == 0)
 	{
@@ -1216,10 +1222,10 @@ selection_canon(Pool *pool, Queue *selection, const char *name, int flags)
       return selection->count ? ret | SELECTION_CANON : 0;
     }
 
-  if ((r = strrchr(name, '-')) == 0)
+  if ((delimiter = strrchr(name, '-')) == 0)
     return 0;
   rname = solv_strdup(name);	/* so we can modify it */
-  r = rname + (r - name);
+  r = rname + (delimiter - name);
   *r = 0;
 
   /* split off potential arch part from version */
