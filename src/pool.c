@@ -437,6 +437,8 @@ pool_set_languages(Pool *pool, const char **languages, int nlanguages)
   for (i = 0; i < pool->nlanguages; i++)
     free((char *)pool->languages[i]);
   pool->languages = solv_free((void *)pool->languages);
+  if (nlanguages < 0 || nlanguages >= 1024)
+    solv_ovfl("language count overflow");
   pool->nlanguages = nlanguages;
   if (!nlanguages)
     return;

@@ -216,7 +216,7 @@ solvable_lookup_str_poollang(Solvable *s, Id keyname)
   cols = pool->nlanguages + 1;
   if (!pool->languagecache)
     {
-      pool->languagecache = solv_calloc(cols * ID_NUM_INTERNAL, sizeof(Id));
+      pool->languagecache = solv_calloc(ID_NUM_INTERNAL, cols * sizeof(Id));
       pool->languagecacheother = 0;
     }
   if (keyname >= ID_NUM_INTERNAL)
