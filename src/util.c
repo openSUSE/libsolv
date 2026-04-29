@@ -111,7 +111,7 @@ solv_extend_realloc(void *old, size_t len, size_t size, size_t block)
 	    len = nlen;
 	}
     }
-  if (len >= SOLV_MAX_BLKLEN)
+  if (len >= SOLV_MAX_INDEX)
     solv_ovfl("solv extend realloc overflow");
   return solv_realloc2(old, len, size);
 }

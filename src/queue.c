@@ -16,6 +16,8 @@
 #include "queue.h"
 #include "util.h"
 
+#define SOLV_MAX_QUEUECOUNT SOLV_MAX_INDEX
+
 static inline int
 queue_extra_space(int size)
 {
@@ -87,6 +89,8 @@ queue_alloc_one(Queue *q)
   else
     {
       int extra_space = queue_extra_space(q->count);
+      if (q->count + extra_space >= SOLV_MAX_QUEUECOUNT)
+	solv_ovfl("queue count overflow");
       if (!q->alloc)
 	{
 	  q->alloc = solv_malloc2(q->count + extra_space, sizeof(Id));
@@ -210,6 +214,9 @@ queue_prealloc(Queue *q, int n)
     queue_alloc_one(q);
   off = q->elements - q->alloc;
   extra_space = queue_extra_space(q->count + n);
+  if (n >= SOLV_MAX_QUEUECOUNT || (unsigned int)(off + q->count + n + extra_space) >= (unsigned int)SOLV_MAX_QUEUECOUNT)
+    solv_ovfl("queue count overflow");
+
   q->alloc = solv_realloc2(q->alloc, off + q->count + n + extra_space, sizeof(Id));
   q->elements = q->alloc + off;
   q->left = n + extra_space;

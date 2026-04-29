@@ -127,7 +127,7 @@ pool_shrink_whatprovides(Pool *pool)
     return;
   r = pool->whatprovidesdataoff - o;
   pool->whatprovidesdataoff = o;
-  pool->whatprovidesdata = solv_realloc(pool->whatprovidesdata, (o + pool->whatprovidesdataleft) * sizeof(Id));
+  pool->whatprovidesdata = solv_realloc2(pool->whatprovidesdata, o + pool->whatprovidesdataleft, sizeof(Id));
   if (r > pool->whatprovidesdataleft)
     r = pool->whatprovidesdataleft;
   memset(pool->whatprovidesdata + o, 0, r * sizeof(Id));
@@ -156,7 +156,7 @@ pool_shrink_whatprovidesaux(Pool *pool)
 	*wp++ = id;
     }
   newoff = wp - pool->whatprovidesauxdata;
-  pool->whatprovidesauxdata = solv_realloc(pool->whatprovidesauxdata, newoff * sizeof(Id));
+  pool->whatprovidesauxdata = solv_realloc2(pool->whatprovidesauxdata, newoff, sizeof(Id));
   POOL_DEBUG(SOLV_DEBUG_STATS, "shrunk whatprovidesauxdata from %d to %d\n", pool->whatprovidesauxdataoff, newoff);
   pool->whatprovidesauxdataoff = newoff;
 }
@@ -225,6 +225,8 @@ pool_createwhatprovides(Pool *pool)
 	  *idp = 1;			/* offset for empty list */
 	  continue;
 	}
+      if (n >= 0xffff0000U - off)
+	solv_ovfl("pool whatprovides overflow");
       off += n;				/* make space for all providers */
       *idp = off++;			/* now idp points to terminating zero */
       np++;				/* inc # of provider 'slots' for stats */
@@ -236,8 +238,12 @@ pool_createwhatprovides(Pool *pool)
   extra = 2 * pool->nrels;
   if (extra < 256)
     extra = 256;
+  if (extra > 0x10000000)
+    extra = 0x10000000;
+  if (off > 0xffff0000U - extra)
+    solv_ovfl("pool whatprovides overflow");
 
-  POOL_DEBUG(SOLV_DEBUG_STATS, "provide space needed: %d + %d\n", off, extra);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "provide space needed: %u + %d\n", off, extra);
 
   /* alloc space for all providers + extra */
   whatprovidesdata = solv_calloc(off + extra, sizeof(Id));
@@ -290,6 +296,9 @@ pool_createwhatprovides(Pool *pool)
   pool->whatprovidesdataoff = off;
   pool->whatprovidesdataleft = extra;
   pool_shrink_whatprovides(pool);
+  if (pool->whatprovidesdataoff >= SOLV_MAX_INDEX || pool->whatprovidesdataoff + pool->whatprovidesdataleft >= SOLV_MAX_INDEX)
+    solv_ovfl("pool whatprovides overflow");
+
   if (pool->whatprovidesaux)
     pool_shrink_whatprovidesaux(pool);
   POOL_DEBUG(SOLV_DEBUG_STATS, "whatprovides memory used: %d K id array, %d K data\n", (pool->ss.nstrings + pool->nrels + WHATPROVIDES_BLOCK) / (int)(1024/sizeof(Id)), (pool->whatprovidesdataoff + pool->whatprovidesdataleft) / (int)(1024/sizeof(Id)));
@@ -375,16 +384,20 @@ pool_ids2whatprovides(Pool *pool, Id *ids, int count)
 {
   Offset off;
 
-  if (count == 0)		       /* queue empty -> 1 */
+  if (count <= 0)		       /* queue empty -> 1 */
     return 1;
   if (count == 1 && *ids == SYSTEMSOLVABLE)
     return 2;
+  if (count >= SOLV_MAX_INDEX)
+    solv_ovfl("pool whatprovides data overflow");
 
   /* extend whatprovidesdata if needed, +1 for 0-termination */
   if (pool->whatprovidesdataleft < count + 1)
     {
       POOL_DEBUG(SOLV_DEBUG_STATS, "growing provides hash data...\n");
-      pool->whatprovidesdata = solv_realloc(pool->whatprovidesdata, (pool->whatprovidesdataoff + count + 4096) * sizeof(Id));
+      if ((unsigned int)(SOLV_MAX_INDEX - pool->whatprovidesdataoff) < (unsigned int)count + 4096)
+	solv_ovfl("pool whatprovides data overflow");
+      pool->whatprovidesdata = solv_realloc2(pool->whatprovidesdata, pool->whatprovidesdataoff + count + 4096, sizeof(Id));
       pool->whatprovidesdataleft = count + 4096;
     }
 

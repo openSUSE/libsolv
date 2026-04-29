@@ -118,11 +118,6 @@ read_id(Repodata *data, Id max)
 	      data->error = pool_error(data->repo->pool, SOLV_ERROR_ID_RANGE, "read_id: id too large (%u/%u)", x, max);
 	      return 0;
 	    }
-	  else if (x >= 0x7fffffffU)
-	    {
-	      data->error = pool_error(data->repo->pool, SOLV_ERROR_ID_RANGE, "read_id: id too large (%u)", x);
-	      return 0;
-	    }
 	  return x;
 	}
       x = (x << 7) ^ c ^ 128;
@@ -157,11 +152,6 @@ read_idarray(Repodata *data, Id max, Id *map, Id *store, Id *end)
       if (max && x >= (unsigned int)max)
 	{
 	  data->error = pool_error(data->repo->pool, SOLV_ERROR_ID_RANGE, "read_idarray: id too large (%u/%u)", x, max);
-	  return 0;
-	}
-      else if (x >= 0x7fffffffU)
-	{
-	  data->error = pool_error(data->repo->pool, SOLV_ERROR_ID_RANGE, "read_idarray: id too large (%u)", x);
 	  return 0;
 	}
       if (map)
@@ -858,6 +848,8 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
 	    }
 	  idmap[i + numid] = MAKERELDEP(id);   /* fill Id map */
 	}
+      if ((unsigned int)pool->nrels >= (unsigned int)SOLV_MAX_INDEX)
+	solv_ovfl("relation count overflow");
       pool_shrink_rels(pool);		/* vacuum */
     }
 
@@ -933,8 +925,8 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
       key = keys + i;
       key->name = id;
       key->type = type;
-      key->size = read_id(&data, type == REPOKEY_TYPE_CONSTANTID ? numid + numrel : SOLV_MAX_BLKLEN);
-      key->storage = read_id(&data, SOLV_MAX_BLKLEN);
+      key->size = read_id(&data, type == REPOKEY_TYPE_CONSTANTID ? numid + numrel : type == REPOKEY_TYPE_CONSTANT ? 0 : SOLV_MAX_INDEX);
+      key->storage = read_id(&data, SOLV_MAX_INDEX);
       /* old versions used SOLVABLE for main solvable data */
       if (key->storage != KEY_STORAGE_INCORE && key->storage != KEY_STORAGE_VERTICAL_OFFSET && key->storage != KEY_STORAGE_SOLVABLE && key->storage != KEY_STORAGE_IDARRAYBLOCK)
 	data.error = pool_error(pool, SOLV_ERROR_UNSUPPORTED, "unsupported storage type %d", key->storage);
@@ -986,7 +978,7 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
 
   /*******  Part 5: Schemata ********************************************/
 
-  id = read_id(&data, SOLV_MAX_BLKLEN);
+  id = read_id(&data, SOLV_MAX_INDEX);
   schemadata = solv_calloc(id + 1, sizeof(Id));
   schemadatap = schemadata + 1;
   schemadataend = schemadatap + id;
@@ -1026,8 +1018,8 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
   idarraydatap = idarraydataend = 0;
   size_idarray = 0;
 
-  maxsize = read_id(&data, SOLV_MAX_BLKLEN);
-  allsize = read_id(&data, SOLV_MAX_BLKLEN);
+  maxsize = read_id(&data, SOLV_MAX_INDEX);
+  allsize = read_id(&data, SOLV_MAX_INDEX);
   if (data.error)
     goto data_error;
   maxsize += 5;	/* so we can read the next schema of an array */
@@ -1295,7 +1287,7 @@ printf("=> %s %s %p\n", pool_id2str(pool, keys[key].name), pool_id2str(pool, key
 		      && id >= INTERESTED_START && id <= INTERESTED_END)
 		    {
 		      size_idarray += keys[i].size;
-		      if ((unsigned int)size_idarray >= (unsigned int)SOLV_MAX_BLKLEN)
+		      if ((unsigned int)size_idarray >= (unsigned int)SOLV_MAX_INDEX)
 		        break;
 		    }
 		}

@@ -160,6 +160,8 @@ repodata_key2id(Repodata *data, Repokey *key, int create)
       if (!create)
 	return 0;
       /* allocate new key */
+      if (data->nkeys >= SOLV_MAX_INDEX)
+	solv_ovfl("repodata key overflow");
       data->keys = solv_realloc2(data->keys, data->nkeys + 1, sizeof(Repokey));
       data->keys[data->nkeys++] = *key;
       if (data->verticaloffset)
@@ -224,8 +226,8 @@ repodata_schema2id(Repodata *data, Id *schema, int create)
   /* a new one */
   if (!create)
     return 0;
-  if (len >= SOLV_MAX_BLKLEN)
-    solv_ovfl("schema length overflow");
+  if (len >= SOLV_MAX_INDEX)
+    solv_ovfl("repodata schema length overflow");
   data->schemadata = solv_extend(data->schemadata, data->schemadatalen, len, sizeof(Id), SCHEMATADATA_BLOCK);
   data->schemata = solv_extend(data->schemata, data->nschemata, 1, sizeof(Id), SCHEMATA_BLOCK);
   /* add schema */
@@ -313,6 +315,8 @@ repodata_str2dir(Repodata *data, const char *dir, int create)
   while (*dir)
     {
       dire = strchrnul(dir, '/');
+      if (dire - dir >= (size_t)0x40000000)
+	solv_ovfl("repodata dir component size overflow");
       if (data->localpool)
         id = stringpool_strn2id(&data->spool, dir, dire - dir, create);
       else
@@ -2531,9 +2535,11 @@ void
 repodata_set_str(Repodata *data, Id solvid, Id keyname, const char *str)
 {
   Repokey key;
-  int l;
+  size_t l;
 
   l = strlen(str) + 1;
+  if (l >= 0x40000000)
+    solv_ovfl("repodata string size overflow");
   key.name = keyname;
   key.type = REPOKEY_TYPE_STR;
   key.size = 0;
@@ -2552,6 +2558,8 @@ repodata_set_binary(Repodata *data, Id solvid, Id keyname, void *buf, int len)
 
   if (len < 0)
     return;
+  if (len >= 0x40000000)
+    solv_ovfl("repodata binary size overflow");
   key.name = keyname;
   key.type = REPOKEY_TYPE_BINARY;
   key.size = 0;
@@ -2696,9 +2704,11 @@ evrid2vrstr(Pool *pool, Id evrid)
 }
 
 static inline void
-repodata_set_poolstrn(Repodata *data, Id solvid, Id keyname, const char *str, int l)
+repodata_set_poolstrn(Repodata *data, Id solvid, Id keyname, const char *str, size_t l)
 {
   Id id;
+  if (l >= (size_t)0x40000000)
+    solv_ovfl("repodata poolstr size overflow");
   if (data->localpool)
     id = stringpool_strn2id(&data->spool, str, l, 1);
   else
@@ -2707,7 +2717,7 @@ repodata_set_poolstrn(Repodata *data, Id solvid, Id keyname, const char *str, in
 }
 
 static inline void
-repodata_set_strn(Repodata *data, Id solvid, Id keyname, const char *str, int l)
+repodata_set_strn(Repodata *data, Id solvid, Id keyname, const char *str, size_t l)
 {
   if (!str[l])
     repodata_set_str(data, solvid, keyname, str);
@@ -2726,7 +2736,7 @@ repodata_set_location(Repodata *data, Id solvid, int medianr, const char *dir, c
   Pool *pool = data->repo->pool;
   Solvable *s;
   const char *str, *fp;
-  int l = 0;
+  size_t l = 0;
 
   if (medianr)
     repodata_set_constant(data, solvid, SOLVABLE_MEDIANR, medianr);
@@ -2866,6 +2876,8 @@ repodata_set_sourcepkg(Repodata *data, Id solvid, const char *sourcepkg)
         repodata_set_str(data, solvid, SOLVABLE_SOURCENAME, sourcepkg);
       return;
     }
+  if (p - sourcepkg >= (size_t)0x40000000) 
+    solv_ovfl("repodata sourcepkg size overflow");
   p--;
   while (p > sourcepkg && *p != '.')
     p--;
@@ -2915,6 +2927,8 @@ repodata_set_idarray(Repodata *data, Id solvid, Id keyname, Queue *q)
   key.size = 0;
   key.storage = KEY_STORAGE_INCORE;
   repodata_set(data, solvid, &key, data->attriddatalen);
+  if (q->count + 1 >= SOLV_MAX_INDEX)
+    solv_ovfl("repodata idarray size overflow");
   data->attriddata = solv_extend(data->attriddata, data->attriddatalen, q->count + 1, sizeof(Id), REPODATA_ATTRIDDATA_BLOCK);
   for (i = 0; i < q->count; i++)
     data->attriddata[data->attriddatalen++] = q->elements[i];
@@ -2939,10 +2953,12 @@ void
 repodata_add_dirstr(Repodata *data, Id solvid, Id keyname, Id dir, const char *str)
 {
   Id stroff;
-  int l;
+  size_t l;
 
   assert(dir);
   l = strlen(str) + 1;
+  if (l >= SOLV_MAX_INDEX)
+    solv_ovfl("repodata dirstr size overflow");
   data->attrdata = solv_extend(data->attrdata, data->attrdatalen, l, 1, REPODATA_ATTRDATA_BLOCK);
   memcpy(data->attrdata + data->attrdatalen, str, l);
   stroff = data->attrdatalen;
