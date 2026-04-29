@@ -450,14 +450,14 @@ pool_id2langid(Pool *pool, Id id, const char *lang, int create)
 {
   const char *n;
   char buf[256], *p;
-  int l;
+  size_t l;
 
   if (!lang || !*lang)
     return id;
   n = pool_id2str(pool, id);
   l = strlen(n) + strlen(lang) + 2;
   if (l > sizeof(buf))
-    p = solv_malloc(strlen(n) + strlen(lang) + 2);
+    p = solv_malloc(l);
   else
     p = buf;
   sprintf(p, "%s:%s", n, lang);
@@ -471,7 +471,7 @@ char *
 pool_alloctmpspace(Pool *pool, int len)
 {
   int n = pool->tmpspace.n;
-  if (!len)
+  if (len <= 0)
     return 0;
   if (len > pool->tmpspace.len[n])
     {
@@ -586,7 +586,7 @@ const char *
 pool_bin2hex(Pool *pool, const unsigned char *buf, int len)
 {
   char *s;
-  if (!len)
+  if (len <= 0)
     return "";
   s = pool_alloctmpspace(pool, 2 * len + 1);
   solv_bin2hex(buf, len, s);
