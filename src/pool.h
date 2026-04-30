@@ -143,7 +143,6 @@ struct s_Pool {
   Hashval relhashmask;
 
   Id *languagecache;
-  int languagecacheother;
 
   /* our tmp space string space */
   struct s_Pool_tmpspace tmpspace;
