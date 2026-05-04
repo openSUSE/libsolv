@@ -111,10 +111,7 @@ pool_free(Pool *pool)
   queue_free(&pool->lazywhatprovidesq);
   for (i = 0; i < POOL_TMPSPACEBUF; i++)
     solv_free(pool->tmpspace.buf[i]);
-  for (i = 0; i < pool->nlanguages; i++)
-    free((char *)pool->languages[i]);
-  solv_free((void *)pool->languages);
-  solv_free(pool->languagecache);
+  pool_set_languages(pool, 0, 0);
   solv_free(pool->errstr);
   solv_free(pool->rootdir);
   solv_free(pool->nonstd_ids);
@@ -425,47 +422,6 @@ void
 pool_clear_pos(Pool *pool)
 {
   memset(&pool->pos, 0, sizeof(pool->pos));
-}
-
-void
-pool_set_languages(Pool *pool, const char **languages, int nlanguages)
-{
-  int i;
-
-  pool->languagecache = solv_free(pool->languagecache);
-  for (i = 0; i < pool->nlanguages; i++)
-    free((char *)pool->languages[i]);
-  pool->languages = solv_free((void *)pool->languages);
-  if (nlanguages < 0 || nlanguages >= 1024)
-    solv_ovfl("language count overflow");
-  pool->nlanguages = nlanguages;
-  if (!nlanguages)
-    return;
-  pool->languages = solv_calloc(nlanguages, sizeof(const char **));
-  for (i = 0; i < pool->nlanguages; i++)
-    pool->languages[i] = solv_strdup(languages[i]);
-}
-
-Id
-pool_id2langid(Pool *pool, Id id, const char *lang, int create)
-{
-  const char *n;
-  char buf[256], *p;
-  size_t l;
-
-  if (!lang || !*lang)
-    return id;
-  n = pool_id2str(pool, id);
-  l = strlen(n) + strlen(lang) + 2;
-  if (l > sizeof(buf))
-    p = solv_malloc(l);
-  else
-    p = buf;
-  sprintf(p, "%s:%s", n, lang);
-  id = pool_str2id(pool, p, create);
-  if (p != buf)
-    free(p);
-  return id;
 }
 
 char *

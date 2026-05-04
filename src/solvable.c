@@ -200,42 +200,6 @@ solvable_lookup_str_base(Solvable *s, Id keyname, Id basekeyname, int usebase)
   return usebase ? basestr : 0;
 }
 
-static Id *
-pool_lookup_languagecache_row(Pool *pool, Id keyname)
-{
-  int cols = pool->nlanguages + 1;
-  Id *row;
-  if (!pool->languagecache)
-    {
-      pool->languagecache = solv_calloc(ID_NUM_INTERNAL + cols + 1, sizeof(Id));
-      pool->languagecache[0] = ID_NUM_INTERNAL;		/* current size */
-    }
-  if (keyname > 0 && keyname < ID_NUM_INTERNAL)
-    {
-      if (cols == 2)
-	return pool->languagecache + keyname;		/* special case for just one language */
-      if (pool->languagecache[keyname])
-	return pool->languagecache + pool->languagecache[keyname];
-    }
-  else
-    {
-      /* find our row, terminate if we reach the trailing zero */
-      for (row = pool->languagecache + ID_NUM_INTERNAL; *row; row += cols)
-	if (*row == keyname)
-	  return row + 1;
-    }
-  /* we need to add a new row (plus the trailing zero) */
-  if (pool->languagecache[0] + cols + 1 >= SOLV_MAX_INDEX)
-    solv_ovfl("languagecache size overflow");
-  pool->languagecache = solv_realloc2(pool->languagecache, pool->languagecache[0] + cols + 1, sizeof(Id));
-  if (keyname < ID_NUM_INTERNAL)
-    pool->languagecache[keyname] = pool->languagecache[0] + 1;
-  row = pool->languagecache + pool->languagecache[0];
-  pool->languagecache[0] += cols;
-  memset(row, 0, (cols + 1) * sizeof(Id));	/* +1 for the trailing zero */
-  *row = keyname;
-  return row + 1;
-}
 
 const char *
 solvable_lookup_str_poollang(Solvable *s, Id keyname)

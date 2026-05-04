@@ -20,6 +20,8 @@
 #include "poolvendor.h"
 #include "util.h"
 
+#define MAX_VENDORCLASSES 0x1000000
+
 /*
  *  const char *vendorsclasses[] = {
  *    "!openSUSE Build Service*",
@@ -78,22 +80,31 @@ Id pool_vendor2mask(Pool *pool, Id vendor)
   return mask;
 }
 
-void
-pool_setvendorclasses(Pool *pool, const char **vendorclasses)
+static void
+pool_freevendorclasses(Pool *pool)
 {
-  int i;
   const char **v;
-
   if (pool->vendorclasses)
     {
       for (v = pool->vendorclasses; v[0] || v[1]; v++)
 	solv_free((void *)*v);
       pool->vendorclasses = solv_free((void *)pool->vendorclasses);
     }
+}
+
+void
+pool_setvendorclasses(Pool *pool, const char **vendorclasses)
+{
+  int i;
+  const char **v;
+
+  pool_freevendorclasses(pool);
   if (!vendorclasses || !vendorclasses[0])
     return;
   for (v = vendorclasses; v[0] || v[1]; v++)
     ;
+  if (v - vendorclasses + 2 >= MAX_VENDORCLASSES)
+    solv_ovfl("vendorclass size overflow");
   pool->vendorclasses = solv_calloc(v - vendorclasses + 2, sizeof(const char *));
   for (v = vendorclasses, i = 0; v[0] || v[1]; v++, i++)
     pool->vendorclasses[i] = *v ? solv_strdup(*v) : 0;
@@ -105,7 +116,7 @@ pool_setvendorclasses(Pool *pool, const char **vendorclasses)
 void
 pool_addvendorclass(Pool *pool, const char **vendorclass)
 {
-  int i, j;
+  size_t i, j;
 
   if (!vendorclass || !vendorclass[0])
     return;
@@ -119,6 +130,8 @@ pool_addvendorclass(Pool *pool, const char **vendorclass)
       if (i)
         i++;
     }
+  if (i + j + 2 >= MAX_VENDORCLASSES)
+    solv_ovfl("vendorclass size overflow");
   pool->vendorclasses = solv_realloc2((void *)pool->vendorclasses, i + j + 2, sizeof(const char *));
   for (j = 0; vendorclass[j]; j++)
     pool->vendorclasses[i++] = solv_strdup(vendorclass[j]);
