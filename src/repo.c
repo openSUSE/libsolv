@@ -23,7 +23,6 @@
 
 #include "repo.h"
 #include "pool.h"
-#include "poolid_private.h"
 #include "util.h"
 #include "chksum.h"
 

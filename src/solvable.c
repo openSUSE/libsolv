@@ -18,6 +18,7 @@
 #include <string.h>
 
 #include "pool.h"
+#include "pool_private.h"
 #include "repo.h"
 #include "util.h"
 #include "policy.h"

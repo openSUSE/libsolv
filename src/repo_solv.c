@@ -25,7 +25,7 @@
 #include "repopack.h"
 #include "repopage.h"
 
-#include "poolid_private.h"	/* WHATPROVIDES_BLOCK */
+#include "pool_private.h"	/* WHATPROVIDES_BLOCK */
 
 #define INTERESTED_START	SOLVABLE_NAME
 #define INTERESTED_END		SOLVABLE_ENHANCES

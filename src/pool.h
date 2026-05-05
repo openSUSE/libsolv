@@ -398,10 +398,6 @@ long long pool_calc_installsizechange(Pool *pool, Map *installedmap);
 
 void pool_add_fileconflicts_deps(Pool *pool, Queue *conflicts);
 
-#ifdef LIBSOLV_INTERNAL
-Id *pool_lookup_languagecache_row(Pool *pool, Id keyname);
-#endif
-
 
 
 /* loop over all providers of d */

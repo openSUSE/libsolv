@@ -16,8 +16,8 @@
 #include <stdio.h>
 
 #include "pool.h"
+#include "pool_private.h"
 #include "poolid.h"
-#include "poolid_private.h"
 #include "util.h"
 
 #define REL_BLOCK		1023	/* hashtable for relations */

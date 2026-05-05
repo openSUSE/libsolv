@@ -19,7 +19,7 @@
 #include <sys/types.h>
 
 #include "pool.h"
-#include "poolid_private.h"
+#include "pool_private.h"
 #include "repo.h"
 #include "util.h"
 #include "evr.h"
