@@ -99,7 +99,7 @@ pool_lookup_languagecache_row(Pool *pool, Id keyname)
   if (pool->languagecache[0] + cols + 1 >= SOLV_MAX_INDEX)
     solv_ovfl("languagecache size overflow");
   pool->languagecache = solv_realloc2(pool->languagecache, pool->languagecache[0] + cols + 1, sizeof(Id));
-  if (keyname < ID_NUM_INTERNAL)
+  if (keyname > 0 && keyname < ID_NUM_INTERNAL)
     pool->languagecache[keyname] = pool->languagecache[0] + 1;
   row = pool->languagecache + pool->languagecache[0];
   pool->languagecache[0] += cols;
