@@ -779,8 +779,8 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
 	  if (compressed)
 	    {
 	      unsigned int out_len;
-	      out_len = unchecked_decompress_buf(buf, in_len, dest, REPOPAGE_BLOBSIZE);
-	      if (out_len != REPOPAGE_BLOBSIZE && pnum < store->num_pages - 1)
+	      out_len = repopagestore_decompress_page(buf, in_len, dest, REPOPAGE_BLOBSIZE);
+	      if (out_len == 0 || (out_len != REPOPAGE_BLOBSIZE && pnum < store->num_pages - 1))
 	        {
 #ifdef DEBUG_PAGING
 	          fprintf(stderr, "can't decompress\n");
@@ -947,8 +947,8 @@ repopagestore_read_or_setup_pages(Repopagestore *store, FILE *fp, unsigned int p
 	    }
 	  if (compressed)
 	    {
-	      out_len = unchecked_decompress_buf(buf, in_len, dest, REPOPAGE_BLOBSIZE);
-	      if (out_len != REPOPAGE_BLOBSIZE && i < npages - 1)
+	      out_len = repopagestore_decompress_page(buf, in_len, dest, REPOPAGE_BLOBSIZE);
+	      if (out_len == 0 || (out_len != REPOPAGE_BLOBSIZE && i < npages - 1))
 	        {
 		  return SOLV_ERROR_CORRUPT;
 	        }
