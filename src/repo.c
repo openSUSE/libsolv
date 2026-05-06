@@ -1621,6 +1621,7 @@ repo_unset(Repo *repo, Id p, Id keyname)
 	  return;
 	case SOLVABLE_SUPPLEMENTS:
 	  s->supplements = 0;
+	  return;
 	case SOLVABLE_ENHANCES:
 	  s->enhances = 0;
 	  return;
