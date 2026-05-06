@@ -25,6 +25,7 @@ parse_deps(Solvable *s, char *bp, Id marker)
   Pool *pool = s->repo->pool;
   Offset deps = 0;
   char *nbp, *ebp;
+  int hadpre = 0;	/* did we add a prereq dep? */
   for (; bp; bp = nbp)
     {
       int ispre = 0;
@@ -67,12 +68,13 @@ parse_deps(Solvable *s, char *bp, Id marker)
       if (ebp[-1] == ']' && ebp >= bp + 3 && !strncmp(ebp - 3, "[*]", 3))
 	{
 	  ispre = 1;
+	  hadpre = 1;
 	  ebp -= 3;
 	}
       id = pool_strn2id(pool, bp, ebp - bp, 1);
       if (evr)
 	id = pool_rel2id(pool, id, evr, flags, 1);
-      deps = repo_addid_dep(s->repo, deps, id, ispre ? marker : 0);
+      deps = repo_addid_dep(s->repo, deps, id, ispre ? marker : hadpre ? -marker : 0);
       bp = nbp;
     }
   return deps;
@@ -123,14 +125,18 @@ repo_add_mdk(Repo *repo, FILE *fp, int flags)
 	s->provides = parse_deps(s, buf + 10, 0);
       else if (!strncmp(buf + 1, "requires@", 9))
 	s->requires = parse_deps(s, buf + 10, SOLVABLE_PREREQMARKER);
-      else if (!strncmp(buf + 1, "recommends@", 11))
-	s->recommends = parse_deps(s, buf + 12, 0);
-      else if (!strncmp(buf + 1, "suggests@", 9))
-	s->suggests = parse_deps(s, buf + 10, 0);
       else if (!strncmp(buf + 1, "obsoletes@", 10))
 	s->obsoletes = parse_deps(s, buf + 11, 0);
       else if (!strncmp(buf + 1, "conflicts@", 10))
 	s->conflicts = parse_deps(s, buf + 11, 0);
+      else if (!strncmp(buf + 1, "recommends@", 11))
+	s->recommends = parse_deps(s, buf + 12, 0);
+      else if (!strncmp(buf + 1, "suggests@", 9))
+	s->suggests = parse_deps(s, buf + 10, 0);
+      else if (!strncmp(buf + 1, "supplements@", 12))
+	s->supplements = parse_deps(s, buf + 13, 0);
+      else if (!strncmp(buf + 1, "enhances@", 9))
+	s->enhances = parse_deps(s, buf + 10, 0);
       else if (!strncmp(buf + 1, "info@", 5))
 	{
 	  char *nvra = buf + 6;
