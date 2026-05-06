@@ -203,7 +203,7 @@ solv_xmlparser_init(struct solv_xmlparser *xmlp,
   xmlp->elements = elements;
   xmlp->nelements = nelements;
   hm = mkmask(nelements);
-  elementhelper = solv_calloc(hm + 1, sizeof(Id));
+  elementhelper = allochashtable(hm, 1);
   for (i = 0; i < nelements; i++)
     {
       h = hash_state_name(elements[i].fromstate, elements[i].element) & hm;

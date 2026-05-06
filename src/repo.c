@@ -399,9 +399,11 @@ repo_addid_dep_hash(Repo *repo, Offset olddeps, Id id, Id marker, int size)
       if ((Hashval)size * 2 > repo->lastidhash_mask)
 	{
 	  repo->lastidhash_mask = mkmask(size < REPO_ADDID_DEP_HASHMIN ? REPO_ADDID_DEP_HASHMIN : size);
-	  repo->lastidhash = solv_realloc2(repo->lastidhash, repo->lastidhash_mask + 1, sizeof(Id));
+	  solv_free(repo->lastidhash);
+	  repo->lastidhash = allochashtable(repo->lastidhash_mask, 1);
 	}
-      memset(repo->lastidhash, 0, (repo->lastidhash_mask + 1) * sizeof(Id));
+      else
+        memset(repo->lastidhash, 0, ((size_t)repo->lastidhash_mask + 1) * sizeof(Id));
       for (oidp = repo->idarraydata + olddeps; (oid = *oidp) != 0; oidp++)
 	{
 	  h = oid & repo->lastidhash_mask;

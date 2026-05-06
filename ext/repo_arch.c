@@ -203,7 +203,7 @@ static Hashtable
 joinhash_init(Repo *repo, Hashval *hmp)
 {
   Hashval hm = mkmask(repo->nsolvables);
-  Hashtable ht = solv_calloc(hm + 1, sizeof(*ht));
+  Hashtable ht = allochashtable(hm, 1);
   Hashval h, hh;
   Solvable *s;
   int i;

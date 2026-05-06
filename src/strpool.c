@@ -90,7 +90,7 @@ stringpool_resize_hash(Stringpool *ss, int numnew)
   /* realloc hash table */
   ss->stringhashmask = hashmask;
   solv_free(ss->stringhashtbl);
-  ss->stringhashtbl = hashtbl = (Hashtable)solv_calloc(hashmask + 1, sizeof(Id));
+  ss->stringhashtbl = hashtbl = allochashtable(hashmask, 1);
   
   /* rehash all strings into new hashtable */
   for (i = 1; i < ss->nstrings; i++)

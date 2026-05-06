@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <stdlib.h>
 
 #include "pool.h"
 #include "repo.h"
@@ -79,23 +80,23 @@ growhash(Hashtable map, Hashval *mapnp)
   Hashtable m;
   Id hx, qx;
 
-  m = solv_calloc(newn + 1, 2 * sizeof(Id));
+  m = allochashtable(newn, 2);
   for (i = 0; i <= mapn; i++)
     {
-      hx = map[2 * i];
+      hx = map[2 * (size_t)i];
       if (!hx)
 	continue;
       h = hx & newn;
       hh = HASHCHAIN_START;
       for (;;)
 	{
-	  qx = m[2 * h];
+	  qx = m[2 * (size_t)h];
 	  if (!qx)
 	    break;
 	  h = HASHCHAIN_NEXT(h, hh, newn);
 	}
-      m[2 * h] = hx;
-      m[2 * h + 1] = map[2 * i + 1];
+      m[2 * (size_t)h] = hx;
+      m[2 * (size_t)h + 1] = map[2 * (size_t)i + 1];
     }
   solv_free(map);
   *mapnp = newn;
@@ -121,7 +122,7 @@ finddirs_cb(void *cbdatav, const char *fn, struct filelistinfo *info)
   hh = HASHCHAIN_START;
   for (;;)
     {
-      qx = cbdata->dirmap[2 * h];
+      qx = cbdata->dirmap[2 * (size_t)h];
       if (!qx)
 	break;
       if (qx == dhx)
@@ -133,21 +134,21 @@ finddirs_cb(void *cbdatav, const char *fn, struct filelistinfo *info)
       /* a miss */
       if (!cbdata->create)
 	return;
-      cbdata->dirmap[2 * h] = dhx;
-      cbdata->dirmap[2 * h + 1] = idx;
-      if (++cbdata->dirmapused * 2 > cbdata->dirmapn)
+      cbdata->dirmap[2 * (size_t)h] = dhx;
+      cbdata->dirmap[2 * (size_t)h + 1] = idx;
+      if (++cbdata->dirmapused > cbdata->dirmapn / 2)
 	cbdata->dirmap = growhash(cbdata->dirmap, &cbdata->dirmapn);
       return;
     }
   /* we saw this dir before */
-  oidx = cbdata->dirmap[2 * h + 1];
+  oidx = cbdata->dirmap[2 * (size_t)h + 1];
   if (oidx == idx)
     return;
   /* found a conflict, this dir may be used in multiple packages */
   if (oidx != -1)
     {
       MAPSET(&cbdata->idxmap, oidx);
-      cbdata->dirmap[2 * h + 1] = -1;	/* mark as "multiple packages" */
+      cbdata->dirmap[2 * (size_t)h + 1] = -1;	/* mark as "multiple packages" */
       cbdata->dirconflicts++;
     }
   MAPSET(&cbdata->idxmap, idx);
@@ -164,11 +165,11 @@ isindirmap(struct cbdata *cbdata, Id dhx)
   hh = HASHCHAIN_START;
   for (;;)
     {
-      qx = cbdata->dirmap[2 * h];
+      qx = cbdata->dirmap[2 * (size_t)h];
       if (!qx)
 	return 0;
       if (qx == dhx)
-	return cbdata->dirmap[2 * h + 1] == -1 ? 1 : 0;
+	return cbdata->dirmap[2 * (size_t)h + 1] == -1 ? 1 : 0;
       h = HASHCHAIN_NEXT(h, hh, cbdata->dirmapn);
     }
 }
@@ -212,7 +213,7 @@ findfileconflicts_cb(void *cbdatav, const char *fn, struct filelistinfo *info)
   hh = HASHCHAIN_START;
   for (;;)
     {
-      qx = cbdata->cflmap[2 * h];
+      qx = cbdata->cflmap[2 * (size_t)h];
       if (!qx)
 	break;
       if (qx == hx)
@@ -224,14 +225,14 @@ findfileconflicts_cb(void *cbdatav, const char *fn, struct filelistinfo *info)
       /* a miss */
       if (!cbdata->create)
 	return;
-      cbdata->cflmap[2 * h] = hx;
-      cbdata->cflmap[2 * h + 1] = (isdir ? ~idx : idx);
-      if (++cbdata->cflmapused * 2 > cbdata->cflmapn)
+      cbdata->cflmap[2 * (size_t)h] = hx;
+      cbdata->cflmap[2 * (size_t)h + 1] = (isdir ? ~idx : idx);
+      if (++cbdata->cflmapused > cbdata->cflmapn / 2)
 	cbdata->cflmap = growhash(cbdata->cflmap, &cbdata->cflmapn);
       return;
     }
   /* we have seen this hx before */
-  oidx = cbdata->cflmap[2 * h + 1];
+  oidx = cbdata->cflmap[2 * (size_t)h + 1];
   if (oidx < 0)
     {
       int i;
@@ -243,7 +244,7 @@ findfileconflicts_cb(void *cbdatav, const char *fn, struct filelistinfo *info)
 	}
       oidx = ~oidx;
       /* now have file, had directories before. */
-      cbdata->cflmap[2 * h + 1] = oidx;	/* make it a file */
+      cbdata->cflmap[2 * (size_t)h + 1] = oidx;	/* make it a file */
       /* dump all delayed directory hits for hx */
       for (i = 0; i < cbdata->lookat_dir.count; i += 2)
 	if (cbdata->lookat_dir.elements[i] == hx)
@@ -291,7 +292,7 @@ findfileconflicts_basename_cb(void *cbdatav, const char *fn, struct filelistinfo
   hh = HASHCHAIN_START;
   for (;;)
     {
-      qx = cbdata->cflmap[2 * h];
+      qx = cbdata->cflmap[2 * (size_t)h];
       if (!qx)
 	break;
       if (qx == hx)
@@ -303,13 +304,13 @@ findfileconflicts_basename_cb(void *cbdatav, const char *fn, struct filelistinfo
       /* a miss */
       if (!cbdata->create)
 	return;
-      cbdata->cflmap[2 * h] = hx;
-      cbdata->cflmap[2 * h + 1] = (isdir ? -idx - 2 : idx);
-      if (++cbdata->cflmapused * 2 > cbdata->cflmapn)
+      cbdata->cflmap[2 * (size_t)h] = hx;
+      cbdata->cflmap[2 * (size_t)h + 1] = (isdir ? -idx - 2 : idx);
+      if (++cbdata->cflmapused > cbdata->cflmapn / 2)
 	cbdata->cflmap = growhash(cbdata->cflmap, &cbdata->cflmapn);
       return;
     }
-  oidx = cbdata->cflmap[2 * h + 1];
+  oidx = cbdata->cflmap[2 * (size_t)h + 1];
   if (oidx < -1)
     {
       int i;
@@ -321,7 +322,7 @@ findfileconflicts_basename_cb(void *cbdatav, const char *fn, struct filelistinfo
 	}
       oidx = -idx - 2;
       /* now have file, had directories before. */
-      cbdata->cflmap[2 * h + 1] = oidx;	/* make it a file */
+      cbdata->cflmap[2 * (size_t)h + 1] = oidx;	/* make it a file */
       /* dump all delayed directory hits for hx */
       for (i = 0; i < cbdata->lookat_dir.count; i += 2)
 	if (cbdata->lookat_dir.elements[i] == hx)
@@ -333,7 +334,7 @@ findfileconflicts_basename_cb(void *cbdatav, const char *fn, struct filelistinfo
     MAPSET(&cbdata->idxmap, oidx);
   MAPSET(&cbdata->idxmap, idx);
   if (oidx != -1)
-    cbdata->cflmap[2 * h + 1] = -1;
+    cbdata->cflmap[2 * (size_t)h + 1] = -1;
 }
 
 static inline Id
@@ -373,12 +374,12 @@ unifywithstat(struct cbdata *cbdata, Id diroff, int dirl)
   hh = HASHCHAIN_START;
   for (;;)
     {
-      qx = cbdata->statmap[2 * h];
+      qx = cbdata->statmap[2 * (size_t)h];
       if (!qx)
 	break;
       if (qx == hx)
 	{
-	  Id off = cbdata->statmap[2 * h + 1];
+	  Id off = cbdata->statmap[2 * (size_t)h + 1];
 	  char *dp = (char *)cbdata->filesspace + cbdata->norq.elements[off];
 	  if (!memcmp(dp, statdata, 16))
 	    return cbdata->norq.elements[off + 1];
@@ -389,9 +390,9 @@ unifywithstat(struct cbdata *cbdata, Id diroff, int dirl)
   nspaceoff = addfilesspace(cbdata, 16);
   memcpy(cbdata->filesspace + nspaceoff, statdata, 16);
   queue_push2(&cbdata->norq, nspaceoff, nspaceoff);
-  cbdata->statmap[2 * h] = hx;
-  cbdata->statmap[2 * h + 1] = cbdata->norq.count - 2;
-  if (++cbdata->statmapused * 2 > cbdata->statmapn)
+  cbdata->statmap[2 * (size_t)h] = hx;
+  cbdata->statmap[2 * (size_t)h + 1] = cbdata->norq.count - 2;
+  if (++cbdata->statmapused > cbdata->statmapn / 2)
     cbdata->statmap = growhash(cbdata->statmap, &cbdata->statmapn);
   return nspaceoff;
 }
@@ -529,12 +530,12 @@ normalizedir(struct cbdata *cbdata, const char *dir, int dirl, Id hx, int create
   hh = HASHCHAIN_START;
   for (;;)
     {
-      qx = cbdata->normap[2 * h];
+      qx = cbdata->normap[2 * (size_t)h];
       if (!qx)
 	break;
       if (qx == hx)
 	{
-	  Id off = cbdata->normap[2 * h + 1];
+	  Id off = cbdata->normap[2 * (size_t)h + 1];
 	  char *dp = (char *)cbdata->filesspace + cbdata->norq.elements[off];
 	  if (!strncmp(dp, dir, dirl) && dp[dirl] == 0)
 	    return cbdata->norq.elements[off + 1];
@@ -558,9 +559,9 @@ normalizedir(struct cbdata *cbdata, const char *dir, int dirl, Id hx, int create
   cbdata->filesspace[nspaceoff + dirl] = 0;
   mycnt = cbdata->norq.count;
   queue_push2(&cbdata->norq, nspaceoff, -1);	/* -1: in progress */
-  cbdata->normap[2 * h] = hx;
-  cbdata->normap[2 * h + 1] = mycnt;
-  if (++cbdata->normapused * 2 > cbdata->normapn)
+  cbdata->normap[2 * (size_t)h] = hx;
+  cbdata->normap[2 * (size_t)h + 1] = mycnt;
+  if (++cbdata->normapused > cbdata->normapn / 2)
     cbdata->normap = growhash(cbdata->normap, &cbdata->normapn);
   /* unify */
   if (cbdata->usestat)
@@ -604,14 +605,14 @@ findfileconflicts_alias_cb(void *cbdatav, const char *fn, struct filelistinfo *i
   hh = HASHCHAIN_START;
   for (;;)
     {
-      qx = cbdata->cflmap[2 * h];
+      qx = cbdata->cflmap[2 * (size_t)h];
       if (!qx)
 	break;
       if (qx == hx)
 	break;
       h = HASHCHAIN_NEXT(h, hh, cbdata->cflmapn);
     }
-  if (!qx || cbdata->cflmap[2 * h + 1] != -1)
+  if (!qx || cbdata->cflmap[2 * (size_t)h + 1] != -1)
     return;
   /* found entry marked as "multiple", recored as conflict candidate */
   if (!cbdata->lastdirhash)
@@ -815,7 +816,7 @@ precheck_solvable_files(struct cbdata *cbdata, Pool *pool, Id p)
       hh = HASHCHAIN_START;
       for (;;)
 	{
-	  qx = cbdata->cflmap[2 * h];
+	  qx = cbdata->cflmap[2 * (size_t)h];
 	  if (!qx)
 	    break;
 	  if (qx == hx)
@@ -891,6 +892,8 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, in
 
   if (cutoff <= 0)
     cutoff = pkgs->count;
+  if (cutoff >= 0x4000000)
+    abort();	/* sorry, this overflows our hashes */
 
   /* avarage file list size: 200 files per package */
   /* avarage dir count: 20 dirs per package */
@@ -900,7 +903,7 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, in
     {
       hdrfetches = 0;
       cbdata.dirmapn = mkmask((cutoff + 3) * 16);
-      cbdata.dirmap = solv_calloc(cbdata.dirmapn + 1, 2 * sizeof(Id));
+      cbdata.dirmap = allochashtable(cbdata.dirmapn, 2);
       cbdata.create = 1;
       idxmapset = 0;
       for (i = 0; i < pkgs->count; i++)
@@ -937,7 +940,7 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, in
   /* second pass: scan files in the directories found above */
   now = solv_timems(0);
   cbdata.cflmapn = mkmask((cutoff + 3) * 32);
-  cbdata.cflmap = solv_calloc(cbdata.cflmapn + 1, 2 * sizeof(Id));
+  cbdata.cflmap = allochashtable(cbdata.cflmapn, 2);
   cbdata.create = 1;
   hdrfetches = 0;
   for (i = 0; i < pkgs->count; i++)
@@ -978,11 +981,11 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, in
       now = solv_timems(0);
       addfilesspace(&cbdata, 1);	/* make sure the first offset is not zero */
       cbdata.normapn = mkmask((cutoff + 3) * 4);
-      cbdata.normap = solv_calloc(cbdata.normapn + 1, 2 * sizeof(Id));
+      cbdata.normap = allochashtable(cbdata.normapn, 2);
       if (cbdata.usestat)
 	{
 	  cbdata.statmapn = cbdata.normapn;
-	  cbdata.statmap = solv_calloc(cbdata.statmapn + 1, 2 * sizeof(Id));
+	  cbdata.statmap = allochashtable(cbdata.statmapn, 2);
 	}
       cbdata.create = 0;
       hdrfetches = 0;
@@ -1088,10 +1091,10 @@ pool_findfileconflicts(Pool *pool, Queue *pkgs, int cutoff, Queue *conflicts, in
       cbdata.fetchmapn = mkmask(cbdata.lookat.count + 3);
       if (cbdata.fetchmapn < 4095)
         cbdata.fetchmapn = 4095;
-      cbdata.fetchmap = solv_calloc(cbdata.fetchmapn + 1, sizeof(Id));
+      cbdata.fetchmap = allochashtable(cbdata.fetchmapn, 1);
       if (cbdata.aliases)
 	{
-	  cbdata.fetchdirmapn = ((cbdata.fetchmapn + 1) / 16) - 1;
+	  cbdata.fetchdirmapn = (((size_t)cbdata.fetchmapn + 1) / 16) - 1;
 	  map_init(&cbdata.fetchdirmap, cbdata.fetchdirmapn + 1);
 	}
     }

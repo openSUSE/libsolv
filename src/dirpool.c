@@ -118,7 +118,7 @@ dirpool_resize_hash(Dirpool *dp, int numnew)
     return;
   dp->dirhashmask = hm;
   solv_free(dp->dirhashtbl);
-  ht = dp->dirhashtbl = (Hashtable)solv_calloc(hm + 1, sizeof(Id));
+  ht = dp->dirhashtbl = allochashtable(hm, 1);
   for (i = 2; i < dp->ndirs; i++)
     {
       if (dp->dirs[i] <= 0)

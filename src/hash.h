@@ -14,6 +14,7 @@
 #define LIBSOLV_HASH_H
 
 #include "pooltypes.h"
+#include "util.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -80,10 +81,20 @@ relhash(Id name, Id evr, int flags)
 static inline Hashval
 mkmask(unsigned int num)
 {
+  if (num >= 0x3ffffffe)
+    return num >= 0x80000000 ? 0 : 0xffffffff;
   num = num * 2 + 3;
   while (num & (num - 1))
     num &= num - 1;
   return num * 2 - 1;
+}
+
+static inline Hashtable
+allochashtable(Hashval mask, size_t size)
+{
+  if (mask == 0 && ((size_t)mask + 1) == 0)
+    solv_oom((size_t)mask, size * sizeof(Id));
+  return solv_calloc((size_t)mask + 1, size * sizeof(Id));
 }
 
 #ifdef __cplusplus
