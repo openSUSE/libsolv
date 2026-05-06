@@ -3394,15 +3394,10 @@ solver_choicerulecheck(Solver *solv, Id pi, Rule *r, Map *m, Queue *q)
 }
 
 static Id
-choicerule_find_installed(Pool *pool, Id p)
+choicerule_find_installed(Pool *pool, Solvable *s)
 {
-  Solvable *s = pool->solvables + p;
   Id p2, pp2;
 
-  if (!s->repo)
-    return 0;
-  if (s->repo == pool->installed)
-    return p;
   FOR_PROVIDES(p2, pp2, s->name)
     {
       Solvable *s2 = pool->solvables + p2;
@@ -3485,6 +3480,7 @@ solver_addchoicerules(Solver *solv)
       queue_empty(&qi);
       havechoice = 0;
       isinstalled = 0;
+      Id name = 0;
       FOR_RULELITERALS(p, pp, r)
 	{
 	  if (p < 0)
@@ -3507,7 +3503,11 @@ solver_addchoicerules(Solver *solv)
 	      continue;
 	    }
 	  /* find an installed package p2 that we can update/downgrade to p */
-	  p2 = choicerule_find_installed(pool, p);
+	  if (name != s->name)
+	    {
+	      p2 = choicerule_find_installed(pool, s);
+	      name = s->name;
+	    }
 	  if (p2)
 	    {
 	      if (MAPTST(&mneg, p))
