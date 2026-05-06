@@ -94,7 +94,7 @@ allochashtable(Hashval mask, size_t size)
 {
   if (mask == 0 && ((size_t)mask + 1) == 0)
     solv_oom((size_t)mask, size * sizeof(Id));
-  return solv_calloc((size_t)mask + 1, size * sizeof(Id));
+  return (Hashtable)solv_calloc((size_t)mask + 1, size * sizeof(Id));
 }
 
 #ifdef __cplusplus
