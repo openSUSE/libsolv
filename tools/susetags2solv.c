@@ -163,6 +163,8 @@ main(int argc, char **argv)
 	{
 	  char *fn = files[i]->d_name;
 
+	  if (strlen(fn) >= 126)
+	    continue;
 	  if (!strcmp(fn, "packages") || !strcmp(fn, "packages.gz"))
 	    {
 	      FILE *fp;
