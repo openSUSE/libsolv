@@ -12,7 +12,7 @@ extern "C" {
 #define CHARCLASS_NAME_MAX 14
 #define RE_DUP_MAX 255
 
-#include <BaseTsd.h>
+#include <basetsd.h>
 typedef SSIZE_T regoff_t;
 // #include <bits/alltypes.h>
 
