@@ -56,12 +56,12 @@ detect_dbpath(struct rpmdbstate *state)
   solv_free((char *)state->dbpath);
   if (access_rootdir(state, "/var/lib/rpm", W_OK) == -1)
     {
-      if (access_rootdir(state, "/usr/share/rpm/Packages", R_OK) == 0 || access_rootdir(state, "/usr/share/rpm/rpmdb.sqlite", R_OK))
+      if (access_rootdir(state, "/usr/share/rpm/Packages", R_OK) == 0 || access_rootdir(state, "/usr/share/rpm/rpmdb.sqlite", R_OK) == 0)
 	{
 	  state->dbpath = "/usr/share/rpm";
 	  return;
 	}
-      if (access_rootdir(state, "/usr/lib/sysimage/rpm/Packages.db", R_OK) == 0 || access_rootdir(state, "/usr/lib/sysimage/rpm/rpmdb.sqlite", R_OK) || access_rootdir(state, "/usr/lib/sysimage/rpm/Packages", R_OK))
+      if (access_rootdir(state, "/usr/lib/sysimage/rpm/Packages.db", R_OK) == 0 || access_rootdir(state, "/usr/lib/sysimage/rpm/rpmdb.sqlite", R_OK) == 0 || access_rootdir(state, "/usr/lib/sysimage/rpm/Packages", R_OK) == 0)
 	{
 	  state->dbpath = "/usr/lib/sysimage/rpm";
 	  return;
