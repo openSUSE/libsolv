@@ -29,6 +29,7 @@
 #include <assert.h>
 #include <fcntl.h>
 #include <time.h>
+#include <threads.h>
 
 #ifdef _WIN32
   #include <windows.h>
@@ -100,8 +101,8 @@ compress_buf(const unsigned char *in, unsigned int in_len,
   unsigned int oo = 0;		/* out-offset */
   unsigned int io = 0;		/* in-offset */
 #define HS (65536)
-  Ref htab[HS];
-  Ref hnext[BLOCK_SIZE];
+  static thread_local Ref htab[HS];
+  static thread_local Ref hnext[BLOCK_SIZE];
   unsigned int litofs = 0;
   memset(htab, -1, sizeof (htab));
   memset(hnext, -1, sizeof (hnext));
