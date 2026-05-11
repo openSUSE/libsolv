@@ -41,9 +41,13 @@ typedef struct s_Repopagestore {
   unsigned int rr_counter;
 } Repopagestore;
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+struct s_PageCompressor;
+typedef struct s_PageCompressor PageCompressor;
+
+PageCompressor *pagecompressor_create(void);
+PageCompressor *pagecompressor_free(PageCompressor *comp);
+unsigned int pagecompressor_compress(PageCompressor *comp, unsigned char *page, unsigned int len, unsigned char *cpage, unsigned int max);
+
 
 void repopagestore_init(Repopagestore *store);
 void repopagestore_free(Repopagestore *store);
@@ -60,9 +64,5 @@ unsigned int repopagestore_decompress_page(const unsigned char *cpage, unsigned 
 int repopagestore_read_or_setup_pages(Repopagestore *store, FILE *fp, unsigned int pagesz, unsigned int blobsz);
 
 void repopagestore_disable_paging(Repopagestore *store);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif	/* LIBSOLV_REPOPAGE_H */

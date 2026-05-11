@@ -41,12 +41,16 @@
 
 
 
+/* max size of a compression block */
 #define BLOCK_SIZE (65536*1)
 #if BLOCK_SIZE <= 65536
 typedef uint16_t Ref;
 #else
 typedef uint32_t Ref;
 #endif
+
+/* size of the compression hash table */
+#define HS (65536)
 
 /*
    The format is tailored for fast decompression (i.e. only byte based),
@@ -91,20 +95,25 @@ typedef uint32_t Ref;
      (with the current block size this can't happen)
    L >= 4096+18, so reduce to 4095+18                  : encode as f
 */
+/*
+  compress_buf used to contain:
+    Ref htab[HS];
+    Ref hnext[BLOCK_SIZE];
+  But this uses too much space on the stack, so we now take pointers
+  to allocated space.
+*/
 
 
 static unsigned int
-compress_buf(const unsigned char *in, unsigned int in_len,
+compress_buf(Ref *htab, Ref *hnext,
+	      const unsigned char *in, unsigned int in_len,
 	      unsigned char *out, unsigned int out_len)
 {
   unsigned int oo = 0;		/* out-offset */
   unsigned int io = 0;		/* in-offset */
-#define HS (65536)
-  Ref htab[HS];
-  Ref hnext[BLOCK_SIZE];
   unsigned int litofs = 0;
-  memset(htab, -1, sizeof (htab));
-  memset(hnext, -1, sizeof (hnext));
+  memset(htab, -1, HS * sizeof(*htab));
+  memset(hnext, -1, BLOCK_SIZE * sizeof(*hnext));
   if (in_len > BLOCK_SIZE)
     return 0;			/* Hey! */
   while (io + 2 < in_len)
@@ -792,10 +801,38 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
   return store->blob_store + best * REPOPAGE_BLOBSIZE;
 }
 
+struct s_PageCompressor {
+  Ref htab[HS];
+  Ref hnext[BLOCK_SIZE];
+};
+
+PageCompressor *
+pagecompressor_create()
+{
+  PageCompressor *comp = solv_malloc(sizeof(PageCompressor));
+  return comp;
+}
+
+PageCompressor *
+pagecompressor_free(PageCompressor *comp)
+{
+  solv_free(comp);
+  return 0;
+}
+
+unsigned int
+pagecompressor_compress(PageCompressor *comp, unsigned char *page, unsigned int len, unsigned char *cpage, unsigned int max)
+{
+  return compress_buf(comp->htab, comp->hnext, page, len, cpage, max);
+}
+
+/* obsolete, to be deleted */
 unsigned int
 repopagestore_compress_page(unsigned char *page, unsigned int len, unsigned char *cpage, unsigned int max)
 {
-  return compress_buf(page, len, cpage, max);
+  Ref htab[HS];
+  Ref hnext[BLOCK_SIZE];
+  return compress_buf(htab, hnext, page, len, cpage, max);
 }
 
 unsigned int
@@ -933,6 +970,8 @@ repopagestore_disable_paging(Repopagestore *store)
 static void
 transfer_file(FILE * from, FILE * to, int compress)
 {
+  Ref htab[HS];
+  Ref hnext[BLOCK_SIZE];
   unsigned char inb[BLOCK_SIZE];
   unsigned char outb[BLOCK_SIZE];
   while (!feof (from) && !ferror (from))
@@ -944,7 +983,7 @@ transfer_file(FILE * from, FILE * to, int compress)
 	  if (in_len)
 	    {
 	      unsigned char *b = outb;
-	      out_len = compress_buf(inb, in_len, outb, sizeof (outb));
+	      out_len = compress_buf(htab, hnext, inb, in_len, outb, sizeof (outb));
 	      if (!out_len)
 		b = inb, out_len = in_len;
 	      if (fwrite(&out_len, sizeof (out_len), 1, to) != 1)
@@ -999,6 +1038,8 @@ benchmark(FILE * from)
 {
   unsigned char inb[BLOCK_SIZE];
   unsigned char outb[BLOCK_SIZE];
+  Ref htab[HS];
+  Ref hnext[BLOCK_SIZE];
   unsigned int in_len = fread(inb, 1, BLOCK_SIZE, from);
   unsigned int out_len;
   if (!in_len)
@@ -1045,7 +1086,7 @@ benchmark(FILE * from)
     {
       calib_loop *= 2;
       for (i = 0; i < calib_loop; i++)
-	compress_buf(inb, in_len, outb, sizeof(outb));
+	compress_buf(htab, hnext, inb, in_len, outb, sizeof(outb));
       per_loop += calib_loop;
     }
 
@@ -1055,13 +1096,13 @@ benchmark(FILE * from)
   start = clock();
   for (i = 0; i < 10; i++)
     for (j = 0; j < per_loop; j++)
-      compress_buf(inb, in_len, outb, sizeof(outb));
+      compress_buf(htab, hnext, inb, in_len, outb, sizeof(outb));
   end = clock();
   seconds = (end - start) / (float) CLOCKS_PER_SEC;
   fprintf(stderr, "%.2f seconds == %.2f MB/s\n", seconds,
 	   ((long long) in_len * per_loop * 10) / (1024 * 1024 * seconds));
 
-  out_len = compress_buf(inb, in_len, outb, sizeof(outb));
+  out_len = compress_buf(htab, hnext, inb, in_len, outb, sizeof(outb));
 
   calib_loop = 1;
   per_loop = 0;

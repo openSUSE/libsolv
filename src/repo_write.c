@@ -164,7 +164,7 @@ write_blob(Repodata *data, void *blob, int len)
 }
 
 static void
-write_compressed_blob(Repodata *data, void *blob, int len)
+write_compressed_blob(PageCompressor *comp, Repodata *data, void *blob, int len)
 {
   unsigned char cpage[65536];
   if (data->error)
@@ -1007,7 +1007,7 @@ traverse_dirs(Dirpool *dp, Id *dirmap, Id n, Id dir, Id *used)
 }
 
 static void
-write_compressed_page(Repodata *data, unsigned char *page, int len)
+write_compressed_page(PageCompressor *comp, Repodata *data, unsigned char *page, int len)
 {
   int clen;
   unsigned char cpage[REPOPAGE_BLOBSIZE];
@@ -1071,7 +1071,7 @@ repo_write_stdkeyfilter(Repo *repo, Repokey *key, void *kfdata)
 }
 
 static int
-write_compressed_extdata(Repodata *target, struct extdata *xd, unsigned char *vpage, int lpage)
+write_compressed_extdata(PageCompressor *comp, Repodata *target, struct extdata *xd, unsigned char *vpage, int lpage)
 {
   unsigned char *dp = xd->buf;
   int l = xd->len;
@@ -1086,7 +1086,7 @@ write_compressed_extdata(Repodata *target, struct extdata *xd, unsigned char *vp
       l -= ll;
       if (lpage == REPOPAGE_BLOBSIZE)
 	{
-	  write_compressed_page(target, vpage, lpage);
+	  write_compressed_page(comp, target, vpage, lpage);
 	  lpage = 0;
 	}
     }
@@ -2145,7 +2145,11 @@ for (i = 1; i < target.nkeys; i++)
 	}
       write_id(&target, cnt);
       if (cnt)
-        write_compressed_blob(&target, xd->buf, xd->len);
+	{
+	  PageCompressor *comp = pagecompressor_create();
+	  write_compressed_blob(comp, &target, xd->buf, xd->len);
+	  pagecompressor_free(comp);
+	}
       solv_free(xd->buf);
     }
 
@@ -2170,13 +2174,14 @@ for (i = 1; i < target.nkeys; i++)
       /* have vertical data, write it in pages */
       unsigned char vpage[REPOPAGE_BLOBSIZE];
       int lpage = 0;
+      PageCompressor *comp = pagecompressor_create();
 
       write_u32(&target, REPOPAGE_BLOBSIZE);
       if (!cbdata.filelistmode)
 	{
 	  for (i = 1; i < target.nkeys; i++)
 	    if (cbdata.extdata[i].len)
-	      lpage = write_compressed_extdata(&target, cbdata.extdata + i, vpage, lpage);
+	      lpage = write_compressed_extdata(comp, &target, cbdata.extdata + i, vpage, lpage);
 	}
       else
 	{
@@ -2207,15 +2212,16 @@ for (i = 1; i < target.nkeys; i++)
 		}
 	      if (xd->len > 1024 * 1024)
 		{
-		  lpage = write_compressed_extdata(&target, xd, vpage, lpage);
+		  lpage = write_compressed_extdata(comp, &target, xd, vpage, lpage);
 		  xd->len = 0;
 		}
 	    }
 	  if (xd->len)
-	    lpage = write_compressed_extdata(&target, xd, vpage, lpage);
+	    lpage = write_compressed_extdata(comp, &target, xd, vpage, lpage);
 	}
       if (lpage)
-	write_compressed_page(&target, vpage, lpage);
+	write_compressed_page(comp, &target, vpage, lpage);
+      pagecompressor_free(comp);
     }
 
   for (i = 1; i < target.nkeys; i++)
