@@ -1,4 +1,17 @@
 
+Next ABI breakage:
+
+- delete repopagestore_compress_page function (leftover from when we
+  had repo_write in libsolvext)
+- add SHA3 digest support
+- use size_t in pool_alloctmpspace, pool_strn2id, stringpool_strn2id,
+  solv_xmlparser_contentspace, solv_hex2bin, solv_bin2hex,
+  solv_chksum_add, strnhash
+- drop solv_pgpvrfy.c and most of repo_pubkey (hopefully noone
+  uses them anyway)
+
+Other TODOs:
+
 - implement package priority (for things like Debian's pin feature)
 
 - merge SUSETAGS_FILE_* and  REPOSITORY_REPOMD_* keys into REPOSITORY_RESOURCE
