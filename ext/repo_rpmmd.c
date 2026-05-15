@@ -521,7 +521,7 @@ rebuild_cshash(struct parsedata *pd)
   fprintf(stderr, "rebuild cshash with mask 0x%x\n", hm);
 #endif
   solv_free(pd->cshash);
-  ht = pd->cshash = (Hashtable)solv_calloc(hm + 1, sizeof(Id));
+  ht = pd->cshash = allochashtable(hm, 1);
   d = pd->csdata;
   de = d + pd->ncsdata;
   while (d != de)
@@ -565,7 +565,7 @@ put_in_cshash(struct parsedata *pd, const unsigned char *key, int keyl, Id id)
   memcpy(d + 1, key, keyl);
   memcpy(d + 1 + keyl, &id, sizeof(Id));
   pd->ncsdata += 1 + keyl + sizeof(Id);
-  if ((Hashval)++pd->ncshash * 2 > hm)
+  if ((Hashval)++pd->ncshash * 2 >= hm)
     {
       pd->cshashm = pd->cshashm ? (2 * pd->cshashm + 1) : 4095;
       rebuild_cshash(pd);
