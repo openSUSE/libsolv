@@ -873,6 +873,7 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
   /*******  Part 3: Dirs  ***********************************************/
   if (numdir)
     {
+      /* note that we do not use DIR_BLOCK here. See comment in dirpool_add_dir */
       data.dirpool.dirs = solv_malloc2(numdir, sizeof(Id));
       data.dirpool.ndirs = numdir;
       data.dirpool.dirs[0] = 0;		/* dir 0: virtual root */

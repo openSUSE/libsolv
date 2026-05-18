@@ -82,9 +82,9 @@ void
 dirpool_make_dirtraverse(Dirpool *dp)
 {
   Id parent, i, *dirtraverse;
+  dp->dirtraverse = solv_free(dp->dirtraverse);
   if (!dp->ndirs)
     return;
-  dp->dirs = solv_extend_resize(dp->dirs, dp->ndirs, sizeof(Id), DIR_BLOCK);
   dirtraverse = solv_calloc_block(dp->ndirs, sizeof(Id), DIR_BLOCK);
   for (i = 0; i < dp->ndirs; i++)
     {
@@ -174,7 +174,12 @@ dirpool_add_dir(Dirpool *dp, Id parent, Id comp, int create)
 
   /* grow hash table if load factor exceeds 50% */
   if ((Hashval)dp->ndirs * 2 >= dp->dirhashmask)
-    dirpool_resize_hash(dp, DIR_BLOCK);
+    {
+      /* hack: repo_add_solv will not use DIR_BLOCK, so realloc here */
+      if (!dp->dirhashmask)
+        dp->dirs = solv_extend_resize(dp->dirs, dp->ndirs, sizeof(Id), DIR_BLOCK);
+      dirpool_resize_hash(dp, DIR_BLOCK);
+    }
 
   ht = dp->dirhashtbl;
   hm = dp->dirhashmask;
