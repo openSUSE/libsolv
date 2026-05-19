@@ -5,7 +5,7 @@ Next ABI breakage:
   had repo_write in libsolvext)
 - add SHA3 digest support
 - use size_t in pool_alloctmpspace, pool_strn2id, stringpool_strn2id,
-  solv_xmlparser_contentspace, solv_hex2bin, solv_bin2hex,
+  solv_xmlparser_contentspace, solv_hex2bin, solv_bin2hex, pool_bin2hex,
   solv_chksum_add, strnhash
 - drop solv_pgpvrfy.c and most of repo_pubkey (hopefully noone
   uses them anyway)

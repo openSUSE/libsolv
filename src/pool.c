@@ -34,6 +34,8 @@
 #include "knownid.h"
 #undef KNOWNID_INITIALIZE
 
+#define POOL_MAX_TMPSPACE_LEN	0x1000000
+
 /* create pool */
 Pool *
 pool_create(void)
@@ -430,6 +432,8 @@ pool_alloctmpspace(Pool *pool, int len)
   int n = pool->tmpspace.n;
   if (len <= 0)
     return 0;
+  if (len >= POOL_MAX_TMPSPACE_LEN)
+    solv_ovfl("tmpspace size overflow");
   if (len > pool->tmpspace.len[n])
     {
       pool->tmpspace.buf[n] = solv_realloc(pool->tmpspace.buf[n], len + 32);
@@ -479,11 +483,13 @@ pool_freetmpspace(Pool *pool, const char *space)
 char *
 pool_tmpjoin(Pool *pool, const char *str1, const char *str2, const char *str3)
 {
-  int l1, l2, l3;
+  size_t l1, l2, l3;
   char *s, *str;
   l1 = str1 ? strlen(str1) : 0;
   l2 = str2 ? strlen(str2) : 0;
   l3 = str3 ? strlen(str3) : 0;
+  if (l1 >= POOL_MAX_TMPSPACE_LEN || l2 >= POOL_MAX_TMPSPACE_LEN || l3 >= POOL_MAX_TMPSPACE_LEN)
+    solv_ovfl("tmpspace size overflow");
   s = str = pool_alloctmpspace(pool, l1 + l2 + l3 + 1);
   if (l1)
     {
@@ -507,12 +513,14 @@ pool_tmpjoin(Pool *pool, const char *str1, const char *str2, const char *str3)
 char *
 pool_tmpappend(Pool *pool, const char *str1, const char *str2, const char *str3)
 {
-  int l1, l2, l3;
+  size_t l1, l2, l3;
   char *s, *str;
 
   l1 = str1 ? strlen(str1) : 0;
   l2 = str2 ? strlen(str2) : 0;
   l3 = str3 ? strlen(str3) : 0;
+  if (l1 >= POOL_MAX_TMPSPACE_LEN || l2 >= POOL_MAX_TMPSPACE_LEN || l3 >= POOL_MAX_TMPSPACE_LEN)
+    solv_ovfl("tmpspace size overflow");
   str = pool_alloctmpspace_free(pool, str1, l1 + l2 + l3 + 1);
   if (str)
     str1 = str;
@@ -545,6 +553,8 @@ pool_bin2hex(Pool *pool, const unsigned char *buf, int len)
   char *s;
   if (len <= 0)
     return "";
+  if (len >= POOL_MAX_TMPSPACE_LEN / 2)
+    solv_ovfl("pool_bin2hex size overflow");
   s = pool_alloctmpspace(pool, 2 * len + 1);
   solv_bin2hex(buf, len, s);
   return s;
