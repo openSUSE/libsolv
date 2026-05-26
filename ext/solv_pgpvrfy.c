@@ -589,7 +589,7 @@ solv_pgpvrfy(const unsigned char *pub, int publ, const unsigned char *sig, int s
 	if (rlen)
 	  memcpy(sigdata + 32 - rlen, r, rlen);
 	if (slen)
-	  memcpy(sigdata + 64 - slen, s, rlen);
+	  memcpy(sigdata + 64 - slen, s, slen);
 	res = mped25519(pub + 1 + 10 + 2 + 1, sigdata, sig + 2, hashl);
 	break;
       }
