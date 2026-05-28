@@ -147,6 +147,8 @@ solv_chksum_str2type(const char *str)
 void *
 solv_chksum_free(Chksum *chk, unsigned char *cp)
 {
+  if (!chk)
+    return 0;
   if (cp)
     {
       int len = chk->impl ? solv_chksum_finalize(chk) : solv_chksum_len(chk->type);
