@@ -1,6 +1,10 @@
 
 This file contains the major changes between libsolv versions:
 
+Version 0.7.39
+- selected bug fixes:
+  * fix solv_chksum_free segfault when called with a NULL pointer
+
 Version 0.7.38
 - selected bug fixes:
   * made repo_add_solv more robust against corrupt files

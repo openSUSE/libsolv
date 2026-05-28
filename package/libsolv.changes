@@ -1,4 +1,10 @@
 -------------------------------------------------------------------
+Thu May 28 11:28:50 CEST 2026 - Michael Schroeder <mls@suse.de>
+
+- fix solv_chksum_free segfault when called with a NULL pointer
+- bump version to 0.7.39
+
+-------------------------------------------------------------------
 Tue May 26 10:31:41 CEST 2026 - Michael Schroeder <mls@suse.de>
 
 - made repo_add_solv more robust against corrupt files
@@ -10,6 +16,7 @@ Tue May 26 10:31:41 CEST 2026 - Michael Schroeder <mls@suse.de>
 - fixed Debian canon selection
 - fixed dbpath detection in repo_rpmdb_librpm
 - reduced stack usage in repo page compression (needed for musl)
+- bump version to 0.7.38
 
 -------------------------------------------------------------------
 Thu Apr 23 11:22:49 CEST 2026 - Michael Schroeder <mls@suse.de>
