@@ -291,7 +291,7 @@ parse_block(struct solv_xmlparser *xmlp, char *buf, int l)
     }
   if (xmlParseChunk(xmlp->parser, buf, l, l == 0 ? 1 : 0))
     {
-      xmlErrorPtr err = xmlCtxtGetLastError(xmlp->parser);
+      const xmlError *err = xmlCtxtGetLastError(xmlp->parser);
       set_error(xmlp, err->message, err->line, err->int2);
       return 0;
     }
