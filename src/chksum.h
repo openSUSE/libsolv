@@ -18,6 +18,7 @@ struct s_Chksum;
 typedef struct s_Chksum Chksum;
 
 Chksum *solv_chksum_create_from_bin(Id type, const unsigned char *buf);
+Chksum *solv_chksum_create_clone(Chksum *chk);
 Id solv_chksum_get_type(Chksum *chk);
 int solv_chksum_isfinished(Chksum *chk);
 const unsigned char *solv_chksum_get(Chksum *chk, int *lenp);
@@ -26,11 +27,9 @@ const char *solv_chksum_type2str(Id type);
 Id solv_chksum_str2type(const char *str);
 int solv_chksum_len(Id type);
 int solv_chksum_cmp(Chksum *chk, Chksum *chk2);
-Chksum *solv_chksum_create_finished_clone(Chksum *chk);
 
 /* implementation */
 Chksum *solv_chksum_create(Id type);
-Chksum *solv_chksum_create_clone(Chksum *chk);
 void solv_chksum_add(Chksum *chk, const void *data, int len);
 
 #define SOLV_CHKSUM_MAXLEN 64
