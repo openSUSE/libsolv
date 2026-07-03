@@ -94,9 +94,10 @@ fix_namespace_dep(Pool *pool, Id id)
   rd = GETRELDEP(pool, id);
   if (rd->flags == REL_AND || rd->flags == REL_OR || rd->flags == REL_COND || rd->flags == REL_UNLESS || rd->flags == REL_ELSE)
     {
-      Id name = fix_namespace_dep(pool, rd->name);
-      Id evr = fix_namespace_dep(pool, rd->evr);
-      return name == rd->name && evr == rd->evr ? id : pool_rel2id(pool, name, evr, rd->flags, 1);
+      Id name = rd->name, evr = rd->evr, flags = rd->flags;
+      Id newname = fix_namespace_dep(pool, name);
+      Id newevr = fix_namespace_dep(pool, evr);
+      return newname == name && newevr == evr ? id : pool_rel2id(pool, newname, newevr, flags, 1);
     }
   return id;
 }
