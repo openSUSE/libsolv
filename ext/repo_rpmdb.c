@@ -52,7 +52,8 @@
 /* 5: fixed checksum copying */
 /* 6: add SOLVABLE_PREREQ_IGNOREINST support */
 /* 7: fix bug in ignoreinst logic */
-#define RPMDB_COOKIE_VERSION 7
+/* 8: add SOLVABLE_CHECKSUM from PACKAGEDIGESTS */
+#define RPMDB_COOKIE_VERSION 8
 
 #define TAG_NAME		1000
 #define TAG_VERSION		1001
@@ -134,6 +135,8 @@
 #define TAG_ENHANCENAME		5055
 #define TAG_ENHANCEVERSION	5056
 #define TAG_ENHANCEFLAGS	5057
+#define TAG_PACKAGEDIGESTS	5118	/* rpm >= 6.0 */
+#define TAG_PACKAGEDIGESTALGOS	5119	/* rpm >= 6.0 */
 
 /* signature tags */
 #define	TAG_SIGBASE		256
@@ -1133,6 +1136,28 @@ set_description_author(Repodata *data, Id handle, const char *str)
 }
 
 static int
+rpmpkgdigestalgo2type(unsigned int algo)
+{
+  switch (algo)
+    {
+    case 1:
+      return REPOKEY_TYPE_MD5;
+    case 2:
+      return REPOKEY_TYPE_SHA1;
+    case 8:
+      return REPOKEY_TYPE_SHA256;
+    case 9:
+      return REPOKEY_TYPE_SHA384;
+    case 10:
+      return REPOKEY_TYPE_SHA512;
+    case 11:
+      return REPOKEY_TYPE_SHA224;
+    default:
+      return 0;
+    }
+}
+
+static int
 rpmhead2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhead, int flags)
 {
   char *name;
@@ -1200,6 +1225,9 @@ rpmhead2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhe
       const char *str;
       unsigned int u32;
       unsigned long long u64;
+      uint32_t *algos;
+      char **digests;
+      int nalgos = 0, ndigests = 0, i;
 
       handle = s - pool->solvables;
       str = headstring(rpmhead, TAG_SUMMARY);
@@ -1247,6 +1275,21 @@ rpmhead2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhe
 	  else if (str && strlen(str) == 64)
 	    repodata_set_checksum(data, handle, SOLVABLE_HDRID, REPOKEY_TYPE_SHA256, str);
 	}
+      algos = headint32array(rpmhead, TAG_PACKAGEDIGESTALGOS, &nalgos);
+      digests = headstringarray(rpmhead, TAG_PACKAGEDIGESTS, &ndigests);
+      /* If there is any digest, store the first one with a supported algorithm. */
+      if (algos && digests && nalgos > 0 && ndigests > 0)
+	for (i = 0; i < nalgos && i < ndigests; i++)
+	  {
+	    Id algo = rpmpkgdigestalgo2type(algos[i]);
+	    if (algo)
+	      {
+		repodata_set_checksum(data, handle, SOLVABLE_CHECKSUM, algo, digests[i]);
+		break;
+	      }
+	  }
+      solv_free(algos);
+      solv_free(digests);
       u32 = headint32(rpmhead, TAG_BUILDTIME);
       if (u32)
         repodata_set_num(data, handle, SOLVABLE_BUILDTIME, u32);
