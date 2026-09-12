@@ -296,7 +296,8 @@ pool_createwhatprovides(Pool *pool)
   pool->whatprovidesdata = whatprovidesdata;
   pool->whatprovidesdataoff = off;
   pool->whatprovidesdataleft = extra;
-  pool_shrink_whatprovides(pool);
+  if (!pool->nowhatprovidesshrink)
+    pool_shrink_whatprovides(pool);
   if (pool->whatprovidesdataoff >= SOLV_MAX_INDEX || pool->whatprovidesdataoff + pool->whatprovidesdataleft >= SOLV_MAX_INDEX)
     solv_ovfl("pool whatprovides overflow");
 

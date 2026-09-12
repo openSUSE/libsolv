@@ -268,6 +268,12 @@ dependencies given by the user, then do not have to rebuild both
 tables over all ids of the pool, at the price of keeping them in
 memory.
 
+*POOL_FLAG_NOWHATPROVIDESSHRINK*::
+Do not unify identical provider lists in pool_createwhatprovides().
+The unification sorts all ids that have providers, which is a
+noticeable part of creating the index for big pools; it saves some
+memory, which is not worth it for short lived pools.
+
 
 === Functions ===
 	int pool_setdisttype(Pool *pool, int disttype);

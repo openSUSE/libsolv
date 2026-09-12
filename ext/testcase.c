@@ -161,6 +161,7 @@ static struct poolflags2str {
   { POOL_FLAG_NOWHATPROVIDESAUX,            "nowhatprovidesaux", 0 },
   { POOL_FLAG_WHATPROVIDESWITHDISABLED,     "whatprovideswithdisabled", 0 },
   { POOL_FLAG_KEEPIDHASHES,                 "keepidhashes", 0 },
+  { POOL_FLAG_NOWHATPROVIDESSHRINK,         "nowhatprovidesshrink", 0 },
   { 0, 0, 0 }
 };
 

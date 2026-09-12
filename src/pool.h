@@ -170,6 +170,7 @@ struct s_Pool {
   /* new internal fields go here, at the end, so that adding one does
    * not move the offsets libsolvext.so was compiled against */
   int keepidhashes;		/* true: keep the id hashes in pool_createwhatprovides */
+  int nowhatprovidesshrink;	/* true: do not unify the whatprovides data */
 #endif
 };
 
@@ -211,6 +212,7 @@ struct s_Pool {
 #define POOL_FLAG_NOWHATPROVIDESAUX			11
 #define POOL_FLAG_WHATPROVIDESWITHDISABLED		12
 #define POOL_FLAG_KEEPIDHASHES				13
+#define POOL_FLAG_NOWHATPROVIDESSHRINK			14
 
 /* ----------------------------------------------- */
 

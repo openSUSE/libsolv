@@ -412,6 +412,11 @@ index is created. Looking up or creating ids after that point then
 does not have to rebuild both tables over all ids of the pool, at the
 price of keeping them in memory.
 
+*POOL_FLAG_NOWHATPROVIDESSHRINK*::
+Do not unify identical provider lists when the whatprovides index is
+created. This makes creating the index faster, at the price of a bit
+more memory.
+
 === METHODS ===
 
 	void free()
