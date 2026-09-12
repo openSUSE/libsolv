@@ -260,6 +260,14 @@ useful if you have only few packages that use non-standard file
 dependencies, but you still want the fast speed that addfileprovides()
 generates.
 
+*POOL_FLAG_KEEPIDHASHES*::
+Do not free the string and relation hash tables in
+pool_createwhatprovides(). Applications that look up or create ids
+after creating the whatprovides index, e.g. when parsing jobs or
+dependencies given by the user, then do not have to rebuild both
+tables over all ids of the pool, at the price of keeping them in
+memory.
+
 
 === Functions ===
 	int pool_setdisttype(Pool *pool, int disttype);

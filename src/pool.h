@@ -166,6 +166,10 @@ struct s_Pool {
   int nonstd_nids;
 
   int whatprovideswithdisabled;
+
+  /* new internal fields go here, at the end, so that adding one does
+   * not move the offsets libsolvext.so was compiled against */
+  int keepidhashes;		/* true: keep the id hashes in pool_createwhatprovides */
 #endif
 };
 
@@ -206,6 +210,7 @@ struct s_Pool {
 #define POOL_FLAG_IMPLICITOBSOLETEUSESCOLORS		10
 #define POOL_FLAG_NOWHATPROVIDESAUX			11
 #define POOL_FLAG_WHATPROVIDESWITHDISABLED		12
+#define POOL_FLAG_KEEPIDHASHES				13
 
 /* ----------------------------------------------- */
 
