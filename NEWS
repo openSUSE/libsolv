@@ -1,6 +1,12 @@
 
 This file contains the major changes between libsolv versions:
 
+Version 0.7.40
+- selected bug fixes:
+  * improve SUSE product link dependency generation if there are
+    multiple release packages for the same product
+  * fix possible segfault in the SUSE namespace dependency generation
+
 Version 0.7.39
 - selected bug fixes:
   * fix solv_chksum_free segfault when called with a NULL pointer

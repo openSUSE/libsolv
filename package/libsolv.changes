@@ -1,4 +1,12 @@
 -------------------------------------------------------------------
+Mon Sep 21 17:07:29 CEST 2026 - Michael Schroeder <mls@suse.de>
+
+- improve SUSE product link dependency generation if there are
+  multiple release packages for the same product [bsc#1279541]
+- fix possible segfault in the SUSE namespace dependency generation
+- bump version to 0.7.39
+
+-------------------------------------------------------------------
 Thu May 28 11:28:50 CEST 2026 - Michael Schroeder <mls@suse.de>
 
 - fix solv_chksum_free segfault when called with a NULL pointer
