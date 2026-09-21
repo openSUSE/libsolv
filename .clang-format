@@ -1,0 +1,33 @@
+---
+BasedOnStyle: WebKit
+---
+Language: Cpp
+
+AlwaysBreakAfterReturnType: AllDefinitions
+# GNU, except for enum/struct/union/extern braces
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterControlStatement: true
+  AfterEnum: false
+  AfterFunction: true
+  AfterStruct: false
+  AfterUnion: false
+  AfterExternBlock: false
+  BeforeElse: true
+  IndentBraces: true
+ForEachMacros:
+  - FOR_REPO_SOLVABLES
+  - FOR_REPODATAS
+  - FOR_PROVIDES
+  - FOR_REPOS
+  - FOR_POOL_SOLVABLES
+  - FOR_RULELITERALS
+  - FOR_JOB_SELECT
+  # This is a bit of obuse to get indentation
+  - IF_POOLDEBUG
+IndentWidth: 2
+PointerAlignment: Right
+SortIncludes: false
+TabWidth: 8
+UseTab: Always
+...
