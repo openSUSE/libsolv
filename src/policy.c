@@ -76,6 +76,17 @@ prune_to_best_version_sortcmp(const void *ap, const void *bp, void *dp)
     }
   /* sort by repository sub-prio (installed repo handled above) */
   r = (sb->repo ? sb->repo->subpriority : 0) - (sa->repo ? sa->repo->subpriority : 0);
+#ifdef ENABLE_CONDA
+  if (r == 0)
+  {
+    Repodata* ra = repo_last_repodata(sa->repo);
+    Repodata* rb = repo_last_repodata(sb->repo);
+
+    unsigned long long bta = repodata_lookup_num(ra, a, SOLVABLE_BUILDTIME, 0ull);
+    unsigned long long btb = repodata_lookup_num(rb, b, SOLVABLE_BUILDTIME, 0ull);
+    r = bta - btb;
+  }
+#endif
   if (r)
     return r;
   /* no idea about the order, sort by id */
