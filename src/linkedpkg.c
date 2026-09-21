@@ -127,6 +127,7 @@ find_product_link(Pool *pool, Solvable *s, Id *reqidp, Queue *qr, Id *prvidp, Qu
   Id p, pp, namerelid;
   char *str;
   unsigned int sbt = 0;
+  Id autoprovid = 0;
 
   /* search for project requires */
   namerelid = 0;
@@ -166,7 +167,22 @@ find_product_link(Pool *pool, Solvable *s, Id *reqidp, Queue *qr, Id *prvidp, Qu
     }
   if (qr->count > 1)
     {
-      /* multiple providers. try buildtime filter */
+      /* multiple providers. use autoproduct() provides as filter if available */
+      autoprovid = find_autopackage_name(pool, s);
+      if (autoprovid)
+	{
+	  int i, j;
+	  for (i = j = 0; i < qr->count; i++)
+	    {
+	      if (pool->solvables[qr->elements[i]].name == autoprovid)
+		qr->elements[j++] = qr->elements[i];
+	    }
+	  if (j)
+	    qr->count = j;
+	  else
+	    autoprovid = 0;	/* can't filter */
+	}
+      /* also try buildtime filter */
       sbt = solvable_lookup_num(s, SOLVABLE_BUILDTIME, 0);
       if (sbt)
 	{
@@ -220,6 +236,8 @@ find_product_link(Pool *pool, Solvable *s, Id *reqidp, Queue *qr, Id *prvidp, Qu
 	{
 	  Solvable *ps = pool->solvables + p;
 	  if (s->name != ps->name || ps->repo != s->repo || ps->arch != s->arch || s->evr != ps->evr)
+	    continue;
+	  if (autoprovid && find_autopackage_name(pool, ps) != autoprovid)
 	    continue;
 	  if (sbt && solvable_lookup_num(ps, SOLVABLE_BUILDTIME, 0) != sbt)
 	    continue;
