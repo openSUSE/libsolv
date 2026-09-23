@@ -1367,7 +1367,11 @@ selectandinstall(Solver *solv, int level, Queue *dq, int disablerules, Id ruleid
   Id p;
 
   if (dq->count > 1)
-    policy_filter_unwanted(solv, dq, POLICY_MODE_CHOOSE);
+    {
+      policy_filter_unwanted(solv, dq, POLICY_MODE_CHOOSE);
+      if (dq->count > 1)
+	policy_prune_to_lib_prefix(solv, dq, 0);
+    }
   /* if we're resolving rules and didn't resolve the installed packages yet,
    * do some special pruning and supplements ordering */
   if (dq->count > 1 && solv->do_extra_reordering)
@@ -2678,6 +2682,8 @@ resolve_weak(Solver *solv, int level, int disablerules, Queue *dq, Queue *dqs, i
 	    continue;
 	  if (dq->count > 1)
 	    policy_filter_unwanted(solv, dq, POLICY_MODE_CHOOSE);
+	  if (dq->count > 1)
+	    policy_prune_to_lib_prefix(solv, dq, rec);
 	  /* if we have multiple candidates we open a branch */
 	  if (dq->count > 1)
 	    createbranch(solv, level, dq, s - pool->solvables, rec);
