@@ -849,6 +849,9 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
         str = solv_xmlparser_find_attr("build", atts);
         if (str && (ti = strtoull(str, 0, 10)) != 0)
           repodata_set_num(pd->data, handle, SOLVABLE_BUILDTIME, ti);
+        str = solv_xmlparser_find_attr("file", atts);
+        if (str && (ti = strtoull(str, 0, 10)) != 0)
+          repodata_set_num(pd->data, handle, SOLVABLE_FILETIME, ti);
 	break;
       }
     case STATE_SIZE:
