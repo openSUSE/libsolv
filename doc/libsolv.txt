@@ -51,6 +51,11 @@ to create a safe copy.)
 The language bindings already deal with pointer validity, so you do
 not have to worry about this issue when using the bindings.
 
+Security
+--------
+Solv files are meant as a caching mechanism, thus the solv file reader
+is optimized for speed and does only few bound checks. Do not use it to
+read solv files that come from untrusted sources.
 
 Author
 ------

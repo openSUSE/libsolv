@@ -2,12 +2,12 @@
 .\"     Title: Libsolv
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 03/02/2022
+.\"      Date: 09/30/2026
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV" "3" "03/02/2022" "libsolv" "LIBSOLV"
+.TH "LIBSOLV" "3" "09/30/2026" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -59,6 +59,9 @@ Note that all pointers to objects that have an Id have only a limited validity p
 Note also that the data lookup functions or the dataiterator also return values with limited lifetime, this is especially true for data stored in the paged data segment of solv files\&. This is normally data that consists of big strings like package descriptions or is not often needed like package checksums\&. Thus looking up a description of a solvable and then looking up the description of a different solvable or even the checksum of the same solvable may invalidate the first result\&. (The dataiterator supports a dataiterator_strdup() function to create a safe copy\&.)
 .sp
 The language bindings already deal with pointer validity, so you do not have to worry about this issue when using the bindings\&.
+.SH "SECURITY"
+.sp
+Solv files are meant as a caching mechanism, thus the solv file reader is optimized for speed and does only few bound checks\&. Do not use it to read solv files that come from untrusted sources\&.
 .SH "AUTHOR"
 .sp
 Michael Schroeder <mls@suse\&.de>
