@@ -4,5 +4,6 @@ includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@
 Name: libsolv
 Description: Library for solving packages
 Version: @VERSION@
+Requires.private: @PKGCONFIG_PRIVATE_DEPS@
 Libs: -L${libdir} -lsolv
 Cflags: -I${includedir}

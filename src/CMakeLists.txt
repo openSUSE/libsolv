@@ -19,7 +19,7 @@ SET (libsolv_SRCS
     solver.c solverdebug.c repo_solv.c repo_write.c evr.c
     queue.c repo.c repodata.c repopage.c util.c policy.c solvable.c
     transaction.c order.c rules.c problems.c linkedpkg.c cplxdeps.c
-    chksum.c chksum_impl.c md5.c sha1.c sha2.c solvversion.c selection.c
+    chksum.c solvversion.c selection.c
     fileprovides.c diskusage.c suse.c solver_util.c cleandeps.c
     userinstalled.c filelistfilter.c decision.c)
 
@@ -34,6 +34,12 @@ IF (ENABLE_CONDA)
     SET (libsolv_SRCS ${libsolv_SRCS} conda.c)
     SET (libsolv_HEADERS ${libsolv_HEADERS} conda.h)
 ENDIF (ENABLE_CONDA)
+
+IF (WITH_OPENSSL)
+    SET (libsolv_SRCS ${libsolv_SRCS} chksum_openssl.c)
+ELSE()
+    SET (libsolv_SRCS ${libsolv_SRCS} chksum_impl.c md5.c sha1.c sha2.c)
+ENDIF (WITH_OPENSSL)
 
 IF (MULTI_SEMANTICS)
     SET (libsolv_SRCS ${libsolv_SRCS} apk.c)
@@ -57,6 +63,11 @@ IF (DISABLE_SHARED)
 ELSE (DISABLE_SHARED)
     ADD_LIBRARY (libsolv SHARED ${libsolv_SRCS})
 ENDIF (DISABLE_SHARED)
+
+IF (WITH_OPENSSL)
+    TARGET_INCLUDE_DIRECTORIES (libsolv PRIVATE ${OPENSSL_INCLUDE_DIR})
+    TARGET_LINK_LIBRARIES (libsolv PRIVATE ${OPENSSL_CRYPTO_LIBRARY})
+ENDIF (WITH_OPENSSL)
 
 IF (WIN32)
     IF (DISABLE_SHARED)

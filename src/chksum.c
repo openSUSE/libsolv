@@ -18,10 +18,6 @@
 #include "util.h"
 #include "chksum.h"
 
-#include "md5.h"
-#include "sha1.h"
-#include "sha2.h"
-
 #ifdef _WIN32
   #include "strfncs.h"
 #endif
