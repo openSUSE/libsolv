@@ -1315,6 +1315,144 @@ policy_filter_unwanted_favored(Solver *solv, Queue *plist, int mode)
 }
 
 /*
+ * Check if the name looks like a library soname: "libfoo.so",
+ * "libfoo.so.2", "libfoo.so.2()(64bit)".
+ */
+static int
+is_soname_name(const char *sn)
+{
+  const char *s;
+  if (strncmp(sn, "lib", 3) != 0)
+    return 0;
+  for (s = sn; (s = strstr(s, ".so")) != 0; s += 3)
+    if (s[3] == '.' || s[3] == '(' || s[3] == 0)
+      return 1;
+  return 0;
+}
+
+/*
+ * Check if the dependency is a library soname dependency,
+ * e.g. "libfoo.so.2()(64bit)" or "libfoo.so.2 >= 1.0".
+ */
+static int
+is_soname_dep(Pool *pool, Id dep)
+{
+  if (!dep)
+    return 0;
+  if (ISRELDEP(dep))
+    dep = GETRELDEP(pool, dep)->name;
+  if (!dep)
+    return 0;
+  return is_soname_name(pool_id2str(pool, dep));
+}
+
+/*
+ * Check if all candidates share a common library soname and no
+ * other common provide. This is the case when the dependency we're
+ * currently resolving is a soname dependency like
+ * "libfoo.so.2()(64bit)" (possibly versioned), as all candidates
+ * must provide the dependency we're resolving. We do not look at
+ * the dependency itself, as it is not stored with the rule, so we
+ * look at the provides of the candidates instead:
+ *
+ *   dependency being      provides shared by          soname
+ *   resolved              all candidates              choice?
+ *   -------------------   -------------------------   -------
+ *   libz.so.1()(64bit)    libz.so.1()(64bit)          yes
+ *   browser-engine        browser-engine,             no
+ *                         libfake.so.1()(64bit)
+ *                         (both providers bundle it)
+ *   Y                     Y                           no
+ */
+static int
+is_soname_choice(Pool *pool, Queue *plist)
+{
+  Solvable *s0 = pool->solvables + plist->elements[0];
+  Id id, *idp;
+  int i, havesoname = 0;
+
+  if (!s0->provides)
+    return 0;
+  /* iterate over the provides of the first candidate, look for
+   * provides that are also provided by all the other candidates */
+  for (idp = s0->repo->idarraydata + s0->provides; (id = *idp) != 0; idp++)
+    {
+      Id name = id;
+      if (ISRELDEP(id))
+	name = GETRELDEP(pool, id)->name;
+      for (i = 1; i < plist->count; i++)
+	{
+	  Solvable *s = pool->solvables + plist->elements[i];
+	  Id id2, name2, *idp2;
+	  if (!s->provides)
+	    break;
+	  for (idp2 = s->repo->idarraydata + s->provides; (id2 = *idp2) != 0; idp2++)
+	    {
+	      name2 = id2;
+	      if (ISRELDEP(id2))
+		name2 = GETRELDEP(pool, id2)->name;
+	      if (name2 == name)
+		break;
+	    }
+	  if (!id2)
+	    break;
+	}
+      if (i != plist->count)
+	continue;		/* not shared by all candidates */
+      if (!is_soname_name(pool_id2str(pool, name)))
+	return 0;		/* shared non-soname provide: not a soname choice */
+      havesoname = 1;
+    }
+  return havesoname;
+}
+
+/*
+ * Prefer packages with a "lib" name prefix when resolving library
+ * (soname) dependencies.
+ *
+ * Packages sometimes provide libraries they bundle in private
+ * directories, thus generating soname provides that shadow the
+ * provides of the real library packages. If multiple candidates
+ * are left after the standard pruning steps and the dependency
+ * looks like a library soname (i.e. "libfoo.so.2"), drop all
+ * candidates whose name does not start with "lib" ("libz",
+ * "lib64z1", ...).
+ *
+ * If the dependency being resolved is known it can be passed in
+ * the dep argument, otherwise (dep == 0) it is deduced from the
+ * provides of the candidates. Installed candidates are never
+ * pruned, the pruning is also skipped if it would remove all
+ * candidates.
+ *
+ * Suggested/enhancing candidates are not kept either: a Suggests
+ * is written for the package as a whole, not for satisfying a
+ * specific soname dependency, so it deliberately stays weaker
+ * than this pruning (unlike Recommends, which prunes candidates
+ * itself and therefore stays stronger).
+ */
+void
+policy_prune_to_lib_prefix(Solver *solv, Queue *plist, Id dep)
+{
+  Pool *pool = solv->pool;
+  int i, j;
+
+  /* soname dependencies like "libfoo.so.2" are specific to the rpm world */
+  if (pool->disttype != DISTTYPE_RPM)
+    return;
+  if (dep ? !is_soname_dep(pool, dep) : !is_soname_choice(pool, plist))
+    return;
+  for (i = j = 0; i < plist->count; i++)
+    {
+      Solvable *s = pool->solvables + plist->elements[i];
+      if (s->repo != pool->installed && strncmp(pool_id2str(pool, s->name), "lib", 3) != 0)
+	continue;
+      plist->elements[j++] = plist->elements[i];
+    }
+  if (j)
+    plist->count = j;
+}
+
+/*
  *  POLICY_MODE_CHOOSE:     default, do all pruning steps
  *  POLICY_MODE_RECOMMEND:  leave out prune_to_recommended
  *  POLICY_MODE_SUGGEST:    leave out prune_to_recommended, do prio pruning just per name

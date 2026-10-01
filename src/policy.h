@@ -47,6 +47,7 @@ extern void pool_best_solvables(Pool *pool, Queue *plist, int flags);
 /* internal, do not use */
 extern void prune_to_best_version(Pool *pool, Queue *plist);
 extern void policy_prefer_favored(Solver *solv, Queue *plist);
+extern void policy_prune_to_lib_prefix(Solver *solv, Queue *plist, Id dep);
 
 
 #ifdef __cplusplus
