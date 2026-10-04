@@ -406,6 +406,17 @@ Make the whatprovides index also contain disabled packages. This
 means that you do not need to recreate the index if a package is
 enabled/disabled, i.e. the pool->considered bitmap is changed.
 
+*POOL_FLAG_KEEPIDHASHES*::
+Do not free the string and relation hash tables when the whatprovides
+index is created. Looking up or creating ids after that point then
+does not have to rebuild both tables over all ids of the pool, at the
+price of keeping them in memory.
+
+*POOL_FLAG_NOWHATPROVIDESSHRINK*::
+Do not unify identical provider lists when the whatprovides index is
+created. This makes creating the index faster, at the price of a bit
+more memory.
+
 === METHODS ===
 
 	void free()
