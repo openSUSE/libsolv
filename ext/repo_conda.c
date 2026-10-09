@@ -414,6 +414,8 @@ parse_info(struct parsedata *pd, struct solv_jsonparser *jp)
 	      return JP_ERROR;
 	    }
 	}
+      else
+	type = jsonparser_skip(jp, type);
     }
   return type;
 }
