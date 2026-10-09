@@ -347,6 +347,11 @@ adb_read_adb_blk(Pool *pool, FILE *fp, const char *fn, size_t *adblenp)
       pool_error(pool, 0, "%s: missing adb block", fn);
       return 0;
     }
+  if (size < 8)		/* sizeof adb_hdr */
+    {
+      pool_error(pool, 0, "%s: adb block too small", fn);
+      return 0;
+    }
   if (size > ADB_MAX_SIZE)
     {
       pool_error(pool, 0, "%s: oversized adb block", fn);
