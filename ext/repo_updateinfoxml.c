@@ -254,8 +254,13 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
 	if (date)
 	  {
 	    unsigned long long t = datestr2timestamp(date);
-	    if (t && t > pd->buildtime)
-              pd->buildtime = t;
+	    if (t)
+	      {
+		/* keep both dates; buildtime stays the newer one for existing users */
+		repodata_set_num(pd->data, pd->handle, state == STATE_ISSUED ? UPDATE_ISSUED : UPDATE_UPDATED, t);
+		if (t > pd->buildtime)
+		  pd->buildtime = t;
+	      }
 	  }
       }
       break;
