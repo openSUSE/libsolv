@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Pool
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 08/01/2025
+.\"      Date: 10/04/2026
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-POOL" "3" "08/01/2025" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-POOL" "3" "10/04/2026" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -356,6 +356,16 @@ If a package is installed in multiversionmode, rpm used to ignore both the impli
 \fBPOOL_FLAG_ADDFILEPROVIDESFILTERED\fR
 .RS 4
 Make the addfileprovides method only add files from the standard locations (i\&.e\&. the \(lqbin\(rq and \(lqetc\(rq directories)\&. This is useful if you have only few packages that use non\-standard file dependencies, but you still want the fast speed that addfileprovides() generates\&.
+.RE
+.PP
+\fBPOOL_FLAG_KEEPIDHASHES\fR
+.RS 4
+Do not free the string and relation hash tables in pool_createwhatprovides()\&. Applications that look up or create ids after creating the whatprovides index, e\&.g\&. when parsing jobs or dependencies given by the user, then do not have to rebuild both tables over all ids of the pool, at the price of keeping them in memory\&.
+.RE
+.PP
+\fBPOOL_FLAG_NOWHATPROVIDESSHRINK\fR
+.RS 4
+Do not unify identical provider lists in pool_createwhatprovides()\&. The unification sorts all ids that have providers, which is a noticeable part of creating the index for big pools; it saves some memory, which is not worth it for short lived pools\&.
 .RE
 .SS "Functions"
 .sp

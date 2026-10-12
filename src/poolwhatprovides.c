@@ -188,7 +188,8 @@ pool_createwhatprovides(Pool *pool)
   if (pool->ss.stringhashmask || pool->relhashmask)
     POOL_DEBUG(SOLV_DEBUG_STATS, "string hash memory: %d K, rel hash memory : %d K\n", (pool->ss.stringhashmask + 1) / (int)(1024/sizeof(Id)), (pool->relhashmask + 1) / (int)(1024/sizeof(Id)));
 
-  pool_freeidhashes(pool);	/* XXX: should not be here! */
+  if (!pool->keepidhashes)
+    pool_freeidhashes(pool);	/* XXX: should not be here! */
   pool_freewhatprovides(pool);
   num = pool->ss.nstrings;
   pool->whatprovides = whatprovides = solv_calloc_block(num, sizeof(Offset), WHATPROVIDES_BLOCK);
@@ -295,7 +296,8 @@ pool_createwhatprovides(Pool *pool)
   pool->whatprovidesdata = whatprovidesdata;
   pool->whatprovidesdataoff = off;
   pool->whatprovidesdataleft = extra;
-  pool_shrink_whatprovides(pool);
+  if (!pool->nowhatprovidesshrink)
+    pool_shrink_whatprovides(pool);
   if (pool->whatprovidesdataoff >= SOLV_MAX_INDEX || pool->whatprovidesdataoff + pool->whatprovidesdataleft >= SOLV_MAX_INDEX)
     solv_ovfl("pool whatprovides overflow");
 

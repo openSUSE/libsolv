@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 08/01/2025
+.\"      Date: 10/04/2026
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "08/01/2025" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "10/04/2026" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -726,6 +726,16 @@ Disable the creation of the auxiliary whatprovides index\&. This saves a bit of 
 \fBPOOL_FLAG_WHATPROVIDESWITHDISABLED\fR
 .RS 4
 Make the whatprovides index also contain disabled packages\&. This means that you do not need to recreate the index if a package is enabled/disabled, i\&.e\&. the pool→considered bitmap is changed\&.
+.RE
+.PP
+\fBPOOL_FLAG_KEEPIDHASHES\fR
+.RS 4
+Do not free the string and relation hash tables when the whatprovides index is created\&. Looking up or creating ids after that point then does not have to rebuild both tables over all ids of the pool, at the price of keeping them in memory\&.
+.RE
+.PP
+\fBPOOL_FLAG_NOWHATPROVIDESSHRINK\fR
+.RS 4
+Do not unify identical provider lists when the whatprovides index is created\&. This makes creating the index faster, at the price of a bit more memory\&.
 .RE
 .SS "METHODS"
 .sp
