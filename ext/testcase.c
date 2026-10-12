@@ -2199,7 +2199,11 @@ testcase_read(Pool *pool, FILE *fp, const char *testcase, Queue *job, char **res
           bufl += 512;
 	}
       if (!fgets(bufp, bufl - (bufp - buf), fp))
-	break;
+	{
+	  if (bufp == buf)
+	    break;
+	  strcpy(bufp, "\n");	/* last line without newline */
+	}
       bufp = buf;
       l = strlen(buf);
       if (!l || buf[l - 1] != '\n')
