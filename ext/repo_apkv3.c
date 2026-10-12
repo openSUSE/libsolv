@@ -286,7 +286,7 @@ add_add_idb_pkg(Pool *pool, Repo *repo, Repodata *data, const unsigned char *adb
   unsigned int cnt, type_size;
   size_t blobl;
   const unsigned char *blob = adb_blob(adb, adblen, v, &blobl);
-  if (blobl < 12 || blobl >= ADB_MAX_SIZE)
+  if (!blob || blobl < 12 || blobl >= ADB_MAX_SIZE)
     return 0;
   type_size = adb_u32(blob);
   if ((type_size & 0xc0000000) == 0 && blobl == type_size + 4)
