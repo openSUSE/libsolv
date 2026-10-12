@@ -347,7 +347,7 @@ const char *
 testcase_repoid2str(Pool *pool, Id repoid)
 {
   Repo *repo = pool_id2repo(pool, repoid);
-  if (repo->name)
+  if (repo && repo->name)
     {
       char *r = pool_tmpjoin(pool, repo->name, 0, 0);
       char *rp;
@@ -661,10 +661,10 @@ testcase_job2str(Pool *pool, Id how, Id what)
     {
       Repo *repo = pool_id2repo(pool, what);
       selstr = " repo ";
-      if (!repo->name)
+      if (!repo || !repo->name)
 	{
           char buf[20];
-	  sprintf(buf, "#%d", repo->repoid);
+	  sprintf(buf, "#%d", repo ? repo->repoid : what);
 	  pkgstr = pool_tmpjoin(pool, buf, 0, 0);
 	}
       else
@@ -2524,9 +2524,12 @@ testcase_read(Pool *pool, FILE *fp, const char *testcase, Queue *job, char **res
 	  else if (jobsel == SOLVER_SOLVABLE_REPO)
 	    {
 	      Repo *repo = pool_id2repo(pool, what);
-	      Solvable *s;
-	      FOR_REPO_SOLVABLES(repo, p, s)
-		MAPCLR(pool->considered, p);
+	      if (repo)
+		{
+		  Solvable *s;
+		  FOR_REPO_SOLVABLES(repo, p, s)
+		    MAPCLR(pool->considered, p);
+		}
 	    }
 	  FOR_JOB_SELECT(p, pp, jobsel, what)
 	    MAPCLR(pool->considered, p);
