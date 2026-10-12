@@ -1246,6 +1246,12 @@ rpmhead2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhe
 	    repodata_set_checksum(data, handle, SOLVABLE_HDRID, REPOKEY_TYPE_SHA1, str);
 	  else if (str && strlen(str) == 64)
 	    repodata_set_checksum(data, handle, SOLVABLE_HDRID, REPOKEY_TYPE_SHA256, str);
+	  else
+	    {
+	      str = headstring(rpmhead, TAG_SHA256HEADER);
+	      if (str && strlen(str) == 64)
+	        repodata_set_checksum(data, handle, SOLVABLE_HDRID, REPOKEY_TYPE_SHA256, str);
+	    }
 	}
       u32 = headint32(rpmhead, TAG_BUILDTIME);
       if (u32)
@@ -2063,6 +2069,15 @@ repo_add_rpm(Repo *repo, const char *rpm, int flags)
 	    {
 	      if (solv_hex2bin(&str, hdrid, 32) == 32)
 	        hdridtype = REPOKEY_TYPE_SHA256;
+	    }
+	  else
+	    {
+	      str = headstring(state.rpmhead, TAG_SHA256HEADER);
+	      if (str && strlen(str) == 64)
+	        {
+	          if (solv_hex2bin(&str, hdrid, 32) == 32)
+	            hdridtype = REPOKEY_TYPE_SHA256;
+	        }
 	    }
 	}
     }
