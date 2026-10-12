@@ -426,15 +426,14 @@ parse_signatures(struct parsedata *pd, struct solv_jsonparser *jp)
   int type = JP_OBJECT;
   while (type > 0 && (type = jsonparser_parse(jp)) > 0 && type != JP_OBJECT_END)
     {
-      struct sigdata *sd;
-      if (type != JP_OBJECT)
+      if (type == JP_OBJECT)
 	{
-	  type = jsonparser_skip(jp, type);
-	  continue;
+	  struct sigdata *sd = fn2sigdata(pd, jp->key, 1);
+	  sd->sigs = solv_free(sd->sigs);
+	  type = jsonparser_collect(jp, type, &sd->sigs);
 	}
-      sd = fn2sigdata(pd, jp->key, 1);
-      sd->sigs = solv_free(sd->sigs);
-      type = jsonparser_collect(jp, type, &sd->sigs);
+      else
+        type = jsonparser_skip(jp, type);
     }
   return type;
 }
