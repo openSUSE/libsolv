@@ -196,7 +196,7 @@ repo_add_cudf(Repo *repo, Repo *installedrepo, FILE *fp, Queue *job, int flags)
   bufl = 0;
   s = 0;
 
-  while (fgets(buf + bufl, bufa - bufl, fp) > 0)
+  while (fgets(buf + bufl, bufa - bufl, fp))
     {
       bufl += strlen(buf + bufl);
       if (bufl && buf[bufl - 1] != '\n')

@@ -210,7 +210,7 @@ add_missing_tags_from_desktop_file(struct parsedata *pd, Solvable *s, const char
     filepath = pool_prepend_rootdir_tmp(pool, filepath);
   if (!(fp = fopen(filepath, "r")))
     return;
-  while (fgets(buf, sizeof(buf), fp) > 0)
+  while (fgets(buf, sizeof(buf), fp))
     {
       int c, l = strlen(buf);
       if (!l)

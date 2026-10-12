@@ -94,7 +94,7 @@ repo_add_mdk(Repo *repo, FILE *fp, int flags)
   buf = solv_malloc(bufa);
   bufl = 0;
   s = 0;
-  while (fgets(buf + bufl, bufa - bufl, fp) > 0)
+  while (fgets(buf + bufl, bufa - bufl, fp))
     {
       bufl += strlen(buf + bufl);
       if (!bufl)
