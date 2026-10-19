@@ -2200,7 +2200,13 @@ testcase_read(Pool *pool, FILE *fp, const char *testcase, Queue *job, char **res
           bufl += 512;
 	}
       if (!fgets(bufp, bufl - (bufp - buf), fp))
-	break;
+	{
+	  /* EOF reached. Process last line if we have anything in the buffer */
+	  if (bufp == buf)
+	    break;
+	  *bufp++ = '\n';	/* we made sure there are 16 bytes free */
+	  *bufp = 0;
+	}
       bufp = buf;
       l = strlen(buf);
       if (!l || buf[l - 1] != '\n')
