@@ -400,7 +400,7 @@ adddep(Pool *pool, struct parsedata *pd, unsigned int olddeps, const char **atts
     k = 0;
   if (k)
     {
-      int l = strlen(k) + 1 + strlen(n) + 1;
+      size_t l = strlen(k) + 1 + strlen(n) + 1;
       char *space = solv_xmlparser_contentspace(&pd->xmlp, l);
       sprintf(space, "%s:%s", k, n);
       id = pool_str2id(pool, space, 1);
@@ -897,7 +897,7 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
 	      str = "/usr/src";
 	    else
 	      {
-		int l = strlen(str) + 2;
+		size_t l = strlen(str) + 2;
 		char *space = solv_xmlparser_contentspace(xmlp, l);
 		space[0] = '/';
 		memcpy(space + 1, str, l - 1);

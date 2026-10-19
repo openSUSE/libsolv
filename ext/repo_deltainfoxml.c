@@ -106,7 +106,7 @@ makeevr_atts(Pool *pool, struct parsedata *pd, const char **atts)
 {
   const char *e, *v, *r, *v2;
   char *c, *space;
-  int l;
+  size_t l;
 
   e = v = r = 0;
   for (; *atts; atts += 2)

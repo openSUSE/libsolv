@@ -377,15 +377,16 @@ solv_xmlparser_parse(struct solv_xmlparser *xmlp, FILE *fp)
 }
 
 char *
-solv_xmlparser_contentspace(struct solv_xmlparser *xmlp, int l)
+solv_xmlparser_contentspace(struct solv_xmlparser *xmlp, size_t l)
 {
   xmlp->lcontent = 0;
-  if (l > xmlp->acontent)
+  if (l > (size_t)xmlp->acontent)
     {
-      if ((unsigned int)l >= 0x40000000U)
+      if (l >= (size_t)0x40000000U)
 	solv_oom(0, l);
-      xmlp->acontent = l + 256; 
-      xmlp->content = solv_realloc(xmlp->content, xmlp->acontent);
+      l += 256;
+      xmlp->content = solv_realloc(xmlp->content, l);
+      xmlp->acontent = l;
     }
   return xmlp->content;
 }

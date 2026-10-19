@@ -164,7 +164,7 @@ static Id
 evr2id(Pool *pool, struct parsedata *pd, const char *e, const char *v, const char *r)
 {
   char *c, *space;
-  int l;
+  size_t l;
 
   /* treat explitcit 0 as NULL */
   if (e && (!*e || !strcmp(e, "0")))

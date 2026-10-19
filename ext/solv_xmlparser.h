@@ -53,6 +53,6 @@ extern void solv_xmlparser_init(struct solv_xmlparser *xmlp, struct solv_xmlpars
 extern void solv_xmlparser_free(struct solv_xmlparser *xmlp);
 extern int solv_xmlparser_parse(struct solv_xmlparser *xmlp, FILE *fp);
 unsigned int solv_xmlparser_lineno(struct solv_xmlparser *xmlp);
-char *solv_xmlparser_contentspace(struct solv_xmlparser *xmlp, int l);
+char *solv_xmlparser_contentspace(struct solv_xmlparser *xmlp, size_t l);
 
 
