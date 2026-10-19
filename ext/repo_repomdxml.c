@@ -150,7 +150,7 @@ struct parsedata {
 
   struct solv_xmlparser xmlp;
 
-  unsigned int timestamp;
+  unsigned long long timestamp;
   /* handles for collection
      structures */
   /* repo updates */
@@ -281,7 +281,7 @@ endElement(struct solv_xmlparser *xmlp, int state, char *content)
          * of all resources to save it as the time
          * the metadata was generated
          */
-        unsigned int timestamp = strtoull(content, 0, 10);
+        unsigned long long timestamp = strtoull(content, 0, 10);
 	if (timestamp)
           repodata_set_num(pd->data, pd->rdhandle, REPOSITORY_REPOMD_TIMESTAMP, timestamp);
         if (timestamp > pd->timestamp)

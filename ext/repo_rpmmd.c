@@ -845,7 +845,7 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
       break;
     case STATE_TIME:
       {
-        unsigned int ti;
+        unsigned long long ti;
         str = solv_xmlparser_find_attr("build", atts);
         if (str && (ti = strtoull(str, 0, 10)) != 0)
           repodata_set_num(pd->data, handle, SOLVABLE_BUILDTIME, ti);
@@ -859,7 +859,7 @@ startElement(struct solv_xmlparser *xmlp, int state, const char *name, const cha
       break;
     case STATE_HEADERRANGE:
       {
-        unsigned int end;
+        unsigned long long end;
         str = solv_xmlparser_find_attr("end", atts);
 	if (str && (end = strtoull(str, 0, 10)) != 0)
 	  repodata_set_num(pd->data, handle, SOLVABLE_HEADEREND, end);
