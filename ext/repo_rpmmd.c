@@ -506,7 +506,7 @@ free_cshash(struct parsedata *pd)
 static inline Hashval
 hashkey(const unsigned char *key, int keyl)
 {
-  return key[0] << 24 | key[1] << 16 | key[2] << 8 | key[3];
+  return (unsigned int)key[0] << 24 | key[1] << 16 | key[2] << 8 | key[3];
 }
 
 static void

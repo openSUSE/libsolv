@@ -209,7 +209,7 @@ set_checksum(struct parsedata *pd, Repodata *data, Id handle, Id keyname, char *
 
 /* Unfortunately "a"[0] is no constant expression in the C languages,
    so we need to pass the four characters individually :-/  */
-#define CTAG(a,b,c,d) ((unsigned)(((unsigned char)a) << 24) \
+#define CTAG(a,b,c,d) (((unsigned int)((unsigned char)a) << 24) \
  | ((unsigned char)b << 16) \
  | ((unsigned char)c << 8) \
  | ((unsigned char)d))
@@ -223,7 +223,7 @@ static inline unsigned int
 tag_from_string(char *cs)
 {
   unsigned char *s = (unsigned char *)cs;
-  return ((s[0] << 24) | (s[1] << 16) | (s[2] << 8) | s[3]);
+  return (((unsigned int)s[0] << 24) | (s[1] << 16) | (s[2] << 8) | s[3]);
 }
 
 

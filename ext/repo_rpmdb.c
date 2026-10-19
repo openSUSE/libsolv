@@ -215,8 +215,8 @@ headint32array(RpmHead *h, int tag, int *cnt)
 
   if (!d || d[4] != 0 || d[5] != 0 || d[6] != 0 || d[7] != 4)
     return 0;
-  o = d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
-  i = d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
+  o = (unsigned int)d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
+  i = (unsigned int)d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
   if (o > h->dcnt || i > h->dcnt || o + 4 * i > h->dcnt)
     return 0;
   d = h->dp + o;
@@ -224,7 +224,7 @@ headint32array(RpmHead *h, int tag, int *cnt)
   if (cnt)
     *cnt = i;
   for (o = 0; o < i; o++, d += 4)
-    r[o] = d[0] << 24 | d[1] << 16 | d[2] << 8 | d[3];
+    r[o] = (unsigned int)d[0] << 24 | d[1] << 16 | d[2] << 8 | d[3];
   return r;
 }
 
@@ -237,12 +237,12 @@ headint32(RpmHead *h, int tag)
 
   if (!d || d[4] != 0 || d[5] != 0 || d[6] != 0 || d[7] != 4)
     return 0;
-  o = d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
-  i = d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
+  o = (unsigned int)d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
+  i = (unsigned int)d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
   if (i == 0 || o > h->dcnt || i > h->dcnt || o + 4 * i > h->dcnt)
     return 0;
   d = h->dp + o;
-  return d[0] << 24 | d[1] << 16 | d[2] << 8 | d[3];
+  return (unsigned int)d[0] << 24 | d[1] << 16 | d[2] << 8 | d[3];
 }
 
 static uint64_t *
@@ -254,8 +254,8 @@ headint64array(RpmHead *h, int tag, int *cnt)
 
   if (!d || d[4] != 0 || d[5] != 0 || d[6] != 0 || d[7] != 5)
     return 0;
-  o = d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
-  i = d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
+  o = (unsigned int)d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
+  i = (unsigned int)d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
   if (o > h->dcnt || i > h->dcnt || o + 8 * i > h->dcnt)
     return 0;
   d = h->dp + o;
@@ -264,8 +264,8 @@ headint64array(RpmHead *h, int tag, int *cnt)
     *cnt = i;
   for (o = 0; o < i; o++, d += 8)
     {
-      uint32_t x = d[0] << 24 | d[1] << 16 | d[2] << 8 | d[3];
-      r[o] = (uint64_t)x << 32 | (uint32_t)(d[4] << 24 | d[5] << 16 | d[6] << 8 | d[7]);
+      uint32_t x = (unsigned int)d[0] << 24 | d[1] << 16 | d[2] << 8 | d[3];
+      r[o] = (uint64_t)x << 32 | (uint32_t)((unsigned int)d[4] << 24 | d[5] << 16 | d[6] << 8 | d[7]);
     }
   return r;
 }
@@ -280,13 +280,13 @@ headint64(RpmHead *h, int tag)
 
   if (!d || d[4] != 0 || d[5] != 0 || d[6] != 0 || d[7] != 5)
     return 0;
-  o = d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
-  i = d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
+  o = (unsigned int)d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
+  i = (unsigned int)d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
   if (i == 0 || o > h->dcnt || i > h->dcnt || o + 8 * i > h->dcnt)
     return 0;
   d = h->dp + o;
-  x = d[0] << 24 | d[1] << 16 | d[2] << 8 | d[3];
-  return (uint64_t)x << 32 | (uint32_t)(d[4] << 24 | d[5] << 16 | d[6] << 8 | d[7]);
+  x = (unsigned int)d[0] << 24 | d[1] << 16 | d[2] << 8 | d[3];
+  return (uint64_t)x << 32 | (uint32_t)((unsigned int)d[4] << 24 | d[5] << 16 | d[6] << 8 | d[7]);
 }
 
 static uint16_t *
@@ -298,8 +298,8 @@ headint16array(RpmHead *h, int tag, int *cnt)
 
   if (!d || d[4] != 0 || d[5] != 0 || d[6] != 0 || d[7] != 3)
     return 0;
-  o = d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
-  i = d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
+  o = (unsigned int)d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
+  i = (unsigned int)d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
   if (o > h->dcnt || i > h->dcnt || o + 2 * i > h->dcnt)
     return 0;
   d = h->dp + o;
@@ -319,7 +319,7 @@ headstring(RpmHead *h, int tag)
   /* 6: STRING, 9: I18NSTRING */
   if (!d || d[4] != 0 || d[5] != 0 || d[6] != 0 || (d[7] != 6 && d[7] != 9))
     return 0;
-  o = d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
+  o = (unsigned int)d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
   if (o >= h->dcnt)
     return 0;
   return (char *)h->dp + o;
@@ -334,8 +334,8 @@ headstringarray(RpmHead *h, int tag, int *cnt)
 
   if (!d || d[4] != 0 || d[5] != 0 || d[6] != 0 || d[7] != 8)
     return 0;
-  o = d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
-  i = d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
+  o = (unsigned int)d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
+  i = (unsigned int)d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
   if (o > h->dcnt || i > h->dcnt)
     return 0;
   r = solv_calloc(i ? i : 1, sizeof(char *));
@@ -363,8 +363,8 @@ headbinary(RpmHead *h, int tag, unsigned int *sizep)
   unsigned char *d = headfindtag(h, tag);
   if (!d || d[4] != 0 || d[5] != 0 || d[6] != 0 || d[7] != 7)
     return 0;
-  o = d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
-  i = d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
+  o = (unsigned int)d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
+  i = (unsigned int)d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
   if (o > h->dcnt || i > h->dcnt || o + i > h->dcnt)
     return 0;
   if (sizep)
@@ -379,8 +379,8 @@ headissourceheuristic(RpmHead *h)
   unsigned char *d = headfindtag(h, TAG_DIRNAMES);
   if (!d || d[4] != 0 || d[5] != 0 || d[6] != 0 || d[7] != 8)
     return 0;
-  o = d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
-  i = d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
+  o = (unsigned int)d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
+  i = (unsigned int)d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
   return i == 1 && o < h->dcnt && !h->dp[o] ? 1 : 0;
 }
 
@@ -1292,7 +1292,7 @@ rpmhead2solv(Pool *pool, Repo *repo, Repodata *data, Solvable *s, RpmHead *rpmhe
 static inline unsigned int
 getu32(const unsigned char *dp)
 {
-  return dp[0] << 24 | dp[1] << 16 | dp[2] << 8 | dp[3];
+  return (unsigned int)dp[0] << 24 | dp[1] << 16 | dp[2] << 8 | dp[3];
 }
 
 #ifdef ENABLE_RPMDB

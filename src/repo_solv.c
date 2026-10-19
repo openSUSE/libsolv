@@ -1481,10 +1481,10 @@ solv_read_userdata(FILE *fp, unsigned char **datap, int *lenp)
   unsigned int n;
   if (fread(d, sizeof(d), 1, fp) != 1)
     return SOLV_ERROR_EOF;
-  n = d[0] << 24 | d[1] << 16 | d[2] << 8 | d[3];
+  n = (unsigned int)d[0] << 24 | d[1] << 16 | d[2] << 8 | d[3];
   if (n != ('S' << 24 | 'O' << 16 | 'L' << 8 | 'V'))
     return SOLV_ERROR_NOT_SOLV;
-  n = d[4] << 24 | d[5] << 16 | d[6] << 8 | d[7];
+  n = (unsigned int)d[4] << 24 | d[5] << 16 | d[6] << 8 | d[7];
   switch(n)
     {
     case SOLV_VERSION_8:
@@ -1493,11 +1493,11 @@ solv_read_userdata(FILE *fp, unsigned char **datap, int *lenp)
     default:
       return SOLV_ERROR_UNSUPPORTED;
     }
-  n = d[32] << 24 | d[33] << 16 | d[34] << 8 | d[35];
+  n = (unsigned int)d[32] << 24 | d[33] << 16 | d[34] << 8 | d[35];
   if (!(n & SOLV_FLAG_USERDATA))
     n = 0;
   else
-    n = d[36] << 24 | d[37] << 16 | d[38] << 8 | d[39];
+    n = (unsigned int)d[36] << 24 | d[37] << 16 | d[38] << 8 | d[39];
   if (n >= 65536)
     return SOLV_ERROR_CORRUPT;
   if (n)

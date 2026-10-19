@@ -36,7 +36,7 @@
 static inline unsigned int
 adb_u32(const unsigned char *p)
 {
-  return p[0] | p[1] << 8 | p[2] << 16 | p[3] << 24;
+  return p[0] | p[1] << 8 | p[2] << 16 | (unsigned int)p[3] << 24;
 }
 
 static const unsigned char *
@@ -55,7 +55,7 @@ adb_blob(const unsigned char *adb, size_t adblen, unsigned int v, size_t *bloblp
   if (type > 9)
     {
       blobl |= adb[v++] << 16;
-      blobl |= adb[v++] << 24;
+      blobl |= (unsigned int)adb[v++] << 24;
     }
   if (blobl > adblen || v + blobl > adblen)
     return 0;
@@ -319,7 +319,7 @@ adb_read_blk_header(FILE *fp, unsigned long long *sizep)
   unsigned long long lsize;
   if (fread(buf, 4, 1, fp) != 1)
     return -1;
-  size = buf[0] | buf[1] << 8 | buf[2] << 16 | (buf[3] & 0x3f) << 24;
+  size = buf[0] | buf[1] << 8 | buf[2] << 16 | (unsigned int)(buf[3] & 0x3f) << 24;
   if ((buf[3] & 0xc0) != 0xc0)
     {
       if (size < 4)

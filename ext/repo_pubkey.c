@@ -410,7 +410,7 @@ pgpsig_init(struct pgpsig *sig, unsigned char *p, int l)
       sig->type = p[2];
       sig->haveissuer = 1;
       memcpy(sig->issuer, p + 7, 8);
-      sig->created = p[3] << 24 | p[4] << 16 | p[5] << 8 | p[6];
+      sig->created = (unsigned int)p[3] << 24 | p[4] << 16 | p[5] << 8 | p[6];
       sig->hashalgo = p[16];
       sig->mpioff = 19;
     }
@@ -459,11 +459,11 @@ pgpsig_init(struct pgpsig *sig, unsigned char *p, int l)
 		  memcpy(sig->issuer, q + 1, 8);
 		}
 	      if (x == 2 && sl == 5 && j == 0)
-		sig->created = q[1] << 24 | q[2] << 16 | q[3] << 8 | q[4];
+		sig->created = (unsigned int)q[1] << 24 | q[2] << 16 | q[3] << 8 | q[4];
 	      if (x == 3 && sl == 5 && j == 0)
-		sig->expires = q[1] << 24 | q[2] << 16 | q[3] << 8 | q[4];
+		sig->expires = (unsigned int)q[1] << 24 | q[2] << 16 | q[3] << 8 | q[4];
 	      if (x == 9 && sl == 5 && j == 0)
-		sig->keyexpires = q[1] << 24 | q[2] << 16 | q[3] << 8 | q[4];
+		sig->keyexpires = (unsigned int)q[1] << 24 | q[2] << 16 | q[3] << 8 | q[4];
 	      q += sl;
 	      ql -= sl;
 	    }
@@ -622,7 +622,7 @@ parsepubkey(Solvable *s, Repodata *data, unsigned char *p, int pl, int flags)
 	    {
 	      unsigned int ex;
 	      Chksum *h;
-	      maxsigcr = kcr = p[1] << 24 | p[2] << 16 | p[3] << 8 | p[4];
+	      maxsigcr = kcr = (unsigned int)p[1] << 24 | p[2] << 16 | p[3] << 8 | p[4];
 	      ex = 0;
 	      if (p[5] || p[6])
 		{
@@ -666,7 +666,7 @@ parsepubkey(Solvable *s, Repodata *data, unsigned char *p, int pl, int flags)
 	      unsigned char fp[20];
 	      char fpx[20 * 2 + 1];
 
-	      maxsigcr = kcr = p[1] << 24 | p[2] << 16 | p[3] << 8 | p[4];
+	      maxsigcr = kcr = (unsigned int)p[1] << 24 | p[2] << 16 | p[3] << 8 | p[4];
 	      hdr[0] = 0x99;
 	      hdr[1] = l >> 8;
 	      hdr[2] = l;
@@ -688,7 +688,7 @@ parsepubkey(Solvable *s, Repodata *data, unsigned char *p, int pl, int flags)
 	      unsigned char fp[32];
 	      char fpx[32 * 2 + 1];
 
-	      maxsigcr = kcr = p[1] << 24 | p[2] << 16 | p[3] << 8 | p[4];
+	      maxsigcr = kcr = (unsigned int)p[1] << 24 | p[2] << 16 | p[3] << 8 | p[4];
 	      hdr[0] = 0x9a;
 	      hdr[1] = l >> 24;
 	      hdr[2] = l >> 16;
