@@ -717,12 +717,18 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
   else
     {
       unsigned int pfsize = read_u32(&data);
-      char *prefix = solv_malloc(pfsize);
-      char *pp = prefix;
+      char *pp, *prefix;
       char *old_str = strsp;
       char *dest = strsp;
       int freesp = sizeid;
 
+      if (pfsize >= SOLV_MAX_INDEX)
+	{
+	  repodata_freedata(&data);
+	  return pool_error(pool, SOLV_ERROR_OVERFLOW, "overflow while expanding strings");
+	}
+      pp = prefix = solv_malloc(pfsize + 3);
+      prefix[pfsize] = prefix[pfsize + 1] = prefix[pfsize + 2] = 0;	/* catch buffer overruns */
       if (pfsize && fread(prefix, pfsize, 1, fp) != 1)
 	{
 	  solv_free(prefix);
@@ -734,7 +740,7 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
 	  int same = (unsigned char)*pp++;
 	  size_t len = strlen(pp) + 1;
 	  freesp -= same + len;
-	  if (freesp < 0)
+	  if (freesp < 0 || (same == 0 && len == 1 && pp - prefix >= pfsize))
 	    {
 	      solv_free(prefix);
 	      repodata_freedata(&data);
