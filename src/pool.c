@@ -197,6 +197,8 @@ pool_get_flag(Pool *pool, int flag)
       return pool->nowhatprovidesaux;
     case POOL_FLAG_WHATPROVIDESWITHDISABLED:
       return pool->whatprovideswithdisabled;
+    case POOL_FLAG_NOWHATPROVIDESSHRINK:
+     return pool->nowhatprovidesshrink;
     default:
       break;
     }
@@ -244,6 +246,9 @@ pool_set_flag(Pool *pool, int flag, int value)
       break;
     case POOL_FLAG_WHATPROVIDESWITHDISABLED:
       pool->whatprovideswithdisabled = value;
+      break;
+    case POOL_FLAG_NOWHATPROVIDESSHRINK:
+      pool->nowhatprovidesshrink = value;
       break;
     default:
       break;

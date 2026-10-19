@@ -166,6 +166,7 @@ struct s_Pool {
   int nonstd_nids;
 
   int whatprovideswithdisabled;
+  int nowhatprovidesshrink;	/* true: do not unify the whatprovides data */
 #endif
 };
 
@@ -206,6 +207,7 @@ struct s_Pool {
 #define POOL_FLAG_IMPLICITOBSOLETEUSESCOLORS		10
 #define POOL_FLAG_NOWHATPROVIDESAUX			11
 #define POOL_FLAG_WHATPROVIDESWITHDISABLED		12
+#define POOL_FLAG_NOWHATPROVIDESSHRINK			13
 
 /* ----------------------------------------------- */
 

@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Pool
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 08/01/2025
+.\"      Date: 10/19/2026
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-POOL" "3" "08/01/2025" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-POOL" "3" "10/19/2026" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -356,6 +356,11 @@ If a package is installed in multiversionmode, rpm used to ignore both the impli
 \fBPOOL_FLAG_ADDFILEPROVIDESFILTERED\fR
 .RS 4
 Make the addfileprovides method only add files from the standard locations (i\&.e\&. the \(lqbin\(rq and \(lqetc\(rq directories)\&. This is useful if you have only few packages that use non\-standard file dependencies, but you still want the fast speed that addfileprovides() generates\&.
+.RE
+.PP
+\fBPOOL_FLAG_NOWHATPROVIDESSHRINK\fR
+.RS 4
+Do not unify identical provider lists when the whatprovides index is created\&. This makes creating the index faster, at the price of using more memory\&.
 .RE
 .SS "Functions"
 .sp
