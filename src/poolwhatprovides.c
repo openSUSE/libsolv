@@ -161,6 +161,22 @@ pool_shrink_whatprovidesaux(Pool *pool)
   pool->whatprovidesauxdataoff = newoff;
 }
 
+static int
+pool_has_repo_with_filelist(Pool *pool)
+{
+  Repo *repo;
+  int i;
+  FOR_REPOS(i, repo)
+    {
+      Repodata *data;
+      int rdid;
+      FOR_REPODATAS(repo, i, data)
+	if (repodata_has_keyname(data, SOLVABLE_FILELIST))
+	  return 1;
+    }
+  return 0;
+}
+
 
 /*
  * pool_createwhatprovides()
@@ -306,6 +322,8 @@ pool_createwhatprovides(Pool *pool)
     POOL_DEBUG(SOLV_DEBUG_STATS, "whatprovidesaux memory used: %d K id array, %d K data\n", pool->whatprovidesauxoff / (int)(1024/sizeof(Id)), pool->whatprovidesauxdataoff / (int)(1024/sizeof(Id)));
 
   queue_empty(&pool->lazywhatprovidesq);
+  if (!pool->addedfileprovides && pool->disttype == DISTTYPE_RPM && !pool_has_repo_with_filelist(pool))
+    pool->addedfileprovides = 2;
   if (pool->addedfileprovides == 1)
     {
       /* lazyly add file provides for nonstd */
