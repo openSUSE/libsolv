@@ -889,6 +889,7 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
 	  repodata_freedata(&data);
 	  return pool_error(pool, SOLV_ERROR_OVERFLOW, "not enough strings");
 	}
+      pool_shrink_strings(pool);
     }
 
 

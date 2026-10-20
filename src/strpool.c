@@ -287,7 +287,6 @@ stringpool_integrate(Stringpool *ss, int numid, Offset sizeid, Id *idmap)
     }
   if ((unsigned int)ss->nstrings >= (unsigned int)SOLV_MAX_INDEX)
     solv_ovfl("string count overpool");
-  stringpool_shrink(ss);		/* vacuum */
   return 1;
 }
 
