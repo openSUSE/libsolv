@@ -196,48 +196,54 @@ stringpool_reserve(Stringpool *ss, int numid, Offset sizeid)
   ss->strings = solv_extend_resize(ss->strings, ss->nstrings + numid, sizeof(Offset), STRING_BLOCK);
 }
 
-int
-stringpool_integrate(Stringpool *ss, int numid, Offset sizeid, Id *idmap)
+/* this seems to be the sweet spot */
+#define INTEGRATE_SPOOL_CHUNK 16
+
+static char *
+integrate_chunk(Stringpool *ss, int numid, char *sp, char *endsp, Id *idmap)
 {
-  int oldnstrings = ss->nstrings;
-  Offset oldsstrings = ss->sstrings;
-  Offset *str;
+  unsigned int l, len[INTEGRATE_SPOOL_CHUNK];
+  Hashval hs[INTEGRATE_SPOOL_CHUNK];
+  Hashval h, hh;
+  Hashtable hashtbl = ss->stringhashtbl;
+  Hashval hashmask = ss->stringhashmask;
   Id id;
-  int i, l;
-  char *strsp, *sp;
-  Hashval hashmask, h, hh;
-  Hashtable hashtbl;
+  char *spstart = sp;
+  Offset *str = ss->strings;
+  int i;
 
-  stringpool_resize_hash(ss, numid);
-  hashtbl = ss->stringhashtbl;
-  hashmask = ss->stringhashmask;
-
-  /*
-   * run over new strings and merge with pool.
-   * we could use stringpool_str2id, but this is faster.
-   * also populate id map (maps solv Id -> pool Id)
-   */
-  str = ss->strings;
-  sp = strsp = ss->stringspace + ss->sstrings;
-  for (i = 1; i < numid; i++)
+  if (numid > INTEGRATE_SPOOL_CHUNK)
+    return 0;
+  for (i = 0; i < numid; i++)
     {
-      if (sp >= strsp + sizeid)
+      if (sp >= endsp)
+	return 0;
+      if (!*sp)
 	{
-	  ss->nstrings = oldnstrings;
-	  ss->sstrings = oldsstrings;
-	  stringpool_freehash(ss);
-	  stringpool_shrink(ss);	/* vacuum */
-	  return 0;
+	  len[i] = 0;
+	  hs[i] = 0;
+	  sp++;
+	  continue;
 	}
-      if (!*sp)				/* shortcut for empty strings */
+      l = (unsigned int)strlen(sp);
+      h = strnhash(sp, l) & hashmask;
+      solv_prefetch(hashtbl + h);
+      len[i] = l;
+      hs[i] = h;
+      sp += l + 1;
+    }
+  sp = spstart;
+  for (i = 0; i < numid; i++)
+    {
+      l = len[i];
+      if (!l)
 	{
 	  idmap[i] = STRID_EMPTY;
 	  sp++;
 	  continue;
 	}
-
-      /* find hash slot */
-      h = strhash(sp) & hashmask;
+      l++;
+      h = hs[i];
       hh = HASHCHAIN_START;
       for (;;)
 	{
@@ -248,9 +254,6 @@ stringpool_integrate(Stringpool *ss, int numid, Offset sizeid, Id *idmap)
 	    break;			/* already in pool */
 	  h = HASHCHAIN_NEXT(h, hh, hashmask);
 	}
-
-      /* length == offset to next string */
-      l = strlen(sp) + 1;
       if (!id)				/* end of hash chain -> new string */
 	{
 	  id = ss->nstrings++;
@@ -262,6 +265,25 @@ stringpool_integrate(Stringpool *ss, int numid, Offset sizeid, Id *idmap)
 	}
       idmap[i] = id;			/* repo relative -> pool relative */
       sp += l;				/* next string */
+    }
+  return sp;
+}
+
+int
+stringpool_integrate(Stringpool *ss, int numid, Offset sizeid, Id *idmap)
+{
+  char *sp = ss->stringspace + ss->sstrings;
+  char *endsp = sp + sizeid;
+  int i;
+
+  stringpool_resize_hash(ss, numid);
+  for (i = 1; i < numid;)
+    {
+      int chunk = numid - i > INTEGRATE_SPOOL_CHUNK ? INTEGRATE_SPOOL_CHUNK : numid - i;
+      sp = integrate_chunk(ss, chunk, sp, endsp, idmap + i);
+      if (!sp)
+	return 0;
+      i += chunk;
     }
   if ((unsigned int)ss->nstrings >= (unsigned int)SOLV_MAX_INDEX)
     solv_ovfl("string count overpool");

@@ -45,10 +45,18 @@ extern char *solv_latin1toutf8(const char *buf);
 extern char *solv_replacebadutf8(const char *buf, int replchar);
 
 #ifdef LIBSOLV_INTERNAL
-/* our index values are 32 bit signed integers. We use a bit less than the
+
+/* our index values are 32 bit signed integers. We use less than the
  * maximum value to allow for a bit of overshooting */
 #define SOLV_MAX_INDEX 0x7fff0000
 extern void solv_ovfl(const char *);
+
+#if defined(__GNUC__) || defined(__clang__)
+#define solv_prefetch(p) __builtin_prefetch(p)
+#else
+#define solv_prefetch(p)
+#endif
+
 #endif
 
 

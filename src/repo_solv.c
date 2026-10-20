@@ -529,6 +529,100 @@ incore_add_u8(Repodata *data, unsigned int x)
 #endif
 
 
+/* this seems to be the sweet spot */
+#define INTEGRATE_RELS_CHUNK 16
+
+static int
+repo_read_and_integrate_rels(Repo *repo, Repodata *data, int numid, int numrel, Id *idmap)
+{
+  Pool *pool = repo->pool;
+  Reldep *ran;
+  Id id;
+  int i, j;
+  Hashval hashmask, h, hh;
+  Hashtable hashtbl;
+
+  /* extend rels */
+  pool->rels = solv_realloc2(pool->rels, pool->nrels + numrel, sizeof(Reldep));
+  ran = pool->rels;
+
+  pool_resize_rels_hash(pool, numrel);
+  hashtbl = pool->relhashtbl;
+  hashmask = pool->relhashmask;
+#if 0
+  POOL_DEBUG(SOLV_DEBUG_STATS, "read %d rels\n", numrel);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "rel hash buckets: %u\n", hashmask + 1);
+#endif
+
+  /*
+   * read RelDeps from repo
+   */
+  for (i = 0; i < numrel;)
+    {
+      Reldep rd[INTEGRATE_RELS_CHUNK];
+      unsigned char delaymap[INTEGRATE_RELS_CHUNK];
+      int chunk = numrel - i > INTEGRATE_RELS_CHUNK ? INTEGRATE_RELS_CHUNK : numrel - i;
+      for (j = 0; j < chunk; j++)
+	{
+	  rd[j].name = read_id(data, numid + i + j);
+	  rd[j].evr = read_id(data, numid + i + j);
+	  rd[j].flags = read_u8(data);
+	  solv_prefetch(idmap + rd[j].name);
+	  solv_prefetch(idmap + rd[j].evr);
+	}
+      memset(delaymap, 0, sizeof(delaymap));
+      for (j = 0; j < chunk; j++)
+	{
+	  Id name = rd[j].name;
+	  Id evr = rd[j].evr;
+	  if (name >= numid + i || evr >= numid + i)
+	    {
+	      delaymap[j] = 1;	/* this should be very rare */
+	      continue;
+	    }
+  	  rd[j].name = name = idmap[name];
+  	  rd[j].evr = evr = idmap[evr];
+	  h = relhash(name, evr, rd[j].flags) & hashmask;
+	  solv_prefetch(hashtbl + h);
+	}
+      for (j = 0; j < chunk; j++)
+	{
+	  Id name = rd[j].name, evr = rd[j].evr;
+	  int flags = rd[j].flags;
+	  if (delaymap[j])
+	    {
+	      name = idmap[name];
+	      evr = idmap[evr];
+	    }
+	  h = relhash(name, evr, flags) & hashmask;
+	  hh = HASHCHAIN_START;
+	  for (;;)
+	    {
+	      id = hashtbl[h];
+	      if (!id)		/* end of hash chain reached */
+		break;
+	      if (ran[id].name == name && ran[id].evr == evr && ran[id].flags == flags)
+		break;
+	      h = HASHCHAIN_NEXT(h, hh, hashmask);
+	    }
+	  if (!id)		/* new RelDep */
+	    {
+	      id = pool->nrels++;
+	      hashtbl[h] = id;
+	      ran[id].name = name;
+	      ran[id].evr = evr;
+	      ran[id].flags = flags;
+	    }
+	  idmap[numid + i + j] = MAKERELDEP(id);   /* fill Id map */
+	}
+      i += chunk;
+    }
+  if ((unsigned int)pool->nrels >= (unsigned int)SOLV_MAX_INDEX)
+    solv_ovfl("relation count overflow");
+  pool_shrink_rels(pool);		/* vacuum */
+}
+
+
 /*******************************************************************************
  * our main function
  */
@@ -549,11 +643,7 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
   char *strsp;			       /* repo string space */
   Id *idmap;			       /* map of repo Ids to pool Ids */
   Id id, type;
-  Hashval hashmask, h, hh;
-  Hashtable hashtbl;
-  Id name, evr, did;
-  int relflags;
-  Reldep *ran;
+  Id did;
   unsigned int size_idarray;
   Id *idarraydatap, *idarraydataend;
   Offset ido;
@@ -810,54 +900,7 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
    */
 
   if (numrel)
-    {
-      /* extend rels */
-      pool->rels = solv_realloc2(pool->rels, pool->nrels + numrel, sizeof(Reldep));
-      ran = pool->rels;
-
-      pool_resize_rels_hash(pool, numrel);
-      hashtbl = pool->relhashtbl;
-      hashmask = pool->relhashmask;
-#if 0
-      POOL_DEBUG(SOLV_DEBUG_STATS, "read %d rels\n", numrel);
-      POOL_DEBUG(SOLV_DEBUG_STATS, "rel hash buckets: %d\n", hashmask + 1);
-#endif
-
-      /*
-       * read RelDeps from repo
-       */
-      for (i = 0; i < numrel; i++)
-	{
-	  name = read_id(&data, i + numid);	/* read (repo relative) Ids */
-	  evr = read_id(&data, i + numid);
-	  relflags = read_u8(&data);
-	  name = idmap[name];		/* map to (pool relative) Ids */
-	  evr = idmap[evr];
-	  h = relhash(name, evr, relflags) & hashmask;
-	  hh = HASHCHAIN_START;
-	  for (;;)
-	    {
-	      id = hashtbl[h];
-	      if (!id)		/* end of hash chain reached */
-		break;
-	      if (ran[id].name == name && ran[id].evr == evr && ran[id].flags == relflags)
-		break;
-	      h = HASHCHAIN_NEXT(h, hh, hashmask);
-	    }
-	  if (!id)		/* new RelDep */
-	    {
-	      id = pool->nrels++;
-	      hashtbl[h] = id;
-	      ran[id].name = name;
-	      ran[id].evr = evr;
-	      ran[id].flags = relflags;
-	    }
-	  idmap[i + numid] = MAKERELDEP(id);   /* fill Id map */
-	}
-      if ((unsigned int)pool->nrels >= (unsigned int)SOLV_MAX_INDEX)
-	solv_ovfl("relation count overflow");
-      pool_shrink_rels(pool);		/* vacuum */
-    }
+    repo_read_and_integrate_rels(repo, &data, numid, numrel, idmap);
 
   /* if we added ids/rels, make room in our whatprovide arrays */
   if (!(flags & REPO_LOCALPOOL))
