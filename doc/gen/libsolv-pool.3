@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Pool
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 10/19/2026
+.\"      Date: 10/21/2026
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-POOL" "3" "10/19/2026" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-POOL" "3" "10/21/2026" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -751,6 +751,30 @@ Convert an Id back into a string\&. If the passed Id belongs to a relation, a st
 .\}
 .sp
 Free the hashes used to unify strings and relations\&. You can use this function to save memory if you know that you will no longer create new strings and relations\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid pool_get_idcounts(Pool *\fR\fIpool\fR\fB, unsigned int *\fR\fInstringsp\fR\fB, unsigned int *\fR\fInrelsp\fR\fB)\fR;
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return the number of string Ids and relation Ids currently in the pool\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid pool_presize_idhashes(Pool *\fR\fIpool\fR\fB, unsigned int\fR \fInstrings\fR\fB, unsigned int\fR \fInrels\fR\fB)\fR;
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Presize the hashes so that nstrings/nrels new strings/relations can be added without needing to grow the hashes\&.
 .SH "SOLVABLE FUNCTIONS"
 .sp
 .if n \{\

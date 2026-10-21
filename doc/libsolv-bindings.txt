@@ -901,6 +901,21 @@ Convert a dependency id into a string. If the id is just a string, this
 function has the same effect as id2str(). For relational dependencies, the
 result is the correct ``name relation evr'' string.
 
+	unsigned int get_idcounts(unsigned int *OUTPUT)
+	my ($nstrings, $nrels) = $pool->get_idcounts();
+	nstrings, nrels = pool.get_idcounts()
+	location, mediano = pool.get_idcounts()
+
+Return the number of string Ids and relation Ids currently in the pool.
+
+	void presize_idhashes(unsigned int nstrings, unsigned int nrels)
+	$pool->presize_idhashes($nstrings, $nrels);
+	pool.presize_idhashes(nstrings, nrels)
+	pool.presize_idhashes(nstrings, nrels)
+
+Presize the hashes so that nstrings/nrels new strings/relations can be
+added without needing to grow the hashes.
+
 
 The Dependency Class
 --------------------

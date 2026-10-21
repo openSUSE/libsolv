@@ -2,12 +2,12 @@
 .\"     Title: Libsolv-Bindings
 .\"    Author: [see the "Author" section]
 .\" Generator: DocBook XSL Stylesheets vsnapshot <http://docbook.sf.net/>
-.\"      Date: 10/19/2026
+.\"      Date: 10/21/2026
 .\"    Manual: LIBSOLV
 .\"    Source: libsolv
 .\"  Language: English
 .\"
-.TH "LIBSOLV\-BINDINGS" "3" "10/19/2026" "libsolv" "LIBSOLV"
+.TH "LIBSOLV\-BINDINGS" "3" "10/21/2026" "libsolv" "LIBSOLV"
 .\" -----------------------------------------------------------------
 .\" * Define some portability stuff
 .\" -----------------------------------------------------------------
@@ -1638,6 +1638,36 @@ Create a language specific Id from some other id\&. This function simply convert
 .\}
 .sp
 Convert a dependency id into a string\&. If the id is just a string, this function has the same effect as id2str()\&. For relational dependencies, the result is the correct \(lqname relation evr\(rq string\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBunsigned int get_idcounts(unsigned int *\fR\fIOUTPUT\fR\fB)\fR
+my \fB(\fR\fI$nstrings\fR\fB,\fR \fI$nrels\fR\fB) =\fR \fI$pool\fR\fB\->get_idcounts()\fR;
+\fInstrings\fR\fB,\fR \fInrels\fR \fB=\fR \fIpool\fR\fB\&.get_idcounts()\fR
+\fIlocation\fR\fB,\fR \fImediano\fR \fB=\fR \fIpool\fR\fB\&.get_idcounts()\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Return the number of string Ids and relation Ids currently in the pool\&.
+.sp
+.if n \{\
+.RS 4
+.\}
+.nf
+\fBvoid presize_idhashes(unsigned int\fR \fInstrings\fR\fB, unsigned int\fR \fInrels\fR\fB)\fR
+\fI$pool\fR\fB\->presize_idhashes(\fR\fI$nstrings\fR\fB,\fR \fI$nrels\fR\fB)\fR;
+\fIpool\fR\fB\&.presize_idhashes(\fR\fInstrings\fR\fB,\fR \fInrels\fR\fB)\fR
+\fIpool\fR\fB\&.presize_idhashes(\fR\fInstrings\fR\fB,\fR \fInrels\fR\fB)\fR
+.fi
+.if n \{\
+.RE
+.\}
+.sp
+Presize the hashes so that nstrings/nrels new strings/relations can be added without needing to grow the hashes\&.
 .SH "THE DEPENDENCY CLASS"
 .sp
 The dependency class is an object orientated way to work with strings and dependencies\&. Internally, dependencies are represented as Ids, i\&.e\&. simple numbers\&. Dependency objects can be constructed by using the Pool\(cqs Dep() method\&.

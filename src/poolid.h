@@ -42,8 +42,14 @@ extern void pool_shrink_strings(Pool *pool);
 extern void pool_shrink_rels(Pool *pool);
 extern void pool_freeidhashes(Pool *pool);
 
-extern void pool_resize_rels_hash(Pool *pool, int numnew);	/* internal */
-extern void pool_init_rels(Pool *pool);				/* internal */
+extern void pool_get_idcounts(Pool *pool, unsigned int *nstringsp, unsigned int *nrelsp);
+extern void pool_presize_idhashes(Pool *pool, unsigned int nstrings, unsigned int nrels);
+
+#ifdef LIBSOLV_INTERNAL
+extern void pool_resize_rels_hash(Pool *pool, int numnew);
+extern void pool_init_rels(Pool *pool);
+#endif
+
 
 #ifdef __cplusplus
 }

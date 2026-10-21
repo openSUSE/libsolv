@@ -478,3 +478,8 @@ SOLV_1.3 {
 		solv_setcloexec;
 		pool_conda_matchspec;
 } SOLV_1.2;
+
+SOLV_1.4 {
+		pool_get_idcount;
+		pool_presize_idhashes;
+} SOLV_1.3;

@@ -2534,6 +2534,17 @@ returnself(matchsolvable)
     return q;
   }
 
+  void presize_idhashes(unsigned int nstrings, unsigned int nrels) {
+    pool_presize_idhashes($self, nstrings, nrels);
+  }
+
+  unsigned int get_idcounts(unsigned int *OUTPUT) {
+    unsigned int nstrings, nrels;
+    pool_get_idcounts($self, &nstrings, &nrels);
+    *OUTPUT = nrels;
+    return nstrings;
+  }
+
 }
 
 %extend Repo {

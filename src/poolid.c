@@ -374,7 +374,8 @@ void
 pool_shrink_strings(Pool *pool)
 {
   /* free excessive big hashes */
-  if (pool->ss.stringhashmask && pool->ss.stringhashmask > mkmask(pool->ss.nstrings + 8192))
+  int nstrings = pool->ss.nstrings > pool->presize_nstrings ? pool->ss.nstrings : pool->presize_nstrings;
+  if (pool->ss.stringhashmask && pool->ss.stringhashmask > mkmask(nstrings + 8192))
     stringpool_freehash(&pool->ss);
   stringpool_shrink(&pool->ss);
 }
@@ -383,7 +384,8 @@ void
 pool_shrink_rels(Pool *pool)
 {
   /* free excessive big hashes */
-  if (pool->relhashmask && pool->relhashmask > mkmask(pool->nrels + 4096))
+  int nrels = pool->nrels > pool->presize_nrels ? pool->nrels : pool->presize_nrels;
+  if (pool->relhashmask && pool->relhashmask > mkmask(nrels + 4096))
     pool_free_rels_hash(pool);
   pool->rels = solv_extend_resize(pool->rels, pool->nrels, sizeof(Reldep), REL_BLOCK);
 }
@@ -394,6 +396,35 @@ pool_freeidhashes(Pool *pool)
 {
   stringpool_freehash(&pool->ss);
   pool_free_rels_hash(pool);
+}
+
+void
+pool_get_idcounts(Pool *pool, unsigned int *nstringsp, unsigned int *nrelsp)
+{
+  if (nstringsp)
+    *nstringsp = (unsigned int)pool->ss.nstrings;
+  if (nrelsp)
+    *nrelsp = (unsigned int)pool->nrels;
+}
+
+#define MAX_IDHASH_PRESIZE 0x20000000		/* somewhat arbitrary */
+
+void
+pool_presize_idhashes(Pool *pool, unsigned int nstrings, unsigned int nrels)
+{
+  /* limit to some sane number */
+  if (nstrings > MAX_IDHASH_PRESIZE)
+    nstrings = MAX_IDHASH_PRESIZE;
+  if (nrels > MAX_IDHASH_PRESIZE)
+    nrels = MAX_IDHASH_PRESIZE;
+  pool->presize_nstrings = pool->ss.nstrings + (int)nstrings;
+  pool->presize_nrels = pool->nrels + (int)nrels;
+  pool_shrink_strings(pool);
+  pool_shrink_rels(pool);
+  if (nstrings)
+    stringpool_resize_hash(&pool->ss, (int)nstrings);
+  if (nrels)
+    pool_resize_rels_hash(pool, (int)nrels);
 }
 
 /* EOF */

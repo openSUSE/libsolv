@@ -167,6 +167,9 @@ struct s_Pool {
 
   int whatprovideswithdisabled;
   int nowhatprovidesshrink;	/* true: do not unify the whatprovides data */
+
+  int presize_nstrings;		/* set by pool_presize_ids */
+  int presize_nrels;		/* set by pool_presize_ids */
 #endif
 };
 

@@ -494,6 +494,15 @@ Free the hashes used to unify strings and relations. You can use this
 function to save memory if you know that you will no longer create new
 strings and relations.
 
+	void pool_get_idcounts(Pool *pool, unsigned int *nstringsp, unsigned int *nrelsp);
+
+Return the number of string Ids and relation Ids currently in the pool.
+
+	void pool_presize_idhashes(Pool *pool, unsigned int nstrings, unsigned int nrels);
+
+Presize the hashes so that nstrings/nrels new strings/relations can be
+added without needing to grow the hashes.
+
 
 Solvable functions
 ------------------
