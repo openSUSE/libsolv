@@ -482,4 +482,5 @@ SOLV_1.3 {
 SOLV_1.4 {
 		pool_get_idcount;
 		pool_presize_idhashes;
+		solv_read_idcounts;
 } SOLV_1.3;

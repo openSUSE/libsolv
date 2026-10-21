@@ -24,6 +24,8 @@ extern "C" {
 
 extern int repo_add_solv(Repo *repo, FILE *fp, int flags);
 extern int solv_read_userdata(FILE *fp, unsigned char **datap, int *lenp);
+extern int solv_read_idcounts(FILE *fp, unsigned int *nstringsp, unsigned int *nrelsp);
+
 
 #define SOLV_ADD_NO_STUBS	(1 << 8)
 

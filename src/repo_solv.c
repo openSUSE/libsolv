@@ -697,7 +697,7 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
   repopagestore_init(&data.store);
 
   if (read_u32(&data) != ('S' << 24 | 'O' << 16 | 'L' << 8 | 'V'))
-     return pool_error(pool, SOLV_ERROR_NOT_SOLV, "not a SOLV file");
+    return pool_error(pool, SOLV_ERROR_NOT_SOLV, "not a SOLV file");
   solvversion = read_u32(&data);
   switch (solvversion)
     {
@@ -1524,12 +1524,12 @@ data_error:
   return 0;
 }
 
-int
-solv_read_userdata(FILE *fp, unsigned char **datap, int *lenp)
+#define SOLV_HEAD_SIZE (4 * 10)
+static int
+read_solv_head(FILE *fp, unsigned char *d)
 {
-  unsigned char d[4 * 10], *ud = 0;
   unsigned int n;
-  if (fread(d, sizeof(d), 1, fp) != 1)
+  if (fread(d, SOLV_HEAD_SIZE, 1, fp) != 1)
     return SOLV_ERROR_EOF;
   n = (unsigned int)d[0] << 24 | d[1] << 16 | d[2] << 8 | d[3];
   if (n != ('S' << 24 | 'O' << 16 | 'L' << 8 | 'V'))
@@ -1543,6 +1543,20 @@ solv_read_userdata(FILE *fp, unsigned char **datap, int *lenp)
     default:
       return SOLV_ERROR_UNSUPPORTED;
     }
+  return 0;
+}
+
+int
+solv_read_userdata(FILE *fp, unsigned char **datap, int *lenp)
+{
+  unsigned char d[SOLV_HEAD_SIZE], *ud = 0;
+  unsigned int n;
+  int err;
+  *datap = NULL;
+  if (lenp)
+    *lenp = 0;
+  if ((err = read_solv_head(fp, d)) != 0)
+    return err;
   n = (unsigned int)d[32] << 24 | d[33] << 16 | d[34] << 8 | d[35];
   if (!(n & SOLV_FLAG_USERDATA))
     n = 0;
@@ -1564,4 +1578,24 @@ solv_read_userdata(FILE *fp, unsigned char **datap, int *lenp)
   if (lenp)
     *lenp = (int)n;
   return 0;
+}
+
+int
+solv_read_idcounts(FILE *fp, unsigned int *nstringsp, unsigned int *nrelsp)
+{
+  unsigned char d[SOLV_HEAD_SIZE];
+  unsigned int nstrings = 0, nrels = 0;
+  int err;
+  if ((err = read_solv_head(fp, d)) == 0)
+    {
+      nstrings = (unsigned int)d[8] << 24 | d[9] << 16 | d[10] << 8 | d[11];
+      nrels = (unsigned int)d[12] << 24 | d[13] << 16 | d[14] << 8 | d[15];
+      if (nstrings >= 0x20000000 || nrels >= 0x20000000)	/* same as in repo_add_solv */
+	err = SOLV_ERROR_CORRUPT;
+    }
+  if (nstringsp)
+    *nstringsp = err ? 0 : nstrings;
+  if (nrelsp)
+    *nrelsp = err ? 0 : nrels;
+  return err;
 }
