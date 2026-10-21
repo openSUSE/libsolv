@@ -530,9 +530,10 @@ incore_add_u8(Repodata *data, unsigned int x)
 
 
 /* this seems to be the sweet spot */
+/* must be <= 32 because we use the bits of an unsigned int! */
 #define INTEGRATE_RELS_CHUNK 16
 
-static int
+static void
 repo_read_and_integrate_rels(Repo *repo, Repodata *data, int numid, int numrel, Id *idmap)
 {
   Pool *pool = repo->pool;
@@ -560,7 +561,7 @@ repo_read_and_integrate_rels(Repo *repo, Repodata *data, int numid, int numrel, 
   for (i = 0; i < numrel;)
     {
       Reldep rd[INTEGRATE_RELS_CHUNK];
-      unsigned char delaymap[INTEGRATE_RELS_CHUNK];
+      unsigned int delayed = 0;
       int chunk = numrel - i > INTEGRATE_RELS_CHUNK ? INTEGRATE_RELS_CHUNK : numrel - i;
       for (j = 0; j < chunk; j++)
 	{
@@ -570,14 +571,13 @@ repo_read_and_integrate_rels(Repo *repo, Repodata *data, int numid, int numrel, 
 	  solv_prefetch(idmap + rd[j].name);
 	  solv_prefetch(idmap + rd[j].evr);
 	}
-      memset(delaymap, 0, sizeof(delaymap));
       for (j = 0; j < chunk; j++)
 	{
 	  Id name = rd[j].name;
 	  Id evr = rd[j].evr;
 	  if (name >= numid + i || evr >= numid + i)
 	    {
-	      delaymap[j] = 1;	/* this should be very rare */
+	      delayed |= 1 << j;	/* this should be very rare */
 	      continue;
 	    }
   	  rd[j].name = name = idmap[name];
@@ -589,7 +589,7 @@ repo_read_and_integrate_rels(Repo *repo, Repodata *data, int numid, int numrel, 
 	{
 	  Id name = rd[j].name, evr = rd[j].evr;
 	  int flags = rd[j].flags;
-	  if (delaymap[j])
+	  if (delayed && (delayed & (1 << j)) != 0)
 	    {
 	      name = idmap[name];
 	      evr = idmap[evr];
