@@ -170,7 +170,7 @@ pool_has_repo_with_filelist(Pool *pool)
     {
       Repodata *data;
       int rdid;
-      FOR_REPODATAS(repo, i, data)
+      FOR_REPODATAS(repo, rdid, data)
 	if (repodata_has_keyname(data, SOLVABLE_FILELIST))
 	  return 1;
     }
