@@ -74,7 +74,7 @@ stringpool_clone(Stringpool *ss, Stringpool *from)
   ss->sstrings = from->sstrings;
 }
 
-static void
+void
 stringpool_resize_hash(Stringpool *ss, int numnew)
 {
   Hashval h, hh, hashmask;

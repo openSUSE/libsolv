@@ -39,8 +39,13 @@ Id stringpool_strn2id(Stringpool *ss, const char *str, unsigned int len, int cre
 
 void stringpool_shrink(Stringpool *ss);
 
+#ifdef LIBSOLV_INTERNAL
+
 void stringpool_reserve(Stringpool *ss, int numid, Offset sizeid);
 int stringpool_integrate(Stringpool *ss, int numid, Offset sizeid, Id *idmap);
+void stringpool_resize_hash(Stringpool *ss, int numnew);
+
+#endif
 
 
 static inline const char *
