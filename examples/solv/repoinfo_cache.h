@@ -10,3 +10,5 @@ extern void calc_cookie_stat(struct stat *stb, Id chktype, unsigned char *cookie
 extern int usecachedrepo(struct repoinfo *cinfo, const char *repoext, int mark);
 extern void  writecachedrepo(struct repoinfo *cinfo, const char *repoext, Repodata *repodata);
 
+extern int get_idcounts_cachedrepo(Pool *pool, struct repoinfo *cinfo, unsigned int *nstringsp, unsigned int *nrelsp);
+

@@ -229,7 +229,30 @@ read_repos(Pool *pool, struct repoinfo *repoinfos, int nrepoinfos)
   Repo *repo;
   int i;
   Pool *sigpool = 0;
+  int nenabled = 0;
 
+  for (i = 0; i < nrepoinfos; i++)
+    if (repoinfos[i].enabled)
+      nenabled++;
+  if (!nenabled)
+    return;
+  if (nenabled > 1)
+    {
+      unsigned int nstringssum = 0, nrelssum = 0;
+      for (i = 0; i < nrepoinfos; i++)
+	{
+	  struct repoinfo *cinfo = repoinfos + i;
+	  unsigned int nstrings = 0, nrels = 0;
+	  if (!cinfo->enabled)
+	    continue;
+	  if (get_idcounts_cachedrepo(pool, cinfo, &nstrings, &nrels) != 0)
+	    continue;
+	  nstringssum += nstrings;
+	  nrelssum += nrels;
+	}
+      if (nstringssum > 10000 || nrelssum > 10000)
+        pool_presize_idhashes(pool, nstringssum, nrelssum);
+    }
   for (i = 0; i < nrepoinfos; i++)
     {
       struct repoinfo *cinfo = repoinfos + i;

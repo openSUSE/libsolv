@@ -55,24 +55,24 @@ calc_cookie_stat(struct stat *stb, Id chktype, unsigned char *cookie, unsigned c
   solv_chksum_free(h, out);
 }
 
-char *
-calc_cachepath(Repo *repo, const char *repoext, int forcesystemloc)
+static char *
+calc_cachepath_internal(Pool *pool, const char *reponame, const char *repoext, int forcesystemloc)
 {
   char *q, *p;
   int l;
   if (!forcesystemloc && userhome && getuid())
-    p = pool_tmpjoin(repo->pool, userhome, "/.solvcache/", 0);
+    p = pool_tmpjoin(pool, userhome, "/.solvcache/", 0);
   else
-    p = pool_tmpjoin(repo->pool, SOLVCACHE_PATH, "/", 0);
+    p = pool_tmpjoin(pool, SOLVCACHE_PATH, "/", 0);
   l = strlen(p);
-  p = pool_tmpappend(repo->pool, p, repo->name, 0);
+  p = pool_tmpappend(pool, p, reponame, 0);
   if (repoext)
     {
-      p = pool_tmpappend(repo->pool, p, "_", repoext);
-      p = pool_tmpappend(repo->pool, p, ".solvx", 0);
+      p = pool_tmpappend(pool, p, "_", repoext);
+      p = pool_tmpappend(pool, p, ".solvx", 0);
     }
   else
-    p = pool_tmpappend(repo->pool, p, ".solv", 0);
+    p = pool_tmpappend(pool, p, ".solv", 0);
   q = p + l;
   if (*q == '.')
     *q = '_';
@@ -80,6 +80,12 @@ calc_cachepath(Repo *repo, const char *repoext, int forcesystemloc)
     if (*q == '/')
       *q = '_';
   return p;
+}
+
+char *
+calc_cachepath(Repo *repo, const char *repoext, int forcesystemloc)
+{
+  return calc_cachepath_internal(repo->pool, repo->name, repoext, forcesystemloc);
 }
 
 int
@@ -288,3 +294,18 @@ writecachedrepo(struct repoinfo *cinfo, const char *repoext, Repodata *repodata)
   free(tmpl);
 }
 
+int
+get_idcounts_cachedrepo(Pool *pool, struct repoinfo *cinfo, unsigned int *nstringsp, unsigned int *nrelsp)
+{
+  FILE *fp;
+  int ret;
+  *nstringsp = *nrelsp = 0;
+  fp = fopen(calc_cachepath_internal(pool, cinfo->alias, NULL, 0), "r");
+  if (!fp && userhome && getuid())
+    fp = fopen(calc_cachepath_internal(pool, cinfo->alias, NULL, 1), "r");
+  if (!fp)
+    return 0;
+  ret = solv_read_idcounts(fp, nstringsp, nrelsp);
+  fclose(fp);
+  return ret;
+}
