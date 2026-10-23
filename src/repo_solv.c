@@ -1037,7 +1037,7 @@ repo_add_solv(Repo *repo, FILE *fp, int flags)
   for (i = 1; i < numschemata; i++)
     {
       schemata[i] = schemadatap - schemadata;
-      schemadatap = read_idarray(&data, numid, 0, schemadatap, schemadataend);
+      schemadatap = read_idarray(&data, numkeys, 0, schemadatap, schemadataend);
 #if 0
       Id *sp = schemadata + schemata[i];
       fprintf(stderr, "schema %d:", i);
