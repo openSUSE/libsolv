@@ -533,27 +533,52 @@ incore_add_u8(Repodata *data, unsigned int x)
 /* must be <= 32 because we use the bits of an unsigned int! */
 #define INTEGRATE_RELS_CHUNK 16
 
-static void
-repo_read_and_integrate_rels(Repo *repo, Repodata *data, int numid, int numrel, Id *idmap)
+static inline unsigned int
+read_rel_id(unsigned char **dpp)
+{
+  unsigned char *dp = *dpp;
+  unsigned int x = *dp;
+  if ((*dp++ & 0x80) != 0)
+    {
+      x = ((x ^ 0x80) << 7) ^ *dp;
+      if ((*dp++ & 0x80) != 0)
+	{
+	  x = ((x ^ 0x80) << 7) ^ *dp;
+	  if ((*dp++ & 0x80) != 0)
+	    {
+	      x = ((x ^ 0x80) << 7) ^ *dp;
+	      if ((*dp++ & 0x80) != 0)
+		{
+		  if ((*dp & 0x80) != 0 || x >= 0x2000000)
+		    x = 0xffffffff;
+		  else
+		    x = ((x ^ 0x80) << 7) ^ *dp;
+		  dp++;
+		}
+	    }
+	}
+    }
+  *dpp = dp;
+  return x;
+}
+
+/* Integrate relations from a memory block starting at blk with len *blklenp.
+ * Return the number of integrated relations, with *blklenp adaped to the
+ * unprocessed bytes
+ * Returns -1 if an id in a relation was out of bounds. */
+int
+repo_integrate_rels_block(Repo *repo, unsigned char *blk, int *blklenp, int numid, int numrel, Id *idmap)
 {
   Pool *pool = repo->pool;
-  Reldep *ran;
+  Reldep *ran = pool->rels;
   Id id;
   int i, j;
   Hashval hashmask, h, hh;
   Hashtable hashtbl;
+  unsigned char *blkend = blk + *blklenp;
 
-  /* extend rels */
-  pool->rels = solv_realloc2(pool->rels, pool->nrels + numrel, sizeof(Reldep));
-  ran = pool->rels;
-
-  pool_resize_rels_hash(pool, numrel);
   hashtbl = pool->relhashtbl;
   hashmask = pool->relhashmask;
-#if 0
-  POOL_DEBUG(SOLV_DEBUG_STATS, "read %d rels\n", numrel);
-  POOL_DEBUG(SOLV_DEBUG_STATS, "rel hash buckets: %u\n", hashmask + 1);
-#endif
 
   /*
    * read RelDeps from repo
@@ -565,9 +590,18 @@ repo_read_and_integrate_rels(Repo *repo, Repodata *data, int numid, int numrel, 
       int chunk = numrel - i > INTEGRATE_RELS_CHUNK ? INTEGRATE_RELS_CHUNK : numrel - i;
       for (j = 0; j < chunk; j++)
 	{
-	  rd[j].name = read_id(data, numid + i + j);
-	  rd[j].evr = read_id(data, numid + i + j);
-	  rd[j].flags = read_u8(data);
+	  unsigned char *oldblk = blk;
+	  rd[j].name = read_rel_id(&blk);
+	  rd[j].evr = read_rel_id(&blk);
+	  rd[j].flags = *blk++;
+	  if (blk > blkend)
+	    {
+	      *blklenp = blkend - oldblk;
+	      chunk = j;
+	      break;
+	    }
+	  if (rd[j].name >= numid + i + j || rd[j].evr >= numid + i + j)
+	    return -1;
 	  solv_prefetch(idmap + rd[j].name);
 	  solv_prefetch(idmap + rd[j].evr);
 	}
@@ -616,6 +650,57 @@ repo_read_and_integrate_rels(Repo *repo, Repodata *data, int numid, int numrel, 
 	  idmap[numid + i + j] = MAKERELDEP(id);   /* fill Id map */
 	}
       i += chunk;
+      if (blk > blkend)		/* ran into end of buffer */
+	return i;
+    }
+  *blklenp = blkend - blk;
+  return numrel;
+}
+
+static void
+repo_read_and_integrate_rels(Repo *repo, Repodata *data, int numid, int numrel, Id *idmap)
+{
+  Pool *pool = repo->pool;
+  int i;
+  int left = 0;
+  unsigned char blk[8192 + 3 * 5];
+
+  /* extend rels */
+  pool->rels = solv_realloc2(pool->rels, pool->nrels + numrel, sizeof(Reldep));
+
+  pool_resize_rels_hash(pool, numrel);
+#if 0
+  POOL_DEBUG(SOLV_DEBUG_STATS, "read %d rels\n", numrel);
+  POOL_DEBUG(SOLV_DEBUG_STATS, "rel hash buckets: %u\n", hashmask + 1);
+#endif
+
+  /*
+   * read RelDeps from repo
+   */
+  memset(blk, 0, sizeof(blk));	/* make valgrind happy */
+  for (i = 0; i < numrel;)
+    {
+      int done, toread = (numrel - i > 8192 ? 8192 : numrel - i) * 3 - left;
+      if (toread < 1)
+	toread = 1;
+      if (toread > 8192 - left)
+	toread = 8192 - left;
+      if (fread(blk + left, toread, 1, data->fp) != 1)
+	{
+	  data->error = pool_error(repo->pool, SOLV_ERROR_EOF, "unexpected EOF");
+	  return;
+	}
+      left += toread;
+      toread = left;
+      done = repo_integrate_rels_block(repo, blk, &left, numid + i, numrel - i, idmap);
+      if (done < 0)
+	{
+	  data->error = pool_error(repo->pool, SOLV_ERROR_CORRUPT, "read_rel_id: id too large");
+	  return;
+	}
+      i += done;
+      if (left && toread != left)
+	memmove(blk, blk + toread - left, left);
     }
   if ((unsigned int)pool->nrels >= (unsigned int)SOLV_MAX_INDEX)
     solv_ovfl("relation count overflow");
