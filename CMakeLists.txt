@@ -37,6 +37,7 @@ OPTION (MULTI_SEMANTICS "Build with support for multiple distribution types?" OF
 
 OPTION (ENABLE_LZMA_COMPRESSION "Build with lzma/xz compression support?" OFF)
 OPTION (ENABLE_BZIP2_COMPRESSION "Build with bzip2 compression support?" OFF)
+OPTION (ENABLE_ZLIB_COMPRESSION "Build with zlib compression support?" ON)
 OPTION (ENABLE_ZSTD_COMPRESSION "Build with zstd compression support?" OFF)
 OPTION (ENABLE_ZCHUNK_COMPRESSION "Build with zchunk compression support?" OFF)
 OPTION (WITH_SYSTEM_ZCHUNK "Use system zchunk library?" OFF)
@@ -145,7 +146,6 @@ IF (${have_system} STRGREATER xx)
     MESSAGE (FATAL_ERROR "Can only compile for one system type.")
 ENDIF (${have_system} STRGREATER xx)
 
-SET (ENABLE_ZLIB_COMPRESSION ON)
 IF (ENABLE_ARCHREPO OR ENABLE_DEBIAN)
 SET (ENABLE_LZMA_COMPRESSION ON)
 ENDIF (ENABLE_ARCHREPO OR ENABLE_DEBIAN)
