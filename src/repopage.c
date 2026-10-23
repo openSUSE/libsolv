@@ -757,6 +757,8 @@ repopagestore_load_page_range(Repopagestore *store, unsigned int pstart, unsigne
 	  unsigned int in_len = p->page_size;
 	  unsigned int compressed = in_len & 1;
 	  in_len >>= 1;
+	  if (in_len > REPOPAGE_BLOBSIZE)
+	    return 0;
 #ifdef DEBUG_PAGING
 	  fprintf(stderr, "PAGEIN: %d to %d", pnum, i);
 #endif
@@ -913,6 +915,8 @@ repopagestore_read_or_setup_pages(Repopagestore *store, FILE *fp, unsigned int p
       unsigned int in_len = read_u32(fp);
       unsigned int compressed = in_len & 1;
       in_len >>= 1;
+      if (in_len > REPOPAGE_BLOBSIZE)
+	return SOLV_ERROR_CORRUPT;
 #ifdef DEBUG_PAGING
       fprintf(stderr, "page %d: len %d (%scompressed)\n",
       	       i, in_len, compressed ? "" : "not ");
