@@ -173,7 +173,7 @@ write_compressed_blob(PageCompressor *comp, Repodata *data, void *blob, int len)
     {
       int chunk = len > sizeof(cpage) ? sizeof(cpage) : len;
       int flag = (chunk == len ? 0x80 : 0x00);
-      int clen = repopagestore_compress_page(blob, chunk, cpage, sizeof(cpage) - 1);
+      int clen = pagecompressor_compress(comp, blob, chunk, cpage, sizeof(cpage) - 1);
       if (!clen)
 	{
 	  write_u8(data, flag);
@@ -1012,7 +1012,7 @@ write_compressed_page(PageCompressor *comp, Repodata *data, unsigned char *page,
   int clen;
   unsigned char cpage[REPOPAGE_BLOBSIZE];
 
-  clen = repopagestore_compress_page(page, len, cpage, len - 1);
+  clen = pagecompressor_compress(comp, page, len, cpage, len - 1);
   if (!clen)
     {
       write_u32(data, len * 2);
