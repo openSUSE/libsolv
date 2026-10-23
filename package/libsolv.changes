@@ -1,10 +1,25 @@
 -------------------------------------------------------------------
+Fri Oct 23 16:00:09 CEST 2026 - Michael Schroeder <mls@suse.de>
+
+- improved speed of repo_add_solv, should now be more that 20%
+  faster in many cases
+- repo_add_solv hardening to catch corrupt solv files earlier
+- hardened apkv3 code [bsc#1284786] [bsc#1284995]
+  [CVE-2026-104622] [CVE-2026-104624]
+- fixed repo_conda xml parsing [bsc#1284786] [CVE-2026-104621]
+- support pre-sizing of id hashes (pool_presize_idhashes,
+  pool_get_idcounts solv_read_idcounts)
+- new POOL_FLAG_NOWHATPROVIDESSHRINK pool flag to disable
+  shrinking if speed matters more then memory usage
+- bump version to 0.7.41
+
+-------------------------------------------------------------------
 Mon Sep 21 17:07:29 CEST 2026 - Michael Schroeder <mls@suse.de>
 
 - improve SUSE product link dependency generation if there are
   multiple release packages for the same product [bsc#1279541]
 - fix possible segfault in the SUSE namespace dependency generation
-- bump version to 0.7.39
+- bump version to 0.7.40
 
 -------------------------------------------------------------------
 Thu May 28 11:28:50 CEST 2026 - Michael Schroeder <mls@suse.de>

@@ -1,6 +1,19 @@
 
 This file contains the major changes between libsolv versions:
 
+Version 0.7.41
+- selected bug fixes:
+  * improved speed of repo_add_solv, should now be more that 20%
+    faster in many cases
+  * repo_add_solv hardening to catch corrupt solv files earlier
+  * hardened apkv3 code (CVE-2026-104622, CVE-2026-104624)
+  * fixed repo_conda xml parsing (CVE-2026-104621)
+- new features:
+  * support pre-sizing of id hashes (pool_presize_idhashes,
+    pool_get_idcounts solv_read_idcounts)
+  * new POOL_FLAG_NOWHATPROVIDESSHRINK pool flag to disable
+    shrinking if speed matters more then memory usage
+
 Version 0.7.40
 - selected bug fixes:
   * improve SUSE product link dependency generation if there are
