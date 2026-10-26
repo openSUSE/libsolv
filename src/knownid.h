@@ -274,6 +274,7 @@ KNOWNID(UPDATE_COLLECTIONLIST,		"update:collectionlist"),	/* list of UPDATE_COLL
 KNOWNID(SOLVABLE_MULTIARCH,		"solvable:multiarch"),		/* debian multi-arch field */
 KNOWNID(SOLVABLE_SIGNATUREDATA,		"solvable:signaturedata"),	/* conda */
 KNOWNID(SOLVABLE_ORDERWITHREQUIRES,	"solvable:orderwithrequires"),	/* rpm */
+KNOWNID(SOLVABLE_FILETIME,		"solvable:filetime"),		/* file publish time from rpm-md <time file="..."> */
 
 KNOWNID(ID_NUM_INTERNAL,		0)
 
