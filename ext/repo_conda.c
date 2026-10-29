@@ -410,8 +410,7 @@ parse_info(struct parsedata *pd, struct solv_jsonparser *jp)
 	    pd->subdir = strdup(jp->value);
 	  else if (strcmp(pd->subdir, jp->value))
 	    {
-	      pd->error = "subdir mismatch";
-	      return JP_ERROR;
+	      printf("warning: subdir mismatch\n");
 	    }
 	}
       else
