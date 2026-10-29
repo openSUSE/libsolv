@@ -1018,19 +1018,40 @@ Id best_matching(Pool* pool, Queue* q, Id name, int* all_have_trackfeatures)
   }
 
   if (selection.count == 0)
-    return 0;
+    {
+      queue_free(&selection);
+      return 0;
+    }
 
   Solvable *stmp, *best = pool_id2solvable(pool, selection.elements[0]);
   int cmp;
 
+  /* Only consider providers from the highest-priority repo. Providers from
+   * lower-priority repos are removed by solver_prune_to_highest_prio before
+   * they could be chosen, so they must not cancel the track_features penalty.
+   * https://github.com/conda/conda-libmamba-solver/issues/1042 */
+  int maxprio = 0, havemaxprio = 0;
+  for (int i = 0; i < selection.count; ++i)
+    {
+      stmp = pool_id2solvable(pool, selection.elements[i]);
+      if (stmp->repo && (!havemaxprio || stmp->repo->priority > maxprio))
+        {
+          maxprio = stmp->repo->priority;
+          havemaxprio = 1;
+        }
+    }
   *all_have_trackfeatures = 1;
   for (int i = 0; i < selection.count; ++i)
-    if (solvable_lookup_count(pool_id2solvable(pool, selection.elements[i]),
-                              SOLVABLE_TRACK_FEATURES) == 0)
-      {
-        *all_have_trackfeatures = 0;
-        break;
-      }
+    {
+      stmp = pool_id2solvable(pool, selection.elements[i]);
+      if (havemaxprio && stmp->repo && stmp->repo->priority != maxprio)
+        continue;
+      if (solvable_lookup_count(stmp, SOLVABLE_TRACK_FEATURES) == 0)
+        {
+          *all_have_trackfeatures = 0;
+          break;
+        }
+    }
   
   for (int i = 0; i < selection.count; ++i)
   {
@@ -1039,6 +1060,7 @@ Id best_matching(Pool* pool, Queue* q, Id name, int* all_have_trackfeatures)
     if (cmp < 0) best = stmp;
   }
 
+  queue_free(&selection);
   return best->evr;
 }
 
@@ -1126,7 +1148,19 @@ sort_by_best_dependencies(const void *ap, const void *bp, void *dp)
     unsigned long long bta = repodata_lookup_num(ra, a, SOLVABLE_BUILDTIME, 0ull);
     unsigned long long btb = repodata_lookup_num(rb, b, SOLVABLE_BUILDTIME, 0ull);
 
-    res = (btb > bta) ? 1 : -1;
+    res = (btb > bta) ? 1 : (btb < bta) ? -1 : 0;
+    /* Equal timestamps (common after ms -> s truncation): fall back to a
+     * deterministic order instead of an unstable -1, so the result does not
+     * depend on solv_sort's input order, i.e. on how the index was composed.
+     * https://github.com/conda/conda-libmamba-solver/issues/1042 */
+    if (res == 0)
+      {
+        const char *fa = solvable_lookup_str(sa, SOLVABLE_BUILDFLAVOR);
+        const char *fb = solvable_lookup_str(sb, SOLVABLE_BUILDFLAVOR);
+        res = strcmp(fa ? fa : "", fb ? fb : "");
+      }
+    if (res == 0)
+      res = a < b ? -1 : a > b ? 1 : 0;
     POOL_DEBUG(SOLV_DEBUG_POLICY, "Fallback to timestamp comparison: %llu vs %llu: [%d]\n", bta, btb, res);
   }
 
