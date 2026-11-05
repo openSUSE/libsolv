@@ -36,6 +36,7 @@ struct parsedata {
   int flags;
 
   char *subdir;
+  char *base_url;
   char *error;
 
   Stringpool fnpool;
@@ -414,6 +415,11 @@ parse_info(struct parsedata *pd, struct solv_jsonparser *jp)
 	      return JP_ERROR;
 	    }
 	}
+      else if (type == JP_STRING && !strcmp(jp->key, "base_url"))
+	{
+	  if (!pd->base_url && *jp->value)
+	    pd->base_url = solv_strdup(jp->value);
+	}
       else
 	type = jsonparser_skip(jp, type);
     }
@@ -469,6 +475,7 @@ repo_add_conda(Repo *repo, FILE *fp, int flags)
   struct solv_jsonparser jp;
   struct parsedata pd;
   Repodata *data;
+  Id firstp = pool->nsolvables;
   int type, ret = 0;
 
   data = repo_add_repodata(repo, flags);
@@ -521,6 +528,20 @@ repo_add_conda(Repo *repo, FILE *fp, int flags)
       solv_free(pd.xdata);
     }
 
+  /* packages are located directly below the base_url (CEP 15). We do
+   * this here as the info block may come after the packages. */
+  if (pd.base_url)
+    {
+      Id p;
+      for (p = firstp; p < repo->end; p++)
+	{
+	  if (pool->solvables[p].repo != repo)
+	    continue;
+	  repodata_unset_uninternalized(data, p, SOLVABLE_MEDIADIR);
+	  repodata_set_poolstr(data, p, SOLVABLE_MEDIABASE, pd.base_url);
+	}
+    }
+
   if (pd.sigdata)
     freesigdata(&pd);
   stringpool_free(&pd.sigpool);
@@ -528,6 +549,7 @@ repo_add_conda(Repo *repo, FILE *fp, int flags)
   queue_free(&pd.fndata);
   stringpool_free(&pd.fnpool);
   solv_free(pd.subdir);
+  solv_free(pd.base_url);
   if (!(flags & REPO_NO_INTERNALIZE))
     repodata_internalize(data);
 
