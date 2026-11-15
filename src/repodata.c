@@ -1392,6 +1392,17 @@ solvabledata_fetch(Solvable *s, KeyValue *kv, Id keyname)
     }
 }
 
+/* matchdata of a SEARCH_FILES|SEARCH_GLOB matcher. The directory map lives here and not in the
+ * repodata, so that searching never writes to the repodata. */
+struct globmatchdata {
+  const char *basename;		/* literal tail of the glob, used by datamatcher_checkbasename */
+  int prefixlen;		/* length of the literal head of the glob (before the first special char) */
+  Repodata *data;		/* repodata the dirmatch map was built for */
+  Id *dirs;			/* its dirpool.dirs when the map was built */
+  unsigned char *dirmatch;	/* per dir id: 0 unknown, 1 may match, 2 cannot match */
+  Id ndirmatch;
+};
+
 int
 datamatcher_init(Datamatcher *ma, const char *match, int flags)
 {
@@ -1420,11 +1431,17 @@ datamatcher_init(Datamatcher *ma, const char *match, int flags)
 	}
       else if ((flags & SEARCH_STRINGMASK) == SEARCH_GLOB)
 	{
+	  struct globmatchdata *gd = solv_calloc(1, sizeof(*gd));
 	  const char *p;
 	  for (p = match + strlen(match) - 1; p >= match; p--)
 	    if (*p == '[' || *p == ']' || *p == '*' || *p == '?' || *p == '/')
 	      break;
-	  ma->matchdata = (void *)(p + 1);
+	  gd->basename = p + 1;
+	  for (p = match; *p; p++)
+	    if (*p == '*' || *p == '?' || *p == '[' || *p == '\\')
+	      break;
+	  gd->prefixlen = p - match;
+	  ma->matchdata = gd;
 	}
     }
   return ma->error;
@@ -1439,6 +1456,12 @@ datamatcher_free(Datamatcher *ma)
     {
       regfree(ma->matchdata);
       solv_free(ma->matchdata);
+    }
+  else if ((ma->flags & SEARCH_FILES) != 0 && (ma->flags & SEARCH_STRINGMASK) == SEARCH_GLOB && ma->matchdata)
+    {
+      struct globmatchdata *gd = ma->matchdata;
+      solv_free(gd->dirmatch);
+      solv_free(gd);
     }
   ma->matchdata = 0;
 }
@@ -1481,6 +1504,71 @@ datamatcher_match(Datamatcher *ma, const char *str)
     }
 }
 
+/* Check if a file in directory "did" can possibly match a SEARCH_FILES|SEARCH_GLOB matcher, looking
+ * only at the literal head of the glob and the directory. This lets us skip all files of a directory
+ * that cannot match without building their paths. The answer is remembered per directory in the
+ * matcher, so every directory is only looked at once. */
+#define DIRPREFIX_MAXDEPTH 32
+
+static int
+datamatcher_checkdirprefix(Datamatcher *ma, Repodata *data, Id did)
+{
+  struct globmatchdata *gd = ma->matchdata;
+  const char *prefix = ma->match;
+  const char *comps[DIRPREFIX_MAXDEPTH];
+  Stringpool *ss;
+  int depth = 0, n, pos = 0, i;
+  Id parent;
+
+  if (!gd || !gd->prefixlen || !did || (ma->flags & SEARCH_NOCASE) != 0)
+    return 1;
+  n = gd->prefixlen;
+  if (gd->data != data || gd->dirs != data->dirpool.dirs)
+    {
+      /* new repodata (or its dirpool was reallocated): forget the old answers */
+      gd->data = data;
+      gd->dirs = data->dirpool.dirs;
+      if (gd->dirmatch)
+	memset(gd->dirmatch, 0, gd->ndirmatch);
+    }
+  if (did >= gd->ndirmatch)
+    {
+      Id nn = data->dirpool.ndirs > did ? data->dirpool.ndirs : did + 1;
+      gd->dirmatch = solv_realloc2(gd->dirmatch, nn, 1);
+      memset(gd->dirmatch + gd->ndirmatch, 0, nn - gd->ndirmatch);
+      gd->ndirmatch = nn;
+    }
+  if (gd->dirmatch[did])
+    return gd->dirmatch[did] == 1;
+
+  ss = data->localpool ? &data->spool : &data->repo->pool->ss;
+  for (parent = did; parent; parent = dirpool_parent(&data->dirpool, parent))
+    {
+      if (depth == DIRPREFIX_MAXDEPTH)
+	return 1;
+      comps[depth++] = stringpool_id2str(ss, dirpool_compid(&data->dirpool, parent));
+    }
+  /* the full path is comps[depth - 1] "/" ... "/" comps[0] "/" basename */
+  gd->dirmatch[did] = 1;
+  for (i = depth - 1; i >= 0; i--)
+    {
+      int l = strlen(comps[i]);
+      int k = n - pos < l ? n - pos : l;
+      if (memcmp(comps[i], prefix + pos, k) != 0)
+	break;
+      pos += k;
+      if (pos >= n)
+	return 1;
+      if (prefix[pos] != '/')
+	break;
+      if (++pos >= n)
+	return 1;
+    }
+  if (i >= 0)
+    gd->dirmatch[did] = 2;
+  return gd->dirmatch[did] == 1;
+}
+
 /* check if the matcher can match the provides basename */
 
 int
@@ -1490,6 +1578,8 @@ datamatcher_checkbasename(Datamatcher *ma, const char *basename)
   const char *match = ma->matchdata;
   if (!match)
     return 1;
+  if ((ma->flags & SEARCH_STRINGMASK) == SEARCH_GLOB)
+    match = ((struct globmatchdata *)ma->matchdata)->basename;
   switch (ma->flags & SEARCH_STRINGMASK)
     {
     case SEARCH_STRING:
@@ -1977,6 +2067,9 @@ dataiterator_step(Dataiterator *di)
 	  /* simple pre-check so that we don't need to stringify */
 	  if (di->keyname == SOLVABLE_FILELIST && di->key->type == REPOKEY_TYPE_DIRSTRARRAY && (di->matcher.flags & SEARCH_FILES) != 0)
 	    if (!datamatcher_checkbasename(&di->matcher, di->kv.str))
+	      continue;
+	  if (di->keyname == SOLVABLE_FILELIST && di->key->type == REPOKEY_TYPE_DIRSTRARRAY && (di->matcher.flags & SEARCH_FILES) != 0 && (di->matcher.flags & SEARCH_STRINGMASK) == SEARCH_GLOB)
+	    if (!datamatcher_checkdirprefix(&di->matcher, di->data, di->kv.id))
 	      continue;
 	  /* now stringify so that we can do the matching */
 	  if (!(str = repodata_stringify(di->pool, di->data, di->key, &di->kv, di->flags)))
