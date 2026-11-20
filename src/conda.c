@@ -65,13 +65,15 @@ endpart(const char *seg, const char *end)
 
 /* C implementation of the version comparison code in conda/models/version.py */
 /* startswith == 1 : check if s1 starts with s2 */
+/* keeptrailing == 1 : a trailing '_' or '-' is part of the last component */
 static int
-solv_vercmp_conda(const char *s1, const char *q1, const char *s2, const char *q2, int startswith)
+solv_vercmp_conda(const char *s1, const char *q1, const char *s2, const char *q2, int startswith, int keeptrailing)
 {
   const char *s1p, *s2p;
   const char *s1e, *s2e;
   int r, isfirst;
   const char *q2end = 0;
+  const char *t1 = 0, *t2 = 0;
 
   if (startswith)
     {
@@ -79,11 +81,16 @@ solv_vercmp_conda(const char *s1, const char *q1, const char *s2, const char *q2
 	if (q2end[-1] != '.' && q2end[-1] != '-' && q2end[-1] != '_')
 	  break;
     }
+  /* openssl-like versions: 1.0.1dev < 1.0.1_ < 1.0.1a < 1.0.1 */
+  if (keeptrailing && q1 > s1 && (q1[-1] == '_' || q1[-1] == '-'))
+    t1 = q1 - 1;
+  if (keeptrailing && !startswith && q2 > s2 && (q2[-1] == '_' || q2[-1] == '-'))
+    t2 = q2 - 1;
   for (;;)
     {
-      while (s1 < q1 && (*s1 == '.' || *s1 == '-' || *s1 == '_'))
+      while (s1 < q1 && s1 != t1 && (*s1 == '.' || *s1 == '-' || *s1 == '_'))
 	s1++;
-      while (s2 < q2 && (*s2 == '.' || *s2 == '-' || *s2 == '_'))
+      while (s2 < q2 && s2 != t2 && (*s2 == '.' || *s2 == '-' || *s2 == '_'))
 	s2++;
       if (s1 == q1 && s2 == q2)
 	return 0;
@@ -91,7 +98,11 @@ solv_vercmp_conda(const char *s1, const char *q1, const char *s2, const char *q2
 	return 0;
       /* find end of component */
       s1e = endseg(s1, q1);
+      if (s1e == t1)
+	s1e = q1;
       s2e = endseg(s2, q2);
+      if (s2e == t2)
+	s2e = q2;
       
       for (isfirst = 1; ; isfirst = 0)
 	{
@@ -159,6 +170,8 @@ solv_vercmp_conda(const char *s1, const char *q1, const char *s2, const char *q2
 		return 1;
 	      /* compare strings */
 	      r = s2p - s2 > s1p - s1 ? s1p - s1 : s2p - s2;
+	      if (r && t1 && t2 && s1p == q1 && s2p == q2 && s1p - s1 == s2p - s2)
+		r--;		/* a trailing '-' is the same as '_' */
 	      if (r)
 	        r = strncasecmp(s1, s2, r);
 	      if (r)
@@ -194,7 +207,7 @@ pool_evrcmp_conda_int(const char *evr1, const char *evr1e, const char *evr2, con
   if (s1 || s2)
     {
       r = solv_vercmp_conda(s1 ? evr1 : zero, s1 ? s1 : zero + 1, 
-                            s2 ? evr2 : zero, s2 ? s2 : zero + 1, 0);
+                            s2 ? evr2 : zero, s2 ? s2 : zero + 1, 0, 0);
       if (r)
 	return r;
       if (s1)
@@ -209,7 +222,7 @@ pool_evrcmp_conda_int(const char *evr1, const char *evr1e, const char *evr2, con
   for (s2 = evr2, r2 = 0; s2 < evr2e; s2++)
     if (*s2 == '+')
       r2 = s2;
-  r = solv_vercmp_conda(evr1, r1 ? r1 : s1, evr2, r2 ? r2 : s2, r2 ? 0 : startswith);
+  r = solv_vercmp_conda(evr1, r1 ? r1 : s1, evr2, r2 ? r2 : s2, r2 ? 0 : startswith, 1);
   if (r)
     return r;
   if ((!r2 && startswith) || (!r1 && !r2))
@@ -218,7 +231,7 @@ pool_evrcmp_conda_int(const char *evr1, const char *evr1e, const char *evr2, con
     return -1;
   if (r1 && !r2)
     return 1;
-  return solv_vercmp_conda(r1 + 1, s1, r2 + 1, s2, startswith);
+  return solv_vercmp_conda(r1 + 1, s1, r2 + 1, s2, startswith, 0);
 }
 
 int
